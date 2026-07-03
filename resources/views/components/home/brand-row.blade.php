@@ -90,10 +90,16 @@
         nudge(dir) {
             const t = this.$refs.track;
             if (! t) { return; }
-            const first   = t.querySelector('.carousel-list > *');
-            const perStep = window.innerWidth >= 640 ? 2 : 1;
-            const gap     = window.innerWidth >= 640 ? 20 : 16;
-            const step    = first ? (first.getBoundingClientRect().width + gap) * perStep : t.clientWidth * 0.8;
+            const first = t.querySelector('.carousel-list > *');
+            const gap   = window.innerWidth >= 640 ? 20 : 16;
+            // Jump a full page of cards (however many fit in the visible track),
+            // keeping one card of overlap for context. A fixed 2-card step meant
+            // long rows took many arrow clicks to cross; a page-sized nudge reaches
+            // the end in a couple.
+            const cardW = first ? first.getBoundingClientRect().width + gap : 0;
+            const step  = cardW > 0
+                ? cardW * Math.max(1, Math.floor(t.clientWidth / cardW) - 1)
+                : t.clientWidth * 0.9;
             t.scrollBy({ left: dir * step, behavior: 'smooth' });
         },
     }"
