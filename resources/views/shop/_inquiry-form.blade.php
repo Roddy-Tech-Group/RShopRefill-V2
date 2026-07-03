@@ -10,10 +10,10 @@
        $postRoute   : route name for POST
        $categories  : array<string> of options for the category select
 --}}
-<x-layouts.app.header :title="$title.' | RshopRefills'">
+<x-layouts.app.header :title="$title.' | '.$siteName">
 
     @php
-        $field = 'w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
+        $field = 'w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
     @endphp
 
     {{-- Hero --}}
@@ -45,12 +45,12 @@
                 <div class="rounded-[24px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
                     @if (session('contact_sent'))
                         <div class="flex flex-col items-center py-10 text-center">
-                            <span class="flex h-14 w-14 items-center justify-center rounded-[10px] bg-emerald-100">
+                            <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-emerald-100">
                                 <svg class="h-7 w-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                             </span>
                             <h2 class="mt-4 text-xl font-bold text-zinc-900">Inquiry received</h2>
                             <p class="mt-1.5 max-w-sm text-sm leading-relaxed text-zinc-600">Thanks for reaching out. Our team will review your inquiry and get back to you shortly.</p>
-                            <a href="{{ url()->current() }}" wire:navigate class="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Submit another</a>
+                            <a href="{{ url()->current() }}" wire:navigate class="mt-6 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Submit another</a>
                         </div>
                     @else
                         <div class="mb-6">
@@ -118,7 +118,7 @@
                             <x-turnstile-widget action="inquiry" context="contact" />
 
                             <div class="flex items-center gap-3 pt-1">
-                                <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700">
+                                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700">
                                     Submit inquiry
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
                                 </button>

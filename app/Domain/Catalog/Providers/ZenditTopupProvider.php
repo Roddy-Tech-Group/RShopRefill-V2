@@ -35,8 +35,12 @@ class ZenditTopupProvider implements ProviderInterface
         // Zendit mobile top-ups live at /topups/offers (NOT /catalog/offers with a type
         // filter), paginated by _offset / _limit like vouchers and eSIMs.
         // Reference: https://developers.zendit.io/api -> GET /v1/topups/offers
+        // Retry transient failures (timeouts, 429s, 5xx) at the source so a single
+        // blip on one page doesn't break the catalog pass. throw:false lets the
+        // failed-response handler below own the final error after retries.
         $response = Http::withToken($this->apiKey)
             ->acceptJson()
+            ->retry(3, 2000, throw: false)
             ->get("{$this->baseUrl}/topups/offers", [
                 '_limit' => $limit,
                 '_offset' => max(0, ($page - 1) * $limit),

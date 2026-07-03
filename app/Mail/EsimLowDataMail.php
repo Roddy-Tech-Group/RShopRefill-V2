@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\OrderItem;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,10 +34,11 @@ class EsimLowDataMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
         $isExpiry = $this->eventType === 'EXPIRY_SOON' || isset($this->payload['days_remaining']);
         $subject = $isExpiry
-            ? '⏰ Your RshopRefills eSIM expires soon'
-            : '⚠️ Your RshopRefills eSIM is running low';
+            ? '⏰ Your '.$brand.' eSIM expires soon'
+            : '⚠️ Your '.$brand.' eSIM is running low';
 
         return new Envelope(subject: $subject);
     }

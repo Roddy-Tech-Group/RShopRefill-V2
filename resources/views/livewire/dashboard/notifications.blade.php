@@ -78,7 +78,7 @@ class extends Component {
     </div>
 
     @if ($notifications->isNotEmpty())
-        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[10px] border border-zinc-200 dark:border-zinc-700">
+        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 dark:border-zinc-700">
             @foreach ($notifications as $note)
                 <div
                     wire:key="note-{{ $note->id }}"
@@ -99,7 +99,7 @@ class extends Component {
                             <div class="flex items-center gap-2">
                                 <p class="truncate text-sm font-bold text-zinc-900">{{ $note->title }}</p>
                                 @unless ($note->read_at)
-                                    <span class="h-2 w-2 shrink-0 rounded-[10px] bg-blue-600" aria-label="Unread"></span>
+                                    <span class="h-2 w-2 shrink-0 rounded-[12px] bg-blue-600" aria-label="Unread"></span>
                                 @endunless
                             </div>
                             <p class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-600">{{ $note->message }}</p>
@@ -132,8 +132,8 @@ class extends Component {
         @endif
     @else
         {{-- Empty state --}}
-        <div class="rounded-[10px] bg-white px-6 py-16 text-center ring-1 ring-zinc-200">
-            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50">
+        <div class="rounded-[12px] bg-white px-6 py-16 text-center ring-1 ring-zinc-200">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50">
                 <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-7 w-7" style="filter: brightness(0) saturate(100%) invert(40%) sepia(95%) saturate(1500%) hue-rotate(205deg);" loading="lazy">
             </span>
             <p class="mt-4 text-base font-semibold text-zinc-900">You're all caught up</p>
@@ -174,7 +174,7 @@ class extends Component {
             x-transition:leave-end="translate-y-full"
             class="w-full max-w-lg rounded-t-[20px] bg-white p-5 pb-7 shadow-2xl shadow-zinc-900/20"
         >
-            <div class="mx-auto mb-4 h-1.5 w-10 rounded-[10px] bg-zinc-200"></div>
+            <div class="mx-auto mb-4 h-1.5 w-10 rounded-[12px] bg-zinc-200"></div>
 
             <div class="flex items-start gap-2">
                 <h2 class="flex-1 text-base font-bold text-zinc-900" x-text="note.title"></h2>
@@ -190,14 +190,14 @@ class extends Component {
                     type="button"
                     x-show="! note.read"
                     @click="$wire.markRead(note.id); note.read = true"
-                    class="flex-1 rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                    class="flex-1 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                     Mark as read
                 </button>
                 <button
                     type="button"
                     @click="$wire.deleteNotification(note.id); close()"
-                    class="rounded-[10px] px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-50"
+                    class="rounded-[12px] px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-50"
                     :class="note.read ? 'flex-1' : ''"
                 >
                     Delete

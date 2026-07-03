@@ -58,9 +58,14 @@
         }))
         ->when($country !== '', fn ($q) => $q->where('country_code', $country))
         ->when($currency !== '', fn ($q) => $q->where('currency_code', $currency))
-        // Precise subcategory filter: match products that have at least one
-        // VARIANT in this subcategory, not just the product's representative one.
-        ->when($sub !== '', fn ($q) => $q->whereHas('variants', fn ($qq) => $qq->whereHas('subcategory', fn ($qqq) => $qqq->where('slug', $sub))));
+        // Offer-type filter (virtual - reads each variant's Zendit subType from JSON):
+        //   'bundles' -> only networks that carry data/bundle plans
+        //   'credit' / '' -> every network (all carry credit)
+        ->when($sub === 'bundles', fn ($q) => $q->whereHas('variants', fn ($qq) => $qq
+            ->where('is_available', true)
+            ->where(fn ($w) => $w
+                ->whereRaw("JSON_EXTRACT(metadata, '\$.subTypes[0]') LIKE '%Data%'")
+                ->orWhereRaw("JSON_EXTRACT(metadata, '\$.subTypes[0]') LIKE '%Bundle%'"))));
 
     // One representative Product id per brand_key. Prefer the US variant (matches the
     // detail page default); fall back to the lowest id when a brand has no US product.
@@ -85,9 +90,27 @@
     // The listing shows every matching operator on one page — no pagination.
     $products = $productsQuery->get();
 
-    $subcategories = $topupCategory
-        ? Subcategory::where('category_id', $topupCategory->id)->orderBy('name')->get(['name', 'slug'])
-        : collect();
+    // Per-operator Credit / Data / Bundle support for the tile badges. One light
+    // DISTINCT query reading just the offer subtype out of the JSON, rather than
+    // loading every variant's full metadata into memory across the whole listing.
+    $topupBadgesByProduct = \Illuminate\Support\Facades\DB::table('product_variants')
+        ->whereIn('product_id', $products->pluck('id'))
+        ->where('is_available', true)
+        ->selectRaw("product_id, JSON_EXTRACT(metadata, '\$.subTypes[0]') AS subtype")
+        ->distinct()
+        ->get()
+        ->groupBy('product_id')
+        ->map(fn ($rows) => $rows
+            ->map(fn ($r) => strtolower(trim((string) $r->subtype, '"')))
+            ->map(fn ($st) => str_contains($st, 'data') ? 'Data' : (str_contains($st, 'bundle') ? 'Bundle' : 'Credit'))
+            ->unique()
+            ->sortBy(fn ($t) => ['Credit' => 0, 'Data' => 1, 'Bundle' => 2][$t] ?? 9)
+            ->values());
+
+    // No type sub-filter on the listing: the per-network Credit/Data/Bundle badges
+    // already show what each operator offers, and the detail page has the switcher.
+    // So the listing is one flat "All networks" list.
+    $subcategories = collect();
 
     // Green tint for the trust-badge icons (instant delivery / refund policy).
     $greenTint = 'filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(394%) hue-rotate(105deg) brightness(92%) contrast(87%);';
@@ -137,20 +160,19 @@
         return $shopRoute('topups', $params);
     };
 
-    // Subcategory links for the shared sidebar — "All" first, then each subtype.
-    $sidebarSubItems = array_merge(
-        [['label' => 'All networks', 'url' => $filterUrl(['subcategory' => null]), 'active' => $sub === '']],
-        $subcategories->map(fn ($s) => [
-            'label' => $s->name,
-            'url' => $filterUrl(['subcategory' => $s->slug]),
-            'active' => $sub === $s->slug,
-        ])->all()
-    );
+    // Offer-type browse modes. "All networks" is untouched (every network). "Credit only"
+    // is every network scoped to credit. "Credit, Data & Calls" is only networks with
+    // data/bundle plans, and carries that scope to the detail page's opening tab.
+    $sidebarSubItems = [
+        ['label' => 'All networks', 'url' => $filterUrl(['subcategory' => null]), 'active' => $sub === ''],
+        ['label' => 'Credit only', 'url' => $filterUrl(['subcategory' => 'credit']), 'active' => $sub === 'credit'],
+        ['label' => 'Credit, Data & Calls', 'url' => $filterUrl(['subcategory' => 'bundles']), 'active' => $sub === 'bundles'],
+    ];
 @endphp
 
-<x-shop.layout :title="'Mobile Top-up | RshopRefills'">
+<x-shop.layout :title="'Mobile Top-up | '.$siteName">
 
-    <section class="min-h-full bg-zinc-100">
+    <section class="min-h-full rounded-[15px] bg-[#eff6ff]">
         <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr] lg:gap-8">
@@ -182,7 +204,7 @@
                         </div>
 
                         {{-- Modern segmented sort selector. URL-driven so the choice survives reloads. --}}
-                        <div class="inline-flex shrink-0 items-center rounded-[10px] bg-zinc-100 p-1 sm:justify-self-end" role="tablist" aria-label="Sort networks">
+                        <div class="inline-flex shrink-0 items-center rounded-[12px] bg-zinc-200 p-1 sm:justify-self-end" role="tablist" aria-label="Sort networks">
                             @foreach ([
                                 ['value' => 'popular',   'label' => 'Popularity'],
                                 ['value' => 'name-asc',  'label' => 'A → Z'],
@@ -193,7 +215,7 @@
                                     wire:navigate
                                     role="tab"
                                     aria-selected="{{ $sort === $opt['value'] ? 'true' : 'false' }}"
-                                    class="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
+                                    class="inline-flex items-center justify-center rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
                                 >
                                     {{ $opt['label'] }}
                                 </a>
@@ -201,29 +223,20 @@
                         </div>
                     </div>
 
-                    {{-- Mobile/tablet subcategory pill row (sidebar hidden below lg) --}}
-                    @if ($subcategories->isNotEmpty())
-                        <div class="-mx-1 mb-6 hidden overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block lg:hidden">
-                            <div class="flex w-max items-center gap-2">
+                    {{-- Mobile/tablet filter pill row (sidebar hidden below lg) --}}
+                    <div class="-mx-1 mb-6 hidden overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block lg:hidden">
+                        <div class="flex w-max items-center gap-2">
+                            @foreach ($sidebarSubItems as $item)
                                 <a
-                                    href="{{ $filterUrl(['subcategory' => null]) }}"
+                                    href="{{ $item['url'] }}"
                                     wire:navigate
-                                    class="inline-flex shrink-0 items-center rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                    class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $item['active'] ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                 >
-                                    All networks
+                                    {{ $item['label'] }}
                                 </a>
-                                @foreach ($subcategories as $s)
-                                    <a
-                                        href="{{ $filterUrl(['subcategory' => $s->slug]) }}"
-                                        wire:navigate
-                                        class="inline-flex shrink-0 items-center rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
-                                    >
-                                        {{ $s->name }}
-                                    </a>
-                                @endforeach
-                            </div>
+                            @endforeach
                         </div>
-                    @endif
+                    </div>
 
                     {{-- Operator grid. Same card treatment as the gift-card listing. --}}
                     <div>
@@ -238,10 +251,11 @@
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                         $opName     = Product::brandDisplayName($product->brand_key);
                                         $tileColor  = Product::tileColor($product->brand_key);
+                                        $badges     = $topupBadgesByProduct[$product->id] ?? collect();
                                     @endphp
                                     <li>
                                         <a
-                                            href="{{ $shopRoute('topup', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}"
+                                            href="{{ $shopRoute('topup', array_filter(['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code, 'plan' => $sub === 'bundles' ? 'bundles' : ($sub === 'credit' ? 'credit' : null)], fn ($v) => $v !== null)) }}"
                                             wire:navigate
                                             class="card-3d-scene group block focus:outline-none"
                                             aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
@@ -282,6 +296,19 @@
                                                 @if ($priceLabel)
                                                     <p class="mt-0.5 truncate text-[14px] text-zinc-600">{{ $priceLabel }}</p>
                                                 @endif
+                                                @if ($badges->isNotEmpty())
+                                                    {{-- What this network offers: Credit / Data / Bundle. --}}
+                                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                                        @foreach ($badges as $badge)
+                                                            <span @class([
+                                                                'inline-flex items-center rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold',
+                                                                'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300' => $badge === 'Credit',
+                                                                'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' => $badge === 'Data',
+                                                                'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' => $badge === 'Bundle',
+                                                            ])>{{ $badge }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
                                             </div>
                                         </a>
                                     </li>
@@ -289,7 +316,7 @@
                             </ul>
 
                         @else
-                            <div class="rounded-[10px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
+                            <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
                                 <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
                                 @if ($search !== '' || $countryFiltered || $sub !== '')
                                     <p class="mt-4 text-base font-semibold text-zinc-900">No networks match these filters</p>

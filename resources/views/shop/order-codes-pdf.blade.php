@@ -17,7 +17,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>RshopRefills receipt {{ $order->order_number }}</title>
+    <title>{{ $siteName }} receipt {{ $order->order_number }}</title>
     <style>
         @page { margin: 32px 36px; }
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #0c1a2e; line-height: 1.4; }
@@ -40,7 +40,7 @@
 <body>
 
     <div class="header">
-        <div class="brand">RshopRefills</div>
+        <div class="brand">{{ $siteName }}</div>
         <div class="meta">
             Order receipt &middot; #{{ $order->order_number }} &middot; {{ $placedAt }}
         </div>
@@ -90,7 +90,7 @@
     </table>
 
     <div class="footer">
-        Keep this receipt safe - the codes above are equivalent to cash. RshopRefills cannot reissue redemption codes that have been viewed, shared, or used. For questions about a code, reply to your order email or visit your account dashboard.
+        Keep this receipt safe - the codes above are equivalent to cash. {{ $siteName }} cannot reissue redemption codes that have been viewed, shared, or used. For questions about a code, reply to your order email or visit your account dashboard.
     </div>
 
 </body>

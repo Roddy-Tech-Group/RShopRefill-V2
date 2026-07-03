@@ -34,7 +34,7 @@
             spellcheck="false"
             class="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder:text-zinc-500 outline-none dark:text-white"
         >
-        <button type="button" x-show="query.length > 0" @click="clear()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-zinc-200 transition-colors hover:bg-zinc-300 focus:outline-none dark:bg-white/10 dark:hover:bg-white/20" aria-label="Clear">
+        <button type="button" x-show="query.length > 0" @click="clear()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300 focus:outline-none dark:bg-white/10 dark:hover:bg-white/20" aria-label="Clear">
             <svg class="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
         </button>
     </form>
@@ -46,7 +46,7 @@
         x-transition:enter-start="opacity-0 -translate-y-1"
         x-transition:enter-end="opacity-100 translate-y-0"
         style="display:none;"
-        class="glass-panel absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[10px] shadow-2xl shadow-zinc-900/15"
+        class="glass-panel absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[12px] shadow-2xl shadow-zinc-900/15"
     >
         <div x-show="loading && results.length === 0" class="px-5 py-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
             <svg class="mx-auto h-5 w-5 animate-spin text-zinc-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>

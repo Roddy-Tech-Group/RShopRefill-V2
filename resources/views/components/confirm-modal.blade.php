@@ -53,13 +53,13 @@
         x-transition:leave="transition ease-in duration-100"
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
-        class="relative w-full max-w-md overflow-hidden rounded-[10px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]"
+        class="relative w-full max-w-md overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]"
     >
         <div class="px-5 py-4">
             <div class="flex items-start gap-3">
                 {{-- Tone-coloured icon. Reads `tone` off the Alpine component. --}}
                 <span
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
                     :class="{
                         'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300': tone === 'danger',
                         'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300': tone === 'warning',
@@ -89,14 +89,14 @@
             <button
                 type="button"
                 @click="cancel()"
-                class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]"
                 x-text="cancelText"
             ></button>
             <button
                 type="button"
                 @click="confirm()"
                 x-ref="confirmBtn"
-                class="inline-flex items-center rounded-[10px] px-4 py-2 text-xs font-semibold text-white transition-colors"
+                class="inline-flex items-center rounded-[12px] px-4 py-2 text-xs font-semibold text-white transition-colors"
                 :class="{
                     'bg-red-600 hover:bg-red-700': tone === 'danger',
                     'bg-amber-600 hover:bg-amber-700': tone === 'warning',

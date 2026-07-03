@@ -9,7 +9,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Refund and Cancellation Policy | RshopRefills'">
+<x-layouts.app.header :title="'Refund and Cancellation Policy | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -24,21 +24,21 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            This policy explains how refunds and cancellations work across every service on RshopRefills. We sell digital
+            This policy explains how refunds and cancellations work across every service on {{ $siteName }}. We sell digital
             products that are delivered instantly, so please read this page before you buy. By making a purchase you agree
             to the terms below. This policy is part of our Terms of Service.
         </p>
 
         {{-- Delivery: digital products ship free and arrive instantly. --}}
         <div class="mt-5 grid gap-3 sm:grid-cols-2">
-            <div class="flex items-start gap-3 rounded-[10px] bg-emerald-50 p-4 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
+            <div class="flex items-start gap-3 rounded-[12px] bg-emerald-50 p-4 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75l2.25 2.25 4.5-4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-emerald-700">Free delivery, always</p>
                     <p class="mt-1 text-sm leading-relaxed text-zinc-600">Every product is digital, so there are no shipping or delivery fees. The price you see is the price you pay.</p>
                 </div>
             </div>
-            <div class="flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Instant delivery</p>
@@ -48,7 +48,7 @@
         </div>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#wallet-first" class="font-medium text-blue-600 hover:underline">1. Global wallet-first refund policy</a></li>
@@ -62,12 +62,12 @@
         <section id="wallet-first" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">1. Global wallet-first refund policy</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                When a refund is approved, we issue it as store credit to your RshopRefills App Wallet. This is our default
+                When a refund is approved, we issue it as store credit to your {{ $siteName }} App Wallet. This is our default
                 method for every approved refund, on every service.
             </p>
 
             {{-- Info callout --}}
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 19.5h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Refunds are instant to your wallet</p>
@@ -84,7 +84,7 @@
             </p>
 
             {{-- Warning callout --}}
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Original-method reversals are not guaranteed</p>
@@ -101,7 +101,7 @@
             </p>
 
             {{-- Summary table --}}
-            <div class="mt-5 overflow-x-auto rounded-[10px] ring-1 ring-zinc-100">
+            <div class="mt-5 overflow-x-auto rounded-[12px] ring-1 ring-zinc-100">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -138,7 +138,7 @@
                 you or to the destination account immediately and cannot be recovered.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">No refunds, all sales are final</p>
@@ -153,7 +153,7 @@
                 device. Once the eSIM is installed or activated, it is considered used and is no longer refundable.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">No refunds after activation or data use</p>
@@ -162,7 +162,7 @@
             </div>
 
             {{-- Wrong-region purchase --}}
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a9.004 9.004 0 018.716 6.747M12 3a9.004 9.004 0 00-8.716 6.747M21.75 12H2.25"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Bought the wrong region?</p>
@@ -178,7 +178,7 @@
                 under their own rules.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">A flat processing fee applies</p>
@@ -194,7 +194,7 @@
                 which case that legal right applies.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Non-refundable once finalized</p>
@@ -208,12 +208,12 @@
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">3. Automated failed-transaction protection</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
                 We built protection directly into the platform so that a failed delivery never costs you money. You never lose
-                money on RshopRefills: every payment is either delivered or refunded to your wallet, and our support team is
+                money on {{ $siteName }}: every payment is either delivered or refunded to your wallet, and our support team is
                 available 24/7 if you ever need a human.
             </p>
 
-            <div class="mt-5 rounded-[10px] bg-blue-600 p-6 sm:p-8">
-                <span class="flex h-12 w-12 items-center justify-center rounded-[10px] bg-white/15">
+            <div class="mt-5 rounded-[12px] bg-blue-600 p-6 sm:p-8">
+                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-white/15">
                     <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </span>
                 <h3 class="mt-4 text-lg font-bold text-white sm:text-xl">Failed delivery? Automatic refund after a fast system check.</h3>
@@ -236,8 +236,8 @@
 
             <div class="mt-5 space-y-4">
                 {{-- Live chat --}}
-                <div class="flex items-start gap-4 rounded-[10px] bg-white p-5 ring-1 ring-zinc-100">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
+                <div class="flex items-start gap-4 rounded-[12px] bg-white p-5 ring-1 ring-zinc-100">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
                     </span>
                     <div>
@@ -247,8 +247,8 @@
                 </div>
 
                 {{-- WhatsApp --}}
-                <div class="flex items-start gap-4 rounded-[10px] bg-white p-5 ring-1 ring-zinc-100">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
+                <div class="flex items-start gap-4 rounded-[12px] bg-white p-5 ring-1 ring-zinc-100">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>
                     </span>
                     <div>
@@ -258,8 +258,8 @@
                 </div>
 
                 {{-- Email --}}
-                <div class="flex items-start gap-4 rounded-[10px] bg-white p-5 ring-1 ring-zinc-100">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
+                <div class="flex items-start gap-4 rounded-[12px] bg-white p-5 ring-1 ring-zinc-100">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                     </span>
                     <div>
@@ -270,7 +270,7 @@
             </div>
 
             {{-- Verification warning --}}
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">We cannot refund without verification</p>

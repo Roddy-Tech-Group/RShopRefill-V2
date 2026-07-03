@@ -358,7 +358,7 @@ new class extends Component {
         x-transition:leave="transition duration-250 ease-in"
         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
         x-transition:leave-end="opacity-0 translate-y-8 scale-[0.98]"
-        class="pointer-events-auto relative flex w-full max-w-md flex-col max-h-[92vh] overflow-hidden rounded-[10px] bg-[#0c1a36] text-white shadow-2xl shadow-zinc-900/50 sm:max-w-lg"
+        class="pointer-events-auto relative flex w-full max-w-md flex-col max-h-[92vh] overflow-hidden rounded-[12px] bg-[#0c1a36] text-white shadow-2xl shadow-zinc-900/50 sm:max-w-lg"
         role="dialog"
         aria-modal="true"
     >
@@ -370,13 +370,13 @@ new class extends Component {
                     x-show="mode === 'register'"
                     x-cloak
                     class="mt-1 text-xs leading-none text-white/65 sm:text-sm"
-                >Join RshopRefills and start spending instantly</p>
+                >Join {{ $siteName }} and start spending instantly</p>
             </div>
             <button
                 type="button"
                 @click="close()"
                 aria-label="Close"
-                class="flex h-9 w-9 items-center justify-center rounded-[10px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                class="flex h-9 w-9 items-center justify-center rounded-[12px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
             >
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
@@ -395,13 +395,13 @@ new class extends Component {
             {{-- ── LOGIN VIEW ───────────────────────────────────────────── --}}
             <div x-show="mode === 'login'" x-cloak>
                 <h3 class="text-xl font-bold tracking-tight text-white sm:text-2xl">Welcome back</h3>
-                <p class="mt-1.5 text-sm text-white/65">Sign in to your RshopRefills account</p>
+                <p class="mt-1.5 text-sm text-white/65">Sign in to your {{ $siteName }} account</p>
 
                 {{-- Google OAuth --}}
                 <a
                     href="{{ route('auth.google.redirect', ['popup' => 1]) }}"
                     @click.prevent="window.rshopOpenGoogleOAuth ? window.rshopOpenGoogleOAuth($el.href) : (window.location.href = $el.href)"
-                    class="mt-5 flex w-full items-center justify-center gap-3 rounded-[10px] border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    class="mt-5 flex w-full items-center justify-center gap-3 rounded-[12px] border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                 >
                     <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -428,7 +428,7 @@ new class extends Component {
                             required
                             autocomplete="email"
                             placeholder="you@example.com"
-                            class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                         >
                         @error('loginEmail') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
@@ -443,7 +443,7 @@ new class extends Component {
                                 required
                                 autocomplete="current-password"
                                 placeholder="••••••••"
-                                class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                                class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                             >
                             <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 transition-colors hover:text-white" :aria-label="show ? 'Hide password' : 'Show password'">
                                 <svg x-show="!show" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -472,7 +472,7 @@ new class extends Component {
 
                     <button
                         type="submit"
-                        class="mt-3 w-full rounded-[10px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
+                        class="mt-3 w-full rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
                     >
                         <span wire:loading.remove wire:target="login">Log in</span>
                         <span wire:loading wire:target="login">Signing in...</span>
@@ -518,7 +518,7 @@ new class extends Component {
                             required
                             autocomplete="name"
                             placeholder="Your name"
-                            class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                         >
                         @error('regName') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
@@ -532,7 +532,7 @@ new class extends Component {
                             required
                             autocomplete="email"
                             placeholder="you@example.com"
-                            class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                         >
                         @error('regEmail') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
@@ -551,7 +551,7 @@ new class extends Component {
                                 required
                                 autocomplete="new-password"
                                 placeholder="••••••••"
-                                class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                                class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                             >
                             <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 transition-colors hover:text-white" :aria-label="show ? 'Hide password' : 'Show password'">
                                 <svg x-show="!show" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -571,7 +571,7 @@ new class extends Component {
                             required
                             autocomplete="new-password"
                             placeholder="••••••••"
-                            class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                         >
                     </div>
 
@@ -581,7 +581,7 @@ new class extends Component {
                          picker so the UI reads as one family. --}}
                     <div>
                         <span class="mb-1.5 block text-sm font-medium text-white/85">Gender</span>
-                        <div class="grid grid-cols-3 gap-1 rounded-[10px] bg-white/5 p-1 ring-1 ring-white/10">
+                        <div class="grid grid-cols-3 gap-1 rounded-[12px] bg-white/5 p-1 ring-1 ring-white/10">
                             @foreach ([
                                 ['value' => 'male',   'label' => 'Male'],
                                 ['value' => 'female', 'label' => 'Female'],
@@ -590,7 +590,7 @@ new class extends Component {
                                 <button
                                     type="button"
                                     wire:click="$set('regGender', '{{ $opt['value'] }}')"
-                                    class="rounded-[10px] px-3 py-2.5 text-sm font-semibold transition-all active:scale-95 {{ $regGender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-white/65 hover:text-white' }}"
+                                    class="rounded-[12px] px-3 py-2.5 text-sm font-semibold transition-all active:scale-95 {{ $regGender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-white/65 hover:text-white' }}"
                                     aria-pressed="{{ $regGender === $opt['value'] ? 'true' : 'false' }}"
                                 >
                                     {{ $opt['label'] }}
@@ -617,7 +617,7 @@ new class extends Component {
                             type="text"
                             autocomplete="off"
                             placeholder="Enter a friend's referral code"
-                            class="w-full rounded-[10px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
                         >
                         @error('regReferral') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
@@ -649,9 +649,9 @@ new class extends Component {
 
                     {{-- Wizard nav: Back / Continue, with the real submit only on step 3. --}}
                     <div class="mt-7 flex items-center gap-3">
-                        <button type="button" x-show="step > 1" @click="step--" class="rounded-[10px] border border-white/20 px-5 py-3 text-sm font-bold text-white/85 transition-colors hover:bg-white/10">Back</button>
-                        <button type="button" x-show="step < 3" @click="nextStep()" class="flex-1 rounded-[10px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">Continue</button>
-                        <button type="submit" x-show="step === 3" x-cloak class="flex-1 rounded-[10px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">
+                        <button type="button" x-show="step > 1" @click="step--" class="rounded-[12px] border border-white/20 px-5 py-3 text-sm font-bold text-white/85 transition-colors hover:bg-white/10">Back</button>
+                        <button type="button" x-show="step < 3" @click="nextStep()" class="flex-1 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">Continue</button>
+                        <button type="submit" x-show="step === 3" x-cloak class="flex-1 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">
                             <span wire:loading.remove wire:target="register">Create account</span>
                             <span wire:loading wire:target="register">Creating account...</span>
                         </button>

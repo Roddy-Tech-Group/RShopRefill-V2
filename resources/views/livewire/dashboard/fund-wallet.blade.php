@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Shared\Enums\Currency;
+use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Models\CurrencyRate;
@@ -73,6 +74,44 @@ new class extends Component
     public function symbol(): string
     {
         return $this->currencyEnum()->symbol();
+    }
+
+    /**
+     * Crypto payments settle to USDT at the gateway, whose minimum sits around
+     * $12-13 regardless of the coin the customer pays with. We hold a flat $13
+     * USD floor (with a little headroom) so crypto top-ups always clear it.
+     */
+    private const CRYPTO_MINIMUM_USD = 13.0;
+
+    /**
+     * The $13 USD crypto floor translated into the selected funding currency.
+     * Uses the display rate (never throws on a stale rate) and rounds up so the
+     * translated figure always covers the USD floor.
+     */
+    public function cryptoMinimum(): float
+    {
+        if ($this->currency === 'USD') {
+            return self::CRYPTO_MINIMUM_USD;
+        }
+
+        $converted = app(CurrencyRateService::class)
+            ->convertForDisplay(self::CRYPTO_MINIMUM_USD, 'USD', $this->currency);
+
+        return (float) ceil($converted);
+    }
+
+    /** The crypto floor formatted for display, e.g. "$13.00" or "₦20,150". */
+    public function cryptoMinimumLabel(): string
+    {
+        $decimals = in_array($this->currency, ['NGN', 'XAF'], true) ? 0 : 2;
+
+        return $this->symbol().number_format($this->cryptoMinimum(), $decimals);
+    }
+
+    /** Whether the entered amount clears the crypto floor. */
+    public function meetsCryptoMinimum(): bool
+    {
+        return (float) $this->amount >= $this->cryptoMinimum();
     }
 
     /**
@@ -563,7 +602,7 @@ new class extends Component
         <button
             type="button"
             @click="open = true"
-            class="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors active:bg-blue-100"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors active:bg-blue-100"
         >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
@@ -606,7 +645,7 @@ new class extends Component
         <div
             x-transition
             :class="paymentState === 'action_3ds' ? 'max-w-lg' : 'max-w-md'"
-            class="relative w-full rounded-[10px] bg-white p-6 text-left shadow-2xl shadow-zinc-900/25 transition-all duration-300"
+            class="relative w-full rounded-[12px] bg-white p-6 text-left shadow-2xl shadow-zinc-900/25 transition-all duration-300"
             role="dialog"
             aria-modal="true"
         >
@@ -627,7 +666,7 @@ new class extends Component
                         type="button"
                         @click="ccyOpen = ! ccyOpen"
                         :aria-expanded="ccyOpen.toString()"
-                        class="flex w-full items-center justify-between gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/15"
+                        class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/15"
                     >
                         <span>{{ $currency }} &middot; {{ \App\Domain\Shared\Enums\Currency::tryFrom($currency)?->label() }}</span>
                         <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="ccyOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -644,7 +683,7 @@ new class extends Component
                         x-transition:leave="transition ease-in duration-100"
                         x-transition:leave-start="opacity-100 translate-y-0"
                         x-transition:leave-end="opacity-0 -translate-y-1"
-                        class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
+                        class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
                         role="listbox"
                     >
                         @foreach (self::fundableCurrencies() as $c)
@@ -654,7 +693,7 @@ new class extends Component
                                 @click="ccyOpen = false"
                                 role="option"
                                 aria-selected="{{ $currency === $c->value ? 'true' : 'false' }}"
-                                class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
+                                class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
                             >
                                 <span>{{ $c->value }} &middot; {{ $c->label() }}</span>
                                 @if ($currency === $c->value)
@@ -669,7 +708,7 @@ new class extends Component
 
                 {{-- Amount --}}
                 <label class="mt-4 block text-xs font-semibold text-zinc-700">Amount</label>
-                <div class="mt-1.5 flex items-stretch overflow-hidden rounded-[10px] border border-zinc-200 bg-white transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15">
+                <div class="mt-1.5 flex items-stretch overflow-hidden rounded-[12px] border border-zinc-200 bg-white transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15">
                     <span class="flex shrink-0 items-center border-r border-zinc-200 bg-zinc-50 px-3 text-sm font-semibold text-zinc-600">{{ $this->symbol() }}</span>
                     <input
                         type="number"
@@ -714,9 +753,9 @@ new class extends Component
                             <button
                                 type="button"
                                 @click="selectPaymentMethod(method)"
-                                class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[10px] hover:border-blue-500 hover:bg-blue-50/30 text-left transition duration-150"
+                                class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[12px] hover:border-blue-500 hover:bg-blue-50/30 text-left transition duration-150"
                             >
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
                                     {{-- Icon by method.type. Falls back to first 2 letters when no icon.
                                          Card + Apple Pay are monochrome: force black in light, white in dark. --}}
                                     <template x-if="methodIcon(method.type)">
@@ -754,7 +793,7 @@ new class extends Component
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-xs font-semibold text-zinc-700">Name on card</label>
-                                <input type="text" id="wallet_card_name" x-model="cardDetails.card_holder" autocomplete="cc-name" placeholder="Full name" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                                <input type="text" id="wallet_card_name" x-model="cardDetails.card_holder" autocomplete="cc-name" placeholder="Full name" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                             </div>
 
                             <div>
@@ -768,10 +807,10 @@ new class extends Component
                                         placeholder="1234 1234 1234 1234" 
                                         x-model="cardDetails.card_number"
                                         @input="detectCardType"
-                                        class="w-full rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 pr-16 tabular-nums"
+                                        class="w-full rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 pr-16 tabular-nums"
                                     >
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-[10px] tracking-wider uppercase bg-zinc-100 text-zinc-500 border border-zinc-200" 
+                                        <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-[12px] tracking-wider uppercase bg-zinc-100 text-zinc-500 border border-zinc-200" 
                                               x-text="cardBrand === 'unknown' ? 'Card' : cardBrand"
                                               :class="{
                                                   'bg-blue-50 text-blue-600 border-blue-200': cardBrand === 'visa',
@@ -797,7 +836,7 @@ new class extends Component
                                         placeholder="MM / YY" 
                                         x-model="cardExpiryRaw"
                                         @input="formatExpiry"
-                                        class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 tabular-nums"
+                                        class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 tabular-nums"
                                     >
                                 </div>
                                 <div>
@@ -810,26 +849,34 @@ new class extends Component
                                         placeholder="123" 
                                         x-model="cardDetails.cvv"
                                         maxlength="4"
-                                        class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 tabular-nums"
+                                        class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 tabular-nums"
                                     >
                                 </div>
                             </div>
 
-                            <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
+                            <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
                                 Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                             </button>
                         </div>
                     @else
-                        <div class="rounded-[10px] border border-zinc-200 bg-zinc-50 p-4 text-center">
+                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4 text-center dark:border-white/10 dark:bg-white/5">
+                            {{-- White chips keep the brand logos legible on the dark
+                                 modal panel; no-dark-invert stops the global image
+                                 dark-mode filter from recolouring the SVGs. Mirrors
+                                 the checkout payment block. --}}
                             <div class="flex justify-center gap-3 mb-3">
-                                <img src="/assets/visa.svg" alt="Visa" class="h-8 object-contain">
-                                <img src="/assets/mastercard.svg" alt="Mastercard" class="h-8 object-contain">
+                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                    <img src="/assets/visa.svg" alt="Visa" class="no-dark-invert h-6 object-contain">
+                                </span>
+                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                    <img src="/assets/mastercard.svg" alt="Mastercard" class="no-dark-invert h-6 object-contain">
+                                </span>
                             </div>
-                            <p class="text-sm font-medium text-zinc-700">
+                            <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                 Secure and encrypted payment with bank-level security.
                             </p>
                         </div>
-                        <button type="button" @click="paySession('card', {})" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-4">
+                        <button type="button" @click="paySession('card', {})" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-4">
                             Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                         </button>
                     @endif
@@ -840,8 +887,8 @@ new class extends Component
                     <h3 class="text-sm font-bold text-zinc-900 mb-2">Card PIN Required</h3>
                     <p class="text-xs text-zinc-600 mb-4">Enter your card 4-digit security PIN to authorize payment.</p>
                     <div class="space-y-4">
-                        <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[10px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
+                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                             Confirm PIN
                         </button>
                     </div>
@@ -852,8 +899,8 @@ new class extends Component
                     <h3 class="text-sm font-bold text-zinc-900 mb-2">OTP Verification</h3>
                     <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
                     <div class="space-y-4">
-                        <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[10px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
+                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                             Verify OTP
                         </button>
                     </div>
@@ -864,11 +911,11 @@ new class extends Component
                     <h3 class="text-sm font-bold text-zinc-900 mb-2">Secure Verification</h3>
                     <p class="text-xs text-zinc-600 mb-4">Please complete the secure authentication inside the window below.</p>
 
-                    <div class="w-full overflow-hidden rounded-[10px] border border-zinc-200 bg-zinc-50 h-[55vh] min-h-[400px] max-h-[520px]">
+                    <div class="w-full overflow-hidden rounded-[12px] border border-zinc-200 bg-zinc-50 h-[55vh] min-h-[400px] max-h-[520px]">
                         <iframe :src="session?.payment_payload?.redirect_url" class="h-full w-full border-0" allow="payment"></iframe>
                     </div>
 
-                    <button @click="verifyPayment()" :disabled="verifying" class="mt-4 flex w-full items-center justify-center gap-2 rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                    <button @click="verifyPayment()" :disabled="verifying" class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
                         <svg x-show="verifying" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -889,13 +936,13 @@ new class extends Component
                     <div class="space-y-4">
                         <div>
                             <label class="block text-xs font-semibold text-zinc-700">Phone Number</label>
-                            <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                            <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-zinc-700">Network</label>
                             <div class="relative mt-1.5">
-                                <select x-model="momoDetails.network" class="w-full appearance-none rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                                <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                     <template x-for="net in selectedMethod?.supported_networks" :key="net">
                                         <option :value="net" x-text="net"></option>
                                     </template>
@@ -906,7 +953,7 @@ new class extends Component
                             </div>
                         </div>
 
-                        <button type="button" @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <button type="button" @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                             Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                         </button>
                     </div>
@@ -919,16 +966,23 @@ new class extends Component
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
                         </button>
                     </div>
-                    <h3 class="text-sm font-bold text-zinc-900 mb-4">Select Cryptocurrency</h3>
-                    
+                    <h3 class="text-sm font-bold text-zinc-900 mb-2">Select Cryptocurrency</h3>
+
+                    {{-- Crypto settles to USDT at the gateway, so it carries its own
+                         floor (~$13) shown here in the funding currency. --}}
+                    <p class="mb-4 text-xs text-zinc-600">
+                        Add money to pay instantly from {{ $this->cryptoMinimumLabel() }} and above.
+                    </p>
+
+                    @if ($this->meetsCryptoMinimum())
                     <div class="mt-1.5 grid grid-cols-4 gap-2 mb-4">
                         @forelse ($cryptoCoins as $coin)
                             <button type="button" @click="cryptoDetails.pay_currency = '{{ strtolower($coin->code) }}'; paySession('crypto', { pay_currency: '{{ strtolower($coin->code) }}' })"
-                                class="flex flex-col items-center gap-1 rounded-[10px] border bg-white px-2 py-2.5 transition-colors border-zinc-200 hover:border-blue-500 hover:bg-blue-50">
+                                class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 transition-colors border-zinc-200 hover:border-blue-500 hover:bg-blue-50">
                                 @if ($coin->icon_path)
-                                    <img src="{{ asset('assets/' . $coin->icon_path) }}" alt="" class="h-6 w-6 rounded-[10px]">
+                                    <img src="{{ asset('assets/' . $coin->icon_path) }}" alt="" class="h-6 w-6 rounded-[12px]">
                                 @else
-                                    <span class="flex h-6 w-6 items-center justify-center rounded-[10px] bg-amber-500 text-[10px] font-black text-white uppercase">{{ substr($coin->code, 0, 1) }}</span>
+                                    <span class="flex h-6 w-6 items-center justify-center rounded-[12px] bg-amber-500 text-[10px] font-black text-white uppercase">{{ substr($coin->code, 0, 1) }}</span>
                                 @endif
                                 <span class="text-xs font-bold text-zinc-900 uppercase">{{ $coin->code }}</span>
                             </button>
@@ -937,8 +991,19 @@ new class extends Component
                         @endforelse
                     </div>
                     <p class="mt-3 text-xs text-zinc-600">
-                        Pick a coin and continue — the next step shows the exact wallet address and amount to send.
+                        Pick a coin and continue. The next step shows the exact wallet address and amount to send.
                     </p>
+                    @else
+                        <div class="rounded-[12px] border border-amber-200 bg-amber-50 p-4">
+                            <p class="text-xs font-semibold text-amber-900">
+                                Crypto top-ups start at {{ $this->cryptoMinimumLabel() }}. You entered {{ $this->symbol() }}{{ number_format((float) $this->amount, 2) }}.
+                            </p>
+                            <button type="button" @click="session = null; paymentState = 'idle'"
+                                class="mt-3 w-full rounded-[12px] bg-blue-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
+                                Change amount
+                            </button>
+                        </div>
+                    @endif
                 </div>
 
                 <!-- Bank Transfer virtual accounts display or Crypto invoice -->
@@ -949,7 +1014,7 @@ new class extends Component
                             <h3 class="text-sm font-bold text-zinc-900 mb-2">Virtual Bank Transfer</h3>
                             <p class="text-xs text-zinc-600 mb-4">Please make a transfer to the temporary virtual account below:</p>
 
-                            <div class="bg-zinc-50 border border-zinc-200 rounded-[10px] p-4 space-y-3">
+                            <div class="bg-zinc-50 border border-zinc-200 rounded-[12px] p-4 space-y-3">
                                 <div class="flex justify-between items-center text-xs">
                                     <span class="text-zinc-500">Bank Name</span>
                                     <span class="font-bold text-zinc-900" x-text="bankDetails?.bank_name"></span>
@@ -979,9 +1044,9 @@ new class extends Component
                             <h3 class="text-sm font-bold text-zinc-900 text-center mb-2">Crypto Payment Details</h3>
                             <p class="text-xs text-zinc-600 text-center mb-4">Send the exact amount of cryptocurrency shown to the address below:</p>
 
-                            <div class="flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[10px] shadow-inner">
+                            <div class="flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
                                 <!-- QR Code -->
-                                <div class="flex shrink-0 flex-col items-center rounded-[10px] bg-white p-3 border border-zinc-150 shadow-sm">
+                                <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-3 border border-zinc-150 shadow-sm">
                                     <img 
                                         :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(session?.payment_payload?.qr_payload || '')" 
                                         alt="Payment QR Code" 
@@ -995,16 +1060,16 @@ new class extends Component
                                     <div>
                                         <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Cryptocurrency / Network</span>
                                         <div class="flex items-center gap-1.5">
-                                            <span class="rounded-[10px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
+                                            <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
                                             <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || 'bitcoin')"></span>
                                         </div>
                                     </div>
                                     <div>
                                         <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Amount to Send</span>
                                         <div class="flex items-center gap-2">
-                                            <span class="font-extrabold text-zinc-900 text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[10px] border border-zinc-150" x-text="session?.payment_payload?.pay_amount"></span>
+                                            <span class="font-extrabold text-zinc-900 text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[12px] border border-zinc-150" x-text="session?.payment_payload?.pay_amount"></span>
                                             <span class="font-bold text-zinc-600 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
-                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[10px] transition-all">
+                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[12px] transition-all">
                                                 Copy
                                             </button>
                                         </div>
@@ -1012,8 +1077,8 @@ new class extends Component
                                     <div>
                                         <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Deposit Address</span>
                                         <div class="mt-1 flex items-center gap-1.5">
-                                            <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-white px-2.5 py-1.5 rounded-[10px] border border-zinc-200 text-[10px] text-zinc-800 font-mono select-all outline-none">
-                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address, 'address')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold shrink-0 bg-blue-50 px-2.5 py-1.5 rounded-[10px] transition-all border border-blue-100">
+                                            <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-white px-2.5 py-1.5 rounded-[12px] border border-zinc-200 text-[10px] text-zinc-800 font-mono select-all outline-none">
+                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address, 'address')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold shrink-0 bg-blue-50 px-2.5 py-1.5 rounded-[12px] transition-all border border-blue-100">
                                                 Copy
                                             </button>
                                         </div>
@@ -1039,7 +1104,7 @@ new class extends Component
                     <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
 
                     <div class="flex flex-col items-center py-6 text-center">
-                        <span class="flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50 ring-8 ring-blue-100/50 mb-4">
+                        <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 ring-8 ring-blue-100/50 mb-4">
                             <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                             </svg>
@@ -1076,7 +1141,7 @@ new class extends Component
                     <h3 class="mt-4 text-sm font-bold text-zinc-900">Payment Failed</h3>
                     <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
 
-                    <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[10px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                    <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                         Try Another Method
                     </button>
                 </div>

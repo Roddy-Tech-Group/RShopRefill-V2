@@ -207,6 +207,59 @@
         ];
     })->values();
 
+    // Top-up offers carry their real type + benefits in the variant metadata
+    // (Zendit subTypes + dataGB/durationDays/voiceMinutes/smsNumber). Group the
+    // fixed offers into Credit / Data / Bundle so each plan shows exactly what it
+    // gives instead of a bare amount. Nothing here is hardcoded - it all reads the
+    // synced metadata; a missing field just drops that chip.
+    $topupGroups = ['credit' => [], 'data' => [], 'bundle' => []];
+    if ($isTopup) {
+        $topupKindOf = function ($v) {
+            $st = strtolower((string) ($v->metadata['subTypes'][0] ?? ''));
+
+            return str_contains($st, 'data') ? 'data' : (str_contains($st, 'bundle') ? 'bundle' : 'credit');
+        };
+
+        foreach ($fixedDenoms as $v) {
+            $m = $v->metadata ?? [];
+            $val = (float) $v->retail_price;
+            $topupGroups[$topupKindOf($v)][] = [
+                'id' => $v->id,
+                'disp' => round($val * $displayRate, 2),
+                'price' => $conv($val),
+                // The offer name ("1GB/day + Call (30d)") carries nuance the GB total
+                // misses, so it headlines the card.
+                'name' => $m['notes'] ?? null,
+                'dataGB' => $m['dataGB'] ?? null,
+                'days' => $m['durationDays'] ?? null,
+                'voice' => $m['voiceMinutes'] ?? null,
+                'sms' => $m['smsNumber'] ?? null,
+                'dataUnlimited' => (bool) ($m['dataUnlimited'] ?? false),
+                'voiceUnlimited' => (bool) ($m['voiceUnlimited'] ?? false),
+                'smsUnlimited' => (bool) ($m['smsUnlimited'] ?? false),
+                'summary' => $m['shortNotes'] ?? ($m['notes'] ?? null),
+            ];
+        }
+    }
+
+    // Switcher tabs: Credit / Data / Bundle (only those the network offers). Credit's
+    // panel is the amount selector; Data/Bundle panels are benefit cards.
+    $topupTabMeta = ['credit' => 'Credit', 'data' => 'Data', 'bundle' => 'Bundles'];
+    $topupTabs = collect($topupTabMeta)
+        ->filter(fn ($label, $key) => ! empty($topupGroups[$key]) || ($key === 'credit' && $variable))
+        ->all();
+    // The switcher only appears when there's an actual choice (data or bundle plans
+    // alongside credit). Credit-only networks just show the amount selector.
+    $topupHasPlans = ! empty($topupGroups['data']) || ! empty($topupGroups['bundle']);
+    // The listing's "Credit, Data & Calls" filter passes ?plan=bundles so the detail
+    // opens on a bundle/data tab; otherwise it opens on Credit (the amount selector).
+    $topupPlanScope = (string) request()->query('plan', '');
+    $topupDefaultTab = ($topupPlanScope === 'bundles' && $topupHasPlans)
+        ? (! empty($topupGroups['bundle']) ? 'bundle' : 'data')
+        : (array_key_first($topupTabs) ?: 'credit');
+    // Credit denominations feed the amount selector's dropdown.
+    $topupCreditPlans = collect($topupGroups['credit'] ?? []);
+
     // Similar brands in same subcategory + same country.
     $similarIds = Product::query()
         ->where('is_active', true)
@@ -233,12 +286,17 @@
      * Structured data for this brand page. A Product schema (with an
      * AggregateOffer spanning the cheapest -> priciest denomination) lets search
      * engines and AI crawlers surface the page as a buyable product, and a
-     * BreadcrumbList gives the listing -> brand trail. Prices use the catalog's
-     * own retail_price + currency so the schema is internally consistent
-     * regardless of the visitor's display currency.
+     * BreadcrumbList gives the listing -> brand trail.
+     *
+     * Offers are priced in USD - the marked-up amount the customer actually pays
+     * (price_usd), not the card's local face value. USD is the settlement
+     * currency for every order, so this keeps the schema consistent with the
+     * real charge AND with Google Merchant's single shipping currency. Emitting a
+     * local priceCurrency (EUR, NGN, ...) is exactly what trips Merchant's
+     * "mismatched shipping currency" disapproval.
      */
-    $schemaPrices = $variants
-        ->pluck('retail_price')
+    $schemaPrices = $variantsForJs
+        ->pluck('price_usd')
         ->map(fn ($p) => round((float) $p, 2))
         ->filter(fn ($p) => $p > 0)
         ->values();
@@ -301,7 +359,7 @@
         '@context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => $brandName.' '.$kindTitle,
-        'description' => 'Buy a '.$brandName.' '.strtolower($kindTitle).' on RshopRefills with instant digital delivery, great prices and 24/7 support.',
+        'description' => 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName.($rangeText ? ' from '.$rangeText : '').' on '.$siteName.'. Instant digital delivery, pay with card, mobile money or crypto.',
         'brand' => ['@type' => 'Brand', 'name' => $brandName],
         'category' => $kindTitle,
         'url' => url()->current(),
@@ -314,7 +372,7 @@
     if ($schemaPrices->isNotEmpty()) {
         $productJsonLd['offers'] = [
             '@type' => 'AggregateOffer',
-            'priceCurrency' => $currency,
+            'priceCurrency' => 'USD',
             'lowPrice' => (string) $schemaPrices->min(),
             'highPrice' => (string) $schemaPrices->max(),
             'offerCount' => (string) $schemaPrices->count(),
@@ -368,12 +426,16 @@
     ];
 
     $pageJsonLd = [$productJsonLd, $breadcrumbJsonLd];
+
+    $metaDescription = 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName
+        .($rangeText ? ' from '.$rangeText : '')
+        .' on '.$siteName.'. Instant email delivery, pay with card, mobile money or crypto.';
 @endphp
 
 <x-shop.layout
-    :title="$brandName . ' ' . $kindTitle . ' | RshopRefills'"
-    :description="'Buy a ' . $brandName . ' ' . strtolower($kindTitle) . ' on RshopRefills - instant delivery, great prices and 24/7 support. Pay with cards, mobile money, crypto and more.'"
-    :keywords="$brandName . ', ' . $brandName . ' ' . strtolower($kindTitle) . ', buy ' . $brandName . ' ' . strtolower($kindTitle) . ' online, RshopRefills'"
+    :title="$brandName . ' ' . $kindTitle . ' | '.$siteName"
+    :description="$metaDescription"
+    :keywords="$brandName . ', ' . $brandName . ' ' . strtolower($kindTitle) . ', buy ' . $brandName . ' ' . strtolower($kindTitle) . ' online, '.$siteName"
     :og-image="$logoSrc ?: asset('assets/og-image.png')"
     og-type="product"
     :json-ld="$pageJsonLd"
@@ -416,7 +478,7 @@
                 {{-- top offset clears the sticky header (top-bar 36 + nav 64 + category bar 40)
                      so the card parks below it instead of sliding up behind the nav. --}}
                 <div class="lg:sticky lg:top-[156px]">
-                    <div class="mx-auto lg:mr-0 flex w-full max-w-lg items-center justify-center rounded-[24px] bg-[#e8e8f7] p-10 sm:p-14 dark:border dark:border-[#24364f] dark:bg-[#0c1a36]">
+                    <div class="pure-card mx-auto lg:mr-0 flex w-full max-w-lg items-center justify-center rounded-[24px] bg-[#e8e8f7] p-10 sm:p-14 dark:border dark:border-[#24364f] dark:bg-[#0c1a36]">
                         <div class="relative flex aspect-[8/5] w-4/5 items-center justify-center overflow-hidden rounded-[20px] bg-[#ffffff] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.25)]">
                             @if ($logoSrc)
                                 <img src="{{ $logoSrc }}" alt="{{ $brandName }} {{ $kindNoun }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high">
@@ -489,7 +551,7 @@
                 <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto text-sm font-medium text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible dark:text-zinc-200">
                     @foreach ($badges as $badge)
                         <span class="flex shrink-0 items-center gap-2">
-                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $badge['d'] }}"/>
                                 </svg>
@@ -510,14 +572,89 @@
                 </div>
 
                 @if ($hasStock)
+                    {{-- Mobile top-ups: a Credit / Data / Bundle switcher sharing one ttab
+                         scope. The Credit panel is the amount selector below; Data/Bundle
+                         panels are benefit cards. All read from synced Zendit metadata. --}}
+                    <div @if ($isTopup && $topupHasPlans) x-data="{ ttab: '{{ $topupDefaultTab }}' }" @endif>
+
+                    @if ($isTopup && $topupHasPlans)
+                        <div class="mb-5">
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-white">Choose how to top up</label>
+
+                            <div class="inline-flex items-center rounded-[12px] bg-zinc-100 p-1 dark:bg-[#0c1a36]" role="tablist" aria-label="Plan type">
+                                @foreach ($topupTabs as $key => $label)
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        @click="ttab = '{{ $key }}'"
+                                        :aria-selected="ttab === '{{ $key }}'"
+                                        :class="ttab === '{{ $key }}' ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:text-white dark:ring-[#24364f]' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
+                                        class="rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-all"
+                                    >{{ $label }}</button>
+                                @endforeach
+                            </div>
+
+                            @foreach ($topupTabs as $key => $label)
+                                @if ($key === 'credit') @continue @endif
+                                <div x-show="ttab === '{{ $key }}'" x-cloak class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    @foreach ($topupGroups[$key] as $plan)
+                                        @php
+                                            // Data/Bundle render as eSIM-style cards: an icon feature list built
+                                            // from the offer's structured benefits. Unlimited flags win over a number.
+                                            $dataIcon = 'M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z';
+                                            $voiceIcon = 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z';
+                                            $smsIcon = 'M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z';
+                                            $clockIcon = 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z';
+
+                                            $features = [];
+                                            if ($plan['dataUnlimited']) { $features[] = [$dataIcon, 'Unlimited data']; }
+                                            elseif (! empty($plan['dataGB'])) { $features[] = [$dataIcon, rtrim(rtrim(number_format((float) $plan['dataGB'], 2, '.', ''), '0'), '.').'GB data']; }
+                                            if ($plan['voiceUnlimited']) { $features[] = [$voiceIcon, 'Unlimited minutes']; }
+                                            elseif (! empty($plan['voice'])) { $features[] = [$voiceIcon, $plan['voice'].' minutes']; }
+                                            if ($plan['smsUnlimited']) { $features[] = [$smsIcon, 'Unlimited SMS']; }
+                                            elseif (! empty($plan['sms'])) { $features[] = [$smsIcon, $plan['sms'].' SMS']; }
+                                            if (! empty($plan['days'])) { $features[] = [$clockIcon, $plan['days'].'-day validity']; }
+                                        @endphp
+                                        <button
+                                            type="button"
+                                            @click="amount = {{ $plan['disp'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; window.innerWidth < 1024 && setTimeout(() => document.getElementById('topup-recipient')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 140)"
+                                            :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-[#24364f] dark:hover:border-blue-400/50'"
+                                            class="esim-tile flex h-full flex-col rounded-[14px] border bg-[#eff6ff] px-4 py-4 text-left transition-colors"
+                                        >
+                                            <span class="inline-flex w-fit items-center rounded-[8px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">{{ $key === 'data' ? 'Data' : 'Bundle' }}</span>
+                                                @if (! empty($plan['name']))
+                                                    <span class="mt-2 block text-sm font-bold leading-snug text-zinc-900 dark:text-white">{{ $plan['name'] }}</span>
+                                                @endif
+                                                @if (! empty($features))
+                                                    <span class="my-3 block h-px bg-zinc-200 dark:bg-zinc-700"></span>
+                                                    <span class="block space-y-2 text-sm text-zinc-900 dark:text-white">
+                                                        @foreach ($features as [$fIcon, $fLabel])
+                                                            <span class="flex items-center gap-2">
+                                                                <svg class="h-4 w-4 shrink-0 text-zinc-700 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
+                                                                <span>{{ $fLabel }}</span>
+                                                            </span>
+                                                        @endforeach
+                                                    </span>
+                                                @elseif (! empty($plan['summary']))
+                                                    <span class="mt-2 block text-xs leading-snug text-zinc-600 dark:text-zinc-400">{{ $plan['summary'] }}</span>
+                                                @endif
+                                                <span class="mt-auto pt-3 text-right text-lg font-bold tabular-nums text-zinc-900 dark:text-white">{{ $plan['price'] }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
                     {{-- Amount / Quantity / Estimated price. Mobile: Amount on its own full
                          row, Quantity + Estimated price share a 2-col row. sm+: one row. --}}
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_auto_auto]">
+                    <div class="grid gap-3 {{ ! ($isTopup && $topupHasPlans) ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : '' }}"
+                        @if ($isTopup && $topupHasPlans) :class="ttab === 'credit' ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_1fr]'" @endif>
 
                         {{-- Amount field — plain typeable input with $ prefix. Suggested denominations
                              render as small clickable chips below so users can one-tap a common value. --}}
-                        <div class="col-span-2 sm:col-span-1">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">Amount</label>
+                        <div class="col-span-2 sm:col-span-1" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? 'Credit amount' : 'Amount' }}</label>
                             <div
                                 x-data="{ open: false, locked: false }"
                                 @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
@@ -529,7 +666,7 @@
                                     type="button"
                                     @click="open = ! open; locked = open"
                                     :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="flex h-[50px] w-full items-center gap-2 rounded-[10px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
                                 >
                                     <span class="font-semibold text-zinc-600">{{ $variable ? $customSymbol : $displaySymbol }}</span>
                                     <span
@@ -547,7 +684,7 @@
                                         role="button"
                                         tabindex="0"
                                         aria-label="Clear selected amount"
-                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[10px] bg-zinc-200 transition-colors hover:bg-zinc-300"
+                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300"
                                     >
                                         <img src="{{ asset('assets/' . rawurlencode('x button.webp')) }}" alt="" class="h-3.5 w-3.5 object-contain" loading="lazy">
                                     </span>
@@ -562,9 +699,34 @@
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
                                     style="display:none;"
-                                    class="absolute left-0 right-0 top-full z-20 max-h-[27rem] overflow-y-auto rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                    class="absolute left-0 right-0 top-full z-20 max-h-[27rem] overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                                     role="listbox"
                                 >
+                                    @if ($isTopup)
+                                        {{-- Credit selector: airtime-credit denominations only (Data/Bundle
+                                             are chosen from their cards above). --}}
+                                        @foreach ($topupCreditPlans as $plan)
+                                            <button
+                                                type="button"
+                                                @click="amount = {{ $plan['disp'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
+                                                :class="(! customMode && Number(amount) === {{ $plan['disp'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                            >
+                                                <span class="font-bold">{{ $plan['price'] }}</span>
+                                            </button>
+                                        @endforeach
+                                        @if ($variable)
+                                            <button
+                                                type="button"
+                                                @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
+                                                :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                                class="flex w-full items-center justify-between rounded-[12px] {{ $topupCreditPlans->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                                            >
+                                                <span class="font-bold">Custom amount</span>
+                                                <span class="text-xs text-zinc-500">{{ $customMoney($variable->min_amount) }} - {{ $customMoney($variable->max_amount) }}</span>
+                                            </button>
+                                        @endif
+                                    @else
                                     @foreach ($fixedDenoms as $i => $v)
                                         @php
                                             $val  = (float) $v->retail_price;
@@ -574,11 +736,11 @@
                                             type="button"
                                             @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false; open = false"
                                             :class="(! customMode && Number(amount) === {{ $disp }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                                         >
                                             <span class="font-bold">{{ $conv($val) }}</span>
                                             @if ($i === $fixedDenoms->count() - 1 && $fixedDenoms->count() > 1)
-                                                <span class="inline-flex items-center rounded-[10px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">Popular</span>
+                                                <span class="inline-flex items-center rounded-[12px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">Popular</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -587,11 +749,12 @@
                                             type="button"
                                             @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
                                             :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-between rounded-[10px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                                            class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                                         >
                                             <span class="font-bold">Custom amount</span>
                                             <span class="text-xs text-zinc-500">{{ $customMoney($variable->min_amount) }} - {{ $customMoney($variable->max_amount) }}</span>
                                         </button>
+                                    @endif
                                     @endif
                                 </div>
                             </div>
@@ -612,7 +775,7 @@
                                             max="{{ (float) $variable->max_amount }}"
                                             step="any"
                                             placeholder="{{ rtrim(rtrim(number_format((float) $variable->min_amount, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $variable->max_amount, 2), '0'), '.') }}"
-                                            class="w-full rounded-[10px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
+                                            class="w-full rounded-[12px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
                                             :class="(amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)) ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-[color:var(--brand)]'"
                                         />
                                     </div>
@@ -647,7 +810,7 @@
                                     type="button"
                                     @click="open = ! open; locked = open"
                                     :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="flex h-[50px] w-full items-center gap-2 rounded-[10px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
                                 >
                                     <span x-data="valueFlip()" x-effect="quantity; flash()" class="flex-1 text-left tabular-nums" x-text="quantity">1</span>
                                     <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -661,7 +824,7 @@
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
                                     style="display:none;"
-                                    class="absolute left-0 right-0 top-full z-20 max-h-60 overflow-y-auto rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                    class="absolute left-0 right-0 top-full z-20 max-h-60 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                                     role="listbox"
                                 >
                                     @for ($n = 1; $n <= 10; $n++)
@@ -669,7 +832,7 @@
                                             type="button"
                                             @click="quantity = {{ $n }}; open = false"
                                             :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-center rounded-[10px] px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
+                                            class="flex w-full items-center justify-center rounded-[12px] px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
                                         >
                                             {{ $n }}
                                         </button>
@@ -693,16 +856,16 @@
                                     type="button"
                                     @click="open = ! open; locked = open"
                                     :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="flex h-[50px] w-full items-center gap-2 rounded-[10px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
                                 >
                                     <template x-if="cryptos[selectedCrypto]?.icon">
-                                        <img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[10px]">
+                                        <img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[12px]">
                                     </template>
                                     <template x-if="!cryptos[selectedCrypto]?.icon && cryptos[selectedCrypto]?.flag">
-                                        <img :src="cryptos[selectedCrypto].flag" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[10px] object-cover ring-1 ring-zinc-200">
+                                        <img :src="cryptos[selectedCrypto].flag" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200">
                                     </template>
                                     <template x-if="!cryptos[selectedCrypto]?.icon && !cryptos[selectedCrypto]?.flag">
-                                        <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[10px] text-[10px] font-black text-white" :class="cryptos[selectedCrypto]?.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="selectedCrypto.charAt(0)"></span>
+                                        <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="cryptos[selectedCrypto]?.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="selectedCrypto.charAt(0)"></span>
                                     </template>
                                     <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; selectedCrypto; flash()" class="flex-1 truncate text-left tabular-nums" x-text="formatCrypto()">0.00 USDT</span>
                                     <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -716,7 +879,7 @@
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
                                     style="display:none;"
-                                    class="absolute right-0 top-full z-20 max-h-80 w-56 overflow-y-auto rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                    class="absolute right-0 top-full z-20 max-h-80 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                                     role="listbox"
                                 >
                                     <template x-for="(meta, code) in cryptos" :key="code">
@@ -724,16 +887,16 @@
                                             type="button"
                                             @click="selectedCrypto = code; open = false"
                                             :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center gap-2 rounded-[10px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
+                                            class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
                                         >
                                             <template x-if="meta.icon">
-                                                <img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[10px]">
+                                                <img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px]">
                                             </template>
                                             <template x-if="!meta.icon && meta.flag">
-                                                <img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[10px] object-cover ring-1 ring-zinc-200">
+                                                <img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200">
                                             </template>
                                             <template x-if="!meta.icon && !meta.flag">
-                                                <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[10px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span>
+                                                <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span>
                                             </template>
                                             <span class="flex-1 truncate text-left tabular-nums" x-text="formatCryptoFor(code)"></span>
                                             <svg x-show="selectedCrypto === code" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -760,7 +923,7 @@
                                 :class="accountIdValid()
                                     ? 'border-emerald-500 ring-2 ring-emerald-500/15'
                                     : (accountId.length > 0 ? 'border-red-300' : 'border-zinc-200')"
-                                class="flex h-[52px] w-full items-center gap-2 rounded-[10px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                                class="flex h-[52px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
                             >
                                 <input
                                     type="text"
@@ -793,7 +956,7 @@
                          enforces a valid number. Country flag + dial code are
                          locked to the product's country_code via dial_codes.php. --}}
                     @if ($isTopup)
-                        <div>
+                        <div id="topup-recipient">
                             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
                                 @if (Product::flagUrl($product->country_code))
                                     <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-3.5 w-5 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
@@ -804,7 +967,7 @@
                                 :class="recipientPhoneValid()
                                     ? 'border-emerald-500 ring-2 ring-emerald-500/15'
                                     : (recipientPhone.length > 0 ? 'border-red-300' : 'border-zinc-200')"
-                                class="flex h-[52px] w-full items-center gap-2 rounded-[10px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                                class="flex h-[52px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
                             >
                                 <span class="shrink-0 text-sm font-semibold text-zinc-600 dark:text-zinc-200" x-text="recipientDialCode">{{ $dialCode }}</span>
                                 <input
@@ -834,7 +997,7 @@
                     @endif
 
                     {{-- Points you earn - calculated via backend rates (USD spent x cashback % / Rcoin USD rate). Coin icon is the site favicon. Hidden when the Rcoin engine is off. --}}
-                    <p x-show="rcoinConfig.enabled" class="flex items-center gap-1.5 text-sm font-semibold text-zinc-700">
+                    <p x-show="rcoinConfig.enabled" class="my-3 flex items-center gap-1.5 text-sm font-semibold text-zinc-700">
                         Points you earn
                         <img src="{{ asset('assets/favicon.ico') }}" alt="coins" class="h-6 w-6 object-contain" loading="lazy">
                         <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; flash()" class="inline-block text-zinc-900" x-text="pointsEarned()">0</span>
@@ -853,7 +1016,7 @@
                             :class="cartState === 'success'
                                 ? 'border-emerald-500 bg-emerald-500 text-white animate-cart-pop'
                                 : 'border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white'"
-                            class="relative flex h-[52px] items-center justify-center rounded-[10px] border-2 px-4 text-base font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="relative flex h-[52px] items-center justify-center rounded-[12px] border-2 px-4 text-base font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <span
                                 x-show="cartState === 'idle'"
@@ -897,7 +1060,7 @@
                             type="button"
                             @click="buyNow()"
                             :disabled="! canAddToCart() || $store.cart.loading"
-                            class="flex h-[52px] items-center justify-center rounded-[10px] bg-blue-600 px-4 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
+                            class="flex h-[52px] items-center justify-center rounded-[12px] bg-blue-600 px-4 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
                         >
                             Buy now
                         </button>
@@ -905,7 +1068,7 @@
 
                     {{-- Country availability — the redeemable country for this
                          variant, plus a link to switch country via the locale modal. --}}
-                    <div>
+                    <div class="mt-4 mb-2">
                         <p class="flex items-center gap-2 text-sm text-zinc-700">
                             @if (Product::flagUrl($product->country_code))
                                 <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-4 w-6 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
@@ -919,8 +1082,9 @@
                             </button>
                         </p>
                     </div>
+                    </div>{{-- /top-up switcher ttab scope --}}
                 @else
-                    <div class="dash-shimmer rounded-[10px] bg-[#eff6ff] px-4 py-8 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+                    <div class="dash-shimmer pure-card rounded-[12px] bg-[#eff6ff] px-4 py-8 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
                         <p class="text-base font-semibold text-zinc-900">Out of stock</p>
                         <p class="mt-1 text-sm text-zinc-600">{{ $isTopup ? 'This network has no top-up amounts available right now.' : ($isBill ? 'This biller has no payment amounts available right now.' : 'This card has no denominations available right now.') }} Check back later.</p>
                     </div>
@@ -935,7 +1099,7 @@
                     href="{{ $redeemUrl }}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="mb-2 inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    class="mb-2 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                     Redeem at {{ $brandName }}
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -981,7 +1145,7 @@
                         </svg>
                     </summary>
                     <div class="pb-5">
-                        <div class="overflow-hidden rounded-[10px] bg-zinc-900 ring-1 ring-zinc-100">
+                        <div class="overflow-hidden rounded-[12px] bg-zinc-900 ring-1 ring-zinc-100">
                             <video controls class="aspect-video w-full">
                                 <source src="{{ $redemptionVideo }}">
                                 Your browser doesn't support embedded video.
@@ -1052,6 +1216,36 @@
                 </div>
             </section>
         @endif
+
+        {{-- Long-form, data-driven brand copy. Everything here is derived from
+             THIS brand's real catalog data (denomination range, the countries it
+             sells in, category), so every brand page carries genuinely unique,
+             indexable text instead of a shared template - the fix for Search
+             Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
+        <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
+            <div class="max-w-3xl">
+                <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
+                    Buy {{ $brandName }} {{ $kindTitle }} in {{ $countryName }}
+                </h2>
+
+                <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                    {{ $brandName }} {{ $kindNoun }}s on {{ $siteName }} are delivered instantly{{ $rangeText ? ', with amounts from '.$rangeText : '' }}. Pay with a debit or credit card, mobile money, or crypto, and your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} lands in your email within seconds of a confirmed payment. Every order is backed by our fair refund policy.
+                </p>
+
+                @if ($brandCountries->count() > 1)
+                    <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        This {{ $brandName }} {{ $kindNoun }} is for {{ $countryName }}. {{ $brandName }} {{ $kindNoun }}s are also available in {{ $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' and ') }}. Switch country at the top of the page to shop them.
+                    </p>
+                @endif
+
+                <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">How to {{ $isTopup ? 'top up' : ($isBill ? 'pay' : 'buy') }} {{ $brandName }} {{ $kindNoun }}</h3>
+                <ol class="mt-3 list-decimal space-y-2 pl-5 text-base leading-relaxed text-zinc-600 marker:font-semibold marker:text-zinc-400 dark:text-zinc-300">
+                    <li>Choose your amount{{ $isTopup ? ' and enter the '.$brandName.' phone number' : ($isBill ? ' and enter your '.$brandName.' account number' : '') }}.</li>
+                    <li>Pay securely with card, mobile money or crypto.</li>
+                    <li>Receive your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} by email instantly{{ $isGiftCard ? ', then redeem it at '.$brandName : '' }}.</li>
+                </ol>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -1141,7 +1335,7 @@
                     return true;
                 },
 
-                async addToCart() {
+                async addToCart(buyNow = false) {
                     // Ignore re-clicks while the spinner/success cue is still playing.
                     if (this.cartState !== 'idle') {
                         return false;
@@ -1165,7 +1359,7 @@
                     }
 
                     this.cartState = 'loading';
-                    const ok = await this.$store.cart.add(this.selectedVariantId, this.quantity || 1, requested, metadata);
+                    const ok = await this.$store.cart.add(this.selectedVariantId, this.quantity || 1, requested, metadata, buyNow);
 
                     if (ok) {
                         // Hold the success cue briefly, then settle back to idle.
@@ -1179,7 +1373,7 @@
                 },
 
                 async buyNow() {
-                    const ok = await this.addToCart();
+                    const ok = await this.addToCart(true);
                     if (ok) {
                         window.location.href = '{{ route('shop.checkout') }}';
                     }

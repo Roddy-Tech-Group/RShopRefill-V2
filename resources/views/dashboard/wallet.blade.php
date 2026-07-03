@@ -79,9 +79,9 @@
         {{-- Summary strip - count chip + add-wallet CTA. Glass surface with
              a subtle ring + tinted shadow to lift it off the page bg without
              feeling heavy. --}}
-        <div class="flex flex-wrap items-center justify-between gap-4 rounded-[10px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+        <div class="flex flex-wrap items-center justify-between gap-4 rounded-[12px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
             <div class="flex min-w-0 items-center gap-4">
-                <span class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm shadow-blue-600/30">
+                <span class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm shadow-blue-600/30">
                     <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
                 </span>
                 <div class="min-w-0">
@@ -100,7 +100,7 @@
                 @foreach ($walletsPayload as $w)
                     {{-- Flat solid blue card: currency chip, large balance, then a
                          hairline divider before the compact Top Up component.
-                         rounded-[10px] keeps it consistent with the rest of the
+                         rounded-[12px] keeps it consistent with the rest of the
                          dashboard. --}}
                     <div
                         class="wallet-glass group relative flex flex-col gap-4 overflow-hidden rounded-2xl p-5 text-blue-950 transition-transform duration-200 hover:-translate-y-0.5 dark:text-white"
@@ -114,7 +114,7 @@
                                 <p class="mt-3 truncate text-3xl font-extrabold tracking-tight tabular-nums">{{ $w['formatted'] }}</p>
                                 <p class="mt-1 text-xs font-medium text-blue-700/80 dark:text-blue-100/90">{{ $w['code'] }} &middot; {{ $w['label'] }}</p>
                             </div>
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-blue-600/10 ring-1 ring-blue-600/15 dark:bg-white/15 dark:ring-white/20">
+                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-600/10 ring-1 ring-blue-600/15 dark:bg-white/15 dark:ring-white/20">
                                 @if ($w['icon'])
                                     <img src="{{ $w['icon'] }}" alt="" class="h-7 w-7 object-contain" loading="lazy">
                                 @else
@@ -136,10 +136,10 @@
             </div>
         @else
             {{-- Empty state - modern centered card with a soft tinted icon halo. --}}
-            <div class="relative overflow-hidden rounded-[10px] bg-[#eff6ff] px-6 py-16 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+            <div class="relative overflow-hidden rounded-[12px] bg-[#eff6ff] px-6 py-16 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
                 {{-- Soft background glow behind the icon. --}}
                 <div class="pointer-events-none absolute left-1/2 top-8 h-32 w-32 -translate-x-1/2 rounded-full bg-blue-100/60 blur-2xl dark:bg-blue-500/10" aria-hidden="true"></div>
-                <span class="relative mx-auto flex h-16 w-16 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg shadow-blue-600/30 ring-4 ring-white dark:ring-[#0c1a36]">
+                <span class="relative mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg shadow-blue-600/30 ring-4 ring-white dark:ring-[#0c1a36]">
                     <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-7 w-7 brightness-0 invert" loading="lazy">
                 </span>
                 <p class="relative mt-5 text-lg font-bold text-zinc-900 dark:text-white">No wallet yet</p>

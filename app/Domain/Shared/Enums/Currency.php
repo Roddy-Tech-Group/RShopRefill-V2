@@ -42,10 +42,10 @@ enum Currency: string
     {
         return match ($this) {
             self::NGN => 1000.00,
-            self::USD => 5.00,
+            self::USD => 2.00,
             self::GBP => 5.00,
             self::GHS => 20.00,
-            self::XAF => 3000.00,
+            self::XAF => 1500.00,
             self::RCOIN => 0.00,
         };
     }

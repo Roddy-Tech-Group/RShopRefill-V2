@@ -5,7 +5,7 @@
     Notifications - so nothing jumps when the data swaps in.
 --}}
 @php
-    $card = 'overflow-hidden rounded-[10px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none';
+    $card = 'overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none';
 @endphp
 <div class="flex w-full flex-col gap-6 pb-4" aria-hidden="true">
 
@@ -20,7 +20,7 @@
         <x-skeleton class="mb-2.5 hidden h-5 w-44 lg:block" />
         <div class="{{ $card }}">
             <div class="flex items-center gap-4 px-5 pt-6 pb-5 sm:px-6">
-                <x-skeleton class="h-20 w-20 shrink-0" rounded="rounded-[10px]" />
+                <x-skeleton class="h-20 w-20 shrink-0" rounded="rounded-[12px]" />
                 <div class="flex-1 space-y-2.5">
                     <x-skeleton class="h-5 w-36" />
                     <x-skeleton class="h-3.5 w-48 max-w-full" />
@@ -33,7 +33,7 @@
                             <x-skeleton class="h-3 w-20" />
                             <x-skeleton class="h-4 w-40 max-w-full" />
                         </div>
-                        <x-skeleton class="h-8 w-8 shrink-0" rounded="rounded-[10px]" />
+                        <x-skeleton class="h-8 w-8 shrink-0" rounded="rounded-[12px]" />
                     </div>
                 @endfor
             </div>
@@ -46,7 +46,7 @@
         <div class="{{ $card }}">
             @for ($i = 0; $i < 2; $i++)
                 <div class="flex items-center gap-4 p-5">
-                    <x-skeleton class="h-10 w-10 shrink-0" rounded="rounded-[10px]" />
+                    <x-skeleton class="h-10 w-10 shrink-0" rounded="rounded-[12px]" />
                     <div class="flex-1 space-y-2">
                         <x-skeleton class="h-4 w-32" />
                         <x-skeleton class="h-3 w-56 max-w-full" />

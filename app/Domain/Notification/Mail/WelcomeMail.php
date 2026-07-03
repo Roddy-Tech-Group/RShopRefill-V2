@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notification\Mail;
 
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -20,10 +21,12 @@ class WelcomeMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
+
         return new Envelope(
             subject: $this->isGoogleAuth
-                ? 'Welcome to RshopRefills via Google!'
-                : 'Welcome to RshopRefills!',
+                ? 'Welcome to '.$brand.' via Google!'
+                : 'Welcome to '.$brand.'!',
         );
     }
 

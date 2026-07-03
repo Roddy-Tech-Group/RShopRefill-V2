@@ -177,7 +177,7 @@ class extends Component {
 }; ?>
 
 @php
-    $field = 'w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
+    $field = 'w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
     $defaultAvatar = $this->admin->initialsAvatar();
 @endphp
 
@@ -188,7 +188,7 @@ class extends Component {
     <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
         {{-- Profile --}}
-        <div class="rounded-[10px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <h2 class="text-base font-semibold text-zinc-900">Profile</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Your name, photo and the email you sign in with.</p>
 
@@ -197,11 +197,11 @@ class extends Component {
                 <img
                     src="{{ $avatar ? $avatar->temporaryUrl() : ($this->admin->avatar_url ?: $defaultAvatar) }}"
                     alt="{{ $this->admin->name }}"
-                    class="h-20 w-20 shrink-0 rounded-[10px] object-cover ring-1 ring-zinc-200"
+                    class="h-20 w-20 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200"
                 >
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-blue-100">
+                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-blue-100">
                             <input type="file" class="hidden" wire:model="avatar" accept="image/*">
                             <span>Change photo</span>
                         </label>
@@ -211,7 +211,7 @@ class extends Component {
                                 wire:click="updateAvatar"
                                 wire:loading.attr="disabled"
                                 wire:target="updateAvatar"
-                                class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                             >
                                 <span wire:loading.remove wire:target="updateAvatar">Save photo</span>
                                 <span wire:loading wire:target="updateAvatar">Saving...</span>
@@ -240,7 +240,7 @@ class extends Component {
                     @error('email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex items-center gap-3 pt-1">
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                         Save changes
                     </button>
                     <x-action-message on="profile-updated" class="text-sm font-medium text-emerald-600">Saved.</x-action-message>
@@ -249,7 +249,7 @@ class extends Component {
         </div>
 
         {{-- Account details (read-only) --}}
-        <div class="rounded-[10px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <h2 class="text-base font-semibold text-zinc-900">Account details</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Role and status are managed by a super admin.</p>
 
@@ -282,7 +282,7 @@ class extends Component {
         </div>
 
         {{-- Security --}}
-        <div class="rounded-[10px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <h2 class="text-base font-semibold text-zinc-900">Security</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Use a long, random password to keep the admin panel secure.</p>
 
@@ -366,7 +366,7 @@ class extends Component {
                 </div>
 
                 <div class="flex items-center gap-3 pt-1">
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                         Update password
                     </button>
                     <x-action-message on="password-updated" class="text-sm font-medium text-emerald-600">Saved.</x-action-message>
@@ -375,13 +375,13 @@ class extends Component {
         </div>
 
         {{-- Two-Factor Authentication --}}
-        <div class="rounded-[10px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <h2 class="text-base font-semibold text-zinc-900">Two-Factor Authentication</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Add an extra layer of security using an Authenticator app (like Google Authenticator or Authy).</p>
 
             <div class="mt-5">
                 @if ($this->admin->hasTotpEnabled())
-                    <div class="flex items-center justify-between rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <div class="flex items-center justify-between rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3">
                         <div class="flex items-center gap-3">
                             <svg class="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -391,13 +391,13 @@ class extends Component {
                                 <p class="text-xs text-emerald-700">You'll be asked for a code from your app when you sign in.</p>
                             </div>
                         </div>
-                        <button type="button" wire:click="disableTotp" class="rounded-[10px] bg-white px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50">
+                        <button type="button" wire:click="disableTotp" class="rounded-[12px] bg-white px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50">
                             Disable
                         </button>
                     </div>
                 @else
                     @if (!$showTotpSetup)
-                        <div class="flex items-center justify-between rounded-[10px] border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <div class="flex items-center justify-between rounded-[12px] border border-zinc-200 bg-zinc-50 px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <svg class="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -407,17 +407,17 @@ class extends Component {
                                     <p class="text-xs text-zinc-600">Currently using Email OTP as the default verification method.</p>
                                 </div>
                             </div>
-                            <button type="button" wire:click="initiateTotpSetup" class="rounded-[10px] bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-700">
+                            <button type="button" wire:click="initiateTotpSetup" class="rounded-[12px] bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-700">
                                 Set up
                             </button>
                         </div>
                     @else
-                        <div class="rounded-[10px] border border-zinc-200 p-5">
+                        <div class="rounded-[12px] border border-zinc-200 p-5">
                             <h3 class="text-sm font-medium text-zinc-900">Configure Authenticator App</h3>
                             <p class="mt-1 text-xs text-zinc-600">Scan this QR code using Google Authenticator, Authy, or your preferred TOTP app.</p>
 
                             <div class="mt-4 flex flex-col sm:flex-row sm:items-start gap-6">
-                                <div class="rounded-[10px] bg-white p-2 shadow-sm ring-1 ring-zinc-200">
+                                <div class="rounded-[12px] bg-white p-2 shadow-sm ring-1 ring-zinc-200">
                                     {!! \BaconQrCode\Renderer\Image\SvgImageBackEnd::class ? (new \BaconQrCode\Writer(new \BaconQrCode\Renderer\ImageRenderer(new \BaconQrCode\Renderer\RendererStyle\RendererStyle(160), new \BaconQrCode\Renderer\Image\SvgImageBackEnd())))->writeString($totpQrCode) : '' !!}
                                 </div>
                                 <div class="flex-1 space-y-4">
@@ -429,7 +429,7 @@ class extends Component {
                                         <label for="totpCode" class="block text-xs font-medium text-zinc-700">Enter the 6-digit code from your app</label>
                                         <div class="mt-1.5 flex gap-2">
                                             <input wire:model="totpCode" id="totpCode" type="text" inputmode="numeric" maxlength="6" required class="{{ $field }} max-w-[150px] text-center tracking-widest">
-                                            <button type="submit" class="inline-flex items-center justify-center rounded-[10px] bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                                            <button type="submit" class="inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                                                 Verify & Save
                                             </button>
                                         </div>

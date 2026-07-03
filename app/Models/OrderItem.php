@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property int $quantity
  * @property string $display_currency
  * @property float $display_amount
+ * @property float|null $provider_face_value
  * @property float $provider_cost_usd
  * @property float $markup_amount
  * @property float $subtotal_amount
@@ -50,6 +51,7 @@ class OrderItem extends Model
         'quantity',
         'display_currency',
         'display_amount',
+        'provider_face_value',
         'provider_cost_usd',
         'markup_amount',
         'subtotal_amount',
@@ -69,6 +71,7 @@ class OrderItem extends Model
             'variant_snapshot' => 'array',
             'quantity' => 'integer',
             'display_amount' => 'decimal:4',
+            'provider_face_value' => 'decimal:4',
             'provider_cost_usd' => 'decimal:4',
             'markup_amount' => 'decimal:4',
             'subtotal_amount' => 'decimal:4',

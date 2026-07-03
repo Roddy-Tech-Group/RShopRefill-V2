@@ -88,7 +88,7 @@ new class extends Component {
             ])
         >
         @if ($this->unreadCount > 0)
-            <span class="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-[10px] bg-red-500 px-1 text-[10px] font-bold text-white ring-2 {{ $tone === 'light' ? 'ring-[#eff6ff] dark:ring-[#0c1a36]' : 'ring-white' }}">
+            <span class="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-[12px] bg-red-500 px-1 text-[10px] font-bold text-white ring-2 {{ $tone === 'light' ? 'ring-[#eff6ff] dark:ring-[#0c1a36]' : 'ring-white' }}">
                 {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
             </span>
         @endif
@@ -103,7 +103,7 @@ new class extends Component {
         x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-100"
         x-transition:leave-end="opacity-0 -translate-y-1"
-        class="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[10px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+        class="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
         role="menu"
     >
         {{-- Header --}}
@@ -125,7 +125,7 @@ new class extends Component {
                     class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-white/5 {{ $n->read_at ? '' : 'bg-blue-50/60 dark:bg-blue-500/10' }}"
                     role="menuitem"
                 >
-                    <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] {{ $toneColor($n->priority) }}">
+                    <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] {{ $toneColor($n->priority) }}">
                         <svg class="h-4.5 w-4.5 text-white" style="height:1.125rem;width:1.125rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
                         </svg>
@@ -134,7 +134,7 @@ new class extends Component {
                         <span class="flex items-start justify-between gap-2">
                             <span class="truncate text-sm font-semibold text-zinc-900">{{ $n->title }}</span>
                             @unless ($n->read_at)
-                                <span class="mt-1 h-2 w-2 shrink-0 rounded-[10px] bg-blue-600"></span>
+                                <span class="mt-1 h-2 w-2 shrink-0 rounded-[12px] bg-blue-600"></span>
                             @endunless
                         </span>
                         <span class="mt-0.5 block text-xs leading-snug text-zinc-600 line-clamp-2">{{ $n->message }}</span>
@@ -143,7 +143,7 @@ new class extends Component {
                 </button>
             @empty
                 <div class="px-4 py-12 text-center">
-                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-400">
+                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-400">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
                         </svg>

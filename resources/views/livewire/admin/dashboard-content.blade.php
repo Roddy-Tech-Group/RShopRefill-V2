@@ -192,7 +192,7 @@
                              Donut is suppressed on Success Rate — that card keeps
                              its decorative illustration instead. --}}
                         <div class="flex items-start justify-between gap-2">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] {{ $kpi['tone'] }} sm:h-11 sm:w-11">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] {{ $kpi['tone'] }} sm:h-11 sm:w-11">
                                 {{-- no-dark-invert keeps the small emoji-style icon in its
                                      original dark artwork (against the pastel tile) instead
                                      of being flipped white by the blanket dark-mode SVG
@@ -250,7 +250,7 @@
                             type="button"
                             @click="open = ! open"
                             :aria-expanded="open.toString()"
-                            class="flex items-center gap-1.5 rounded-[10px] border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                            class="flex items-center gap-1.5 rounded-[12px] border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:text-zinc-300 dark:hover:bg-[#26416b]"
                         >
                             <span x-text="continent === 'all' ? 'Global' : continent"></span>
                             <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -261,7 +261,7 @@
                             x-show="open"
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             style="display:none;"
-                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                             role="menu"
                         >
                             @php
@@ -280,7 +280,7 @@
                                     type="button"
                                     @click="setContinent(@js($opt['key'])); open = false"
                                     :class="continent === @js($opt['key']) ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
-                                    class="flex w-full items-center justify-between rounded-[10px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
+                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
                                 >
                                     <span>{{ $opt['label'] }}</span>
                                     <svg x-show="continent === @js($opt['key'])" class="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -306,7 +306,7 @@
                     <div
                         x-show="isEmpty()"
                         x-cloak
-                        class="absolute inset-0 z-10 flex items-center justify-center rounded-[10px] bg-zinc-50/95 text-sm text-zinc-600 dark:bg-[#26416b]/95 dark:text-zinc-400"
+                        class="absolute inset-0 z-10 flex items-center justify-center rounded-[12px] bg-zinc-50/95 text-sm text-zinc-600 dark:bg-[#26416b]/95 dark:text-zinc-400"
                     >
                         No completed orders in this period yet.
                     </div>
@@ -322,7 +322,7 @@
                                 type="button"
                                 @click="open = ! open"
                                 :aria-expanded="open.toString()"
-                                class="flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                                class="flex items-center gap-2 rounded-[12px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
                             >
                                 <span>{{ $currentCountryPeriod }}</span>
                                 <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -333,7 +333,7 @@
                                 x-show="open"
                                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                                 style="display:none;"
-                                class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                                class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                                 role="menu"
                             >
                                 @foreach ($countryPeriods as $p)
@@ -342,7 +342,7 @@
                                         wire:click="setCountryDays({{ $p['days'] }})"
                                         @click="open = false"
                                         @class([
-                                            'flex w-full items-center justify-between rounded-[10px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
+                                            'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
                                             'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentCountryPeriod === $p['label'],
                                             'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentCountryPeriod !== $p['label'],
                                         ])
@@ -364,7 +364,7 @@
                                 type="button"
                                 @click="open = ! open"
                                 :aria-expanded="open.toString()"
-                                class="flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                                class="flex items-center gap-2 rounded-[12px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
                             >
                                 <span>{{ $currentCountryCategory }}</span>
                                 <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -375,7 +375,7 @@
                                 x-show="open"
                                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                                 style="display:none;"
-                                class="absolute left-0 bottom-full z-30 mb-2 w-44 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                                class="absolute left-0 bottom-full z-30 mb-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                                 role="menu"
                             >
                                 @foreach ($countryCategories as $cat)
@@ -384,7 +384,7 @@
                                         wire:click="setCountryCategory({{ '\''.$cat['key'].'\'' }})"
                                         @click="open = false"
                                         @class([
-                                            'flex w-full items-center justify-between rounded-[10px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
+                                            'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
                                             'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentCountryCategory === $cat['label'],
                                             'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentCountryCategory !== $cat['label'],
                                         ])
@@ -402,9 +402,9 @@
                     </div>
 
                     {{-- Country / Region toggle — client-side, repaints the map. --}}
-                    <div class="flex items-center gap-1 rounded-[10px] bg-zinc-100 p-1 dark:bg-[#26416b]">
-                        <button type="button" @click="setView('country')" :class="view === 'country' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-200'" class="rounded-[10px] px-3 py-1 text-xs font-semibold transition-colors">Country</button>
-                        <button type="button" @click="setView('region')"  :class="view === 'region'  ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-200'" class="rounded-[10px] px-3 py-1 text-xs font-semibold transition-colors">Region</button>
+                    <div class="flex items-center gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-[#26416b]">
+                        <button type="button" @click="setView('country')" :class="view === 'country' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-200'" class="rounded-[12px] px-3 py-1 text-xs font-semibold transition-colors">Country</button>
+                        <button type="button" @click="setView('region')"  :class="view === 'region'  ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-200'" class="rounded-[12px] px-3 py-1 text-xs font-semibold transition-colors">Region</button>
                     </div>
                 </div>
             </div>
@@ -447,7 +447,7 @@
                             type="button"
                             @click="open = ! open"
                             :aria-expanded="open.toString()"
-                            class="flex items-center gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:hover:bg-[#34507a]"
+                            class="flex items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:hover:bg-[#34507a]"
                         >
                             <span x-text="modeLabel()">Sales / Cost</span>
                             <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -460,7 +460,7 @@
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             x-transition:leave="transition ease-in duration-100"   x-transition:leave-start="opacity-100 translate-y-0"  x-transition:leave-end="opacity-0 -translate-y-1"
                             style="display:none;"
-                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                             role="menu"
                         >
                             @foreach ([['both', 'Sales / Cost'], ['sales', 'Sales'], ['cost', 'Cost']] as [$key, $label])
@@ -468,7 +468,7 @@
                                     type="button"
                                     @click="setMode('{{ $key }}'); open = false"
                                     :class="mode === '{{ $key }}' ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
-                                    class="flex w-full items-center justify-between rounded-[10px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
+                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
                                 >
                                     {{ $label }}
                                     <svg x-show="mode === '{{ $key }}'" class="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -491,7 +491,7 @@
                     <div
                         x-show="isEmpty()"
                         x-cloak
-                        class="absolute inset-0 z-10 mt-2 flex items-center justify-center rounded-[10px] bg-zinc-50/95 text-sm text-zinc-600 dark:bg-[#26416b]/95 dark:text-zinc-400"
+                        class="absolute inset-0 z-10 mt-2 flex items-center justify-center rounded-[12px] bg-zinc-50/95 text-sm text-zinc-600 dark:bg-[#26416b]/95 dark:text-zinc-400"
                     >
                         No completed orders in this period yet.
                     </div>
@@ -506,7 +506,7 @@
                             type="button"
                             @click="open = ! open"
                             :aria-expanded="open.toString()"
-                            class="flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                            class="flex items-center gap-2 rounded-[12px] px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#26416b]"
                         >
                             <span>{{ $currentTrendsLabel }}</span>
                             <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -519,7 +519,7 @@
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             x-transition:leave="transition ease-in duration-100"   x-transition:leave-start="opacity-100 translate-y-0"  x-transition:leave-end="opacity-0 -translate-y-1"
                             style="display:none;"
-                            class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                             role="menu"
                         >
                             @foreach ($trendsPeriods as $p)
@@ -528,7 +528,7 @@
                                     wire:click="setRevenueDays({{ $p['days'] }})"
                                     @click="open = false"
                                     @class([
-                                        'flex w-full items-center justify-between rounded-[10px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
+                                        'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
                                         'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentTrendsLabel === $p['label'],
                                         'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentTrendsLabel !== $p['label'],
                                     ])
@@ -561,7 +561,7 @@
                         <img src="{{ asset('assets/' . rawurlencode('user.svg')) }}" alt="" class="h-5 w-5" loading="lazy">
                         <h2 class="text-base font-semibold text-zinc-900">Latest Users</h2>
                     </div>
-                    <a href="{{ route('admin.customers') }}" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View All</a>
+                    <a href="{{ route('admin.customers') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View All</a>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -582,7 +582,7 @@
                                             @php
                                                 $rowAvatar = $user->avatar_url ?: $user->initialsAvatar();
                                             @endphp
-                                            <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-cover ring-1 ring-blue-100">
+                                            <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100">
                                             <div class="leading-tight">
                                                 <p class="text-[11px] font-semibold text-zinc-900">{{ $user->name }}</p>
                                                 <p class="text-[10px] text-zinc-600">{{ $user->email }}</p>
@@ -604,7 +604,7 @@
                                     </td>
                                     <td class="px-5 py-3 text-[11px] text-zinc-600">{{ $user->created_at->format('M j, Y') }}</td>
                                     <td class="px-5 py-3 text-right">
-                                        <a href="{{ route('admin.customers') }}" class="inline-flex items-center rounded-[10px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View</a>
+                                        <a href="{{ route('admin.customers') }}" class="inline-flex items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View</a>
                                     </td>
                                 </tr>
                             @empty
@@ -624,7 +624,7 @@
                         <img src="{{ asset('assets/' . rawurlencode('Latest transactions.webp')) }}" alt="" class="h-5 w-5 dark:invert dark:brightness-200" loading="lazy">
                         <h2 class="text-base font-semibold text-zinc-900 dark:text-white">Latest Transactions</h2>
                     </div>
-                    <a href="{{ route('admin.transactions') }}" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">View All</a>
+                    <a href="{{ route('admin.transactions') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">View All</a>
                 </div>
 
                 <div class="overflow-x-auto">

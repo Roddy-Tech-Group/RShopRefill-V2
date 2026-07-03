@@ -24,21 +24,39 @@ class SyncTopupsCommand extends Command
 
         $this->info('Syncing Zendit mobile top-ups...');
 
-        do {
+        $knownTotal = 0;
+        $failedPages = [];
+
+        while (true) {
             try {
                 $result = $syncService->sync($page, 100);
-            } catch (\Throwable $e) {
-                $this->error("Page {$page} failed: {$e->getMessage()}");
 
-                return self::FAILURE;
+                $totalProcessed += $result['processed'];
+                $knownTotal = $result['total'] ?: $knownTotal;
+                $this->line("  page {$page}: {$result['processed']} offers  (running total {$totalProcessed} of {$result['total']})");
+                $hasMore = $result['has_more'];
+            } catch (\Throwable $e) {
+                // A single bad page must NOT abort the whole catalog - skip it and keep
+                // going so later pages (where most Data/Bundle plans live) still sync.
+                $this->error("Page {$page} failed: {$e->getMessage()} - skipping.");
+                $failedPages[] = $page;
+                // We couldn't read this page's total/has_more; infer from the last
+                // known total, with a small floor so an early failure still probes on.
+                $hasMore = $knownTotal > 0 ? ($page * 100) < $knownTotal : ($page < 25);
             }
 
-            $totalProcessed += $result['processed'];
-            $this->line("  page {$page}: {$result['processed']} offers  (running total {$totalProcessed} of {$result['total']})");
             $page++;
-        } while ($result['has_more']);
+
+            if (! $hasMore) {
+                break;
+            }
+        }
 
         $this->info("Done. Processed {$totalProcessed} offers.");
+
+        if (! empty($failedPages)) {
+            $this->warn('Skipped pages after retries: '.implode(', ', $failedPages).' - re-run topups:sync to backfill them.');
+        }
 
         // Summary — operators are Products grouped under the mobile-airtime category.
         $category = Category::where('slug', 'mobile-airtime')->first();

@@ -97,12 +97,8 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
 
             // Variable-value top-ups: Zendit takes the amount in the operator's
             // minor units (e.g. cents). Same convention as gift cards.
-            if (isset($item->variant_snapshot['is_variable']) && $item->variant_snapshot['is_variable']) {
-                $divisor = (float) ($item->variant_snapshot['metadata']['send']['currencyDivisor'] ?? 100);
-                $requestPayload['value'] = [
-                    'type' => 'PRICE',
-                    'value' => (int) round($item->display_amount * $divisor),
-                ];
+            if ($variableValue = $this->variablePriceValue($item)) {
+                $requestPayload['value'] = $variableValue;
             }
             $endpoint = '/topups/purchases';
         } elseif ($isBill) {
@@ -142,12 +138,8 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
 
             // Variable-amount bills (post-paid, water, etc.) use the same minor-
             // units convention as vouchers + top-ups.
-            if (isset($item->variant_snapshot['is_variable']) && $item->variant_snapshot['is_variable']) {
-                $divisor = (float) ($item->variant_snapshot['metadata']['send']['currencyDivisor'] ?? 100);
-                $requestPayload['value'] = [
-                    'type' => 'PRICE',
-                    'value' => (int) round($item->display_amount * $divisor),
-                ];
+            if ($variableValue = $this->variablePriceValue($item)) {
+                $requestPayload['value'] = $variableValue;
             }
             $endpoint = '/vouchers/purchases'; // Zendit routes bills through the same vouchers endpoint
         } else {
@@ -162,12 +154,8 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             ];
 
             // For variable price items, Zendit requires value in minor units
-            if (isset($item->variant_snapshot['is_variable']) && $item->variant_snapshot['is_variable']) {
-                $divisor = (float) ($item->variant_snapshot['metadata']['send']['currencyDivisor'] ?? 100);
-                $requestPayload['value'] = [
-                    'type' => 'PRICE',
-                    'value' => (int) round($item->display_amount * $divisor),
-                ];
+            if ($variableValue = $this->variablePriceValue($item)) {
+                $requestPayload['value'] = $variableValue;
             }
             $endpoint = '/vouchers/purchases';
         }
@@ -221,6 +209,16 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             ]);
 
             if ($response->failed() || ! isset($responseBody['transactionId'])) {
+                // We resent a transaction id Zendit already holds (typically an auto-retry
+                // after a timed-out response). Treating this as a failure would refund an
+                // item Zendit may have actually delivered - instead look up the existing
+                // transaction's real status and act on that.
+                if (($responseBody['errorCode'] ?? null) === 'transaction_duplicate_id') {
+                    $breaker->recordSuccess();
+
+                    return $this->recoverDuplicateTransaction($item, $customTransactionId, $isEsim, $isTopup);
+                }
+
                 $breaker->recordFailure();
                 Log::error("Zendit transaction failed: {$item->id}", [
                     'status' => $response->status(),
@@ -268,6 +266,94 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                 'reference' => null,
                 'payload' => [],
             ];
+        }
+    }
+
+    /**
+     * Build Zendit's `value` object for a variable/custom-amount item, or null
+     * for a fixed-denomination item (whose offerId already encodes the value).
+     *
+     * Zendit wants the amount in the OFFER's currency, in minor units. We send
+     * `provider_face_value` (the chosen face value captured at checkout in the
+     * offer currency, e.g. USD for a Visa card) - NOT `display_amount`, which is
+     * the display-currency figure. Sending the converted display_amount made
+     * Zendit read a USD card's XAF amount as USD ("value is out of range").
+     *
+     * Older items predate the provider_face_value column; back the offer amount
+     * out of display_amount via the order's stored exchange rate so an in-flight
+     * order never sends a converted figure.
+     *
+     * @return array{type: string, value: int}|null
+     */
+    private function variablePriceValue(OrderItem $item): ?array
+    {
+        if (empty($item->variant_snapshot['is_variable'])) {
+            return null;
+        }
+
+        $divisor = (float) ($item->variant_snapshot['metadata']['send']['currencyDivisor'] ?? 100);
+
+        $faceValue = $item->provider_face_value;
+        if ($faceValue === null) {
+            $rate = (float) (data_get($item->order, 'metadata.exchange_rate') ?: 1);
+            $faceValue = $rate > 0 ? ((float) $item->display_amount / $rate) : (float) $item->display_amount;
+        }
+
+        return [
+            'type' => 'PRICE',
+            'value' => (int) round((float) $faceValue * $divisor),
+        ];
+    }
+
+    /**
+     * Resolve a "transaction_duplicate_id" rejection by fetching the existing
+     * transaction's real status (Zendit keys transactions by the id we supply).
+     *
+     * A delivered transaction comes back Fulfilled (no false refund); an
+     * unconfirmed or errored lookup stays Processing so polling retries rather
+     * than refunding something that may have gone through; a genuinely declined
+     * transaction comes back Failed so the normal refund path runs.
+     *
+     * @return array{status: FulfillmentStatus, reference: string, payload: array<string, mixed>}
+     */
+    private function recoverDuplicateTransaction(OrderItem $item, string $transactionId, bool $isEsim, bool $isTopup): array
+    {
+        $endpoint = match (true) {
+            $isEsim => "/esim/purchases/{$transactionId}",
+            $isTopup => "/topups/purchases/{$transactionId}",
+            default => "/vouchers/purchases/{$transactionId}",
+        };
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(10)
+                ->withToken($this->apiKey)
+                ->acceptJson()
+                ->get("{$this->baseUrl}{$endpoint}");
+
+            $body = $response->json() ?? [];
+
+            if ($response->failed()) {
+                Log::warning("Zendit duplicate-id lookup unconfirmed for {$transactionId} (item {$item->id})", [
+                    'http_status' => $response->status(),
+                    'body' => $body,
+                ]);
+
+                // Can't confirm - keep it in flight rather than refund a possible delivery.
+                return ['status' => FulfillmentStatus::Processing, 'reference' => $transactionId, 'payload' => $body];
+            }
+
+            $statusEnum = match (strtoupper($body['status'] ?? 'PENDING')) {
+                'SUCCESS', 'COMPLETED', 'DONE' => FulfillmentStatus::Fulfilled,
+                'PENDING', 'PROCESSING', 'AUTHORIZED', 'IN_PROGRESS', 'ACCEPTED' => FulfillmentStatus::Processing,
+                default => FulfillmentStatus::Failed,
+            };
+
+            return ['status' => $statusEnum, 'reference' => $transactionId, 'payload' => $body];
+        } catch (\Exception $e) {
+            Log::error("Zendit duplicate-id lookup threw for {$transactionId}: ".$e->getMessage());
+
+            return ['status' => FulfillmentStatus::Processing, 'reference' => $transactionId, 'payload' => []];
         }
     }
 

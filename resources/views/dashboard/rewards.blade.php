@@ -114,7 +114,7 @@
                 @if ($hasMultiplier)
                     {{-- Power-user multiplier badge. Only renders when admin
                          has bumped the user above (or dropped below) 1×. --}}
-                    <span class="inline-flex items-center gap-1.5 rounded-[10px] bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-sm shadow-orange-500/30">
+                    <span class="inline-flex items-center gap-1.5 rounded-[12px] bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-sm shadow-orange-500/30">
                         <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 2l2.39 7.36H22l-6.18 4.49L18.18 21 12 16.51 5.82 21l2.36-7.15L2 9.36h7.61z"/>
                         </svg>
@@ -123,9 +123,9 @@
                 @endif
             </div>
 
-            <div class="mt-4 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
+            <div class="mt-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
                 <div class="flex items-start gap-4">
-                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 shadow-sm shadow-zinc-900/10">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 shadow-sm shadow-zinc-900/10">
                         <img src="{{ $coin }}" alt="Rcoin" class="h-7 w-7 object-contain">
                     </span>
 
@@ -160,9 +160,9 @@
         <section>
             <h2 class="text-sm font-bold text-black">Earn more Rcoin</h2>
 
-            <div class="mt-3 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
+            <div class="mt-3 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
                 <div class="flex items-start gap-4">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 dark:bg-blue-500/15">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 dark:bg-blue-500/15">
                         <img src="{{ asset('assets/referals.webp') }}" alt="" class="no-dark-invert h-5 w-5 object-contain" loading="lazy">
                     </span>
                     <div class="min-w-0">
@@ -177,11 +177,11 @@
 
                 {{-- Two ways referrals pay out Rcoin. --}}
                 <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
-                    <div class="rounded-[10px] bg-blue-50 px-3 py-2.5 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                    <div class="rounded-[12px] bg-blue-50 px-3 py-2.5 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
                         <p class="font-semibold text-zinc-900">On sign-up</p>
                         <p class="text-xs text-zinc-600">Rcoin lands when your referral creates their account.</p>
                     </div>
-                    <div class="rounded-[10px] bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
+                    <div class="rounded-[12px] bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
                         <p class="font-semibold text-zinc-900">On every order</p>
                         <p class="text-xs text-zinc-600">Keep earning Rcoin each time they buy.</p>
                     </div>
@@ -197,14 +197,14 @@
                 {{-- Convert to wallet - instant Rcoin → USD wallet swap.
                      Posts to RcoinConvertController. Min USD floor lives in
                      `wallet_conversion_min_usd` setting (default $2). --}}
-                <div class="flex flex-col rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-[10px] bg-blue-50 dark:bg-blue-500/15">
+                <div class="flex flex-col rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-[12px] bg-blue-50 dark:bg-blue-500/15">
                         <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="no-dark-invert h-5 w-5 dark:invert dark:brightness-200" loading="lazy">
                     </span>
                     <p class="mt-3 text-base font-bold text-black">Convert to wallet balance</p>
                     <p class="mt-1 text-sm text-zinc-600">Swap your Rcoin for instant USD wallet credit. Spend it on any product - gift cards, eSIMs, top-ups, flights.</p>
 
-                    <div class="mt-4 rounded-[10px] bg-blue-50 px-3 py-2.5 text-sm ring-1 ring-blue-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                    <div class="mt-4 rounded-[12px] bg-blue-50 px-3 py-2.5 text-sm ring-1 ring-blue-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
                         <div class="flex items-center justify-between">
                             <span class="text-zinc-600">Available</span>
                             <span class="inline-flex items-center gap-1 font-bold text-zinc-900">
@@ -219,7 +219,7 @@
 
                     {{-- Status flash pops as the global flash-toast pill (dashboard layout). --}}
                     @error('convert_amount')
-                        <p class="mt-3 rounded-[10px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ $message }}</p>
+                        <p class="mt-3 rounded-[12px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ $message }}</p>
                     @enderror
 
                     @if ($canConvert)
@@ -233,16 +233,16 @@
                                 step="1"
                                 value="{{ $convertThreshold }}"
                                 placeholder="Rcoin to convert"
-                                class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                             >
                             <p class="text-[11px] text-zinc-500">Minimum {{ number_format($convertThreshold) }} Rcoin (≈ ${{ number_format($convertMinUsd, 2) }}). Credit lands in your USD wallet instantly.</p>
-                            <button type="submit" class="mt-1 w-full rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                            <button type="submit" class="mt-1 w-full rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                                 Convert to USD wallet
                             </button>
                         </form>
                     @else
                         <div class="mt-auto pt-4">
-                            <button type="button" disabled class="w-full cursor-not-allowed rounded-[10px] bg-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-500">
+                            <button type="button" disabled class="w-full cursor-not-allowed rounded-[12px] bg-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-500">
                                 {{ number_format(max(0, $convertThreshold - $rcoinBalance)) }} more Rcoin to unlock (${{ number_format($convertMinUsd, 2) }} minimum)
                             </button>
                             <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
@@ -255,15 +255,15 @@
                 {{-- Withdraw to cash --}}
                 <div
                     x-data="{ amount: '', method: 'wallet' }"
-                    class="flex flex-col rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none"
+                    class="flex flex-col rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none"
                 >
-                    <span class="flex h-10 w-10 items-center justify-center rounded-[10px] bg-emerald-50 dark:bg-emerald-500/15">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-[12px] bg-emerald-50 dark:bg-emerald-500/15">
                         <img src="{{ asset('assets/' . rawurlencode('wallet 2.svg')) }}" alt="" class="no-dark-invert h-5 w-5 dark:invert dark:brightness-200" loading="lazy">
                     </span>
                     <p class="mt-3 text-base font-bold text-black">Withdraw to cash</p>
                     <p class="mt-1 text-sm text-zinc-600">Cash out your Rcoin balance once you reach the minimum.</p>
 
-                    <div class="mt-4 rounded-[10px] bg-emerald-50 px-3 py-2.5 text-sm ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
+                    <div class="mt-4 rounded-[12px] bg-emerald-50 px-3 py-2.5 text-sm ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
                         <div class="flex items-center justify-between">
                             <span class="text-zinc-600">Available</span>
                             <span class="inline-flex items-center gap-1 font-bold text-zinc-900">
@@ -282,7 +282,7 @@
                              creates a `pending` RcoinWithdrawal row for admin review. --}}
                         {{-- Status flash pops as the global flash-toast pill (dashboard layout). --}}
                         @error('withdraw_amount')
-                            <p class="mt-3 rounded-[10px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ $message }}</p>
+                            <p class="mt-3 rounded-[12px] bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{{ $message }}</p>
                         @enderror
                         <form method="POST" action="{{ route('dashboard.rewards.withdraw') }}" class="mt-4 flex flex-col gap-2.5">
                             @csrf
@@ -293,7 +293,7 @@
                                 min="{{ $withdrawThreshold }}"
                                 max="{{ $rcoinBalance }}"
                                 placeholder="Rcoin to withdraw"
-                                class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                             >
                             {{-- Brand dropdown (custom Alpine listbox, not the
                                  native select): same recipe as the admin and
@@ -312,7 +312,7 @@
                                     :aria-expanded="openMethod.toString()"
                                     aria-haspopup="listbox"
                                     :class="openMethod ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-zinc-400'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] border bg-white py-2.5 pl-3 pr-3 text-sm font-medium text-zinc-900 outline-none transition-colors"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border bg-white py-2.5 pl-3 pr-3 text-sm font-medium text-zinc-900 outline-none transition-colors"
                                 >
                                     <span x-text="methodLabels[method] ?? 'Choose method'">RShop wallet</span>
                                     <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="openMethod && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -328,7 +328,7 @@
                                     x-transition:leave-start="opacity-100 translate-y-0"
                                     x-transition:leave-end="opacity-0 -translate-y-1"
                                     style="display:none;"
-                                    class="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[10px] bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200"
+                                    class="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[12px] bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200"
                                     role="listbox"
                                 >
                                     <template x-for="(label, value) in methodLabels" :key="value">
@@ -338,7 +338,7 @@
                                             :aria-selected="(method === value).toString()"
                                             @click="method = value; openMethod = false"
                                             :class="method === value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-50'"
-                                            class="flex w-full items-center justify-between rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors"
+                                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors"
                                         >
                                             <span x-text="label"></span>
                                             <svg x-show="method === value" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -348,19 +348,19 @@
                                     </template>
                                 </div>
                             </div>
-                            <button type="submit" class="mt-1 w-full rounded-[10px] bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
+                            <button type="submit" class="mt-1 w-full rounded-[12px] bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
                                 Request withdrawal
                             </button>
                         </form>
                     @else
                         <div class="mt-auto pt-4">
                             @if ($kycBlocksWithdrawal)
-                                <a href="{{ route('dashboard.kyc') }}" wire:navigate class="block w-full rounded-[10px] bg-amber-50 px-4 py-2.5 text-center text-sm font-semibold text-amber-700 ring-1 ring-amber-200 transition-colors hover:bg-amber-100">
+                                <a href="{{ route('dashboard.kyc') }}" wire:navigate class="block w-full rounded-[12px] bg-amber-50 px-4 py-2.5 text-center text-sm font-semibold text-amber-700 ring-1 ring-amber-200 transition-colors hover:bg-amber-100">
                                     Verify your identity to unlock withdrawals
                                 </a>
                                 <p class="mt-2 text-center text-[11px] text-zinc-500">KYC is required for withdrawals.</p>
                             @else
-                                <button type="button" disabled class="w-full cursor-not-allowed rounded-[10px] bg-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-500">
+                                <button type="button" disabled class="w-full cursor-not-allowed rounded-[12px] bg-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-500">
                                     {{ number_format($withdrawThreshold - $rcoinBalance) }} more Rcoin to unlock
                                 </button>
                                 <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
@@ -436,7 +436,7 @@
         {{-- ─── Rcoin history ─── --}}
         <section>
             <h2 class="mb-3 text-sm font-bold text-black">Rcoin history</h2>
-            <div class="divide-y divide-zinc-100 rounded-[10px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+            <div class="divide-y divide-zinc-100 rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
                 @forelse ($rcoinHistory as $entry)
                     <div class="flex items-center justify-between gap-4 px-5 py-3">
                         <div class="min-w-0">

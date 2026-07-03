@@ -15,18 +15,18 @@
         ->all();
 @endphp
 
-<x-layouts.app.header :title="'FAQ | RshopRefills'">
+<x-layouts.app.header :title="'FAQ | '.$siteName">
 
     <div class="mx-auto w-full max-w-[1140px] px-4 py-14 sm:px-6 sm:py-20">
         <div class="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-14">
 
             {{-- Title --}}
-            <div class="lg:sticky lg:top-28 lg:self-start">
-                <h1 class="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">Everything you need to know</h1>
-                <p class="mt-3 text-sm text-zinc-600 sm:text-base">Frequently asked questions</p>
-                <p class="mt-6 text-sm leading-relaxed text-zinc-600">
-                    Still need help? Visit our <a href="{{ route('shop.help') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Help Center</a>
-                    or <a href="{{ route('shop.contact') }}" wire:navigate class="font-medium text-blue-600 hover:underline">contact our team</a>.
+            <div class="lg:sticky lg:top-[156px] lg:self-start">
+                <h1 class="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl dark:text-white">Everything you need to know</h1>
+                <p class="mt-3 text-sm text-zinc-600 sm:text-base dark:text-zinc-400">Frequently asked questions</p>
+                <p class="mt-6 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    Still need help? Visit our <a href="{{ route('shop.help') }}" wire:navigate class="font-medium text-blue-600 hover:underline dark:text-blue-400">Help Center</a>
+                    or <a href="{{ route('shop.contact') }}" wire:navigate class="font-medium text-blue-600 hover:underline dark:text-blue-400">contact our team</a>.
                 </p>
             </div>
 
@@ -34,18 +34,18 @@
             <div class="lg:col-span-2">
                 @foreach ($groups as $heading => $items)
                     <section class="mt-2 first:mt-0">
-                        <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-500">{{ $heading }}</h2>
-                        <div class="mt-3 border-t border-zinc-100">
+                        <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ $heading }}</h2>
+                        <div class="mt-3 border-t border-zinc-100 dark:border-zinc-700/60">
                             @foreach ($items as [$q, $a])
-                                <div x-data="{ open: false }" class="border-b border-zinc-100">
+                                <div x-data="{ open: false }" class="border-b border-zinc-100 dark:border-zinc-700/60">
                                     <button type="button" @click="open = ! open" :aria-expanded="open.toString()" class="flex w-full items-center justify-between gap-4 py-4 text-left">
-                                        <span class="text-sm font-semibold text-zinc-900 sm:text-base">{{ $q }}</span>
-                                        <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform duration-200" :class="open && 'rotate-45'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <span class="text-sm font-semibold text-zinc-900 sm:text-base dark:text-white">{{ $q }}</span>
+                                        <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform duration-200 dark:text-zinc-400" :class="open && 'rotate-45'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                                         </svg>
                                     </button>
                                     <div x-show="open" x-collapse x-cloak>
-                                        <p class="pb-4 pr-8 text-sm leading-relaxed text-zinc-600">{{ $a }}</p>
+                                        <p class="pb-4 pr-8 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{{ $a }}</p>
                                     </div>
                                 </div>
                             @endforeach

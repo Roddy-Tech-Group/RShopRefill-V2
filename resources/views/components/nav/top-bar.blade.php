@@ -21,7 +21,7 @@
                 href="{{ config('services.trustpilot.profile_url') }}"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-[10px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 aria-label="See our {{ number_format($tpRating, 1) }} out of 5 rating on Trustpilot (opens in a new tab)"
             >
                 {{-- Stars: each one is its own 16px box. The "fill" is driven
@@ -63,9 +63,9 @@
             <button
                 type="button"
                 @click="localeModalOpen = true"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-[10px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
-                <img :src="'https://flagcdn.com/w40/' + (countryCode || 'us').toLowerCase() + '.png'" alt="" class="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200">
+                <img :src="'https://flagcdn.com/w40/' + (countryCode || 'us').toLowerCase() + '.png'" alt="" class="h-4 w-6 shrink-0 rounded-[3px] object-cover ring-1 ring-zinc-200">
                 <span x-text="country">United States</span>
             </button>
 
@@ -73,7 +73,7 @@
             <button
                 type="button"
                 @click="localeModalOpen = true"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-[10px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
                 <svg viewBox="0 0 24 24" class="h-5 w-5 shrink-0" fill="currentColor" aria-hidden="true">
                     <path d="M22.55 18.71a1 1 0 0 0 -1.24 0.61 4 4 0 0 1 -6.6 1.58 0.51 0.51 0 0 1 -0.15 -0.35 0.47 0.47 0 0 1 0.15 -0.35l1.51 -1.52a0.48 0.48 0 0 0 0.11 -0.53 0.49 0.49 0 0 0 -0.45 -0.3h-4.37a0.49 0.49 0 0 0 -0.49 0.49v4.37a0.5 0.5 0 0 0 0.3 0.45 0.51 0.51 0 0 0 0.54 -0.11l0.77 -0.77a0.5 0.5 0 0 1 0.69 0A6 6 0 0 0 23.16 20a1 1 0 0 0 -0.61 -1.29Z"/>
@@ -84,13 +84,13 @@
             </button>
 
             {{-- Help --}}
-            <a href="{{ route('shop.help') }}" wire:navigate class="flex items-center gap-1.5 px-2.5 py-1 rounded-[10px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+            <a href="{{ route('shop.help') }}" wire:navigate class="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] text-[13px] font-medium text-zinc-900 hover:bg-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                 <img src="{{ asset('assets/' . rawurlencode('new info.svg')) }}" alt="" class="w-5 h-5 shrink-0" loading="lazy">
                 <span>Help</span>
             </a>
 
             {{-- Theme picker (light / dark / system) — hover or click to open --}}
-            <x-theme-toggle class="h-9 w-9 rounded-[10px] text-zinc-900 hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40" />
+            <x-theme-toggle class="h-9 w-9 rounded-[12px] text-zinc-900 hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40" />
 
             </div>
         </div>

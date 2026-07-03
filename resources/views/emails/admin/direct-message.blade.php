@@ -1,9 +1,9 @@
 @php
     $isWarning = $type === 'warning';
-    $headline = $isWarning ? 'Important update about your account' : 'A message from RshopRefills';
+    $headline = $isWarning ? 'Important update about your account' : 'A message from '.$siteName;
     $preheader = $isWarning
-        ? 'Please review this warning about your RshopRefills account.'
-        : 'You have a new message from the RshopRefills team.';
+        ? 'Please review this warning about your '.$siteName.' account.'
+        : 'You have a new message from the '.$siteName.' team.';
     $accent = $isWarning ? '#b45309' : '#2563eb';   // amber-700 vs brand blue
     $bgTint = $isWarning ? '#fef3c7' : '#dbeafe';   // amber-100 vs blue-100
     $badge  = $isWarning ? 'Warning' : 'Notification';

@@ -175,7 +175,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                         required
                         autocomplete="email"
                         placeholder="Enter your email address"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                 </div>
                 @error('email') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
@@ -198,12 +198,12 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="Create a new password"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button
                         type="button"
                         @click="show = !show"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[10px] text-zinc-600 hover:text-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[12px] text-zinc-600 hover:text-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                         :aria-label="show ? 'Hide password' : 'Show password'"
                     >
                         <svg x-show="!show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -235,12 +235,12 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="Re-enter your new password"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button
                         type="button"
                         @click="show = !show"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[10px] text-zinc-600 hover:text-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[12px] text-zinc-600 hover:text-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                         :aria-label="show ? 'Hide password' : 'Show password'"
                     >
                         <svg x-show="!show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -270,7 +270,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
 
             <button
                 type="submit"
-                class="mt-2 flex w-full items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                class="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
             >
                 <span>Reset password</span>
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">

@@ -8,7 +8,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Privacy Policy | RshopRefills'">
+<x-layouts.app.header :title="'Privacy Policy | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -23,15 +23,15 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            Your privacy matters to us. This policy explains, in plain language, what information RshopRefills collects, how we
+            Your privacy matters to us. This policy explains, in plain language, what information {{ $siteName }} collects, how we
             use it, who we share it with, and the rights you have over your data. We serve customers across Africa and
             internationally, and we work to comply with applicable data-protection laws, including the EU GDPR, the California
-            CCPA, the Nigeria Data Protection Act (NDPA) and the Kenya Data Protection Act. By using RshopRefills, you agree to
+            CCPA, the Nigeria Data Protection Act (NDPA) and the Kenya Data Protection Act. By using {{ $siteName }}, you agree to
             this policy.
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#collect" class="font-medium text-blue-600 hover:underline">1. Information we collect</a></li>
@@ -52,7 +52,7 @@
             </p>
 
             <div class="mt-5 space-y-4">
-                <div class="rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Account information</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Your name, email address and phone number.</li>
@@ -61,7 +61,7 @@
                     </ul>
                 </div>
 
-                <div class="rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Identity verification (KYC)</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Government-issued identification, such as a national ID card.</li>
@@ -70,13 +70,13 @@
                     </ul>
                 </div>
 
-                <div class="rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Transaction and payment data</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>The payment methods you use, your transaction history and your billing address.</li>
                         <li>Records of purchases, refunds and wallet top-ups.</li>
                     </ul>
-                    <div class="mt-4 flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+                    <div class="mt-4 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                         <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                         <div>
                             <p class="text-sm font-bold text-blue-700">We do not store full card numbers</p>
@@ -85,7 +85,7 @@
                     </div>
                 </div>
 
-                <div class="rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Technical and location data</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Your IP address and device identifiers.</li>
@@ -106,7 +106,7 @@
                 <li>To keep the platform secure, reliable and improving over time.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Fraud prevention keeps your money safe</p>
@@ -131,8 +131,8 @@
                 <li><span class="font-semibold text-zinc-900">Regulators and authorities</span>, when we are legally required to share information.</li>
             </ul>
 
-            <div class="my-5 rounded-[10px] bg-blue-600 p-6">
-                <span class="flex h-12 w-12 items-center justify-center rounded-[10px] bg-white/15">
+            <div class="my-5 rounded-[12px] bg-blue-600 p-6">
+                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-white/15">
                     <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </span>
                 <p class="mt-4 text-lg font-bold text-white">We never sell your personal data to third-party advertisers.</p>
@@ -166,7 +166,7 @@
                 <li><span class="font-semibold text-zinc-900">Withdraw consent</span> where we rely on it.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Some records must be kept by law</p>

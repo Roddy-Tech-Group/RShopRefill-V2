@@ -20,7 +20,18 @@
             ->where('country_code', $region)
             ->when($giftCardsCategory, fn ($q) => $q->where('category_id', $giftCardsCategory->id));
         if ($flag) {
-            $base->where($flag, true);
+            // Curation is brand-level. A product row carries is_featured /
+            // is_popular on a single country, but the badge should follow the
+            // brand: flagging Amazon's GB row must still feature Amazon on the
+            // US homepage. So we gather every flagged brand_key (any country)
+            // and keep the region's own row above for correct price + link.
+            $flaggedKeys = Product::query()
+                ->where($flag, true)
+                ->whereNotNull('brand_key')
+                ->when($giftCardsCategory, fn ($q) => $q->where('category_id', $giftCardsCategory->id))
+                ->distinct()
+                ->pluck('brand_key');
+            $base->whereIn('brand_key', $flaggedKeys);
         }
         $ids = (clone $base)
             ->select('brand_key', DB::raw("COALESCE(MIN(CASE WHEN country_code = 'US' THEN id END), MIN(id)) as id"))

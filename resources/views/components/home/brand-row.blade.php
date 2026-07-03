@@ -90,10 +90,16 @@
         nudge(dir) {
             const t = this.$refs.track;
             if (! t) { return; }
-            const first   = t.querySelector('.carousel-list > *');
-            const perStep = window.innerWidth >= 640 ? 2 : 1;
-            const gap     = window.innerWidth >= 640 ? 20 : 16;
-            const step    = first ? (first.getBoundingClientRect().width + gap) * perStep : t.clientWidth * 0.8;
+            const first = t.querySelector('.carousel-list > *');
+            const gap   = window.innerWidth >= 640 ? 20 : 16;
+            // Jump a full page of cards (however many fit in the visible track),
+            // keeping one card of overlap for context. A fixed 2-card step meant
+            // long rows took many arrow clicks to cross; a page-sized nudge reaches
+            // the end in a couple.
+            const cardW = first ? first.getBoundingClientRect().width + gap : 0;
+            const step  = cardW > 0
+                ? cardW * Math.max(1, Math.floor(t.clientWidth / cardW) - 1)
+                : t.clientWidth * 0.9;
             t.scrollBy({ left: dir * step, behavior: 'smooth' });
         },
     }"
@@ -117,7 +123,7 @@
                     </svg>
                 </a>
             @elseif ($viewAllVariant !== 'none')
-                <a href="{{ $viewAllHref }}" class="shrink-0 text-base font-medium text-zinc-700 underline underline-offset-4 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
+                <a href="{{ $viewAllHref }}" class="inline-flex shrink-0 items-center rounded-[8px] bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">
                     See all
                 </a>
             @endif
@@ -160,8 +166,12 @@
             x-ref="track"
             @scroll.passive="refresh()"
             @resize.window.debounce.200ms="setup()"
-            class="{{ $bleed ? 'mx-[calc(50%-50vw)] w-screen' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] [scroll-snap-type:x_proximity] scroll-pl-4 sm:scroll-pl-6 lg:scroll-pl-8"
-            style="scroll-behavior: smooth;"
+            {{-- Free native horizontal scroll, matching the "How it works" row: no
+                 scroll-snap and no container-level `scroll-behavior: smooth`. Both fight
+                 the -webkit-overflow-scrolling momentum and make the swipe feel
+                 catchy/sluggish instead of gliding freely. The arrow buttons still
+                 animate via nudge()'s explicit scrollBy({ behavior: 'smooth' }). --}}
+            class="{{ $bleed ? 'mx-[calc(50%-50vw)] w-screen' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
         >
             {{-- pl-* / --card-w fallbacks: setup() overrides paddingLeft and sets
                  --card-w inline at runtime; these keep a sane layout pre-JS. --}}
@@ -172,18 +182,20 @@
                 x-ref="list"
                 data-reveal-group
                 style="--card-w: 160px;"
-                class="carousel-list flex w-max gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0 [&>*]:snap-start"
+                class="carousel-list flex w-max gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0"
             >
                 {{ $slot }}
             </ul>
         </div>
     @else
-        {{-- Grid mode (default): horizontal scroll on mobile, responsive grid on tablet+. --}}
-        <div class="-mx-4 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0 sm:py-0">
+        {{-- Grid mode (default): horizontal scroll on mobile, responsive grid on tablet+.
+             -webkit-overflow-scrolling:touch gives the mobile swipe the same native
+             momentum glide as the testimonial carousel (otherwise it scrolls flat). --}}
+        <div class="-mx-4 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] sm:mx-0 sm:overflow-visible sm:px-0 sm:py-0">
             @if ($loading)
                 <ul class="skeleton-stagger-fast flex w-max gap-4 sm:grid sm:w-full sm:grid-cols-3 sm:gap-5 {{ $gridCols }}">
                     @for ($i = 0; $i < (int) $cols; $i++)
-                        <li class="rounded-[10px] bg-white p-3 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100" style="--i: {{ $i }}">
+                        <li class="rounded-[12px] bg-white p-3 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100" style="--i: {{ $i }}">
                             <x-skeleton class="aspect-[16/10] w-full rounded-[15px]" />
                             <x-skeleton class="mt-3 h-4 w-3/4" />
                         </li>

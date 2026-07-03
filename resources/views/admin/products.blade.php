@@ -216,7 +216,7 @@
                 ['label' => 'Featured', 'value' => $stats['featured'], 'dot' => 'bg-amber-500'],
                 ['label' => 'Popular',  'value' => $stats['popular'],  'dot' => 'bg-fuchsia-500'],
             ] as $stat)
-                <div class="rounded-[10px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -248,7 +248,7 @@
                     @input="suggest()"
                     value="{{ $search }}"
                     placeholder="Search products by name, SKU or country (e.g. Cameroon, US, ESIM-AD)"
-                    class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                    class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
                 />
                 @if ($categorySlug !== 'all')
                     <input type="hidden" name="category" value="{{ $categorySlug }}">
@@ -261,7 +261,7 @@
                     x-show="results.length > 0 || loading"
                     x-cloak
                     x-transition.opacity
-                    class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-[10px] bg-white/90 ring-1 ring-zinc-900/10 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl dark:bg-[#0c1a36]/95 dark:ring-white/10 dark:shadow-black/40"
+                    class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-[12px] bg-white/90 ring-1 ring-zinc-900/10 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl dark:bg-[#0c1a36]/95 dark:ring-white/10 dark:shadow-black/40"
                 >
                     {{-- Loading state --}}
                     <div x-show="loading" class="flex items-center gap-2 px-4 py-3 text-[12px] text-zinc-500 dark:text-zinc-400">
@@ -279,13 +279,13 @@
                                 <a
                                     :href="'{{ route('admin.products') }}?q=' + encodeURIComponent(row.name || row.sku)"
                                     wire:navigate
-                                    class="flex items-center gap-3 rounded-[10px] px-3 py-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                                    class="flex items-center gap-3 rounded-[12px] px-3 py-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-500/10"
                                 >
                                     <template x-if="row.logo">
-                                        <img :src="row.logo" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-contain bg-white ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
+                                        <img :src="row.logo" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-contain bg-white ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
                                     </template>
                                     <template x-if="! row.logo">
-                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/20" x-text="(row.brand || row.name || row.sku || '').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase() || '—'"></span>
+                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/20" x-text="(row.brand || row.name || row.sku || '').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase() || '—'"></span>
                                     </template>
                                     <span class="min-w-0 flex-1 leading-tight">
                                         <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.brand || row.name || row.sku"></span>
@@ -357,7 +357,7 @@
                     type="button"
                     @click="open = ! open; if (open) $nextTick(() => $refs.countrySearch.focus())"
                     :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-zinc-400'"
-                    class="flex w-full items-center gap-2 rounded-[10px] border bg-white py-2.5 pl-3 pr-3 text-sm text-zinc-900 outline-none transition-colors"
+                    class="flex w-full items-center gap-2 rounded-[12px] border bg-white py-2.5 pl-3 pr-3 text-sm text-zinc-900 outline-none transition-colors"
                 >
                     <span class="flex-1 truncate text-left font-medium">
                         @if ($selectedCountryName)
@@ -380,7 +380,7 @@
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
                     style="display:none;"
-                    class="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[10px] border border-zinc-200 bg-white shadow-xl shadow-zinc-900/10"
+                    class="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[12px] border border-zinc-200 bg-white shadow-xl shadow-zinc-900/10"
                 >
                     <div class="border-b border-zinc-100 p-2">
                         <input
@@ -388,13 +388,13 @@
                             x-model="search"
                             type="text"
                             placeholder="Search countries"
-                            class="w-full rounded-[10px] border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                            class="w-full rounded-[12px] border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
                         >
                     </div>
                     <div class="max-h-72 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         <a
                             href="{{ $countryFilterUrl(null) }}"
-                            class="flex items-center justify-between rounded-[10px] px-3 py-2 text-sm font-medium transition-colors {{ $country === 'ALL' ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-100' }}"
+                            class="flex items-center justify-between rounded-[12px] px-3 py-2 text-sm font-medium transition-colors {{ $country === 'ALL' ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-100' }}"
                         >
                             <span>All countries</span>
                             <span class="text-xs text-zinc-500">{{ number_format($stats['total']) }}</span>
@@ -407,7 +407,7 @@
                             <a
                                 href="{{ $countryFilterUrl($code) }}"
                                 x-show="'{{ Str::lower($name . ' ' . $code) }}'.includes(search.toLowerCase())"
-                                class="flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors {{ $country === $code ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-100' }}"
+                                class="flex items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-sm font-medium transition-colors {{ $country === $code ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-100' }}"
                             >
                                 <span class="flex min-w-0 items-center gap-2">
                                     @if (Product::flagUrl($code))
@@ -423,7 +423,7 @@
             </div>
 
             @if ($anyFilter)
-                <a href="{{ route('admin.products') }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
+                <a href="{{ route('admin.products') }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
                     <img src="{{ asset('assets/' . rawurlencode('x button.webp')) }}" alt="" class="h-4 w-4 object-contain" loading="lazy">
                     Clear filters
                 </a>
@@ -463,7 +463,7 @@
                         href="{{ $href }}"
                         wire:navigate
                         @class([
-                            'group relative inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-semibold ring-1 backdrop-blur-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+                            'group relative inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-sm font-semibold ring-1 backdrop-blur-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
                             // Active: solid blue glass — pops as the picked filter. Icon is whitened to read on the blue bg.
                             'bg-blue-600/90 text-white ring-blue-500/50 shadow-lg shadow-blue-600/20' => $isActive,
                             // Inactive: frosted glass — translucent panel with subtle hairline ring
@@ -560,7 +560,7 @@
             x-data="{ navigating: false }"
             x-on:livewire:navigate.window="navigating = true"
             x-on:livewire:navigated.window="navigating = false"
-            class="relative overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252] dark:border-white"
+            class="relative overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252] dark:border-white"
         >
           <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
@@ -571,10 +571,10 @@
                 $filterIcon = asset('assets/'.rawurlencode('filter to be used as black and white for light mode and dark mode leave origianl color if only asked.webp'));
                 $activeItem = 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300';
                 $inactiveItem = 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-white/5';
-                $itemBase = 'block truncate rounded-[10px] px-3 py-2 text-[12px] font-medium transition-colors';
-                $panelBase = 'absolute left-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-[10px] bg-white shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60';
+                $itemBase = 'block truncate rounded-[12px] px-3 py-2 text-[12px] font-medium transition-colors';
+                $panelBase = 'absolute left-0 top-full z-40 mt-2 w-72 overflow-hidden rounded-[12px] bg-white shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60';
             @endphp
-            <div class="variant-row variant-header grid mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+            <div class="variant-row variant-header grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
 
                 {{-- BRAND --}}
                 <span class="col-brand relative" x-data="{ open: false, search: '' }" @click.outside="open = false" @keydown.escape.window="open = false">
@@ -586,7 +586,7 @@
                     </span>
                     <div x-show="open" x-cloak x-transition.opacity class="{{ $panelBase }}">
                         <div class="border-b border-zinc-100 p-2 dark:border-zinc-700/60">
-                            <input x-model="search" type="text" placeholder="Search brands…" class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                            <input x-model="search" type="text" placeholder="Search brands…" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                         </div>
                         <div class="max-h-80 overflow-y-auto p-1">
                             <a href="{{ $filterUrl(['brand' => null, 'provider' => null]) }}" wire:navigate class="{{ $itemBase }} {{ $brandKey === '' && $providerName === '' ? $activeItem : $inactiveItem }}">All brands</a>
@@ -655,7 +655,7 @@
                     </span>
                     <div x-show="open" x-cloak x-transition.opacity class="{{ $panelBase }}">
                         <div class="border-b border-zinc-100 p-2 dark:border-zinc-700/60">
-                            <input x-model="search" type="text" placeholder="Search countries…" class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                            <input x-model="search" type="text" placeholder="Search countries…" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                         </div>
                         <div class="max-h-72 overflow-y-auto p-1">
                             <a href="{{ $filterUrl(['country' => null]) }}" wire:navigate class="{{ $itemBase }} {{ $country === 'ALL' ? $activeItem : $inactiveItem }}">All countries</a>
@@ -698,15 +698,15 @@
             {{-- Skeleton overlay shown while navigating between paginator pages or filtered URLs. --}}
             <div x-show="navigating" x-cloak class="absolute inset-0 z-10 flex flex-col gap-2 bg-[#eff6ff] dark:bg-transparent" aria-hidden="true">
                 @for ($i = 0; $i < 8; $i++)
-                    <div class="flex items-center gap-3 rounded-[10px] bg-white p-4 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60" style="--i: {{ $i }}">
-                        <x-skeleton class="h-10 w-10" rounded="rounded-[10px]" />
+                    <div class="flex items-center gap-3 rounded-[12px] bg-white p-4 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60" style="--i: {{ $i }}">
+                        <x-skeleton class="h-10 w-10" rounded="rounded-[12px]" />
                         <div class="flex flex-1 flex-col gap-2">
                             <x-skeleton class="h-4 w-40" />
                             <x-skeleton class="h-3 w-24" />
                         </div>
                         <x-skeleton class="h-4 w-20" />
                         <x-skeleton class="h-4 w-16" />
-                        <x-skeleton class="h-6 w-16 rounded-[10px]" />
+                        <x-skeleton class="h-6 w-16 rounded-[12px]" />
                     </div>
                 @endfor
             </div>
@@ -908,6 +908,7 @@
                         'duration' => data_get($meta, 'duration'),
                         'dataSpeed' => data_get($meta, 'dataSpeed'),
                         'isAvailable' => (bool) $variant->is_available,
+                        'isActive' => (bool) ($product?->is_active ?? false),
                         'isFeatured' => (bool) ($product?->is_featured ?? false),
                         'isPopular' => (bool) ($product?->is_popular ?? false),
                         'valueLabel' => $valueLabel,
@@ -968,7 +969,7 @@
                          w-fit + inline-flex so the pill hugs its content and
                          doesn't fill the full grid cell. --}}
                     <span class="col-price">
-                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[10px] bg-blue-50/70 px-3 py-1.5 text-[13px] font-bold tabular-nums text-blue-900 ring-1 ring-blue-100 dark:bg-blue-600/10 dark:text-blue-200 dark:ring-blue-500/20">@moneyCode($retailUsd, 'USD')</span>
+                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[12px] bg-blue-50/70 px-3 py-1.5 text-[13px] font-bold tabular-nums text-blue-900 ring-1 ring-blue-100 dark:bg-blue-600/10 dark:text-blue-200 dark:ring-blue-500/20">@moneyCode($retailUsd, 'USD')</span>
                     </span>
 
                     {{-- Benefits — clamp to 2 lines so long lists ("5GB · 30 days · 200 SMS")
@@ -977,7 +978,7 @@
                 </article>
             @empty
                 <div class="px-5 py-20 text-center">
-                    <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600 dark:bg-blue-600/15 dark:text-blue-300">
+                    <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-600/15 dark:text-blue-300">
                         <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
@@ -1038,7 +1039,7 @@
                 {{-- Header --}}
                 <header class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                     <h2 class="text-base font-bold text-zinc-900 dark:text-white">Product Details</h2>
-                    <button type="button" @click="close()" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white">
+                    <button type="button" @click="close()" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </header>
@@ -1057,10 +1058,24 @@
                                 </button>
                             </div>
                         </div>
+                        {{-- Live on website: flips products.is_active. Off pulls the
+                             WHOLE product (every variant) from storefront listings and
+                             its detail page - this is the "turn a product off" switch. --}}
                         <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Status</p>
-                            <div class="mt-1 inline-flex items-center gap-0.5 rounded-[10px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
-                                <button type="button" @click="setAvailable(true)" :disabled="savingAvailable" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="data.isAvailable ? 'bg-red-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">Enabled</button>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Live on website</p>
+                            <div class="mt-1 inline-flex items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
+                                <button type="button" @click="setActive(true)" :disabled="savingActive" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="data.isActive ? 'bg-emerald-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">On</button>
+                                <button type="button" @click="setActive(false)" :disabled="savingActive" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="! data.isActive ? 'bg-zinc-700 text-white' : 'text-zinc-600 dark:text-zinc-300'">Off</button>
+                            </div>
+                            <p class="mt-1 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">Off removes the whole product from the website.</p>
+                        </div>
+
+                        {{-- Availability: flips THIS variant's is_available, so only this
+                             one denomination/amount disappears from the product page. --}}
+                        <div>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Availability (this variant)</p>
+                            <div class="mt-1 inline-flex items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
+                                <button type="button" @click="setAvailable(true)" :disabled="savingAvailable" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="data.isAvailable ? 'bg-emerald-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">Enabled</button>
                                 <button type="button" @click="setAvailable(false)" :disabled="savingAvailable" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="! data.isAvailable ? 'bg-zinc-700 text-white' : 'text-zinc-600 dark:text-zinc-300'">Disabled</button>
                             </div>
                         </div>
@@ -1075,7 +1090,7 @@
                         <div>
                             <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Sub Type</dt>
                             <dd class="mt-1">
-                                <span class="inline-flex items-center rounded-[10px] bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-white/5 dark:text-zinc-200" x-text="data.subType"></span>
+                                <span class="inline-flex items-center rounded-[12px] bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-white/5 dark:text-zinc-200" x-text="data.subType"></span>
                             </dd>
                         </div>
                         <div class="col-span-2" x-show="data.notes">
@@ -1085,7 +1100,7 @@
                         <div>
                             <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Offer Price Type</dt>
                             <dd class="mt-1">
-                                <span class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-600/15 dark:text-blue-300">
+                                <span class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-600/15 dark:text-blue-300">
                                     <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                                     <span x-text="data.isVariable ? 'Variable' : 'Fixed'"></span>
                                 </span>
@@ -1117,7 +1132,7 @@
                     <div class="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-700/60" x-show="(data.roamingCountries || []).length > 0">
                         <div class="flex items-center justify-between">
                             <h3 class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Roaming Countries</h3>
-                            <div class="inline-flex items-center gap-0.5 rounded-[10px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
+                            <div class="inline-flex items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
                                 <button type="button" @click="roamingView = 'map'" :class="roamingView === 'map' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-300'" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors">Map View</button>
                                 <button type="button" @click="roamingView = 'list'" :class="roamingView === 'list' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-300'" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors">List View</button>
                             </div>
@@ -1132,7 +1147,7 @@
                                 x-data="variantRoamingMap()"
                                 x-init="render($el, data.roamingCountries)"
                                 x-effect="render($el, data.roamingCountries)"
-                                class="h-64 w-full rounded-[10px] bg-zinc-50 dark:bg-[#0c1a36]"
+                                class="h-64 w-full rounded-[12px] bg-zinc-50 dark:bg-[#0c1a36]"
                             ></div>
                         </div>
 
@@ -1184,14 +1199,14 @@
                         <div class="flex items-center justify-between">
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Sales Price</h3>
                             <span
-                                class="rounded-[10px] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                                class="rounded-[12px] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                                 :class="data.manualPriceUsd !== null ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300'"
                                 x-text="data.manualPriceUsd !== null ? 'Override active' : 'Using rates'"
                             ></span>
                         </div>
                         <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Leave blank to use the rates settings.</p>
                         <div class="mt-3 flex items-stretch gap-2">
-                            <div class="flex flex-1 overflow-hidden rounded-[10px] border border-zinc-200 dark:border-zinc-700/60">
+                            <div class="flex flex-1 overflow-hidden rounded-[12px] border border-zinc-200 dark:border-zinc-700/60">
                                 <span class="bg-zinc-50 px-3 py-2 text-[11px] font-medium text-zinc-600 dark:bg-white/5 dark:text-zinc-300">USD</span>
                                 <input
                                     type="number" step="0.01" min="0"
@@ -1202,12 +1217,12 @@
                             </div>
                             <button type="button"
                                 @click="savePrice()" :disabled="savingPrice"
-                                class="rounded-[10px] bg-blue-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                class="rounded-[12px] bg-blue-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                                 <span x-text="savingPrice ? 'Saving…' : 'Save'"></span>
                             </button>
                             <button type="button"
                                 @click="resetPrice()" :disabled="savingPrice || data.manualPriceUsd === null"
-                                class="rounded-[10px] border border-zinc-200 bg-white px-3 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">
+                                class="rounded-[12px] border border-zinc-200 bg-white px-3 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">
                                 Reset
                             </button>
                         </div>
@@ -1243,7 +1258,7 @@
                                     @click="open = !open"
                                     :disabled="savingMarkup"
                                     :aria-expanded="open.toString()"
-                                    class="flex h-9 w-full items-center justify-between gap-2 rounded-[10px] border bg-white px-3 text-[12px] font-semibold text-zinc-900 outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#0c1a36] dark:text-white"
+                                    class="flex h-9 w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 text-[12px] font-semibold text-zinc-900 outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#0c1a36] dark:text-white"
                                     :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-zinc-400 dark:border-zinc-700/60'"
                                 >
                                     <span x-text="options[markupType]">Percent (%)</span>
@@ -1257,7 +1272,7 @@
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-[10px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 dark:border-zinc-700/60 dark:bg-[#1d3252]"
+                                    class="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 dark:border-zinc-700/60 dark:bg-[#1d3252]"
                                     role="listbox"
                                 >
                                     <template x-for="(label, value) in options" :key="value">
@@ -1266,7 +1281,7 @@
                                             role="option"
                                             :aria-selected="markupType === value"
                                             @click="markupType = value; open = false"
-                                            class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-[12px] font-medium transition-colors"
+                                            class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-[12px] font-medium transition-colors"
                                             :class="markupType === value ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/5'"
                                         >
                                             <span x-text="label"></span>
@@ -1284,13 +1299,13 @@
                                 x-model="markupValue"
                                 :disabled="savingMarkup"
                                 :placeholder="markupType === 'percentage' ? '5' : '0.50'"
-                                class="h-9 flex-1 rounded-[10px] border border-zinc-200 bg-white px-3 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
+                                class="h-9 flex-1 rounded-[12px] border border-zinc-200 bg-white px-3 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
                             >
                             <button
                                 type="button"
                                 @click="saveMarkup()"
                                 :disabled="savingMarkup || !markupValue"
-                                class="h-9 rounded-[10px] bg-blue-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                class="h-9 rounded-[12px] bg-blue-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <span x-text="savingMarkup ? 'Saving...' : 'Save'"></span>
                             </button>
@@ -1298,7 +1313,7 @@
                                 type="button"
                                 @click="resetMarkup()"
                                 :disabled="savingMarkup || !data.productMarkup"
-                                class="h-9 rounded-[10px] border border-zinc-200 bg-white px-3 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"
+                                class="h-9 rounded-[12px] border border-zinc-200 bg-white px-3 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"
                             >
                                 Reset
                             </button>
@@ -1320,70 +1335,66 @@
                                  OR (once set) a red X button to remove it -
                                  same "click here to switch off" affordance the
                                  admin asked for, no extra round-trip needed. --}}
-                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-zinc-200 px-3 py-2.5 dark:border-zinc-700/60" :class="data.isFeatured && 'ring-1 ring-inset ring-amber-300/60 bg-amber-50/40 dark:bg-amber-500/[0.07] dark:ring-amber-400/30'">
+                            <div class="flex items-center justify-between gap-3 rounded-[12px] border border-zinc-200 px-3 py-2.5 dark:border-zinc-700/60" :class="data.isFeatured && 'ring-1 ring-inset ring-amber-300/60 bg-amber-50/40 dark:bg-amber-500/[0.07] dark:ring-amber-400/30'">
                                 <span class="flex items-center gap-2.5">
-                                    <span class="inline-flex items-center gap-1 rounded-[10px] bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm shadow-pink-500/40">
+                                    <span class="inline-flex items-center gap-1 rounded-[12px] bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm shadow-pink-500/40">
                                         <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.39 7.36H22l-6.18 4.49L18.18 21 12 16.51 5.82 21l2.36-7.15L2 9.36h7.61z"/></svg>
                                         Featured
                                     </span>
                                     <span class="text-[12px] text-zinc-700 dark:text-zinc-200">Glowing gradient badge</span>
                                 </span>
-                                {{-- Off state: checkbox to enable. --}}
-                                <input
-                                    x-show="!data.isFeatured"
-                                    type="checkbox"
-                                    x-model="data.isFeatured"
-                                    @change="toggleFeatured()"
-                                    :disabled="togglingFeatured"
-                                    class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-                                >
-                                {{-- On state: explicit Remove X button. --}}
+                                {{-- One persistent control. ON: a red X that stays put so the
+                                     drawer shows at a glance the product is featured - click it
+                                     to remove. OFF: a + to add it. toggleFeatured() flips the
+                                     server flag and syncs data.isFeatured from the response. --}}
                                 <button
                                     type="button"
-                                    x-show="data.isFeatured"
-                                    x-cloak
-                                    @click.prevent="data.isFeatured = false; toggleFeatured()"
+                                    @click="toggleFeatured()"
                                     :disabled="togglingFeatured"
-                                    aria-label="Remove Featured badge"
-                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-red-50 text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25"
+                                    :aria-label="data.isFeatured ? 'Remove Featured badge' : 'Mark as Featured'"
+                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                    :class="data.isFeatured
+                                        ? 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25'
+                                        : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15'"
                                 >
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <svg x-show="data.isFeatured" x-cloak class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
+                                    <svg x-show="!data.isFeatured" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                                    </svg>
                                 </button>
-                            </label>
+                            </div>
 
                             {{-- Popular toggle. Same pattern. --}}
-                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-zinc-200 px-3 py-2.5 dark:border-zinc-700/60" :class="data.isPopular && 'ring-1 ring-inset ring-blue-300/60 bg-blue-50/40 dark:bg-blue-500/[0.07] dark:ring-blue-400/30'">
+                            <div class="flex items-center justify-between gap-3 rounded-[12px] border border-zinc-200 px-3 py-2.5 dark:border-zinc-700/60" :class="data.isPopular && 'ring-1 ring-inset ring-blue-300/60 bg-blue-50/40 dark:bg-blue-500/[0.07] dark:ring-blue-400/30'">
                                 <span class="flex items-center gap-2.5">
-                                    <span class="inline-flex items-center gap-1 rounded-[10px] bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                                    <span class="inline-flex items-center gap-1 rounded-[12px] bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                                         <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5a9.5 9.5 0 100 19 9.5 9.5 0 000-19zm1 14h-2v-2h2v2zm0-4h-2V6h2v6.5z"/></svg>
                                         Popular
                                     </span>
                                     <span class="text-[12px] text-zinc-700 dark:text-zinc-200">Customer-favourite tag</span>
                                 </span>
-                                <input
-                                    x-show="!data.isPopular"
-                                    type="checkbox"
-                                    x-model="data.isPopular"
-                                    @change="togglePopular()"
-                                    :disabled="togglingPopular"
-                                    class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-                                >
+                                {{-- Same persistent control as Featured: X stays while ON
+                                     (visible "this is popular" marker + remove), + to add. --}}
                                 <button
                                     type="button"
-                                    x-show="data.isPopular"
-                                    x-cloak
-                                    @click.prevent="data.isPopular = false; togglePopular()"
+                                    @click="togglePopular()"
                                     :disabled="togglingPopular"
-                                    aria-label="Remove Popular badge"
-                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-red-50 text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25"
+                                    :aria-label="data.isPopular ? 'Remove Popular badge' : 'Mark as Popular'"
+                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                    :class="data.isPopular
+                                        ? 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25'
+                                        : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15'"
                                 >
-                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <svg x-show="data.isPopular" x-cloak class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
+                                    <svg x-show="!data.isPopular" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                                    </svg>
                                 </button>
-                            </label>
+                            </div>
                         </div>
                     </div>
 
@@ -1396,9 +1407,9 @@
                         </div>
 
                         {{-- Create form --}}
-                        <div class="mt-3 space-y-2 rounded-[10px] border border-zinc-200 p-3 dark:border-zinc-700/60">
+                        <div class="mt-3 space-y-2 rounded-[12px] border border-zinc-200 p-3 dark:border-zinc-700/60">
                             <div class="grid grid-cols-2 gap-2">
-                                <input type="text" x-model="couponForm.code" placeholder="CODE (e.g. SAVE10)" class="col-span-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] uppercase text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                                <input type="text" x-model="couponForm.code" placeholder="CODE (e.g. SAVE10)" class="col-span-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] uppercase text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                                 {{-- Modern dropdown (Alpine) - mirrors the markup-type
                                      picker so the drawer reads consistently. --}}
                                 <div
@@ -1411,7 +1422,7 @@
                                         type="button"
                                         @click="open = !open"
                                         :aria-expanded="open.toString()"
-                                        class="flex w-full items-center justify-between gap-2 rounded-[10px] border bg-white px-3 py-2 text-[12px] font-medium text-zinc-900 outline-none transition-colors dark:bg-[#26416b] dark:text-white"
+                                        class="flex w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2 text-[12px] font-medium text-zinc-900 outline-none transition-colors dark:bg-[#26416b] dark:text-white"
                                         :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-zinc-400 dark:border-zinc-700/60'"
                                     >
                                         <span x-text="options[couponForm.discount_type]">Percent off</span>
@@ -1425,7 +1436,7 @@
                                         x-transition:enter="transition ease-out duration-150"
                                         x-transition:enter-start="opacity-0 -translate-y-1"
                                         x-transition:enter-end="opacity-100 translate-y-0"
-                                        class="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-[10px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 dark:border-zinc-700/60 dark:bg-[#1d3252]"
+                                        class="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 dark:border-zinc-700/60 dark:bg-[#1d3252]"
                                         role="listbox"
                                     >
                                         <template x-for="(label, value) in options" :key="value">
@@ -1434,7 +1445,7 @@
                                                 role="option"
                                                 :aria-selected="couponForm.discount_type === value"
                                                 @click="couponForm.discount_type = value; open = false"
-                                                class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-[12px] font-medium transition-colors"
+                                                class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-[12px] font-medium transition-colors"
                                                 :class="couponForm.discount_type === value ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/5'"
                                             >
                                                 <span x-text="label"></span>
@@ -1445,8 +1456,8 @@
                                         </template>
                                     </div>
                                 </div>
-                                <input type="number" step="0.01" min="0.01" x-model="couponForm.discount_value" :placeholder="couponForm.discount_type === 'percent' ? '10' : '5.00'" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] tabular-nums text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
-                                <input type="number" min="1" x-model="couponForm.max_uses" placeholder="Max uses (blank = ∞)" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] tabular-nums text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                                <input type="number" step="0.01" min="0.01" x-model="couponForm.discount_value" :placeholder="couponForm.discount_type === 'percent' ? '10' : '5.00'" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] tabular-nums text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                                <input type="number" min="1" x-model="couponForm.max_uses" placeholder="Max uses (blank = ∞)" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] tabular-nums text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                                 {{-- Flatpickr expiry picker. Date-only, future dates only (the API
                                      requires valid_until > now), stored as end-of-day. flatpickr is
                                      exposed on window in app.js; the dark calendar theme lives in
@@ -1464,10 +1475,10 @@
                                         });
                                         $watch('couponForm.valid_until', (v) => { if (!v && fp.selectedDates.length) { fp.clear(); } });
                                     "
-                                    class="cursor-pointer rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[12px] text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-500">
+                                    class="cursor-pointer rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[12px] text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-500">
                             </div>
                             <p x-show="couponError" x-text="couponError" class="text-[11px] text-red-600"></p>
-                            <button type="button" @click="createCoupon()" :disabled="creatingCoupon" class="w-full rounded-[10px] bg-blue-600 px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                            <button type="button" @click="createCoupon()" :disabled="creatingCoupon" class="w-full rounded-[12px] bg-blue-600 px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                                 <span x-text="creatingCoupon ? 'Creating…' : '+ Create coupon'"></span>
                             </button>
                         </div>
@@ -1475,7 +1486,7 @@
                         {{-- Existing coupons list --}}
                         <ul class="mt-3 space-y-1.5" x-show="coupons.length > 0">
                             <template x-for="c in coupons" :key="c.id">
-                                <li class="flex items-center justify-between gap-2 rounded-[10px] border border-zinc-200 px-3 py-2 dark:border-zinc-700/60">
+                                <li class="flex items-center justify-between gap-2 rounded-[12px] border border-zinc-200 px-3 py-2 dark:border-zinc-700/60">
                                     <span class="min-w-0 flex-1">
                                         <span class="block truncate font-mono text-[12px] font-bold text-zinc-900 dark:text-white" x-text="c.code"></span>
                                         <span class="block text-[10px] text-zinc-500 dark:text-zinc-400">
@@ -1485,11 +1496,11 @@
                                         </span>
                                     </span>
                                     <span
-                                        class="rounded-[10px] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                                        class="rounded-[12px] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
                                         :class="c.is_redeemable ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : (c.is_expired ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300')"
                                         x-text="c.is_redeemable ? 'Active' : (c.is_expired ? 'Expired' : (c.is_used_up ? 'Used up' : 'Paused'))"
                                     ></span>
-                                    <button type="button" @click="deleteCoupon(c.id)" aria-label="Delete coupon" class="rounded-[10px] p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10">
+                                    <button type="button" @click="deleteCoupon(c.id)" aria-label="Delete coupon" class="rounded-[12px] p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10">
                                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
                                     </button>
                                 </li>
@@ -1501,7 +1512,7 @@
 
                 {{-- Footer: just Close. Save/Reset live inline with their fields. --}}
                 <footer class="border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#162a4a]">
-                    <button type="button" @click="close()" class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Close</button>
+                    <button type="button" @click="close()" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Close</button>
                 </footer>
             </aside>
         </div>
@@ -1526,6 +1537,9 @@
 
                     // Variant availability toggle
                     savingAvailable: false,
+
+                    // Product on/off (is_active) toggle
+                    savingActive: false,
 
                     // Per-product markup rule form
                     markupType: 'percentage',
@@ -1704,6 +1718,25 @@
                         }
                     },
 
+                    async setActive(value) {
+                        if (!this.data.productId || this.savingActive || this.data.isActive === value) { return; }
+                        const previous = this.data.isActive;
+                        this.data.isActive = value;
+                        this.savingActive = true;
+                        try {
+                            // toggle-active flips is_active; we only get here when the
+                            // current state differs from `value`, so the flip lands on it.
+                            const json = await this._send('PATCH',
+                                `/admin/api/catalog/products/${this.data.productId}/toggle-active`);
+                            this.data.isActive = json.is_active;
+                        } catch (e) {
+                            this.data.isActive = previous;
+                            alert(e.message);
+                        } finally {
+                            this.savingActive = false;
+                        }
+                    },
+
                     async toggleFeatured() {
                         if (!this.data.productId) { return; }
                         this.togglingFeatured = true;
@@ -1712,7 +1745,9 @@
                                 `/admin/api/catalog/products/${this.data.productId}/toggle-featured`);
                             this.data.isFeatured = json.is_featured;
                         } catch (e) {
-                            this.data.isFeatured = !this.data.isFeatured; // revert
+                            // data.isFeatured is only ever set from the server response,
+                            // so a failed flip (e.g. the 10-badge cap) leaves it correct -
+                            // just surface why.
                             alert(e.message);
                         } finally {
                             this.togglingFeatured = false;
@@ -1727,7 +1762,8 @@
                                 `/admin/api/catalog/products/${this.data.productId}/toggle-popular`);
                             this.data.isPopular = json.is_popular;
                         } catch (e) {
-                            this.data.isPopular = !this.data.isPopular;
+                            // Same as Featured: state mirrors the server, so no revert -
+                            // a rejected flip (cap reached) just alerts.
                             alert(e.message);
                         } finally {
                             this.togglingPopular = false;

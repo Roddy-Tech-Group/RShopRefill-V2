@@ -4,6 +4,7 @@ namespace App\Domain\Notification\Listeners;
 
 use App\Domain\Notification\Mail\WelcomeMail;
 use App\Domain\Notification\Services\NotificationDispatcher;
+use App\Models\SiteSetting;
 use Illuminate\Auth\Events\Registered;
 
 class SendWelcomeEmailListener
@@ -19,7 +20,7 @@ class SendWelcomeEmailListener
 
         $this->dispatcher->dispatch(
             user: $user,
-            title: 'Welcome to RshopRefills!',
+            title: 'Welcome to '.SiteSetting::get('site.name', 'RshopRefills').'!',
             message: $isGoogleAuth
                 ? 'Welcome! Your account has been registered successfully via Google.'
                 : 'Welcome! Your account has been registered successfully.',

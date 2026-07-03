@@ -113,14 +113,14 @@ new class extends Component
     }
 }; ?>
 
-<div class="rounded-[10px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+<div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
     <div class="mb-5">
         <h2 class="text-base font-semibold text-black">Transaction PIN</h2>
         <p class="mt-0.5 text-xs text-zinc-600">A 4-digit PIN that authorizes payments from your wallet balance.</p>
     </div>
 
     @if ($locked)
-        <div class="mb-5 flex items-start gap-2 rounded-[10px] bg-red-50 px-3.5 py-3 ring-1 ring-red-100">
+        <div class="mb-5 flex items-start gap-2 rounded-[12px] bg-red-50 px-3.5 py-3 ring-1 ring-red-100">
             <svg class="mt-0.5 h-4 w-4 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
             </svg>
@@ -142,7 +142,7 @@ new class extends Component
                         maxlength="4"
                         autocomplete="off"
                         placeholder="4 digits"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600" :aria-label="show ? 'Hide PIN' : 'Show PIN'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -168,7 +168,7 @@ new class extends Component
                         maxlength="4"
                         autocomplete="off"
                         placeholder="Re-enter PIN"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600" :aria-label="show ? 'Hide PIN' : 'Show PIN'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -184,7 +184,7 @@ new class extends Component
             </div>
 
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
+                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
                     Set up PIN
                 </button>
                 <x-action-message on="pin-updated" class="text-sm font-medium text-emerald-600">
@@ -206,7 +206,7 @@ new class extends Component
                         maxlength="4"
                         autocomplete="off"
                         placeholder="4 digits"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600" :aria-label="show ? 'Hide PIN' : 'Show PIN'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -232,7 +232,7 @@ new class extends Component
                         maxlength="4"
                         autocomplete="off"
                         placeholder="4 digits"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600" :aria-label="show ? 'Hide PIN' : 'Show PIN'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -258,7 +258,7 @@ new class extends Component
                         maxlength="4"
                         autocomplete="off"
                         placeholder="Re-enter new PIN"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm tracking-[0.5em] text-black placeholder:tracking-normal placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600" :aria-label="show ? 'Hide PIN' : 'Show PIN'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -274,7 +274,7 @@ new class extends Component
             </div>
 
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
+                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
                     Change PIN
                 </button>
                 <x-action-message on="pin-updated" class="text-sm font-medium text-emerald-600">
@@ -297,11 +297,11 @@ new class extends Component
                             type="password"
                             autocomplete="current-password"
                             placeholder="Account password"
-                            class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
+                            class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
                         />
                         @error('remove_password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">
                         Remove PIN
                     </button>
                 </form>

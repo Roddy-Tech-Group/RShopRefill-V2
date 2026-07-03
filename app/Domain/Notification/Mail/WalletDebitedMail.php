@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notification\Mail;
 
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Bus\Queueable;
@@ -21,8 +22,10 @@ class WalletDebitedMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
+
         return new Envelope(
-            subject: 'Wallet Debit Notification - RshopRefills',
+            subject: 'Wallet Debit Notification - '.$brand,
         );
     }
 

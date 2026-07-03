@@ -38,27 +38,11 @@
     <x-slot:heading>Orders</x-slot:heading>
     <x-slot:subheading>{{ number_format($totalOrders) }} orders total. Showing the latest 50.</x-slot:subheading>
 
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="inline-flex overflow-x-auto rounded-[12px] bg-zinc-100 p-1 font-medium text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
-            @php
-                $tabs = [
-                    'completed' => 'Completed',
-                    'processing' => 'Processing',
-                    'failed-fulfillment' => 'Failed Fulfillment',
-                    'unpaid' => 'Unpaid / Abandoned',
-                    'all-paid' => 'All Paid',
-                ];
-            @endphp
-            @foreach($tabs as $key => $label)
-                <a href="{{ route('admin.orders', ['tab' => $key]) }}"
-                   class="whitespace-nowrap rounded-[10px] px-4 py-2 text-sm transition-all {{ $tab === $key ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-900/5 dark:bg-[#1d3252] dark:text-white dark:ring-white/10' : 'hover:text-zinc-900 hover:bg-zinc-200/50 dark:hover:text-white dark:hover:bg-zinc-700/50' }}">
-                    {{ $label }}
-                </a>
-            @endforeach
-        </div>
-
-        <a href="{{ route('admin.api.commerce.orders.export', ['tab' => $tab]) }}"
-            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+    {{-- Export the full order history (excludes never-paid checkouts, matching
+         the list below) as a CSV for record-keeping / accounting. --}}
+    <div class="mb-4 flex justify-end">
+        <a href="{{ route('admin.api.commerce.orders.export') }}"
+            class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/>
             </svg>
@@ -100,11 +84,11 @@
         .order-body:hover { border-radius: 10px; }
     </style>
 
-    <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill — light-blue bg, 2px blue ring. --}}
-        <div class="order-row grid mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+        <div class="order-row grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
             <span class="col-order">Order #</span>
             <span>Customer</span>
             <span>Items</span>
@@ -132,7 +116,7 @@
                         x-data="{ copied: false }"
                         @click.stop.prevent="navigator.clipboard.writeText(@js($orderNumber)); copied = true; setTimeout(() => copied = false, 1500)"
                         :aria-label="copied ? 'Copied' : 'Copy order id'"
-                        class="group/copy inline-flex max-w-full items-center gap-1 rounded-[10px] px-1.5 py-0.5 font-mono text-[12px] font-semibold text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-500/15"
+                        class="group/copy inline-flex max-w-full items-center gap-1 rounded-[12px] px-1.5 py-0.5 font-mono text-[12px] font-semibold text-blue-600 transition-colors hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-500/15"
                     >
                         <span class="truncate">{{ $orderNumber }}</span>
                         <svg x-show="! copied" class="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/copy:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -143,7 +127,7 @@
                         </svg>
                     </button>
                     @if ($order->hasSuspectPricing())
-                        <span class="ml-1 inline-flex items-center rounded-[10px] bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200" title="No exchange rate snapshot — display amount may be raw USD mis-labelled">!</span>
+                        <span class="ml-1 inline-flex items-center rounded-[12px] bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200" title="No exchange rate snapshot — display amount may be raw USD mis-labelled">!</span>
                     @endif
                 </span>
 

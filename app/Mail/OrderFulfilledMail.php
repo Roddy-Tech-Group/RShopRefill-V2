@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\OrderItem;
+use App\Models\SiteSetting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -18,8 +19,10 @@ class OrderFulfilledMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
+
         return new Envelope(
-            subject: 'Your RshopRefills Order #'.$this->item->order->order_number.' is Ready!',
+            subject: 'Your '.$brand.' Order #'.$this->item->order->order_number.' is Ready!',
         );
     }
 

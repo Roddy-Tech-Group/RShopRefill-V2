@@ -38,7 +38,7 @@ new class extends Component
         wire:loading.attr="disabled"
         @disabled($queued)
         @class([
-            'inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors',
+            'inline-flex items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors',
             'bg-emerald-600 text-white' => $queued,
             'bg-blue-600 text-white hover:bg-blue-700' => ! $queued,
         ])

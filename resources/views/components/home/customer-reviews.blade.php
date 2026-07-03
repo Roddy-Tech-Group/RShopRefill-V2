@@ -3,7 +3,6 @@
     // the left, then a horizontal scroll of individual review cards. The header
     // arrow advances the scroll one screenful at a time with a custom rAF easing
     // pass (see customerReviewsCarousel in app.js) and loops back at the end.
-    // During SPA navigation the card row is held behind a matching skeleton.
     //
     // Content source: the `reviews` table + `site_settings` (CMS-managed).
     $reviews = \App\Models\Review::published()->with('user:id,kyc_status')->ordered()->get();
@@ -32,8 +31,7 @@
     x-data="customerReviewsCarousel()"
     x-init="$nextTick(() => { setup(); })"
     @resize.window.debounce.200ms="setup()"
-    x-on:livewire:navigate.window="navigating = true"
-    x-on:livewire:navigated.window="navigating = false; $nextTick(() => { setup(); })"
+    x-on:livewire:navigated.window="$nextTick(() => { setup(); })"
 >
 
     {{-- Header aligns with the page content width. --}}
@@ -47,7 +45,7 @@
                 type="button"
                 @click="next()"
                 aria-label="Show more reviews"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M9 6l6 6-6 6"/>
@@ -56,8 +54,7 @@
         </div>
     </div>
 
-    {{-- Full-bleed scroll area. The skeleton overlay sits absolutely on top of the
-         real track, so both share the exact same footprint. --}}
+    {{-- Full-bleed scroll area. --}}
     <div class="relative">
 
         {{-- Transform-based carousel viewport (overflow-hidden). The inner
@@ -70,7 +67,10 @@
             x-ref="track"
             class="overflow-x-auto overflow-y-hidden py-6 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
         >
-            <div x-ref="list" class="carousel-list flex w-max gap-4 sm:gap-5">
+            {{-- pl-[...] starts the first card at the same content-column left as
+                 the "What our customers say" header (matches its mx-auto max-w-[1550px]
+                 px-4/sm:px-6/lg:px-8), while the row still bleeds full-width to the right. --}}
+            <div x-ref="list" class="carousel-list flex w-max gap-4 sm:gap-5 pl-[max(1rem,calc((100vw-1550px)/2+1rem))] sm:pl-[max(1.5rem,calc((100vw-1550px)/2+1.5rem))] lg:pl-[max(2rem,calc((100vw-1550px)/2+2rem))]">
 
                 {{-- Single aggregate card that auto-flips between Trustpilot
                      and Google every 5 seconds. Counts are pulled live from
@@ -109,7 +109,7 @@
                     }"
                     @mouseenter="paused = true"
                     @mouseleave="paused = false"
-                    class="relative flex w-72 shrink-0 flex-col rounded-[10px] bg-[#eff6ff] p-5 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+                    class="relative flex w-72 shrink-0 flex-col rounded-[12px] bg-[#eff6ff] p-5 ring-1 ring-zinc-200 dark:ring-[#24364f]"
                 >
                     @foreach ($aggSources as $i => $agg)
                         @php $isGoogle = $agg['key'] === 'Google'; @endphp
@@ -210,33 +210,6 @@
                 @endforeach
 
             </div>
-        </div>
-
-        {{-- Navigation skeleton — mirrors the review-card layout, fades in/out smoothly. --}}
-        <div
-            x-show="navigating"
-            x-cloak
-            x-transition.opacity.duration.200ms
-            aria-hidden="true"
-            class="skeleton-stagger-fast pointer-events-none absolute inset-0 z-10 flex gap-4 overflow-hidden bg-zinc-100 px-4 py-6 sm:gap-5 sm:px-6 lg:px-8"
-        >
-            @for ($i = 0; $i < 6; $i++)
-                <div class="flex w-72 shrink-0 flex-col rounded-[10px] bg-white p-5 ring-1 ring-zinc-200 shadow-sm" style="--i: {{ $i }}">
-                    <div class="flex items-center gap-3">
-                        <x-skeleton class="h-11 w-11 rounded-[10px]" />
-                        <div class="min-w-0 flex-1 space-y-2">
-                            <x-skeleton class="h-4 w-2/3" />
-                            <x-skeleton class="h-3 w-1/3" />
-                        </div>
-                    </div>
-                    <x-skeleton class="mt-4 h-4 w-28" />
-                    <div class="mt-4 space-y-2.5">
-                        <x-skeleton class="h-3.5 w-full" />
-                        <x-skeleton class="h-3.5 w-full" />
-                        <x-skeleton class="h-3.5 w-4/5" />
-                    </div>
-                </div>
-            @endfor
         </div>
 
     </div>

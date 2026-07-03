@@ -18,6 +18,7 @@ use App\Domain\Wallet\Events\FundingFailed;
 use App\Domain\Wallet\Events\WalletCredited;
 use App\Domain\Wallet\Events\WalletDebited;
 use App\Http\View\Composers\CartComposer;
+use App\Http\View\Composers\SiteIdentityComposer;
 use App\Listeners\CommerceNotificationListener;
 use App\Listeners\CreateWalletForNewUser;
 use App\Listeners\TransactionPinNotificationListener;
@@ -79,6 +80,11 @@ class AppServiceProvider extends ServiceProvider
         Event::subscribe(AuditLogListener::class);
 
         View::composer('*', CartComposer::class);
+
+        // Share the admin-editable brand name ($siteName) with every view so the
+        // website name is driven by the System Settings -> Site setting rather
+        // than hardcoded in each layout, the nav, the footer and emails.
+        View::composer('*', SiteIdentityComposer::class);
 
         // @money($amount, $code)      => "₦25,000.00"   (symbol + amount)
         // @moneyCode($amount, $code)  => "NGN 25,000.00" (ISO code + amount)

@@ -97,4 +97,31 @@ class CatalogSearchTest extends TestCase
         $this->assertNotNull($page, 'Expected a page result when searching "help".');
         $this->assertSame('Help center', $page['name']);
     }
+
+    public function test_global_search_surfaces_esim_countries(): void
+    {
+        $esims = Category::create(['name' => 'eSIMs', 'slug' => 'esims', 'type' => 'digital']);
+
+        // eSIM products carry no brand_key, so the brand query skips them; the
+        // dedicated eSIM branch should still surface them by country name.
+        Product::create([
+            'category_id' => $esims->id,
+            'subcategory_id' => null,
+            'provider_name' => 'zendit',
+            'brand_key' => null,
+            'country_code' => 'FR',
+            'currency_code' => 'USD',
+            'name' => 'France eSIM',
+            'slug' => 'esim-fr-france',
+            'is_active' => true,
+        ]);
+
+        $results = collect($this->getJson(route('api.search.brands', ['q' => 'france']))->assertOk()->json());
+
+        $esim = $results->firstWhere('type', 'eSIM');
+
+        $this->assertNotNull($esim, 'Expected an eSIM result when searching a country name.');
+        $this->assertStringStartsWith('/esims/', $esim['url']);
+        $this->assertStringContainsString('france', strtolower($esim['name']));
+    }
 }

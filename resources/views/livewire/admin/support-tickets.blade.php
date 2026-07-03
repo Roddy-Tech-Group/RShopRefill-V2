@@ -128,7 +128,7 @@ class extends Component {
     <div class="flex flex-col gap-6">
 
         @if (session('status'))
-            <div class="rounded-[10px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
+            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
         @endif
 
         {{-- KPI strip --}}
@@ -139,7 +139,7 @@ class extends Component {
                 ['label' => 'Resolved', 'value' => $this->counts['resolved'], 'dot' => 'bg-emerald-500'],
                 ['label' => 'Total',    'value' => $this->counts['total'],    'dot' => 'bg-amber-500'],
             ] as $stat)
-                <div class="rounded-[10px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -159,7 +159,7 @@ class extends Component {
                     wire:model.live.debounce.250ms="search"
                     type="search"
                     placeholder="Search by name, email or subject..."
-                    class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                    class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
                 />
             </div>
 
@@ -169,7 +169,7 @@ class extends Component {
                         type="button"
                         wire:click="$set('statusFilter', '{{ $value }}')"
                         @class([
-                            'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                            'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                             'bg-blue-600 text-white' => $statusFilter === $value,
                             'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]' => $statusFilter !== $value,
                         ])
@@ -179,7 +179,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead class="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-600 dark:bg-[#0c1a36] dark:text-zinc-400">
@@ -256,13 +256,13 @@ class extends Component {
         @php $msg = $this->activeMessage; @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="closeMessage" class="absolute inset-0 bg-zinc-900/40"></div>
-            <div class="relative max-h-[90vh] w-full max-w-xl overflow-hidden rounded-[10px] bg-white shadow-2xl flex flex-col dark:bg-[#1d3252]">
+            <div class="relative max-h-[90vh] w-full max-w-xl overflow-hidden rounded-[12px] bg-white shadow-2xl flex flex-col dark:bg-[#1d3252]">
                 <div class="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                     <div>
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">{{ $msg->subject ?? '(no subject)' }}</h3>
                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Ticket #{{ $msg->id }}</p>
                     </div>
-                    <button type="button" wire:click="closeMessage" aria-label="Close" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                    <button type="button" wire:click="closeMessage" aria-label="Close" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -311,27 +311,27 @@ class extends Component {
                     {{-- Message body --}}
                     <div>
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Message</p>
-                        <div class="mt-2 rounded-[10px] border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-700 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-zinc-300">
+                        <div class="mt-2 rounded-[12px] border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-700 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-zinc-300">
                             {{ $msg->message }}
                         </div>
                     </div>
                 </div>
 
                 <div class="flex shrink-0 items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
-                    <button type="button" wire:click="closeMessage" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Close</button>
+                    <button type="button" wire:click="closeMessage" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Close</button>
                     <div class="flex items-center gap-2">
                         @if ($msg->status !== 'read')
                             <button
                                 type="button"
                                 wire:click="markRead({{ $msg->id }})"
-                                class="inline-flex items-center rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                                class="inline-flex items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
                             >Mark as read</button>
                         @endif
                         @if ($msg->status !== 'resolved')
                             <button
                                 type="button"
                                 wire:click="markResolved({{ $msg->id }})"
-                                class="inline-flex items-center rounded-[10px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                                class="inline-flex items-center rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                             >Mark resolved</button>
                         @endif
                     </div>

@@ -152,6 +152,29 @@ class OrderFulfilledMailTest extends TestCase
         $this->assertStringContainsString('9876', $html);
     }
 
+    public function test_pin_redemption_url_card_email_surfaces_the_redemption_link_and_pin(): void
+    {
+        // Virtual prepaid Visa (VISA_AWARDS): Zendit delivers a 6-digit PIN under
+        // `epin` plus a registration link - and the link is the buyer's ONLY way
+        // to claim the card. It was being captured but never rendered, leaving
+        // customers stuck (the bug this fixes). The PIN must also read as a PIN,
+        // not leak through the generic code fallback as a "Code".
+        $item = $this->makeFulfilledItem(
+            ['epin' => '585634', 'redemption_url' => 'https://giftonline.biz/_myglobe/ltg_-GKf'],
+            ['name' => 'Visa (Prepaid) (US)', 'country_code' => 'US'],
+            'zendit',
+        );
+
+        $html = (new OrderFulfilledMail($item))->render();
+
+        $this->assertStringContainsString('Your gift card is ready', $html);
+        // The registration link must be delivered as a clickable CTA.
+        $this->assertStringContainsString('https://giftonline.biz/_myglobe/ltg_-GKf', $html);
+        $this->assertStringContainsString('Redeem your card', $html);
+        // The epin must surface as the PIN.
+        $this->assertStringContainsString('585634', $html);
+    }
+
     public function test_delivery_email_previews_rcoin_cashback_before_the_reward_lands(): void
     {
         // Pin the rate so the preview is independent of the default: $7 order

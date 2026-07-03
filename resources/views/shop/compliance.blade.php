@@ -7,7 +7,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Compliance and Regulatory Framework | RshopRefills'">
+<x-layouts.app.header :title="'Compliance and Regulatory Framework | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -22,7 +22,7 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            RshopRefills operates a multi-vertical digital commerce and payments platform serving customers across Africa,
+            {{ $siteName }} operates a multi-vertical digital commerce and payments platform serving customers across Africa,
             Europe and North America. This framework sets out the governance, controls and standards we apply to meet our
             regulatory obligations, protect our customers and partners, and safeguard the integrity of the financial system.
             Our program is risk-based, independently reviewed, and continuously updated to reflect evolving law and
@@ -30,7 +30,7 @@
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#statement" class="font-medium text-blue-600 hover:underline">1. Compliance statement and commitment</a></li>
@@ -47,14 +47,14 @@
         <section id="statement" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">1. Compliance statement and commitment</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                RshopRefills maintains a zero-tolerance policy toward financial crime in all its forms, including money
+                {{ $siteName }} maintains a zero-tolerance policy toward financial crime in all its forms, including money
                 laundering, terrorist financing, fraud, bribery, corruption and sanctions evasion. We are committed to
                 conducting business lawfully and ethically, and to upholding the highest standards of regulatory integrity in
                 every jurisdiction we serve across Africa and globally.
             </p>
 
-            <div class="my-5 rounded-[10px] bg-blue-600 p-6">
-                <span class="flex h-12 w-12 items-center justify-center rounded-[10px] bg-white/15">
+            <div class="my-5 rounded-[12px] bg-blue-600 p-6">
+                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-white/15">
                     <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 </span>
                 <p class="mt-4 text-lg font-bold text-white">We have zero tolerance for money laundering, terrorist financing and financial crime.</p>
@@ -78,7 +78,7 @@
                 <li><span class="font-semibold text-zinc-900">Record-keeping</span> of transactions and verification data for the periods required by law.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Designed to detect structuring and smurfing</p>
@@ -96,7 +96,7 @@
                 higher-risk activity carries stronger checks.
             </p>
 
-            <div class="mt-5 overflow-x-auto rounded-[10px] ring-1 ring-zinc-100">
+            <div class="mt-5 overflow-x-auto rounded-[12px] ring-1 ring-zinc-100">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -141,7 +141,7 @@
                 for Politically Exposed Persons (PEPs).
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">No onboarding or payments involving sanctioned territories</p>
@@ -193,7 +193,7 @@
                 lawful information requests.
             </p>
 
-            <div class="mt-5 rounded-[10px] bg-zinc-50 p-6 ring-1 ring-zinc-100">
+            <div class="mt-5 rounded-[12px] bg-zinc-50 p-6 ring-1 ring-zinc-100">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Compliance department</p>
                 <a href="mailto:{{ $complianceEmail }}" class="mt-2 inline-flex items-center gap-2 text-lg font-bold text-blue-600 hover:underline">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>

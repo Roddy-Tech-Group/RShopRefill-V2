@@ -69,7 +69,7 @@ new class extends Component {
             x-transition:leave="transition duration-200 ease-in"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 translate-y-4"
-            class="glass-panel relative w-full max-w-md rounded-t-3xl p-5 shadow-2xl shadow-zinc-900/30 sm:rounded-[10px]"
+            class="glass-panel relative w-full max-w-md rounded-t-3xl p-5 shadow-2xl shadow-zinc-900/30 sm:rounded-[12px]"
             style="padding-bottom: max(1.25rem, env(safe-area-inset-bottom));"
         >
             {{-- Drag handle (mobile only) --}}
@@ -97,7 +97,7 @@ new class extends Component {
                         name="password"
                         autocomplete="current-password"
                         required
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-[#0c1a36] dark:text-white"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-[#0c1a36] dark:text-white"
                         placeholder="••••••••"
                     >
                     @error('password') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
@@ -107,13 +107,13 @@ new class extends Component {
                     <button
                         type="button"
                         @click="open = false"
-                        class="rounded-[10px] border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                        class="rounded-[12px] border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
                     >
                         {{ __('Cancel') }}
                     </button>
                     <button
                         type="submit"
-                        class="rounded-[10px] bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-600/25 transition-colors hover:bg-red-700"
+                        class="rounded-[12px] bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-600/25 transition-colors hover:bg-red-700"
                     >
                         {{ __('Delete account') }}
                     </button>

@@ -65,7 +65,7 @@ new class extends Component
     <button
         type="button"
         @click="open = true"
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
     >
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
@@ -83,7 +83,7 @@ new class extends Component
 
             <div
                 x-transition
-                class="relative w-full max-w-md rounded-[10px] bg-white p-6 text-left shadow-2xl shadow-zinc-900/25"
+                class="relative w-full max-w-md rounded-[12px] bg-white p-6 text-left shadow-2xl shadow-zinc-900/25"
                 role="dialog"
                 aria-modal="true"
             >
@@ -96,7 +96,7 @@ new class extends Component
                 </div>
 
                 @if (count($this->availableCurrencies()) === 0)
-                    <div class="mt-6 rounded-[10px] bg-zinc-50 px-4 py-6 text-center ring-1 ring-zinc-100">
+                    <div class="mt-6 rounded-[12px] bg-zinc-50 px-4 py-6 text-center ring-1 ring-zinc-100">
                         <p class="text-sm font-semibold text-zinc-900">You hold every currency</p>
                         <p class="mt-1 text-xs text-zinc-600">There are no more wallet currencies to add right now.</p>
                     </div>
@@ -108,7 +108,7 @@ new class extends Component
                             type="button"
                             @click="ccyOpen = ! ccyOpen"
                             :aria-expanded="ccyOpen.toString()"
-                            class="flex w-full items-center justify-between gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/15"
+                            class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/15"
                         >
                             <span>{{ $currency }} &middot; {{ Currency::tryFrom($currency)?->label() }}</span>
                             <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="ccyOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -122,7 +122,7 @@ new class extends Component
                             x-transition:enter="transition ease-out duration-150"
                             x-transition:enter-start="opacity-0 -translate-y-1"
                             x-transition:enter-end="opacity-100 translate-y-0"
-                            class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
+                            class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
                             role="listbox"
                         >
                             @foreach ($this->availableCurrencies() as $c)
@@ -132,7 +132,7 @@ new class extends Component
                                     @click="ccyOpen = false"
                                     role="option"
                                     aria-selected="{{ $currency === $c->value ? 'true' : 'false' }}"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
                                 >
                                     <span>{{ $c->value }} &middot; {{ $c->label() }}</span>
                                     @if ($currency === $c->value)

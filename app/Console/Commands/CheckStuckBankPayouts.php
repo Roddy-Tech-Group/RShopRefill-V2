@@ -45,10 +45,19 @@ class CheckStuckBankPayouts extends Command
         $systemAdmin = Admin::first();
         $secretKey = config('services.flutterwave.secret_key');
 
+        if (! $systemAdmin) {
+            $this->error('No admin available to attribute system actions; aborting stuck-payout check.');
+
+            return;
+        }
+
         foreach ($stuckPayouts as $payout) {
             $this->info("Verifying stuck payout ID: {$payout->id} (Ref: {$payout->reference}) for Trade ID: {$payout->trade_id}");
 
-            // CRITICAL SAFEGUARD: Verify with Flutterwave before reverting to prevent double-payouts
+            // Verify with Flutterwave before touching anything. We must positively
+            // identify THIS transfer (by matching reference) and only act on a
+            // definitive status - otherwise we risk re-paying a transfer that went through.
+            $fwRecord = null;
             try {
                 $response = Http::timeout(10)
                     ->withToken($secretKey)
@@ -57,54 +66,67 @@ class CheckStuckBankPayouts extends Command
                     ]);
 
                 if ($response->successful()) {
-                    $data = $response->json('data');
-
-                    // If Flutterwave HAS a record of this transfer, we must be careful!
-                    if (! empty($data) && isset($data[0])) {
-                        $fwStatus = strtoupper($data[0]['status']);
-
-                        if ($fwStatus === 'SUCCESSFUL') {
-                            $this->info('Flutterwave actually succeeded. Updating payout to successful.');
-                            // It succeeded! The webhook might have been lost.
-                            $payout->update([
-                                'status' => 'successful',
-                                'gateway_response' => ['note' => 'Recovered via cron check', 'data' => $data[0]],
-                            ]);
-
-                            if ($payout->trade) {
-                                $reviewService->updateStatus(
-                                    $payout->trade,
-                                    TradeStatus::Paid,
-                                    $systemAdmin,
-                                    null,
-                                    'Bank transfer completed successfully (recovered by system check).'
-                                );
-                            }
-
-                            continue; // Move to next payout
-                        } elseif (in_array($fwStatus, ['PENDING', 'PROCESSING', 'NEW'])) {
-                            $this->info('Flutterwave is still processing this transfer. Skipping fallback to prevent double payout.');
-
-                            // We MUST NOT fallback, otherwise admin might manually pay it while FW is still trying.
-                            continue;
-                        }
-                        // If it's FAILED, we can safely proceed with fallback below.
-                    }
+                    // The list endpoint may not filter by reference server-side, so match
+                    // it ourselves - never act on some other transfer's record.
+                    $fwRecord = collect($response->json('data') ?? [])
+                        ->first(fn ($t) => ($t['reference'] ?? null) === $payout->reference);
                 }
             } catch (\Exception $e) {
                 $this->error('Failed to verify with Flutterwave: '.$e->getMessage());
+            }
 
-                // If we can't verify with the gateway, do NOT blindly fallback, it's too dangerous.
+            // Couldn't positively identify this transfer (empty data, no reference match,
+            // or the verify call errored). It may still be in flight or already delivered -
+            // reverting now could double-pay, so leave it pending and ask an admin to
+            // reconcile by hand. NEVER auto-revert on an unconfirmed lookup.
+            if (! $fwRecord) {
+                $this->warn("Payout {$payout->id} unconfirmed at gateway; leaving pending for manual reconciliation.");
+
+                app(AdminNotificationService::class)->push(
+                    'payout_unconfirmed',
+                    'Payout Needs Manual Reconciliation',
+                    'Trade #'.substr((string) optional($payout->trade)->uuid, 0, 8).' bank payout has been pending over 15 mins and could not be confirmed with the gateway. Check Flutterwave directly before any manual payment.',
+                    $payout->trade ? route('admin.gift-cards.trades.show', $payout->trade) : null
+                );
+
                 continue;
             }
 
-            // If we reached here, Flutterwave either returned empty data (never received the request)
-            // or returned FAILED. We can safely fallback to manual.
-            $this->info("Reverting stuck payout ID: {$payout->id} to manual processing.");
+            $fwStatus = strtoupper($fwRecord['status'] ?? '');
+
+            if ($fwStatus === 'SUCCESSFUL') {
+                $this->info('Flutterwave succeeded (webhook likely lost). Marking payout successful.');
+                $payout->update([
+                    'status' => 'successful',
+                    'gateway_response' => ['note' => 'Recovered via cron check', 'data' => $fwRecord],
+                ]);
+
+                if ($payout->trade) {
+                    $reviewService->updateStatus(
+                        $payout->trade,
+                        TradeStatus::Paid,
+                        $systemAdmin,
+                        null,
+                        'Bank transfer completed successfully (recovered by system check).'
+                    );
+                }
+
+                continue;
+            }
+
+            if (in_array($fwStatus, ['PENDING', 'PROCESSING', 'NEW'], true)) {
+                $this->info('Flutterwave still processing this transfer. Skipping to prevent double payout.');
+
+                continue;
+            }
+
+            // Only here - a CONFIRMED, reference-matched FAILED transfer - is it safe to
+            // mark failed and reopen the trade for retry / manual payment.
+            $this->info("Confirmed failed at gateway. Reverting payout ID: {$payout->id} for manual processing.");
 
             $payout->update([
                 'status' => 'failed',
-                'gateway_response' => ['error' => 'Automated timeout reached without gateway success. Falling back to manual.'],
+                'gateway_response' => ['note' => 'Gateway-confirmed failed', 'data' => $fwRecord],
             ]);
 
             if ($payout->trade) {
@@ -113,19 +135,19 @@ class CheckStuckBankPayouts extends Command
                     TradeStatus::Approved,
                     $systemAdmin,
                     null,
-                    'Automated bank payout timed out (over 15 mins). Reverted to Approved for manual processing.'
+                    'Bank transfer failed at gateway. Reverted to Approved for retry / manual processing.'
                 );
 
                 $payout->trade->messages()->create([
                     'sender_type' => Admin::class,
                     'sender_id' => $systemAdmin->id,
-                    'message' => 'Automated bank payout timed out. Reverted to Approved for manual transfer.',
+                    'message' => 'Automated bank payout failed at the gateway. Reverted to Approved for manual transfer.',
                 ]);
 
                 app(AdminNotificationService::class)->push(
                     'payout_reverted',
                     'Automated Payout Reverted',
-                    'Trade #'.substr($payout->trade->uuid, 0, 8).' automated payout failed. It has been safely reverted to Approved for manual payment.',
+                    'Trade #'.substr($payout->trade->uuid, 0, 8).' bank payout failed at the gateway and was reverted to Approved for manual payment.',
                     route('admin.gift-cards.trades.show', $payout->trade)
                 );
             }

@@ -46,7 +46,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     </div>
 
     {{-- Password form --}}
-    <div class="rounded-[10px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+    <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
         <div class="mb-5">
             <h2 class="text-base font-semibold text-black">Change password</h2>
             <p class="mt-0.5 text-xs text-zinc-600">You'll stay signed in on this device after updating.</p>
@@ -65,7 +65,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         required
                         autocomplete="current-password"
                         placeholder="Enter your current password"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-600" :aria-label="show ? 'Hide password' : 'Show password'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -92,7 +92,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="At least 8 characters"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-600" :aria-label="show ? 'Hide password' : 'Show password'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -119,7 +119,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="Re-enter your new password"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 pr-11 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     />
                     <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-600" :aria-label="show ? 'Hide password' : 'Show password'">
                         <svg x-show="!show" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -136,7 +136,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
             {{-- Save action --}}
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
+                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
                     {{ __('Update password') }}
                 </button>
 

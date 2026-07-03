@@ -101,7 +101,7 @@ class extends Component {
     <x-slot:subheading>Partner API credentials and integration keys. Values you store here mirror the .env entries; pair with a config bridge before they take effect in code.</x-slot:subheading>
 
     {{-- Security warning so the admin understands the implications. --}}
-    <div class="mb-6 flex items-start gap-3 rounded-[10px] border-[1.5px] border-amber-200 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10">
+    <div class="mb-6 flex items-start gap-3 rounded-[12px] border-[1.5px] border-amber-200 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10">
         <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
         </svg>
@@ -114,10 +114,10 @@ class extends Component {
     <div class="flex flex-col gap-6">
 
         @forelse ($this->providerCards as $card)
-            <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
 
                 {{-- Provider header pill --}}
-                <div class="mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+                <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                     <h2 class="text-sm font-bold text-blue-700 dark:text-blue-300">{{ $card['label'] }}</h2>
                     @if ($card['blurb'])
                         <p class="mt-0.5 text-[11px] text-blue-700/70 dark:text-blue-300/70">{{ $card['blurb'] }}</p>
@@ -127,7 +127,7 @@ class extends Component {
                 <ul class="divide-inset">
                     @foreach ($card['settings'] as $setting)
                         @php $displayVal = $this->displayValue($setting->value); @endphp
-                        <li class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[10px] sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
+                        <li class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
                             {{-- Key + description --}}
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
@@ -155,7 +155,7 @@ class extends Component {
                                         autocomplete="off"
                                         spellcheck="false"
                                         placeholder="Not set"
-                                        class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-3 pr-10 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
+                                        class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-10 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
                                         aria-label="{{ $setting->key }}"
                                     >
                                     <button
@@ -173,7 +173,7 @@ class extends Component {
                                     type="button"
                                     :disabled="value === initial"
                                     @click="$wire.updateSetting('{{ $setting->key }}', value).then(() => initial = value)"
-                                    class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] bg-blue-600 px-3.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
+                                    class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] bg-blue-600 px-3.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
                                 >
                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
@@ -187,7 +187,7 @@ class extends Component {
 
             </div>
         @empty
-            <div class="rounded-[10px] border-[1.5px] border-white bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="rounded-[12px] border-[1.5px] border-white bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
                 <p class="text-sm font-semibold text-zinc-900 dark:text-white">No integration keys seeded yet</p>
                 <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Run <code class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan migrate</code> to seed the inventory of supported partners.</p>
             </div>

@@ -205,7 +205,7 @@ class extends Component {
     </header>
 
     {{-- Tabs --}}
-    <nav class="mb-4 flex flex-wrap items-center gap-1 rounded-[10px] border border-zinc-100 bg-white p-1 dark:border-zinc-700/60 dark:bg-[#1d3252]">
+    <nav class="mb-4 flex flex-wrap items-center gap-1 rounded-[12px] border border-zinc-100 bg-white p-1 dark:border-zinc-700/60 dark:bg-[#1d3252]">
         @foreach ([
             'pending' => 'Pending review',
             'approved' => 'Approved - awaiting payout',
@@ -217,7 +217,7 @@ class extends Component {
                 type="button"
                 wire:click="setTab('{{ $key }}')"
                 @class([
-                    'flex items-center gap-2 rounded-[10px] px-3 py-2 text-xs font-semibold transition-colors',
+                    'flex items-center gap-2 rounded-[12px] px-3 py-2 text-xs font-semibold transition-colors',
                     'bg-blue-600 text-white' => $tab === $key,
                     'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]' => $tab !== $key,
                 ])
@@ -241,7 +241,7 @@ class extends Component {
                 $isPending = $w->status === 'pending';
                 $isApproved = $w->status === 'approved';
             @endphp
-            <article class="rounded-[10px] border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-700/60 dark:bg-[#1d3252]" wire:key="w-{{ $w->id }}">
+            <article class="rounded-[12px] border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-700/60 dark:bg-[#1d3252]" wire:key="w-{{ $w->id }}">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
@@ -263,15 +263,15 @@ class extends Component {
                             @endif
                         </p>
                         @if (! empty($w->payout_details))
-                            <pre class="mt-2 max-w-md overflow-auto rounded-[10px] bg-zinc-50 px-3 py-2 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($w->payout_details, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                            <pre class="mt-2 max-w-md overflow-auto rounded-[12px] bg-zinc-50 px-3 py-2 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($w->payout_details, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                         @endif
                         @if ($w->reject_reason)
-                            <p class="mt-2 rounded-[10px] bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                            <p class="mt-2 rounded-[12px] bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
                                 <span class="font-semibold">Reason:</span> {{ $w->reject_reason }}
                             </p>
                         @endif
                         @if ($w->payout_reference)
-                            <p class="mt-2 inline-flex items-center gap-2 rounded-[10px] bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                            <p class="mt-2 inline-flex items-center gap-2 rounded-[12px] bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                                 <span class="font-semibold">Payout ref:</span>
                                 <span class="font-mono">{{ $w->payout_reference }}</span>
                             </p>
@@ -291,46 +291,46 @@ class extends Component {
                 {{-- Actions per status --}}
                 @if ($isPending)
                     <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-700/60">
-                        <button type="button" wire:click="approve({{ $w->id }})" class="rounded-[10px] bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">
+                        <button type="button" wire:click="approve({{ $w->id }})" class="rounded-[12px] bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">
                             Approve
                         </button>
-                        <button type="button" wire:click="startReject({{ $w->id }})" class="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+                        <button type="button" wire:click="startReject({{ $w->id }})" class="rounded-[12px] border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
                             Reject &amp; refund
                         </button>
                     </div>
                     @if ($rejectingId === $w->id)
-                        <div class="mt-3 rounded-[10px] border border-red-200 bg-red-50/40 p-3 dark:border-red-500/30 dark:bg-red-500/10">
+                        <div class="mt-3 rounded-[12px] border border-red-200 bg-red-50/40 p-3 dark:border-red-500/30 dark:bg-red-500/10">
                             <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Rejection reason (visible to the customer)</label>
-                            <textarea wire:model="rejectReason" rows="2" class="mt-1 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white"></textarea>
+                            <textarea wire:model="rejectReason" rows="2" class="mt-1 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white"></textarea>
                             @error('rejectReason') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             <div class="mt-2 flex items-center justify-end gap-2">
-                                <button type="button" wire:click="cancelReject" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Cancel</button>
-                                <button type="button" wire:click="reject({{ $w->id }})" class="rounded-[10px] bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Confirm reject &amp; refund</button>
+                                <button type="button" wire:click="cancelReject" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Cancel</button>
+                                <button type="button" wire:click="reject({{ $w->id }})" class="rounded-[12px] bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Confirm reject &amp; refund</button>
                             </div>
                         </div>
                     @endif
                 @elseif ($isApproved)
                     <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-700/60">
-                        <button type="button" wire:click="startPay({{ $w->id }})" class="rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+                        <button type="button" wire:click="startPay({{ $w->id }})" class="rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700">
                             Mark as paid
                         </button>
                     </div>
                     @if ($payingId === $w->id)
-                        <div class="mt-3 rounded-[10px] border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-500/30 dark:bg-blue-500/10">
+                        <div class="mt-3 rounded-[12px] border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-500/30 dark:bg-blue-500/10">
                             <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Payout reference</label>
                             <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Bank txn id, wallet transfer ref, or mobile-money receipt.</p>
-                            <input type="text" wire:model="payoutReference" class="mt-1 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                            <input type="text" wire:model="payoutReference" class="mt-1 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                             @error('payoutReference') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             <div class="mt-2 flex items-center justify-end gap-2">
-                                <button type="button" wire:click="cancelPay" class="rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Cancel</button>
-                                <button type="button" wire:click="markPaid({{ $w->id }})" class="rounded-[10px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Confirm paid</button>
+                                <button type="button" wire:click="cancelPay" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">Cancel</button>
+                                <button type="button" wire:click="markPaid({{ $w->id }})" class="rounded-[12px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Confirm paid</button>
                             </div>
                         </div>
                     @endif
                 @endif
             </article>
         @empty
-            <div class="rounded-[10px] border border-dashed border-zinc-300 bg-white px-5 py-12 text-center text-sm text-zinc-600 dark:border-white/10 dark:bg-[#1d3252] dark:text-zinc-400">
+            <div class="rounded-[12px] border border-dashed border-zinc-300 bg-white px-5 py-12 text-center text-sm text-zinc-600 dark:border-white/10 dark:bg-[#1d3252] dark:text-zinc-400">
                 No {{ $tab }} withdrawals.
             </div>
         @endforelse

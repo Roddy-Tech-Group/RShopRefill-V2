@@ -120,8 +120,8 @@ class extends Component {
                     </svg>
                 </div>
             </div>
-            <label class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[10px] px-1 py-2">
-                <input type="checkbox" wire:model.live="expired" class="h-5 w-5 rounded-[10px] border-2 border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/30">
+            <label class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[12px] px-1 py-2">
+                <input type="checkbox" wire:model.live="expired" class="h-5 w-5 rounded-[12px] border-2 border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/30">
                 <span class="text-sm font-semibold text-zinc-700">Expired orders</span>
             </label>
         </div>
@@ -131,7 +131,7 @@ class extends Component {
         {{-- All orders live in ONE card; each order is a drop-down row.
              State lifted to the parent so opening an order auto-closes the
              previously-opened one (single-expanded accordion behaviour). --}}
-        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[10px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
             @foreach ($orders as $order)
                 @php
                     [$statusLabel, $statusPillClass] = $statusUi[$order->order_status->value] ?? ['Placed', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'];
@@ -266,11 +266,17 @@ class extends Component {
                                         : null;
                                     $country  = $countryNames[strtoupper((string) ($snap['country_code'] ?? ''))] ?? ($snap['country_code'] ?? null);
                                     $payload  = (array) ($item->fulfillment_payload ?? []);
-                                    $cardPin  = (! empty($payload['pin']) && is_scalar($payload['pin'])) ? (string) $payload['pin'] : null;
+                                    // pin-redemptionURL cards (e.g. virtual prepaid Visa) deliver the PIN
+                                    // under `epin`, not `pin` - fall back to it so it shows as the PIN
+                                    // instead of leaking through the generic code-picker below.
+                                    $cardPin  = (! empty($payload['pin']) && is_scalar($payload['pin'])) ? (string) $payload['pin'] : ((! empty($payload['epin']) && is_scalar($payload['epin'])) ? (string) $payload['epin'] : null);
                                     $cardCode = null;
                                     foreach (['code', 'voucher_code', 'redeem_code', 'card_number', 'serial'] as $credKey) {
                                         if (! empty($payload[$credKey]) && is_scalar($payload[$credKey])) { $cardCode = (string) $payload[$credKey]; break; }
                                     }
+                                    // The registration/redemption link is the customer's only entry point
+                                    // for pin-redemptionURL cards - surface it as a button below.
+                                    $redemptionUrl = (! empty($payload['redemption_url']) && is_scalar($payload['redemption_url'])) ? (string) $payload['redemption_url'] : null;
                                     // eSIM delivery is shaped completely differently from a gift card:
                                     // a QR image (qrcode_url) plus the SM-DP+ address (lpa) and an
                                     // activation code (matching_id) for manual entry. The presence of
@@ -339,7 +345,7 @@ class extends Component {
                                 {{-- Gift card — brand logo + denomination, full width inside the order card.
                                      `theme-static`: resellers screenshot this to deliver to their own
                                      customers, so it must look identical in light and dark mode. --}}
-                                <div class="theme-static max-w-[340px] rounded-[10px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
+                                <div class="theme-static max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
                                     <div class="flex items-start justify-between gap-3 px-2 pt-2">
                                         <div class="flex min-w-0 flex-col items-start gap-2.5">
                                             @if ($logo)
@@ -371,7 +377,7 @@ class extends Component {
                                         {{-- eSIM: QR for scan + SM-DP+ address and activation code for manual entry. --}}
                                         <div class="space-y-2">
                                             @if ($esim['qr'])
-                                                <div class="flex flex-col items-center gap-2 rounded-[10px] border-2 border-zinc-100 bg-white p-4">
+                                                <div class="flex flex-col items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white p-4">
                                                     <img src="{{ $esim['qr'] }}" alt="eSIM activation QR code" class="h-44 w-44 object-contain" loading="lazy">
                                                     <p class="text-center text-xs font-medium text-zinc-600">Scan this QR from another device to install your eSIM.</p>
                                                 </div>
@@ -379,7 +385,7 @@ class extends Component {
                                             @if ($esim['install'])
                                                 {{-- One-tap install on iPhone (iOS 17.4+). The link opens Apple's
                                                      eSIM provisioning flow without needing the QR scan. --}}
-                                                <a href="{{ $esim['install'] }}" class="flex items-center justify-center gap-2 rounded-[10px] bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
+                                                <a href="{{ $esim['install'] }}" class="flex items-center justify-center gap-2 rounded-[12px] bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
                                                     <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                                                     Install on this iPhone
                                                 </a>
@@ -387,7 +393,7 @@ class extends Component {
                                             @if ($esim['manage'])
                                                 {{-- Branded eSIMs Cloud portal — customer monitors usage,
                                                      re-installs, and tops up on a RshopRefills-branded page. --}}
-                                                <a href="{{ $esim['manage'] }}" target="_blank" rel="noopener" class="flex items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                                                <a href="{{ $esim['manage'] }}" target="_blank" rel="noopener" class="flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788M12 12h.008v.008H12V12z"/>
                                                     </svg>
@@ -396,7 +402,7 @@ class extends Component {
                                             @endif
                                             @if ($esim['iccid'] && $item->provider_name === 'airalo' && $item->fulfillment_status->value === 'fulfilled')
                                                 {{-- Native top-up — refill the same ICCID from the dashboard. --}}
-                                                <a href="{{ route('dashboard.esim.topup', $item) }}" wire:navigate class="flex items-center justify-center gap-2 rounded-[10px] bg-white px-4 py-3 text-sm font-semibold text-blue-600 ring-1 ring-blue-200 transition-colors hover:bg-blue-50 dark:bg-[#26416b] dark:text-blue-300 dark:ring-blue-400/40 dark:hover:bg-[#34507a]">
+                                                <a href="{{ route('dashboard.esim.topup', $item) }}" wire:navigate class="flex items-center justify-center gap-2 rounded-[12px] bg-white px-4 py-3 text-sm font-semibold text-blue-600 ring-1 ring-blue-200 transition-colors hover:bg-blue-50 dark:bg-[#26416b] dark:text-blue-300 dark:ring-blue-400/40 dark:hover:bg-[#34507a]">
                                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                     </svg>
@@ -404,7 +410,7 @@ class extends Component {
                                                 </a>
                                             @endif
                                             @foreach (array_filter(['SM-DP+' => $esim['lpa'], 'Code' => $esim['code'], 'ICCID' => $esim['iccid'], 'Access' => $esim['access']]) as $credLabel => $credValue)
-                                                <div class="flex items-center gap-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="esim-{{ $item->id }}-{{ $credLabel }}">
+                                                <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="esim-{{ $item->id }}-{{ $credLabel }}">
                                                     <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
                                                     <span class="min-w-0 flex-1 truncate text-sm font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                                     <button
@@ -425,8 +431,8 @@ class extends Component {
                                     @elseif ($topup)
                                         {{-- Mobile top-up — no code to copy; airtime lands on the
                                              recipient phone. Tile confirms the number that was credited. --}}
-                                        <div class="flex items-center gap-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3">
-                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                                        <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3">
+                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
                                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                                                 </svg>
@@ -457,11 +463,11 @@ class extends Component {
                                                 </button>
                                             @endif
                                         </div>
-                                    @elseif ($cardCode || $cardPin)
+                                    @elseif ($cardCode || $cardPin || $redemptionUrl)
                                         {{-- Gift card — code + PIN, each independently copyable. --}}
                                         <div class="space-y-2">
                                             @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
-                                                <div class="flex items-center gap-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
+                                                <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
                                                     <span class="w-9 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
                                                     <span class="min-w-0 flex-1 truncate text-base font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                                     <button
@@ -479,17 +485,25 @@ class extends Component {
                                                 </div>
                                             @endforeach
 
+                                            @if ($redemptionUrl)
+                                                {{-- pin-redemptionURL cards: the registration link is the
+                                                     customer's entry point - without it they cannot redeem. --}}
+                                                <a href="{{ $redemptionUrl }}" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                                                    Redeem your card
+                                                </a>
+                                            @endif
+
                                             @if ($appleRedeemUrl)
                                                 {{-- Apple deep link: on iPhone/iPad the App Store opens with the
                                                      code pre-filled, ready to add to the user's Apple account. --}}
-                                                <a href="{{ $appleRedeemUrl }}" class="flex items-center justify-center gap-2 rounded-[10px] bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
+                                                <a href="{{ $appleRedeemUrl }}" class="flex items-center justify-center gap-2 rounded-[12px] bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
                                                     <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                                                     Add to Apple account
                                                 </a>
                                             @endif
                                         </div>
                                     @else
-                                        <div class="flex items-center gap-2 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">
+                                        <div class="flex items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">
                                             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
@@ -519,12 +533,12 @@ class extends Component {
                                     </div>
 
                                     @if ($redeemHtml)
-                                        <div x-show="panel === 'redeem'" x-collapse x-cloak class="mt-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
+                                        <div x-show="panel === 'redeem'" x-collapse x-cloak class="mt-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
                                             {!! $redeemHtml !!}
                                         </div>
                                     @endif
                                     @if ($termsHtml)
-                                        <div x-show="panel === 'terms'" x-collapse x-cloak class="mt-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
+                                        <div x-show="panel === 'terms'" x-collapse x-cloak class="mt-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
                                             {!! $termsHtml !!}
                                         </div>
                                     @endif
@@ -541,8 +555,8 @@ class extends Component {
              orders ever" variant is much warmer and offers four storefront
              surfaces to start from so the page doesn't feel like a dead end. --}}
         @if (trim($search) !== '' || $expired)
-            <div class="rounded-[10px] bg-[#eff6ff] px-6 py-16 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60">
-                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+            <div class="rounded-[12px] bg-[#eff6ff] px-6 py-16 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
@@ -589,7 +603,7 @@ class extends Component {
                 ];
             @endphp
 
-            <div class="overflow-hidden rounded-[10px] bg-[#eff6ff] px-6 py-12 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60 sm:px-10">
+            <div class="overflow-hidden rounded-[12px] bg-[#eff6ff] px-6 py-12 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60 sm:px-10">
                 <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full text-blue-600 ring-1 ring-blue-100 dark:text-blue-300 dark:ring-blue-500/20">
                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
@@ -607,7 +621,7 @@ class extends Component {
                         <a
                             href="{{ $link['href'] }}"
                             wire:navigate
-                            class="group flex flex-col items-center gap-3 rounded-[10px] border-2 border-zinc-200 bg-[#eff6ff] px-3 py-4 text-center transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm dark:border-zinc-700/60 dark:hover:border-blue-400/50"
+                            class="group flex flex-col items-center gap-3 rounded-[12px] border-2 border-zinc-200 bg-[#eff6ff] px-3 py-4 text-center transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm dark:border-zinc-700/60 dark:hover:border-blue-400/50"
                         >
                             <span class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/20">
                                 <img src="{{ asset('assets/' . rawurlencode($link['icon'])) }}" alt="" class="h-6 w-6 object-contain" loading="lazy">
@@ -633,7 +647,7 @@ class extends Component {
 
     @if ($orders->hasPages())
         {{-- Matches the admin products page paginator (vendor/pagination/circles). --}}
-        <div class="mt-2 rounded-[10px] border-2 border-zinc-100 bg-[#eff6ff] px-5 py-3 dark:ring-zinc-700/60">
+        <div class="mt-2 rounded-[12px] border-2 border-zinc-100 bg-[#eff6ff] px-5 py-3 dark:ring-zinc-700/60">
             {{ $orders->onEachSide(1)->links('vendor.pagination.circles-livewire') }}
         </div>
     @endif

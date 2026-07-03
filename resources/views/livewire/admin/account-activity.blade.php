@@ -194,7 +194,7 @@ class extends Component {
                 ['label' => 'Failed attempts', 'value' => $summary['failed'], 'dot' => 'bg-red-500'],
                 ['label' => 'Total events',    'value' => $summary['total'],  'dot' => 'bg-zinc-500'],
             ] as $stat)
-                <div class="rounded-[10px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -214,7 +214,7 @@ class extends Component {
                     wire:model.live.debounce.300ms="search"
                     type="search"
                     placeholder="Search by action, IP, or correlation ID"
-                    class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                    class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
                 />
             </div>
 
@@ -226,7 +226,7 @@ class extends Component {
                         type="button"
                         wire:click="setActorFilter('{{ $value }}')"
                         @class([
-                            'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                            'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                             'bg-blue-600 text-white' => $actorFilter === $value,
                             'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]' => $actorFilter !== $value,
                         ])
@@ -244,7 +244,7 @@ class extends Component {
                     type="button"
                     wire:click="setActionFilter('{{ $value }}')"
                     @class([
-                        'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                        'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                         'bg-blue-600 text-white' => $actionFilter === $value,
                         'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]' => $actionFilter !== $value,
                     ])
@@ -253,7 +253,7 @@ class extends Component {
         </div>
 
         {{-- Log table --}}
-        <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead>
@@ -280,11 +280,11 @@ class extends Component {
                                 <td class="px-5 py-3">
                                     <div class="flex items-center gap-2">
                                         @if ($actor['kind'] === 'admin')
-                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-fuchsia-500/15 text-[11px] font-bold text-fuchsia-700 dark:text-fuchsia-300">A</span>
+                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-fuchsia-500/15 text-[11px] font-bold text-fuchsia-700 dark:text-fuchsia-300">A</span>
                                         @elseif ($actor['kind'] === 'user')
-                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-blue-500/15 text-[11px] font-bold text-blue-700 dark:text-blue-300">{{ strtoupper(substr($actor['name'], 0, 1)) }}</span>
+                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-blue-500/15 text-[11px] font-bold text-blue-700 dark:text-blue-300">{{ strtoupper(substr($actor['name'], 0, 1)) }}</span>
                                         @else
-                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-zinc-200 text-[11px] font-bold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">S</span>
+                                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 text-[11px] font-bold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">S</span>
                                         @endif
                                         <div class="min-w-0">
                                             <div class="truncate text-sm font-semibold text-zinc-900 dark:text-white">{{ $actor['name'] }}</div>
@@ -337,13 +337,13 @@ class extends Component {
         @php $actor = $actorLabel($viewing); @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="closeView" class="absolute inset-0 bg-zinc-900/40"></div>
-            <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[10px] bg-white shadow-2xl dark:bg-[#1d3252]">
+            <div class="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[12px] bg-white shadow-2xl dark:bg-[#1d3252]">
                 <div class="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                     <div>
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Audit event #{{ $viewing->id }}</h3>
                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $viewing->created_at->format('M j, Y H:i:s') }} - {{ $viewing->created_at->diffForHumans() }}</p>
                     </div>
-                    <button type="button" wire:click="closeView" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                    <button type="button" wire:click="closeView" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -390,7 +390,7 @@ class extends Component {
                     @if (! empty($viewing->metadata))
                         <div>
                             <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Metadata</p>
-                            <pre class="mt-1 max-h-48 overflow-auto rounded-[10px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->metadata, JSON_PRETTY_PRINT) }}</pre>
+                            <pre class="mt-1 max-h-48 overflow-auto rounded-[12px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->metadata, JSON_PRETTY_PRINT) }}</pre>
                         </div>
                     @endif
 
@@ -399,20 +399,20 @@ class extends Component {
                             @if (! empty($viewing->before_state))
                                 <div>
                                     <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Before</p>
-                                    <pre class="mt-1 max-h-48 overflow-auto rounded-[10px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->before_state, JSON_PRETTY_PRINT) }}</pre>
+                                    <pre class="mt-1 max-h-48 overflow-auto rounded-[12px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->before_state, JSON_PRETTY_PRINT) }}</pre>
                                 </div>
                             @endif
                             @if (! empty($viewing->after_state))
                                 <div>
                                     <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">After</p>
-                                    <pre class="mt-1 max-h-48 overflow-auto rounded-[10px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->after_state, JSON_PRETTY_PRINT) }}</pre>
+                                    <pre class="mt-1 max-h-48 overflow-auto rounded-[12px] bg-zinc-50 p-3 text-[11px] text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">{{ json_encode($viewing->after_state, JSON_PRETTY_PRINT) }}</pre>
                                 </div>
                             @endif
                         </div>
                     @endif
                 </div>
                 <div class="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
-                    <button type="button" wire:click="closeView" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">Close</button>
+                    <button type="button" wire:click="closeView" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">Close</button>
                 </div>
             </div>
         </div>

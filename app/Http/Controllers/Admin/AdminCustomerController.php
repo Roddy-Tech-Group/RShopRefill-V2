@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AdminDirectMessageMail;
 use App\Models\Notification;
 use App\Models\NotificationDelivery;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -263,7 +264,7 @@ class AdminCustomerController extends Controller
 
         $admin = $request->user('admin');
         $isWarning = $validated['type'] === 'warning';
-        $title = $isWarning ? 'Account warning' : 'Message from RshopRefills';
+        $title = $isWarning ? 'Account warning' : 'Message from '.SiteSetting::get('site.name', 'RshopRefills');
 
         // 1. Dashboard notification - always lands. We write directly to the
         //    custom `notifications` table (App\Models\Notification) to match

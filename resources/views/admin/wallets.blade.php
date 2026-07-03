@@ -30,7 +30,7 @@
 
     <div class="flex flex-1 flex-col gap-6">
 
-        <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead>
@@ -51,7 +51,7 @@
                                         @php
                                             $rowAvatar = $wallet->user?->avatar_url ?: ($wallet->user?->initialsAvatar() ?? '');
                                         @endphp
-                                        <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30">
+                                        <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30">
                                         <div class="leading-tight">
                                             <p class="text-[12px] font-semibold text-zinc-900 dark:text-white">{{ $wallet->user?->name ?? '—' }}</p>
                                             <p class="text-[11px] text-zinc-600 dark:text-zinc-400">{{ $wallet->user?->email ?? '—' }}</p>

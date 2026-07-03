@@ -29,7 +29,7 @@
             }"
             @mouseenter="paused = true"
             @mouseleave="paused = false"
-            class="group relative aspect-[16/10] overflow-hidden rounded-[10px] bg-[#070D1A] ring-1 ring-zinc-200 shadow-sm"
+            class="group relative aspect-[16/10] overflow-hidden rounded-[12px] bg-[#070D1A] ring-1 ring-zinc-200 shadow-sm"
         >
             <div :class="current === 0 ? 'opacity-100' : 'opacity-0'" class="absolute inset-0 transition-opacity duration-700 ease-in-out group-hover:scale-105">
                 <x-illos.esim-people class="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice" />
@@ -63,7 +63,7 @@
             }"
             @mouseenter="paused = true"
             @mouseleave="paused = false"
-            class="group relative aspect-[16/10] overflow-hidden rounded-[10px] ring-1 ring-zinc-200 shadow-sm"
+            class="group relative aspect-[16/10] overflow-hidden rounded-[12px] ring-1 ring-zinc-200 shadow-sm"
         >
             <template x-for="(src, i) in images" :key="src">
                 <img
@@ -99,7 +99,7 @@
             }"
             @mouseenter="paused = true"
             @mouseleave="paused = false"
-            class="group relative aspect-[16/10] overflow-hidden rounded-[10px] ring-1 ring-zinc-200 shadow-sm"
+            class="group relative aspect-[16/10] overflow-hidden rounded-[12px] ring-1 ring-zinc-200 shadow-sm"
         >
             <template x-for="(src, i) in images" :key="src">
                 <img

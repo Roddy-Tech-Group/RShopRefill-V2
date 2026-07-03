@@ -12,14 +12,20 @@ class NotificationPreferenceService
      */
     public function getPreferences(User $user): NotificationPreference
     {
+        // Opt-out model: every channel/category is ON by default. Users turn
+        // individual ones off from their account notification settings. (Web push
+        // additionally needs the browser's permission grant before it can deliver,
+        // but the preference itself defaults on like the rest.)
         return NotificationPreference::firstOrCreate(
             ['user_id' => $user->id],
             [
                 'email_enabled' => true,
+                'push_enabled' => true,
                 'marketing_enabled' => true,
                 'order_notifications' => true,
                 'wallet_notifications' => true,
                 'security_notifications' => true,
+                'engagement_enabled' => true,
             ]
         );
     }

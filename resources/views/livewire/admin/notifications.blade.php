@@ -152,13 +152,13 @@ class extends Component {
              to flush ALL failed rows immediately after fixing the root cause
              (rate-limited provider, swapped API key, etc.). --}}
         <div class="flex flex-wrap items-center gap-3">
-            <div class="inline-flex w-max items-center rounded-[10px] bg-zinc-100 p-1" role="tablist" aria-label="Filter notifications">
+            <div class="inline-flex w-max items-center rounded-[12px] bg-zinc-100 p-1" role="tablist" aria-label="Filter notifications">
                 @foreach (['all' => 'All', 'pending' => 'Pending', 'sent' => 'Sent', 'failed' => 'Failed'] as $value => $label)
                     <button
                         type="button"
                         wire:click="setFilter('{{ $value }}')"
                         @class([
-                            'inline-flex items-center justify-center rounded-[10px] px-3.5 py-1.5 text-xs font-semibold transition-all',
+                            'inline-flex items-center justify-center rounded-[12px] px-3.5 py-1.5 text-xs font-semibold transition-all',
                             'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' => $filter === $value,
                             'text-zinc-600 hover:text-zinc-900' => $filter !== $value,
                         ])
@@ -175,7 +175,7 @@ class extends Component {
                     wire:loading.attr="disabled"
                     wire:target="retryAllFailed"
                     wire:confirm="Re-queue every failed notification? Each row is capped at {{ \App\Domain\Notification\Jobs\RetryFailedNotificationsJob::MAX_AUTO_RETRIES }} auto-retries."
-                    class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                 >
                     <svg wire:loading.remove wire:target="retryAllFailed" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
@@ -241,7 +241,7 @@ class extends Component {
                                                 wire:click="retry('{{ $n->id }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="retry('{{ $n->id }}')"
-                                                class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                                                class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                                             >
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
@@ -329,7 +329,7 @@ class extends Component {
             x-transition:leave-end="translate-y-full"
             class="w-full max-w-lg rounded-t-[20px] bg-white p-5 pb-7 shadow-2xl shadow-zinc-900/20"
         >
-            <div class="mx-auto mb-4 h-1.5 w-10 rounded-[10px] bg-zinc-200"></div>
+            <div class="mx-auto mb-4 h-1.5 w-10 rounded-[12px] bg-zinc-200"></div>
 
             <div class="flex items-start gap-2">
                 <h2 class="flex-1 text-base font-bold text-zinc-900" x-text="note.title"></h2>
@@ -356,7 +356,7 @@ class extends Component {
                 <button
                     type="button"
                     @click="$wire.delete(note.id); close()"
-                    class="flex-1 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-50"
+                    class="flex-1 rounded-[12px] px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-50"
                 >
                     Delete
                 </button>

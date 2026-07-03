@@ -14,7 +14,7 @@
     // tile never reads "0+" on an empty/seeded environment.
     $catalogVariantsRounded = max(100, intdiv($catalogVariantCount, 100) * 100);
 @endphp
-<section data-reveal aria-label="Why shop with RshopRefills">
+<section data-reveal aria-label="Why shop with {{ $siteName }}">
     <ul class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
 
         {{-- Best Prices --}}

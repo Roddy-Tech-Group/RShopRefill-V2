@@ -46,6 +46,17 @@ class CartWebController extends Controller
     {
         [$cart, $token] = $this->resolve($request);
 
+        // Ephemeral "Buy now" items only live during a checkout visit. Any time
+        // the cart is read from somewhere that ISN'T checkout (the JS store sends
+        // ?ctx=checkout only on checkout pages), purge them so an abandoned Buy
+        // now never lingers in the persistent cart.
+        if ($request->query('ctx') !== 'checkout') {
+            $buyNowIds = (array) $request->session()->pull('cart.buy_now_items', []);
+            if ($buyNowIds) {
+                $cart->items()->whereIn('id', $buyNowIds)->delete();
+            }
+        }
+
         return $this->respond($cart, $token, $request->query('currency'));
     }
 
@@ -73,18 +84,27 @@ class CartWebController extends Controller
             // Bill payment account / meter ID. Alphanumeric + common separators,
             // 4-30 chars (covers electricity meters, DSTV smartcards, etc.).
             'metadata.account_id' => ['nullable', 'string', 'regex:/^[A-Za-z0-9 \-]{4,30}$/'],
+            // "Buy now" adds: tagged ephemeral so they don't linger if the
+            // shopper abandons checkout (see show()).
+            'buy_now' => ['nullable', 'boolean'],
         ]);
 
         [$cart, $token] = $this->resolve($request);
         $variant = ProductVariant::findOrFail($data['product_variant_id']);
 
-        $this->cartManager->addItem(
+        $item = $this->cartManager->addItem(
             $cart,
             $variant,
             (int) $data['quantity'],
             isset($data['requested_value']) ? (float) $data['requested_value'] : null,
             $data['metadata'] ?? null,
         );
+
+        if ($request->boolean('buy_now')) {
+            $ids = (array) $request->session()->get('cart.buy_now_items', []);
+            $ids[] = $item->id;
+            $request->session()->put('cart.buy_now_items', array_values(array_unique($ids)));
+        }
 
         return $this->respond($cart, $token, $request->query('currency'));
     }

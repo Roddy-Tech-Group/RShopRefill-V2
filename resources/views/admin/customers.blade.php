@@ -92,11 +92,11 @@
         .cust-body:hover { border-radius: 10px; }
     </style>
 
-    <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill --}}
-        <div class="cust-row grid mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+        <div class="cust-row grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
             <span class="col-user">User</span>
             <span class="col-status">Status</span>
             <span>Wallet Balance</span>
@@ -116,7 +116,7 @@
             >
                 {{-- User — avatar + name + email stacked. --}}
                 <div class="col-user flex min-w-0 items-center gap-3">
-                    <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
+                    <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
                     <div class="min-w-0 leading-tight">
                         <p class="flex items-center gap-1 text-[13px] font-semibold text-zinc-900 dark:text-white">
                             <span class="truncate">{{ $user->name }}</span>
@@ -149,7 +149,7 @@
                 {{-- View action — kept as a visual chip on the right; the
                      entire row is the link, so this is just an affordance. --}}
                 <span class="col-action text-right">
-                    <span class="inline-flex w-fit items-center rounded-[10px] border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium text-zinc-600 transition-colors group-hover:border-blue-600 group-hover:bg-white group-hover:text-blue-700 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:group-hover:border-blue-400 dark:group-hover:text-blue-300">
+                    <span class="inline-flex w-fit items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium text-zinc-600 transition-colors group-hover:border-blue-600 group-hover:bg-white group-hover:text-blue-700 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:group-hover:border-blue-400 dark:group-hover:text-blue-300">
                         View
                     </span>
                 </span>

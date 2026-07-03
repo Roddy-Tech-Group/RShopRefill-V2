@@ -27,7 +27,13 @@
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
         @endif
     </head>
-    <body class="flex min-h-screen flex-col bg-white text-zinc-900 antialiased">
+    <body class="flex min-h-screen flex-col bg-white dark:bg-[#0c1a36] text-zinc-900 antialiased">
+
+        {{-- Themed branded loader on hard reload / first paint. Shown on the
+             storefront too (not just the dashboard) so a website reload follows
+             the active theme instead of flashing unbranded. Hides on
+             DOMContentLoaded; never shown on wire:navigate. --}}
+        <x-ui.app-loader />
 
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
         @include('partials.translate-engine')
@@ -60,7 +66,7 @@
                  <main> made <main> clip its fixed-position descendants (the eSIM buy
                  bar + modals rendered trapped inside the content box instead of the
                  viewport). <html> is the viewport root, so it never traps fixed. --}}
-            <main data-page-content class="flex-1 bg-[#eff6ff]">
+            <main data-page-content class="flex-1 bg-[#eff6ff] dark:bg-[#0c1a36]">
                 {{ $slot }}
             </main>
 
@@ -97,6 +103,9 @@
 
         {{-- PWA pull-to-refresh (standalone mode only). --}}
         <x-pull-to-refresh />
+
+        {{-- Google Customer Reviews seller-rating badge (storefront-wide). --}}
+        @include('partials.google-reviews-badge')
 
         @fluxScripts
     </body>

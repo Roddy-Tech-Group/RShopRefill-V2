@@ -16,7 +16,9 @@ class AboutPageTest extends TestCase
         $this->get(route('shop.about'))
             ->assertOk()
             ->assertSee('The Global Digital Ecosystem')
-            ->assertSee('About RShopRefill')
+            // The story heading now renders the brand from the site.name setting
+            // (seeded "RshopRefills") instead of the old hardcoded "RShopRefill".
+            ->assertSee('About RshopRefills')
             ->assertSee('Powered by innovation.')
             ->assertSee('Countries');
     }

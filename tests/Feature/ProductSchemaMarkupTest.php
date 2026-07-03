@@ -37,10 +37,13 @@ class ProductSchemaMarkupTest extends TestCase
             'is_active' => true,
         ]);
 
+        // manual_retail_price_usd pins the payable USD price (bypasses markup),
+        // so the schema's low/high prices are deterministic.
         ProductVariant::factory()->for($product)->create([
             'currency' => 'USD',
             'face_value' => 10,
             'retail_price' => 10,
+            'manual_retail_price_usd' => 10,
             'is_available' => true,
             'is_variable' => false,
         ]);
@@ -48,6 +51,38 @@ class ProductSchemaMarkupTest extends TestCase
             'currency' => 'USD',
             'face_value' => 50,
             'retail_price' => 50,
+            'manual_retail_price_usd' => 50,
+            'is_available' => true,
+            'is_variable' => false,
+        ]);
+
+        return $product;
+    }
+
+    /**
+     * A gift card denominated in a non-USD currency. Its face value is local
+     * (EUR) but the customer pays in USD, so the schema must advertise USD.
+     */
+    private function euroGiftCardBrand(): Product
+    {
+        $category = Category::create(['name' => 'Gift Cards', 'slug' => 'gift-cards', 'type' => 'digital']);
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'provider_name' => 'zendit',
+            'brand_key' => 'Euro',
+            'country_code' => 'FR',
+            'currency_code' => 'EUR',
+            'name' => 'Euro Gift Card',
+            'slug' => 'euro-gift-card',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::factory()->for($product)->create([
+            'currency' => 'EUR',
+            'face_value' => 25,
+            'retail_price' => 25,
+            'manual_retail_price_usd' => 27,
             'is_available' => true,
             'is_variable' => false,
         ]);
@@ -70,6 +105,37 @@ class ProductSchemaMarkupTest extends TestCase
         $response->assertSee('"highPrice":"50"', false);
         $response->assertSee('"priceCurrency":"USD"', false);
         $response->assertSee('https://schema.org/InStock', false);
+    }
+
+    public function test_brand_page_renders_unique_data_driven_content(): void
+    {
+        $this->withoutVite();
+        $this->giftCardBrand();
+
+        $response = $this->get(route('shop.brand', ['brandSlug' => 'acme']))->assertOk();
+
+        // Long-form copy woven from real catalog data (brand, category, country)
+        // so the page isn't a thin near-duplicate template.
+        $response->assertSee('Buy Acme Gift Card in United States', false);
+        $response->assertSee('How to buy Acme gift card', false);
+        // Richer, per-brand meta description (country + denomination range).
+        $response->assertSee('Buy Acme gift card in United States', false);
+    }
+
+    public function test_non_usd_gift_card_advertises_usd_price_currency_for_merchant_shipping_match(): void
+    {
+        $this->withoutVite();
+        $this->euroGiftCardBrand();
+
+        $response = $this->get(route('shop.brand', ['brandSlug' => 'euro']))->assertOk();
+
+        $response->assertSee('"@type":"AggregateOffer"', false);
+        // Priced in USD (the settlement + Merchant shipping currency), and the USD
+        // payable amount - never the card's local EUR face value. A local
+        // priceCurrency is what triggers Google's shipping-currency mismatch.
+        $response->assertSee('"priceCurrency":"USD"', false);
+        $response->assertDontSee('"priceCurrency":"EUR"', false);
+        $response->assertSee('"lowPrice":"27"', false);
     }
 
     public function test_gift_card_page_emits_aggregate_rating_and_reviews_from_published_reviews(): void

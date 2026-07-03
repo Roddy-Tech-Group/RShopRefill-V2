@@ -20,7 +20,7 @@
     @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
     aria-label="Back to top"
     style="position: fixed; left: 1.5rem; bottom: 1.5rem; z-index: 60; width: 2.5rem; height: 2.5rem;"
-    class="flex items-center justify-center rounded-[10px] bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-600/20 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-blue-500/60"
+    class="flex items-center justify-center rounded-[12px] bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-600/20 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-blue-500/60"
 >
     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/>

@@ -43,16 +43,16 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-x-0"
             x-transition:leave-end="opacity-0 translate-x-full"
-            class="relative w-full max-w-md overflow-hidden rounded-[10px] bg-[#eff6ff] p-5 shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-white/10"
+            class="relative w-full max-w-md overflow-hidden rounded-[12px] bg-[#eff6ff] p-5 shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-white/10"
         >
             {{-- Close --}}
-            <button type="button" @click="dismiss()" aria-label="Close" class="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[10px] bg-white/70 text-zinc-600 transition-colors hover:bg-white dark:bg-white/10 dark:text-zinc-200 dark:hover:bg-white/15">
+            <button type="button" @click="dismiss()" aria-label="Close" class="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[12px] bg-white/70 text-zinc-600 transition-colors hover:bg-white dark:bg-white/10 dark:text-zinc-200 dark:hover:bg-white/15">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
             {{-- World Cup advert banner: same illustration as the eSIM hero. --}}
             <div class="overflow-hidden rounded-[14px] bg-[#0c1a36] p-4 text-white">
-                <x-illos.esim-worldcup class="h-auto w-full rounded-[10px]" aria-hidden="true" />
+                <x-illos.esim-worldcup class="h-auto w-full rounded-[12px]" aria-hidden="true" />
                 <h2 id="esim-tip-title" class="mt-4 text-lg font-bold tracking-tight">Where are you going?</h2>
                 <p class="mt-1 text-sm text-zinc-300">Heading to the World Cup, or travelling soon?</p>
             </div>
@@ -64,7 +64,7 @@
 
             {{-- Action --}}
             <div class="mt-5">
-                <button type="button" @click="dismiss()" class="inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Find my eSIM</button>
+                <button type="button" @click="dismiss()" class="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Find my eSIM</button>
             </div>
         </div>
     </div>

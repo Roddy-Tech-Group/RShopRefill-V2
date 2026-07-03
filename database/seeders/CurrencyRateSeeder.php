@@ -65,10 +65,10 @@ class CurrencyRateSeeder extends Seeder
             ['code' => 'ZAR', 'name' => 'South African Rand',     'type' => 'fiat', 'rate_per_usd' => 18.50,    'icon_path' => null, 'sort_order' => 50],
 
             // Crypto.
-            ['code' => 'BNB',  'name' => 'BNB',      'type' => 'crypto', 'rate_per_usd' => 0.001733,   'icon_path' => 'BNB.svg',     'sort_order' => 110],
+            ['code' => 'BNB',  'name' => 'BNB',      'type' => 'crypto', 'rate_per_usd' => 0.001733,   'icon_path' => 'BNB.webp',    'sort_order' => 110],
             ['code' => 'BTC',  'name' => 'Bitcoin',  'type' => 'crypto', 'rate_per_usd' => 0.00001733, 'icon_path' => 'BTC.svg',    'sort_order' => 120],
             ['code' => 'ETH',  'name' => 'Ethereum', 'type' => 'crypto', 'rate_per_usd' => 0.0003467,  'icon_path' => 'ETH.svg',    'sort_order' => 130],
-            ['code' => 'LTC',  'name' => 'Litecoin', 'type' => 'crypto', 'rate_per_usd' => 0.01156,    'icon_path' => 'LTC.svg',     'sort_order' => 140],
+            ['code' => 'LTC',  'name' => 'Litecoin', 'type' => 'crypto', 'rate_per_usd' => 0.01156,    'icon_path' => 'LTC.webp',    'sort_order' => 140],
             ['code' => 'SOL',  'name' => 'Solana',   'type' => 'crypto', 'rate_per_usd' => 0.00693,    'icon_path' => 'SOLANA.svg', 'sort_order' => 150],
             ['code' => 'USDT', 'name' => 'Tether',   'type' => 'crypto', 'rate_per_usd' => 1.03,       'icon_path' => 'USDT.svg',   'sort_order' => 160],
         ];

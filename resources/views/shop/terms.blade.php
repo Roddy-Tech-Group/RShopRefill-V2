@@ -7,7 +7,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Terms of Service | RshopRefills'">
+<x-layouts.app.header :title="'Terms of Service | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -22,13 +22,13 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            These Terms of Service ("Terms") govern your access to and use of RshopRefills, including our website, app,
+            These Terms of Service ("Terms") govern your access to and use of {{ $siteName }}, including our website, app,
             wallet and all products and services we offer. Please read them carefully. By creating an account or making a
             purchase, you agree to these Terms. If you do not agree, please do not use the platform.
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <li><a href="#acceptance" class="font-medium text-blue-600 hover:underline">1. Acceptance of these Terms</a></li>
@@ -50,7 +50,7 @@
         <section id="acceptance" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">1. Acceptance of these Terms</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                By accessing or using RshopRefills, you confirm that you have read, understood and agree to be bound by these
+                By accessing or using {{ $siteName }}, you confirm that you have read, understood and agree to be bound by these
                 Terms and by our <a href="{{ route('shop.privacy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Privacy Policy</a>,
                 <a href="{{ route('shop.refund-policy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Refund and Cancellation Policy</a>
                 and <a href="{{ route('shop.cookie-policy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Cookie Policy</a>, which form part of these Terms.
@@ -68,7 +68,7 @@
                 <li>One person should hold one account. We may decline, suspend or remove accounts that breach these Terms.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Keep your account secure</p>
@@ -81,7 +81,7 @@
         <section id="services" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">3. Our products and services</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                RshopRefills offers digital products and services, including gift cards, eSIMs, mobile top-ups, bill payments,
+                {{ $siteName }} offers digital products and services, including gift cards, eSIMs, mobile top-ups, bill payments,
                 and travel such as flights and stays, alongside an in-app wallet. Many products are fulfilled by third-party
                 suppliers and networks. Product availability, pricing and features can vary by country and region, and may
                 change or be withdrawn at any time.
@@ -109,7 +109,7 @@
                 before you pay.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Refunds follow our Refund Policy</p>
@@ -121,7 +121,7 @@
         {{-- ── 6 ─────────────────────────────────────────────────── --}}
         <section id="acceptable-use" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">6. Acceptable use</h2>
-            <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">When using RshopRefills, you agree not to:</p>
+            <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">When using {{ $siteName }}, you agree not to:</p>
             <ul class="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500 sm:text-base">
                 <li>Use the platform for fraud, money laundering, terrorist financing or any unlawful purpose.</li>
                 <li>Use stolen, unauthorised or another person's payment details.</li>
@@ -131,7 +131,7 @@
                 <li>Infringe our or any third party's intellectual property or other rights.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Breaching these rules can cost you access</p>
@@ -144,7 +144,7 @@
         <section id="ip" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">7. Intellectual property</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                The RshopRefills name, logo, software, design and content are owned by us or our licensors and are protected by
+                The {{ $siteName }} name, logo, software, design and content are owned by us or our licensors and are protected by
                 law. You may use the platform only as permitted by these Terms. Brand names and logos of the products we sell
                 belong to their respective owners and are used to identify those products.
             </p>
@@ -168,16 +168,16 @@
                 but we do not guarantee that it will always be uninterrupted or error-free.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Limitation of liability</p>
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">To the maximum extent permitted by law, RshopRefills is not liable for indirect or consequential losses. Our total liability for any claim relating to a transaction is limited to the amount you paid for that transaction. Nothing in these Terms limits liability that cannot be excluded by law.</p>
+                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">To the maximum extent permitted by law, {{ $siteName }} is not liable for indirect or consequential losses. Our total liability for any claim relating to a transaction is limited to the amount you paid for that transaction. Nothing in these Terms limits liability that cannot be excluded by law.</p>
                 </div>
             </div>
 
             <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-                You agree to indemnify RshopRefills against losses arising from your breach of these Terms or your misuse of
+                You agree to indemnify {{ $siteName }} against losses arising from your breach of these Terms or your misuse of
                 the platform.
             </p>
         </section>

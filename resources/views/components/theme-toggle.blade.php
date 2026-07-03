@@ -45,7 +45,7 @@
     <div
         x-data="{
             choice: (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system')),
-            extraDark: (window.pureDarkOn ? window.pureDarkOn() : false),
+            softDark: (window.pureDarkOn ? ! window.pureDarkOn() : false),
             switching: false,
             pick(v) {
                 this.choice = v;
@@ -54,18 +54,19 @@
                 clearTimeout(this._popTimer);
                 this._popTimer = setTimeout(() => this.switching = false, 650);
             },
-            toggleExtra() {
-                this.extraDark = ! this.extraDark;
-                if (window.setPureDark) { window.setPureDark(this.extraDark); }
-                if (this.extraDark && window.themeIsDark && ! window.themeIsDark()) {
+            toggleSoft() {
+                this.softDark = ! this.softDark;
+                // Pure black is the default, so the stored pure-dark flag is the inverse.
+                if (window.setPureDark) { window.setPureDark(! this.softDark); }
+                if (this.softDark && window.themeIsDark && ! window.themeIsDark()) {
                     this.choice = 'dark';
                     if (window.setTheme) { window.setTheme('dark'); }
                 }
             },
         }"
         x-on:theme-changed.window="choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
-        x-on:pure-dark-changed.window="extraDark = (window.pureDarkOn ? window.pureDarkOn() : false)"
-        {{ $attributes->class('inline-flex w-fit items-center gap-0.5 rounded-[10px] border border-blue-400 p-0.5 dark:border-blue-500/60') }}
+        x-on:pure-dark-changed.window="softDark = (window.pureDarkOn ? ! window.pureDarkOn() : false)"
+        {{ $attributes->class('inline-flex w-fit items-center gap-0.5 rounded-[12px] border border-blue-400 p-0.5 dark:border-blue-500/60') }}
         role="radiogroup"
         aria-label="Theme"
     >
@@ -88,17 +89,18 @@
                 <x-dynamic-component :component="$opt['icon']" class="h-4 w-4" />
             </button>
         @endforeach
-        {{-- Extra Dark: pure-black variant of dark mode, divided off after the
-             three theme segments. Blue when active; turning it on forces dark. --}}
+        {{-- Soft dark: navy palette opt-in (dark mode is pure black by default),
+             divided off after the three theme segments. Blue when active; turning
+             it on forces dark so the change is visible. --}}
         <span class="mx-0.5 h-5 w-px shrink-0 bg-blue-400/40 dark:bg-blue-500/50" aria-hidden="true"></span>
         <button
             type="button"
-            @click="toggleExtra()"
-            :class="extraDark ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'"
+            @click="toggleSoft()"
+            :class="softDark ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'"
             class="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors duration-150"
-            :aria-pressed="extraDark.toString()"
-            aria-label="Extra dark"
-            title="Extra dark"
+            :aria-pressed="softDark.toString()"
+            aria-label="Soft dark"
+            title="Soft dark"
         >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
@@ -118,7 +120,7 @@
             open: false,
             locked: false,
             switching: false,
-            extraDark: (window.pureDarkOn ? window.pureDarkOn() : false),
+            softDark: (window.pureDarkOn ? ! window.pureDarkOn() : false),
             pick(v) {
                 this.choice = v;
                 if (window.setTheme) { window.setTheme(v); }
@@ -128,17 +130,18 @@
                 clearTimeout(this._popTimer);
                 this._popTimer = setTimeout(() => this.switching = false, 650);
             },
-            toggleExtra() {
-                this.extraDark = ! this.extraDark;
-                if (window.setPureDark) { window.setPureDark(this.extraDark); }
-                if (this.extraDark && window.themeIsDark && ! window.themeIsDark()) {
+            toggleSoft() {
+                this.softDark = ! this.softDark;
+                // Pure black is the default, so the stored pure-dark flag is the inverse.
+                if (window.setPureDark) { window.setPureDark(! this.softDark); }
+                if (this.softDark && window.themeIsDark && ! window.themeIsDark()) {
                     this.choice = 'dark';
                     if (window.setTheme) { window.setTheme('dark'); }
                 }
             },
         }"
         x-on:theme-changed.window="dark = $event.detail.dark; choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
-        x-on:pure-dark-changed.window="extraDark = (window.pureDarkOn ? window.pureDarkOn() : false)"
+        x-on:pure-dark-changed.window="softDark = (window.pureDarkOn ? ! window.pureDarkOn() : false)"
         @mouseenter="open = true"
         @mouseleave="if (! locked) open = false"
         @click.outside="open = false; locked = false"
@@ -193,21 +196,21 @@
                         <span>{{ $opt['label'] }}</span>
                     </button>
                 @endforeach
-                {{-- Extra Dark: pure-black variant of dark mode. Highlights blue
-                     when active; enabling it forces dark mode. --}}
+                {{-- Soft dark: navy palette opt-in (dark mode is pure black by
+                     default). Highlights blue when active; enabling it forces dark. --}}
                 <div class="my-0.5 h-px bg-zinc-200/70 dark:bg-white/10" aria-hidden="true"></div>
                 <button
                     type="button"
-                    @click="toggleExtra()"
-                    :class="extraDark ? 'bg-blue-600 text-white' : 'text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-[#26416b]'"
+                    @click="toggleSoft()"
+                    :class="softDark ? 'bg-blue-600 text-white' : 'text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-[#26416b]'"
                     class="flex w-full items-center gap-2 whitespace-nowrap rounded-[5px] py-1.5 pl-2 pr-4 text-left text-xs font-medium transition-colors"
                     role="menuitemcheckbox"
-                    :aria-checked="extraDark.toString()"
+                    :aria-checked="softDark.toString()"
                 >
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
                     </svg>
-                    <span>Extra dark</span>
+                    <span>Soft dark</span>
                 </button>
             </div>
         </div>

@@ -75,7 +75,7 @@
                 Access <span class="font-semibold text-blue-400">23+ digital services</span> in one powerful ecosystem including gift cards, eSIMs, mobile top-ups, bill payments, flights, and global stays.
             </p>
             <p class="mt-3 text-base leading-relaxed text-zinc-300 sm:text-lg">
-                RShopRefill brings everything together under one roof, making international shopping, connectivity, travel, and everyday digital payments fast, seamless, and stress-free.
+                {{ $siteName }} brings everything together under one roof, making international shopping, connectivity, travel, and everyday digital payments fast, seamless, and stress-free.
             </p>
             <p class="mt-4 text-base font-semibold text-white sm:text-lg">
                 One platform. Endless possibilities.<br>
@@ -179,7 +179,7 @@
                 <a
                     href="{{ route('shop.gift-cards') }}"
                     wire:navigate
-                    class="inline-flex items-center gap-2 rounded-[10px] border-2 border-white bg-transparent px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
+                    class="inline-flex items-center gap-2 rounded-[12px] border-2 border-white bg-transparent px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
@@ -189,7 +189,7 @@
                 <a
                     href="{{ route('shop.esims') }}"
                     wire:navigate
-                    class="inline-flex items-center gap-2 rounded-[10px] border-2 border-white bg-transparent px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
+                    class="inline-flex items-center gap-2 rounded-[12px] border-2 border-white bg-transparent px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/>

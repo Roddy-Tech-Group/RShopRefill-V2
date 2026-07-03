@@ -308,13 +308,13 @@ class extends Component {
     <div class="flex flex-1 flex-col gap-6">
 
         @if (session('status'))
-            <div class="rounded-[10px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
+            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
         @endif
 
         {{-- Critical-stale warning banner. Surfaces the same StaleRateException
              that the runtime would throw, BEFORE a checkout hits it. --}}
         @if ($this->summary['critical'] > 0)
-            <div class="flex items-start gap-3 rounded-[10px] bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">
+            <div class="flex items-start gap-3 rounded-[12px] bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
                 </svg>
@@ -334,7 +334,7 @@ class extends Component {
                 ['label' => 'Fresh',    'value' => $this->summary['fresh'],    'dot' => 'bg-blue-500'],
                 ['label' => 'Stale + critical', 'value' => $this->summary['stale'] + $this->summary['critical'], 'dot' => $this->summary['critical'] > 0 ? 'bg-red-500' : 'bg-amber-500'],
             ] as $stat)
-                <div class="rounded-[10px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+                <div class="rounded-[12px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -356,7 +356,7 @@ class extends Component {
                     wire:model.live.debounce.250ms="search"
                     type="search"
                     placeholder="Search by code or name (e.g. USD, Bitcoin, Euro)"
-                    class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                    class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
                 />
             </div>
 
@@ -372,7 +372,7 @@ class extends Component {
                         type="button"
                         wire:click="$set('typeFilter', '{{ $value }}')"
                         @class([
-                            'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                            'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                             'bg-blue-600 text-white' => $typeFilter === $value,
                             'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]' => $typeFilter !== $value,
                         ])
@@ -386,7 +386,7 @@ class extends Component {
                     wire:loading.attr="disabled"
                     wire:target="runSync"
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                    class="inline-flex items-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
                 >
                     <svg wire:loading.remove wire:target="runSync" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
@@ -401,7 +401,7 @@ class extends Component {
                 <button
                     wire:click="newRate"
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                    class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
@@ -422,7 +422,7 @@ class extends Component {
         @endif
 
         {{-- Table card --}}
-        <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead>
@@ -477,16 +477,16 @@ class extends Component {
                                             <img
                                                 src="{{ $primaryIcon }}"
                                                 alt="{{ $rate->code }}"
-                                                class="h-9 w-9 rounded-[10px] {{ $isFlag ? 'object-cover' : 'object-contain' }} bg-zinc-50 ring-1 ring-zinc-100 dark:bg-[#0c1a36] dark:ring-white/10"
+                                                class="h-9 w-9 rounded-[12px] {{ $isFlag ? 'object-cover' : 'object-contain' }} bg-zinc-50 ring-1 ring-zinc-100 dark:bg-[#0c1a36] dark:ring-white/10"
                                                 loading="lazy"
                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                                             >
-                                            <span class="hidden h-9 w-9 items-center justify-center rounded-[10px] {{ $rate->type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500' }} text-xs font-bold text-white">
+                                            <span class="hidden h-9 w-9 items-center justify-center rounded-[12px] {{ $rate->type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500' }} text-xs font-bold text-white">
                                                 {{ substr($rate->code, 0, 1) }}
                                             </span>
                                         </span>
                                     @else
-                                        <span class="flex h-9 w-9 items-center justify-center rounded-[10px] {{ $rate->type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500' }} text-xs font-bold text-white">
+                                        <span class="flex h-9 w-9 items-center justify-center rounded-[12px] {{ $rate->type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500' }} text-xs font-bold text-white">
                                             {{ substr($rate->code, 0, 1) }}
                                         </span>
                                     @endif
@@ -535,10 +535,10 @@ class extends Component {
     @if ($showForm)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="closeForm" class="absolute inset-0 bg-zinc-900/40"></div>
-            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-lg overflow-hidden rounded-[10px] bg-white shadow-2xl flex flex-col dark:bg-[#1d3252]">
+            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-lg overflow-hidden rounded-[12px] bg-white shadow-2xl flex flex-col dark:bg-[#1d3252]">
                 <div class="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                     <h3 class="text-sm font-bold text-zinc-900 dark:text-white">{{ $editingId ? 'Edit currency' : 'Add currency' }}</h3>
-                    <button type="button" wire:click="closeForm" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                    <button type="button" wire:click="closeForm" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -546,12 +546,12 @@ class extends Component {
                     <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Code</label>
-                            <input wire:model="code" type="text" placeholder="USD" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm font-bold uppercase text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                            <input wire:model="code" type="text" placeholder="USD" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm font-bold uppercase text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                             @error('code') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="col-span-2">
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Name</label>
-                            <input wire:model="name" type="text" placeholder="United States Dollar" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                            <input wire:model="name" type="text" placeholder="United States Dollar" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                             @error('name') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -562,19 +562,19 @@ class extends Component {
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Rate per USD</label>
-                            <input wire:model="rate_per_usd" type="number" step="0.00000001" min="0" placeholder="0.00" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                            <input wire:model="rate_per_usd" type="number" step="0.00000001" min="0" placeholder="0.00" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                             @error('rate_per_usd') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-4">
                         <div class="col-span-2">
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Icon filename (optional)</label>
-                            <input wire:model="icon_path" type="text" placeholder="BTC.svg" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                            <input wire:model="icon_path" type="text" placeholder="BTC.svg" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                             <p class="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">Path under <code class="rounded bg-zinc-100 px-1 text-[10px] dark:bg-zinc-700/50">public/assets/</code>. Fiat falls back to a flag automatically.</p>
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Sort order</label>
-                            <input wire:model="sort_order" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                            <input wire:model="sort_order" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                         </div>
                     </div>
                     <label class="flex items-center gap-2">
@@ -583,8 +583,8 @@ class extends Component {
                     </label>
                 </div>
                 <div class="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
-                    <button type="button" wire:click="closeForm" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
-                    <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create currency' }}</button>
+                    <button type="button" wire:click="closeForm" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
+                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create currency' }}</button>
                 </div>
             </form>
         </div>

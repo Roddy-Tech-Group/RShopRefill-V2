@@ -24,10 +24,13 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::prefix('admin')->name('admin.')->group(function () {
-    // Guest admin routes (login)
+    // Guest admin routes (login). The login URI is a non-obvious slug
+    // (admin/rshopadmins) to keep bots off the obvious /admin/login path;
+    // the route NAME stays `admin.login` so every route('admin.login') still
+    // resolves. This is obscurity on top of - not instead of - auth + 2FA.
     Route::middleware('guest:admin')->group(function () {
-        Route::get('login', [AdminLoginController::class, 'create'])->name('login');
-        Route::post('login', [AdminLoginController::class, 'store']);
+        Route::get('rshopadmins', [AdminLoginController::class, 'create'])->name('login');
+        Route::post('rshopadmins', [AdminLoginController::class, 'store']);
 
         Route::get('2fa', [AdminTwoFactorController::class, 'create'])->name('2fa.challenge');
         Route::post('2fa', [AdminTwoFactorController::class, 'store'])->name('2fa.verify');

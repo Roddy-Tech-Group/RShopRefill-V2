@@ -43,7 +43,7 @@ class extends Component {
             <button
                 wire:navigate
                 href="{{ route('admin.campaign-editor') }}"
-                class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
             >
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>

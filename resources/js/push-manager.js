@@ -26,7 +26,7 @@ export const RshopPush = {
 
             // Send to server
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            const res = await fetch('/api/push/subscribe', {
+            const res = await fetch('/push/subscribe', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -56,7 +56,7 @@ export const RshopPush = {
             if (subscription) {
                 await subscription.unsubscribe();
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-                await fetch('/api/push/unsubscribe', {
+                await fetch('/push/unsubscribe', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

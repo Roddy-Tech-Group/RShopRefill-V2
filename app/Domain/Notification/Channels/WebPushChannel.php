@@ -37,6 +37,9 @@ class WebPushChannel implements NotificationChannelInterface
             'badge' => '/badge-72x72.png',
             'url' => $payload->metadata['url'] ?? config('app.url'),
             'id' => $payload->id ?? null,
+            // Carried through so the service worker's notificationclick can
+            // attribute the click back to its campaign (the Clicked stat).
+            'campaign_id' => $payload->metadata['campaign_id'] ?? null,
         ];
 
         $overallSuccess = false;

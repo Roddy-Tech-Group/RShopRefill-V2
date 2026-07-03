@@ -1,11 +1,17 @@
 @props([
-    'title' => 'RshopRefills',
+    'title' => null,
     'preheader' => null,
     // The Illuminate\Mail\Message for the send in progress. Blade components
     // do not inherit the parent view's $message variable, so templates pass
     // it in (:mail-message="$message ?? null") to enable CID inline images.
     'mailMessage' => null,
 ])
+@php
+    // Brand name from the admin "Site -> name" setting. Read inline (like the
+    // social links below) so it is certain in every mail-render scope without
+    // depending on a view composer firing. Falls back to the literal brand.
+    $siteName = \App\Models\SiteSetting::get('site.name', 'RshopRefills');
+@endphp
 {{--
     Shared branded email shell. Table-based + inline styles for broad email-client
     support (Gmail, Apple Mail, Outlook). Brand: blue-600 accent, navy heads, white
@@ -19,7 +25,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="x-apple-disable-message-reformatting">
-    <title>{{ $title }}</title>
+    <title>{{ $title ?? $siteName }}</title>
     <style>
         body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
@@ -68,7 +74,7 @@
                     @endphp
                     <tr>
                         <td align="center" class="em-pad" style="padding:32px 40px 4px;">
-                            <img src="{{ $emailLogoSrc }}" alt="RshopRefills" width="190" style="width:190px; max-width:62%; height:auto; display:block; background:#ffffff;">
+                            <img src="{{ $emailLogoSrc }}" alt="{{ $siteName }}" width="190" style="width:190px; max-width:62%; height:auto; display:block; background:#ffffff;">
                         </td>
                     </tr>
 
@@ -90,9 +96,9 @@
                                 <a href="{{ \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">TikTok</a>
                                 <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Instagram</a>
                             </p>
-                            <p style="margin:0 0 6px; color:#a1a1aa;">RshopRefills, your digital marketplace for gift cards, eSIMs, top-ups and bills.</p>
+                            <p style="margin:0 0 6px; color:#a1a1aa;">{{ $siteName }}, your digital marketplace for gift cards, eSIMs, top-ups and bills.</p>
                             <p style="margin:0 0 6px;">Need a hand? <a href="https://wa.me/19402386229" style="color:#2563eb; text-decoration:none;">Chat with support</a></p>
-                            <p style="margin:0; color:#a1a1aa;">&copy; 2026 RshopRefills. All rights reserved.</p>
+                            <p style="margin:0; color:#a1a1aa;">&copy; {{ date('Y') }} {{ $siteName }}. All rights reserved.</p>
                         </td>
                     </tr>
                 </table>

@@ -155,7 +155,7 @@ new class extends Component {
             x-transition:leave="transition ease-in duration-150"
             x-transition:leave-start="opacity-100 translate-x-0 scale-100"
             x-transition:leave-end="opacity-0 translate-x-4 scale-75"
-            class="absolute right-full mr-2 w-72 origin-right rounded-[10px] bg-[#eff6ff] p-4 shadow-2xl shadow-zinc-900/25 ring-1 ring-zinc-200 motion-reduce:transition-none dark:bg-[#0c1a36] dark:ring-white/15"
+            class="absolute right-full mr-2 w-72 origin-right rounded-[12px] bg-[#eff6ff] p-4 shadow-2xl shadow-zinc-900/25 ring-1 ring-zinc-200 motion-reduce:transition-none dark:bg-[#0c1a36] dark:ring-white/15"
             role="dialog"
             aria-modal="false"
             aria-labelledby="feedback-title"
@@ -173,7 +173,7 @@ new class extends Component {
                         type="button"
                         wire:click="startOver"
                         x-on:click="$nextTick(() => renderTurnstile())"
-                        class="mt-3 rounded-[10px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                        class="mt-3 rounded-[12px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                     >Send another</button>
                 </div>
             @else
@@ -193,7 +193,7 @@ new class extends Component {
                         required
                         autocomplete="email"
                         placeholder="Your email"
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     >
                     @error('email') <p class="-mt-1 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
 
@@ -202,7 +202,7 @@ new class extends Component {
                         rows="3"
                         required
                         placeholder="Your feedback..."
-                        class="w-full rounded-[10px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
+                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     ></textarea>
                     @error('message') <p class="-mt-1 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
 
@@ -218,7 +218,7 @@ new class extends Component {
 
                     <button
                         type="submit"
-                        class="inline-flex w-full items-center justify-center rounded-[10px] bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700"
+                        class="inline-flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700"
                     >
                         <span wire:loading.remove wire:target="submit">Send</span>
                         <span wire:loading wire:target="submit">Sending...</span>

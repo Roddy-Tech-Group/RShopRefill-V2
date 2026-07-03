@@ -298,7 +298,7 @@
         ->values();
 @endphp
 
-<x-shop.layout :title="$regionLabel . ' eSIM | RshopRefills'" :og-image="asset('assets/'.rawurlencode('Esim.webp'))">
+<x-shop.layout :title="$regionLabel . ' eSIM | '.$siteName" :og-image="asset('assets/'.rawurlencode('Esim.webp'))">
 
     {{-- translate="no": the page translator (Google) rewrites text nodes, which
          corrupts Alpine's reactive <template x-for> package list (it renders then
@@ -330,11 +330,11 @@
             <span class="font-semibold text-zinc-900 dark:text-white">{{ $regionLabel }}</span>
         </nav>
 
-        {{-- ── Country header (glass card, 900px centered) ──────────────────── --}}
-        {{-- z-20: backdrop-blur creates a stacking context — without lifting it
+        {{-- ── Country header (glass card, centered) ─────────────────────── --}}
+        {{-- z-20: backdrop-blur creates a stacking context - without lifting it
              above the plan selector (also a blur context, later in DOM), the
              region picker dropdown gets clipped behind the plans card. --}}
-        <div class="relative z-20 mx-auto mt-4 w-full max-w-[800px] rounded-[10px] bg-transparent p-6 ring-1 ring-zinc-200 sm:p-8 dark:ring-zinc-700/60">
+        <div class="esim-tile relative z-20 mx-auto mt-4 w-full max-w-[800px] rounded-[12px] bg-transparent p-6 ring-1 ring-zinc-200 sm:p-8 dark:ring-zinc-700/60">
             <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex items-center gap-3">
@@ -372,7 +372,7 @@
 
                     {{-- Check compatibility --}}
                     <div class="mt-4">
-                        <button type="button" @click="showCompat = true" class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                        <button type="button" @click="showCompat = true" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/>
                             </svg>
@@ -402,7 +402,7 @@
                         $isDiscoverGlobal = $product->slug === $discoverGlobalSlug || strtoupper((string) $product->country_code) === 'WW';
                     @endphp
                     @unless ($isDiscoverGlobal)
-                        <div class="mt-5 flex items-start gap-2.5 rounded-[10px] bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
+                        <div class="mt-5 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
                             <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                             <p class="text-sm leading-relaxed text-amber-800 dark:text-amber-200">
                                 Only buy this if you're in <span class="font-semibold">{{ $regionLabel }}</span> or travelling there - it only works on {{ $regionLabel }} networks. Not headed there?
@@ -419,12 +419,14 @@
                 {{-- Region switcher --}}
                 <div class="w-full shrink-0 sm:w-64">
                     <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-zinc-200">Change country or region</label>
-                    <div x-data="{ open: false, search: '' }" @click.outside="open = false; search = ''" class="relative">
+                    <div x-data="{ open: false, search: '' }" @click.outside="open = false; search = ''" @keydown.escape.window="open = false; search = ''" class="relative">
                         <button
                             type="button"
                             @click="open = ! open; if (open) $nextTick(() => $refs.regionSearch?.focus())"
                             :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600'"
-                            class="flex h-[46px] w-full items-center gap-2 rounded-[10px] border bg-transparent px-3 text-sm font-medium text-zinc-900 outline-none transition-colors dark:text-white"
+                            class="flex h-[46px] w-full items-center gap-2 rounded-[12px] border bg-transparent px-3 text-sm font-medium text-zinc-900 outline-none transition-colors dark:text-white"
+                            aria-haspopup="listbox"
+                            :aria-expanded="open.toString()"
                         >
                             @if ($flag)
                                 <img src="{{ $flag }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700">
@@ -436,29 +438,42 @@
                             x-show="open"
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             style="display:none;"
-                            class="glass-panel absolute right-0 left-0 top-full z-50 mt-2 overflow-hidden rounded-[10px] shadow-xl shadow-zinc-900/10 dark:shadow-black/40"
-                            role="listbox"
+                            {{-- Solid surface on purpose: a `backdrop-filter` here plus
+                                 the `overflow-hidden` needed for the rounded corners is a
+                                 known iOS Safari combo that kills touch-scrolling of the
+                                 list inside. Opaque bg (matching the selector card below)
+                                 keeps the country list natively scrollable on mobile. --}}
+                            class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-white shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:shadow-black/40 dark:ring-1 dark:ring-white/10"
                         >
-                            <div class="border-b border-zinc-100 p-2 dark:border-zinc-700">
-                                <input x-ref="regionSearch" x-model="search" type="text" placeholder="Search a country or region" aria-label="Search a country or region" class="w-full rounded-[10px] border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:bg-zinc-900">
+                            <div class="border-b border-zinc-200 p-2 dark:border-white/10">
+                                <div class="relative">
+                                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <input x-ref="regionSearch" x-model="search" type="text" placeholder="Search a country or region" aria-label="Search a country or region" class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">
+                                </div>
                             </div>
-                            <div class="max-h-72 overflow-y-auto p-1">
+                            <div
+                                class="max-h-72 overflow-y-auto overscroll-contain p-1 [-webkit-overflow-scrolling:touch]"
+                                role="listbox"
+                                aria-label="Choose a country or region"
+                            >
                                 @foreach ($esimRegions as $r)
                                     <a
                                         href="{{ $shopRoute('esim', $r['slug']) }}"
                                         wire:navigate
+                                        role="option"
+                                        aria-selected="{{ $r['key'] === $currentKey ? 'true' : 'false' }}"
                                         data-name="{{ Str::lower($r['name']) }}"
                                         x-show="search === '' || $el.dataset.name.includes(search.toLowerCase())"
                                         @class([
-                                            'flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors',
+                                            'flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors',
                                             'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $r['key'] === $currentKey,
-                                            'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800' => $r['key'] !== $currentKey,
+                                            'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]' => $r['key'] !== $currentKey,
                                         ])
                                     >
                                         @if ($r['flag'])
                                             <img src="{{ $r['flag'] }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" loading="lazy">
                                         @else
-                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-zinc-700"></span>
+                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-white/10"></span>
                                         @endif
                                         <span class="flex-1 truncate">{{ $r['name'] }}</span>
                                     </a>
@@ -492,7 +507,7 @@
                     {{-- Category selector (Data Only / Voice) - segmented control with
                          a smooth sliding bubble. The bubble width adapts to however
                          many categories this region actually carries. --}}
-                    <div class="relative flex rounded-[10px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
+                    <div class="relative flex rounded-[12px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
                         <div
                             class="pointer-events-none absolute inset-y-1 left-1 rounded-[8px] bg-white shadow-sm transition-transform duration-300 ease-out dark:border dark:border-white dark:bg-[#1d3252]"
                             :style="`width: calc((100% - 0.5rem) / ${tabList().length}); transform: translateX(${tabIndex() * 100}%)`"
@@ -503,14 +518,14 @@
                                 @click="setTab(t)"
                                 :class="activeTab === t ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'"
                                 class="relative z-10 flex-1 rounded-[8px] px-4 py-2.5 text-sm font-bold transition-colors"
-                                x-text="t === 'voice' ? 'Unlimited Voice' : 'Data Only'"
+                                x-text="t === 'voice' ? 'Voice Plans' : 'Data Only'"
                             ></button>
                         </template>
                     </div>
 
                     {{-- Standard / Unlimited selector - same sliding-bubble control,
                          only shown when the category carries both tiers. --}}
-                    <div x-show="showModeToggle()" class="relative mt-3 flex rounded-[10px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
+                    <div x-show="showModeToggle()" class="relative mt-3 flex rounded-[12px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
                         <div
                             class="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%_-_0.5rem)/2)] rounded-[8px] bg-blue-600 shadow-sm transition-transform duration-300 ease-out"
                             :style="`transform: translateX(${dataMode === 'unlimited' ? 100 : 0}%)`"
@@ -521,38 +536,36 @@
                 </div>
             </div>
 
-            {{-- ── Plan section. Full-bleed wrapper lets the grid exceed the page's
-                 1140px column; the inner column caps at 1500px and re-centers. ──── --}}
-            <div class="mt-6 [margin-left:calc(50%-50vw)] [margin-right:calc(50%-50vw)]">
-                <div class="mx-auto w-full max-w-[1500px] px-4 sm:px-6">
-                <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Choose your package</h2>
-
-                    {{-- Plan cards. Flat (no duration grouping) - each card carries its
-                         own validity. Same responsive grid as the gift-card catalog:
-                         2 per row on mobile, scaling up to 5 per row on large screens. --}}
-                    {{-- Re-keyed per tab/mode so the whole grid fades + slides in on switch. --}}
-                    <template x-for="frame in [activeTab + '-' + dataMode]" :key="frame">
+            {{-- Plan section. Uses the same carousel component, alignment + scroll as the
+                 storefront brand rows. Re-keyed per tab/mode so the whole row rebuilds,
+                 re-aligns and resets its scroll when the buyer switches Voice / Data. --}}
+            <div class="mt-3">
+                <template x-for="frame in [activeTab + '-' + dataMode]" :key="frame">
                     <div
                         x-transition:enter="transition ease-out duration-300"
                         x-transition:enter-start="opacity-0 translate-y-2"
                         x-transition:enter-end="opacity-100 translate-y-0"
-                        class="mt-4 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
                     >
-                        <template x-for="(p, idx) in sortedPlans()" :key="p.id">
+                        <x-home.brand-row title="Choose your package" :carousel="true" :bleed="! $inDash" view-all-variant="none">
+                            <template x-for="(p, idx) in sortedPlans()" :key="p.id">
                             <button
                                 type="button"
                                 @click="selectedId = p.id"
                                 :class="selectedId === p.id ? 'border-2 border-blue-600 dark:border-blue-500' : 'border border-white hover:border-green-200 dark:border-[#24364f] dark:hover:border-white'"
-                                class="flex flex-col rounded-[14px] bg-transparent px-4 py-4 text-left transition-colors focus:outline-none"
+                                class="esim-tile flex h-full w-[70vw]! min-w-[70vw]! flex-col rounded-[14px] bg-transparent px-4 py-4 text-left transition-colors focus:outline-none sm:w-60! sm:min-w-60!"
                             >
-                                {{-- Badges: tier (TRIP/EXPLORER/ADVENTURER/NOMAD, cycles by
-                                     position) + a Data only / Voice type badge. --}}
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <span x-show="tiers[idx % 4] !== 'TRIP'" class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
+                                {{-- Type badge ("Data only" / "Voice") plus an optional tier
+                                     chip. The tier (TRIP/EXPLORER/ADVENTURER/NOMAD) is shown
+                                     ONLY on voice plans: on data plans it was a variable-length
+                                     chip that wrapped to a 2nd line on long names (ADVENTURER)
+                                     and made those cards taller, so data plans now carry the
+                                     single "Data only" badge - every data card is one height. --}}
+                                <div class="flex flex-nowrap items-center gap-1">
+                                    <span x-show="p.is_voice && tiers[idx % 4] !== 'TRIP'" class="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
                                         <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="tierDotClasses[idx % 4]"></span>
-                                        <span x-text="tiers[idx % 4]"></span>
+                                        <span class="truncate" x-text="tiers[idx % 4]"></span>
                                     </span>
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
+                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
                                         <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="p.is_voice ? 'bg-blue-500' : 'bg-zinc-400'"></span>
                                         <span x-text="p.is_voice ? 'Voice' : 'Data only'"></span>
                                     </span>
@@ -603,15 +616,18 @@
                                     <p class="mt-3 text-xs text-zinc-700 dark:text-white" x-text="p.note"></p>
                                 </template>
 
-                                {{-- See more: selects this plan and opens its full package details. --}}
-                                <span @click.stop="detailsId = p.id; showDetails = true" @keydown.enter.stop="detailsId = p.id; showDetails = true" role="button" tabindex="0" class="mt-3 self-start cursor-pointer text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">See more</span>
-
-                                <p class="mt-2 text-right text-lg font-bold tabular-nums text-zinc-900 dark:text-white" x-text="rowPrice(p)"></p>
+                                {{-- See more (left) + price (right) share one row, pinned to the
+                                     card bottom so every card lines up regardless of feature count. --}}
+                                <div class="mt-auto flex items-center justify-between gap-2 pt-3">
+                                    <span @click.stop="detailsId = p.id; showDetails = true" @keydown.enter.stop="detailsId = p.id; showDetails = true" role="button" tabindex="0" class="inline-flex cursor-pointer items-center {{ $inDash ? 'rounded-md px-1.5 text-[10px]' : 'rounded-[8px] px-2 text-[11px]' }} bg-blue-50 py-0.5 font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">See more</span>
+                                    <p class="text-lg font-bold tabular-nums text-zinc-900 dark:text-white" x-text="rowPrice(p)"></p>
+                                </div>
                             </button>
                         </template>
+                        </x-home.brand-row>
                     </div>
-                    </template>
-                    <p x-show="sortedPlans().length === 0" class="mt-4 rounded-[10px] bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-400 dark:ring-zinc-700">No packages in this category right now.</p>
+                </template>
+                    <p x-show="sortedPlans().length === 0" class="mt-4 rounded-[12px] bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-400 dark:ring-zinc-700">No packages in this category right now.</p>
 
                     {{-- Voice-plan inclusions - only on the Voice tab.
                          Each inclusion is its own card. --}}
@@ -619,12 +635,12 @@
                         <p class="text-sm font-bold text-zinc-900 dark:text-white">Every voice plan includes</p>
                         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             @foreach ([
-                                ['title' => 'App verification', 'desc' => 'WhatsApp, Facebook, TikTok and many other apps that need a number.', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                                ['title' => 'App verification', 'desc' => 'WhatsApp, Telegram, TikTok and many other apps that need a number.', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                                 ['title' => 'Unlimited iMessage', 'desc' => 'Unlimited iMessage for the full validity period your plan carries.', 'icon' => 'M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z'],
                                 ['title' => 'Renewable & top-up', 'desc' => 'Top up for local calls any time, with iMessage unlimited.', 'icon' => 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99'],
                             ] as $voiceCard)
-                                <div class="rounded-[10px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
-                                    <span class="flex h-9 w-9 items-center justify-center rounded-[10px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
+                                <div class="rounded-[12px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                                    <span class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
                                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $voiceCard['icon'] }}"/></svg>
                                     </span>
                                     <p class="mt-3 text-sm font-bold text-zinc-900 dark:text-white">{{ $voiceCard['title'] }}</p>
@@ -637,12 +653,16 @@
                     {{-- Need broader coverage - sits beneath the plans. --}}
                     @if ($broaderCoverage->isNotEmpty())
                         <div class="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-700/60">
-                            <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Need broader coverage?</h2>
-                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Explore our regional and global eSIMs. Packages start from the shown price and include coverage for the selected location.</p>
-                            {{-- Same card style + responsive grid as the plan cards. --}}
-                            <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            {{-- Broader coverage as a full-bleed carousel, same as the storefront brand rows. --}}
+                            <x-home.brand-row
+                                title="Need broader coverage?"
+                                subtitle="Explore our regional and global eSIMs. Packages start from the shown price and include coverage for the selected location."
+                                :carousel="true"
+                                :bleed="! $inDash"
+                                view-all-variant="none"
+                            >
                                 @foreach ($broaderCoverage as $b)
-                                    <a href="{{ $shopRoute('esim', $b['slug']) }}" wire:navigate class="group flex flex-col rounded-[14px] border border-white bg-transparent px-4 py-4 transition-colors hover:border-blue-600 dark:border-[#24364f] dark:hover:border-white">
+                                    <a href="{{ $shopRoute('esim', $b['slug']) }}" wire:navigate class="esim-tile group flex flex-col rounded-[14px] border border-white bg-transparent px-4 py-4 transition-colors hover:border-blue-600 dark:border-[#24364f] dark:hover:border-white">
                                         <span class="flex h-10 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-blue-50 ring-1 ring-zinc-200 dark:bg-blue-950/40 dark:ring-zinc-700">
                                             @if ($b['flag'])
                                                 <img src="{{ $b['flag'] }}" alt="" class="h-full w-full object-cover" loading="lazy">
@@ -655,15 +675,14 @@
                                         <p class="text-lg font-bold tabular-nums text-zinc-900 dark:text-white">${{ number_format($b['from'], 2) }}</p>
                                     </a>
                                 @endforeach
-                            </div>
+                            </x-home.brand-row>
                         </div>
                     @endif
                 </div>
-            </div>
 
             {{-- ── Why choose us (1000px centered) ───────────────────────────── --}}
             <section class="mx-auto mt-8 w-full max-w-[1000px] rounded-[40px] bg-blue-100 p-6 sm:p-10 dark:bg-[#1d3252]">
-                <h2 class="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Why travelers choose RshopRefills eSIMs</h2>
+                <h2 class="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Why travelers choose {{ $siteName }} eSIMs</h2>
                 <div class="mt-8 grid grid-cols-2 gap-6 lg:grid-cols-4">
                     @foreach ([
                         ['t' => 'Local, regional & global coverage for 200+ destinations', 'd' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8'],
@@ -672,7 +691,7 @@
                         ['t' => 'Easy install and set up to get connected in minutes', 'd' => 'M3.75 4.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm12 0a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm-12 12a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zM15 15.75h.008v.008H15v-.008zm0 3h.008v.008H15v-.008zm3-3h.008v.008H18v-.008zm0 3h.008v.008H18v-.008zm3-3h.008v.008H21v-.008zm0 3h.008v.008H21v-.008z'],
                     ] as $feature)
                         <div class="flex flex-col items-center text-center">
-                            <span class="flex h-16 w-16 items-center justify-center rounded-[10px] bg-white shadow-sm dark:bg-[#26416b]">
+                            <span class="flex h-16 w-16 items-center justify-center rounded-[12px] bg-white shadow-sm dark:bg-[#26416b]">
                                 @if (! empty($feature['image']))
                                     <img src="{{ asset('assets/'.rawurlencode($feature['image'])) }}" alt="" class="h-7 w-7 object-contain dark:invert" aria-hidden="true">
                                 @else
@@ -686,10 +705,10 @@
             </section>
 
             {{-- ── FAQ (glass card, 800px centered) ─────────────────────────── --}}
-            <section class="mx-auto mt-8 w-full max-w-[800px] rounded-[10px] bg-white/60 p-6 ring-1 ring-white/60 shadow-xl shadow-zinc-900/5 backdrop-blur-xl sm:p-8 dark:bg-[#1d3252] dark:ring-zinc-800/60 dark:shadow-black/40">
+            <section class="mx-auto mt-8 w-full max-w-[800px] rounded-[12px] bg-white/60 p-6 ring-1 ring-white/60 shadow-xl shadow-zinc-900/5 backdrop-blur-xl sm:p-8 dark:bg-[#1d3252] dark:ring-zinc-800/60 dark:shadow-black/40">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Frequently asked questions</h2>
-                    <a href="{{ route('shop.help') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[10px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Go to help center</a>
+                    <a href="{{ route('shop.help') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Go to help center</a>
                 </div>
                 <div class="mt-5 space-y-2.5">
                     @foreach ([
@@ -698,7 +717,7 @@
                         ['q' => 'Can I reuse my eSIM?', 'a' => 'If your plan supports top-ups you can add more data to the same eSIM. Otherwise, buy a fresh package whenever you travel again.'],
                         ['q' => 'What are renewals?', 'a' => 'Some packages can be renewed or topped up before they expire so you stay connected without installing a new eSIM.'],
                     ] as $faq)
-                        <details class="group rounded-[10px] bg-zinc-50 px-4 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                        <details class="group rounded-[12px] bg-zinc-50 px-4 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                             <summary class="flex cursor-pointer items-center justify-between py-4 text-sm font-semibold text-zinc-900 marker:content-[''] dark:text-white">
                                 {{ $faq['q'] }}
                                 <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform group-open:rotate-180 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
@@ -712,7 +731,7 @@
                         <p class="text-sm font-bold text-zinc-900 dark:text-white">Support</p>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400">Need help? We offer 24/7, multi-language support.</p>
                     </div>
-                    <a href="{{ route('shop.contact') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[10px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Contact support</a>
+                    <a href="{{ route('shop.contact') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Contact support</a>
                 </div>
             </section>
 
@@ -736,10 +755,15 @@
                     ],
                 ];
             @endphp
-            {{-- Full-bleed bg: the negative-margin calc extends the section past the
-                 parent's max-w-[1320px] + horizontal padding so the surface fills the
-                 viewport, while the inner column stays constrained to 1450px. --}}
-            <section class="mt-8 bg-gradient-to-r from-[#dfe5f1] via-[#dfe5f1] to-white py-10 sm:py-14 dark:from-[#1d3252] dark:via-[#1d3252] dark:to-[#34507a] [margin-left:calc(50%-50vw)] [margin-right:calc(50%-50vw)]">
+            {{-- How-to band. Full-bleed (edge-to-edge) on the storefront, where the
+                 page is centered in the viewport. In the dashboard the content column
+                 is offset by the sidebar, so calc(50%-50vw) breaks out under the rail
+                 and overflows - there we keep it contained as a rounded band instead. --}}
+            <section @class([
+                'esim-tile mt-8 bg-gradient-to-r from-[#dfe5f1] via-[#dfe5f1] to-white py-10 sm:py-14 dark:from-[#1d3252] dark:via-[#1d3252] dark:to-[#34507a]',
+                '[margin-left:calc(50%-50vw)] [margin-right:calc(50%-50vw)]' => ! $inDash,
+                'overflow-hidden rounded-[15px]' => $inDash,
+            ])>
                 <div class="mx-auto w-full max-w-[1450px] px-4 sm:px-6">
                 <div>
                     <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">How to add your eSIM</h2>
@@ -757,11 +781,12 @@
                                 width="785"
                                 height="900"
                                 decoding="async"
-                                loading="lazy"
+                                loading="eager"
+                                fetchpriority="high"
                                 class="aspect-[3/4] w-full object-contain [image-rendering:high-quality] [image-rendering:-webkit-optimize-contrast]"
                             >
                             <div class="mt-4 flex items-center gap-3">
-                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-blue-600 text-xs font-bold text-white">{{ $i + 1 }}</span>
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-blue-600 text-xs font-bold text-white">{{ $i + 1 }}</span>
                                 <p class="text-base font-bold text-zinc-900 dark:text-white">{!! $step['title'] !!}</p>
                             </div>
                             <p class="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{{ $step['body'] }}</p>
@@ -770,7 +795,7 @@
                 </ol>
 
                 <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                    <a href="#esim-packages" class="inline-flex items-center rounded-[10px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    <a href="#esim-packages" class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                         Choose your package
                     </a>
                     <a href="{{ route('shop.help') }}" wire:navigate class="text-sm font-semibold text-zinc-700 underline-offset-2 transition-colors hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-300">Still stuck? Read the full guide</a>
@@ -781,11 +806,11 @@
             {{-- ── Anonymous eSIM with crypto (no KYC) ──────────────────────── --}}
             <section class="mx-auto mt-12 grid w-full max-w-[1450px] grid-cols-1 items-start gap-10 lg:grid-cols-2 lg:gap-16">
                 <div>
-                    <span class="flex h-12 w-12 items-center justify-center rounded-[10px] bg-blue-50 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:ring-blue-900/40">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-blue-50 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:ring-blue-900/40">
                         <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                     </span>
                     <h2 class="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Anonymous eSIM with MOMO, Cards, Crypto and more. No KYC required.</h2>
-                    <p class="mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-300">Unlike traditional SIM cards that ask for a passport and personal details, your RshopRefills eSIM can be bought with mobile money, cards, crypto and more. No identity verification, no personal data collected.</p>
+                    <p class="mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-300">Unlike traditional SIM cards that ask for a passport and personal details, your {{ $siteName }} eSIM can be bought with mobile money, cards, crypto and more. No identity verification, no personal data collected.</p>
                 </div>
 
                 <ul class="space-y-5">
@@ -833,7 +858,7 @@
                                 src="{{ asset('assets/'.rawurlencode($m['icon'])) }}"
                                 alt=""
                                 @class([
-                                    'h-10 w-10 shrink-0 rounded-[10px] object-contain',
+                                    'h-10 w-10 shrink-0 rounded-[12px] object-contain',
                                     'brightness-0 dark:invert' => ! empty($m['mono']),
                                 ])
                                 loading="lazy"
@@ -865,31 +890,31 @@
                         type="button"
                         @click="selectedId = null"
                         aria-label="Deselect plan"
-                        class="absolute bottom-0 left-1/2 z-10 flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-[10px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-md transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:bg-[#26416b] dark:text-white dark:ring-zinc-700/60 dark:hover:bg-[#34507a]"
+                        class="absolute bottom-0 left-1/2 z-10 flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-md transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:bg-[#26416b] dark:text-white dark:ring-zinc-700/60 dark:hover:bg-[#34507a]"
                     >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
 
                     <div class="flex w-full flex-wrap items-center gap-3 px-4 py-4 sm:px-6">
-                    <button type="button" @click="detailsId = selectedId; showDetails = true" class="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-400/60 backdrop-blur-md transition-colors hover:bg-white/60 dark:text-white dark:ring-white/60 dark:hover:bg-white/10">
+                    <button type="button" @click="detailsId = selectedId; showDetails = true" class="inline-flex items-center gap-2 rounded-[12px] px-4 py-2.5 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-400/60 backdrop-blur-md transition-colors hover:bg-white/60 dark:text-white dark:ring-white/60 dark:hover:bg-white/10">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
                         Package details
                     </button>
 
                     {{-- Currency selector --}}
                     <div x-data="{ open: false }" @click.outside="open = false" class="relative">
-                        <button type="button" @click="open = ! open" class="flex items-center gap-1.5 rounded-[10px] px-3.5 py-2.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-400/60 backdrop-blur-md transition-colors hover:bg-white/60 dark:text-white dark:ring-white/60 dark:hover:bg-white/10">
-                            <template x-if="cryptos[selectedCrypto]?.icon"><img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-4 w-4 rounded-[10px]"></template>
-                            <template x-if="!cryptos[selectedCrypto]?.icon && cryptos[selectedCrypto]?.flag"><img :src="cryptos[selectedCrypto].flag" :alt="selectedCrypto" class="h-4 w-4 rounded-[10px] object-cover"></template>
+                        <button type="button" @click="open = ! open" class="flex items-center gap-1.5 rounded-[12px] px-3.5 py-2.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-400/60 backdrop-blur-md transition-colors hover:bg-white/60 dark:text-white dark:ring-white/60 dark:hover:bg-white/10">
+                            <template x-if="cryptos[selectedCrypto]?.icon"><img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-4 w-4 rounded-[12px]"></template>
+                            <template x-if="!cryptos[selectedCrypto]?.icon && cryptos[selectedCrypto]?.flag"><img :src="cryptos[selectedCrypto].flag" :alt="selectedCrypto" class="h-4 w-4 rounded-[12px] object-cover"></template>
                             <span x-text="selectedCrypto"></span>
                             <svg class="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        <div x-show="open" x-transition style="display:none;" class="absolute top-full left-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto rounded-[10px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-zinc-700 dark:bg-[#1d3252] dark:shadow-black/40" role="listbox">
+                        <div x-show="open" x-transition style="display:none;" class="absolute top-full left-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-zinc-700 dark:bg-[#1d3252] dark:shadow-black/40" role="listbox">
                             <template x-for="(meta, code) in cryptos" :key="code">
-                                <button type="button" @click="selectedCrypto = code; open = false" :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'" class="flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-sm font-medium transition-colors">
-                                    <template x-if="meta.icon"><img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[10px]"></template>
-                                    <template x-if="!meta.icon && meta.flag"><img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[10px] object-cover ring-1 ring-zinc-200"></template>
-                                    <template x-if="!meta.icon && !meta.flag"><span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[10px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span></template>
+                                <button type="button" @click="selectedCrypto = code; open = false" :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'" class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors">
+                                    <template x-if="meta.icon"><img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px]"></template>
+                                    <template x-if="!meta.icon && meta.flag"><img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200"></template>
+                                    <template x-if="!meta.icon && !meta.flag"><span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span></template>
                                     <span class="flex-1 truncate" x-text="code"></span>
                                     <svg x-show="selectedCrypto === code" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                 </button>
@@ -911,7 +936,7 @@
                             @click="addToCart()"
                             :disabled="! selectedId"
                             :class="cartState === 'success' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-blue-600 bg-white/70 text-blue-600 backdrop-blur-md hover:bg-blue-600 hover:text-white dark:bg-white/10 dark:text-blue-300 dark:hover:bg-blue-600 dark:hover:text-white'"
-                            class="hidden h-12 items-center justify-center rounded-[10px] border-2 px-6 text-sm font-semibold transition-colors disabled:opacity-50 sm:flex"
+                            class="hidden h-12 items-center justify-center rounded-[12px] border-2 px-6 text-sm font-semibold transition-colors disabled:opacity-50 sm:flex"
                         >
                             <span x-show="cartState !== 'success'">Add to cart</span>
                             <span x-show="cartState === 'success'" style="display:none;">Added</span>
@@ -920,7 +945,7 @@
                             type="button"
                             @click="buyNow()"
                             :disabled="! selectedId || $store.cart.loading"
-                            class="flex h-12 items-center justify-center rounded-[10px] bg-blue-600 px-7 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-50 disabled:hover:bg-blue-600"
+                            class="flex h-12 items-center justify-center rounded-[12px] bg-blue-600 px-7 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-50 disabled:hover:bg-blue-600"
                         >
                             Buy now
                         </button>
@@ -929,7 +954,7 @@
                 </div>
             </div>
         @else
-            <div class="mt-8 rounded-[10px] bg-zinc-50 px-4 py-10 text-center ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+            <div class="mt-8 rounded-[12px] bg-zinc-50 px-4 py-10 text-center ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                 <p class="text-base font-semibold text-zinc-900 dark:text-white">No data plans available</p>
                 <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">This region has no plans in stock right now. Check back later.</p>
                 <a href="{{ $shopRoute('esims') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Browse other regions</a>
@@ -944,7 +969,7 @@
             <div x-show="showNetworks" x-transition class="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white/65 p-6 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
                 <div class="flex items-start justify-between gap-4">
                     <h2 id="networks-title" class="text-lg font-bold text-zinc-900 dark:text-white">{{ $coverageCount > 1 ? 'Countries & Networks' : 'Networks' }}</h2>
-                    <button type="button" @click="showNetworks = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showNetworks = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 @if ($coverageCount > 1)
                     <p class="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-white">This eSIM works across {{ $coverageCount }} countries and connects to a local network automatically in each.</p>
@@ -1021,10 +1046,10 @@
         {{-- Check compatibility modal --}}
         <div x-show="showCompat" style="display:none;" class="fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="compat-title">
             <div x-show="showCompat" @click="showCompat = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showCompat" x-transition class="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[14px] bg-white/65 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+            <div x-show="showCompat" x-transition class="esim-tile relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[14px] bg-white/65 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
                 <div class="flex items-start justify-between gap-4 p-5 pb-3">
                     <h2 id="compat-title" class="text-lg font-bold text-zinc-900 dark:text-white">Check compatibility</h2>
-                    <button type="button" @click="showCompat = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showCompat = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <div class="px-6 text-sm leading-relaxed text-zinc-600 dark:text-white">
                     <p>To use an eSIM, a device must meet the following conditions:</p>
@@ -1048,7 +1073,7 @@
                     </div>
                 </div>
 
-                <div class="mx-4 mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[10px] p-3 ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                <div class="mx-4 mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[12px] p-3 ring-1 ring-zinc-200 dark:ring-zinc-700/60">
                     {{-- iOS --}}
                     <div x-show="compatTab === 'ios'" class="space-y-0.5">
                         @foreach ($compat['ios'] as $device)
@@ -1079,7 +1104,7 @@
         {{-- Package details modal --}}
         <div x-show="showDetails" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="details-title">
             <div x-show="showDetails" @click="showDetails = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showDetails" x-transition class="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white/65 p-6 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+            <div x-show="showDetails" x-transition class="esim-tile relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white/65 p-6 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
                 <div class="flex items-start justify-between gap-4">
                     <h2 id="details-title" class="flex items-center gap-2.5 text-lg font-bold text-zinc-900 dark:text-white">
                         @if ($flag)
@@ -1087,28 +1112,28 @@
                         @endif
                         {{ $regionLabel }}
                     </h2>
-                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <div class="mt-5">
                     <p class="text-sm font-bold text-zinc-900 dark:text-white">Package</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                        <span class="inline-flex flex-col rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Coverage</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $regionLabel }}</span>
                         </span>
-                        <span class="inline-flex flex-col rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Data</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.data || '-'"></span>
                         </span>
-                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Calls</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.voice || '-'"></span>
                         </span>
-                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Texts</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.sms || '-'"></span>
                         </span>
-                        <span class="inline-flex flex-col rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Validity</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="(detailsPlan()?.days > 0 ? detailsPlan().days + ' days' : 'Flexible')"></span>
                         </span>
@@ -1124,8 +1149,8 @@
                                 ['t' => 'iMessage text', 'd' => 'Send and receive texts over iMessage.', 'icon' => 'M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z'],
                                 ['t' => 'FaceTime', 'd' => 'Video and audio FaceTime over data.', 'icon' => 'M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z'],
                             ] as $svc)
-                                <div class="flex items-start gap-2.5 rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
+                                <div class="flex items-start gap-2.5 rounded-[12px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $svc['icon'] }}"/></svg>
                                     </span>
                                     <div class="min-w-0">
@@ -1138,7 +1163,7 @@
                     </div>
 
                     {{-- Top-up + free iMessage note (voice plans). --}}
-                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[10px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
                         <p class="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                             <svg class="h-4 w-4 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                             Top-ups &amp; iMessage
@@ -1147,7 +1172,7 @@
                     </div>
 
                     {{-- Data-only note: pure connectivity, no calls/texts/number. --}}
-                    <div x-show="detailsPlan() && ! detailsPlan().is_voice" x-cloak class="mt-4 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                    <div x-show="detailsPlan() && ! detailsPlan().is_voice" x-cloak class="mt-4 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                         <p class="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                             <svg class="h-4 w-4 text-zinc-500 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
                             Data only
@@ -1185,7 +1210,9 @@
                         @endif
 
                         @if ($planPolicy['bullets']->isNotEmpty() || $planPolicy['other'])
-                            <div>
+                            {{-- Supplier info is product-level and mentions voice / SMS / a US number,
+                                 so only show it on voice plans - data-only plans have none of that. --}}
+                            <div x-show="detailsPlan()?.is_voice" x-cloak>
                                 <p class="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                                     <svg class="h-4 w-4 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
                                     Other info
@@ -1205,14 +1232,10 @@
                     </div>
 
                     {{-- What happens when the allowance runs out + how to manage the
-                         eSIM. Two variants: the voice copy talks about SMS / calls /
-                         credit, the data-only copy must NOT (a data-only plan has no
-                         number, SMS or calls) - it only covers data + app messaging. --}}
-                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-[#24364f]">
+                         eSIM. Shown for voice plans only; data-only plans intentionally
+                         show no message here. --}}
+                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-[#24364f]">
                         <p class="text-sm leading-relaxed text-zinc-700 dark:text-white">After your data, SMS and calls finish, you can still call, text and FaceTime over iMessage, WhatsApp and your WiFi. To keep using normal texts, calls and data, top up before you let your eSIM expire. If you plan to keep using it, a top-up auto-renews your eSIM to the top-up plan you choose. On your Web App orders page you can manage your eSIM, see remaining data, credit and SMS, top up your eSIM (only from there) and install your eSIM from there too. Have fun 😊</p>
-                    </div>
-                    <div x-show="detailsPlan() && ! detailsPlan().is_voice" x-cloak class="mt-4 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-[#24364f]">
-                        <p class="text-sm leading-relaxed text-zinc-700 dark:text-white">After your data runs out you can still chat and FaceTime over iMessage, WhatsApp and WiFi. To keep browsing, top up before your eSIM expires - a top-up auto-renews it to the plan you choose. On your Web App orders page you can manage your eSIM, check your remaining data, top up (only from there) and install it. Have fun 😊</p>
                     </div>
 
                     <p class="mt-5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">To complete your order, confirm your device is eSIM-compatible and network-unlocked.</p>
@@ -1233,7 +1256,7 @@
                 cryptos: cryptoMap,
                 selectedCrypto: cryptoMap[defaultCrypto] ? defaultCrypto : (cryptos[0]?.code ?? 'USD'),
 
-                activeTab: 'data',     // 'data' | 'voice'
+                activeTab: 'voice',    // 'voice' | 'data' - voice leads; buyers switch to data only
                 dataMode: 'standard',  // 'standard' | 'unlimited'
                 selectedId: null,
                 detailsId: null,       // plan previewed in the details modal (independent of selection)
@@ -1256,11 +1279,12 @@
                 locSearch: '',
 
                 init() {
-                    if (! this.tabHasPlans('data') && this.tabHasPlans('voice')) {
-                        this.activeTab = 'voice';
+                    // Voice leads; fall back to data only when this region carries no voice plans.
+                    if (! this.tabHasPlans('voice') && this.tabHasPlans('data')) {
+                        this.activeTab = 'data';
                     }
                     this.normalizeMode();
-                    // No auto-selection — the buyer chooses a package by tapping it.
+                    // No auto-selection - the buyer chooses a package by tapping it.
                 },
 
                 // ---- filtering ----
@@ -1270,9 +1294,9 @@
                 // the segmented control + its sliding bubble width/offset.
                 tabList() {
                     const t = [];
-                    if (this.tabHasPlans('data')) { t.push('data'); }
                     if (this.tabHasPlans('voice')) { t.push('voice'); }
-                    return t.length ? t : ['data'];
+                    if (this.tabHasPlans('data')) { t.push('data'); }
+                    return t.length ? t : ['voice'];
                 },
                 tabIndex() { return Math.max(0, this.tabList().indexOf(this.activeTab)); },
                 currentTabPlans() { return this.plans.filter((p) => this.inTab(p)); },
@@ -1336,7 +1360,7 @@
                 },
                 async buyNow() {
                     if (! this.selectedId) { return; }
-                    const ok = await this.$store.cart.add(this.selectedId, 1);
+                    const ok = await this.$store.cart.add(this.selectedId, 1, null, null, true);
                     if (ok) { window.location.href = this.checkoutUrl; }
                 },
             };

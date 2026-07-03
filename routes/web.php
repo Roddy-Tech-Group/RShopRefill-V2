@@ -4,6 +4,7 @@ use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Notification\Services\AdminNotificationService;
 use App\Http\Controllers\Admin\AdminCustomerController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CartWebController;
 use App\Http\Controllers\CheckoutController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SuspensionController;
 use App\Http\Controllers\ThemeController;
 use App\Models\BlogPost;
+use App\Models\Category;
 use App\Models\Coupon;
 use App\Models\CurrencyRate;
 use App\Models\PressArticle;
@@ -87,6 +89,41 @@ Route::get('api/search/brands', function (Request $request) {
         ];
     });
 
+    // eSIMs are country / region products with no brand_key, so the brand query
+    // above skips them entirely. Search them separately by name and dedupe to one
+    // result per country (mirroring the eSIM catalog grouping) so a search for a
+    // country or region surfaces its eSIM.
+    $esimItems = collect();
+    if ($esimCat = Category::where('slug', 'esims')->first()) {
+        $esimItems = Product::query()
+            ->where('is_active', true)
+            ->where('category_id', $esimCat->id)
+            ->where('name', 'like', "%{$q}%")
+            ->orderBy('name')
+            ->get(['slug', 'name', 'country_code'])
+            ->groupBy(function ($p) {
+                $cc = strtoupper((string) $p->country_code);
+
+                return (strlen($cc) === 2 && $cc !== 'WW') ? $cc : 'slug:'.$p->slug;
+            })
+            ->map(function ($group) {
+                $p = $group->first();
+                $cc = strtoupper((string) $p->country_code);
+                $isLocal = strlen($cc) === 2 && $cc !== 'WW';
+
+                return [
+                    'type' => 'eSIM',
+                    'name' => EsimStoreController::regionMeta($p->country_code, $p->slug, $p->name)['name'],
+                    'logo' => $isLocal ? Product::flagUrl($cc) : EsimStoreController::globalFlag(),
+                    'url' => '/esims/'.$p->slug,
+                    'slug' => $p->slug,
+                    'country' => $p->country_code,
+                ];
+            })
+            ->take(6)
+            ->values();
+    }
+
     // Key pages, matched by title - so a global search also surfaces sections.
     $pages = collect([
         ['name' => 'Gift cards', 'url' => route('shop.gift-cards')],
@@ -100,7 +137,7 @@ Route::get('api/search/brands', function (Request $request) {
         ->take(4)
         ->values();
 
-    return response()->json($items->concat($pages)->values());
+    return response()->json($items->concat($esimItems)->concat($pages)->values());
 })->name('api.search.brands');
 
 // Brand-level detail page. The URL slug is a kebab-cased brand_key
@@ -292,6 +329,15 @@ $resolveBillBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
 Route::get('bills/{brandSlug}', $resolveBillBrand)->name('shop.bill');
 
+// Legacy URL redirects. Old path shapes Google still has indexed (surfacing as
+// 404s in Search Console) folded onto the current structure with a 301, so their
+// crawl equity lands on a live page instead of dying on a not-found. The
+// top-ups/{brand} wildcard catches the old hyphenated brand pages too.
+Route::redirect('giftcards', '/gift-cards', 301);
+Route::redirect('top-ups', '/topups', 301);
+Route::get('top-ups/{brand}', fn (string $brand) => redirect('/topups/'.$brand, 301))->where('brand', '.*');
+Route::redirect('en', '/', 301);
+
 // Flights & Stays - branded "coming soon" pages until the booking catalog ships.
 // One shared view, the `service` data flag drives the per-service copy + art.
 Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('shop.flights');
@@ -379,6 +425,21 @@ Route::get('robots.txt', function () {
         'Disallow: /cart',
         'Disallow: /checkout',
         'Disallow: /order',
+        // Internal endpoints Googlebot kept hitting (showing up as 404s / crawl
+        // waste in Search Console): the ajax brand-search backend and the region
+        // switch action. Neither is a page. (Brand pages like /gift-cards/ajax -
+        // the football club - are unaffected: they don't start with /ajax.)
+        'Disallow: /ajax',
+        'Disallow: /country',
+        // Faceted-navigation params. sort= (same products, reordered) and
+        // subcategory= filters generate endless duplicate listing URLs that all
+        // canonicalise back to the base page - Google reports them as "Alternate
+        // page with proper canonical tag". Block them from crawl so Googlebot
+        // spends its budget on real pages; every clean canonical URL is already
+        // listed in sitemap.xml, so indexing is unaffected. (?country= stays
+        // crawlable - it's the region switch, not a duplicate filter.)
+        'Disallow: /*sort=',
+        'Disallow: /*subcategory=',
         '',
         'Sitemap: '.url('/sitemap.xml'),
         '',
@@ -722,6 +783,12 @@ Route::middleware(['auth'])->group(function () {
     // shared admin notification feed.
     Route::post('dashboard/suspension/request-review', [SuspensionController::class, 'requestReview'])
         ->name('suspension.request-review');
+
+    // Web Push subscriptions for web users
+    Route::prefix('push')->name('push.')->group(function () {
+        Route::post('subscribe', [PushSubscriptionController::class, 'subscribe'])->name('subscribe');
+        Route::post('unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('unsubscribe');
+    });
 });
 
 // Dashboard shop chrome - mirrors the public storefront URLs under /dashboard/shop/*

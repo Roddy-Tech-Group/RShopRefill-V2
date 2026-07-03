@@ -151,6 +151,10 @@ class CheckoutController extends Controller
             );
 
             $fraudService->recordCheckout($user, $request->ip());
+
+            // Order placed — the cart is converted, so drop the ephemeral
+            // "Buy now" tag too (its item ids are now stale).
+            $request->session()->forget('cart.buy_now_items');
         } catch (InvalidCouponException $e) {
             // Coupon error - surface the customer-safe message verbatim so the
             // buyer sees "That coupon code is not valid" instead of a generic

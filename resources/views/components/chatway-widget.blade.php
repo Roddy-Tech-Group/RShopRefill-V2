@@ -21,17 +21,35 @@
             window.__chatwayKeepAlive = true;
 
             let container = null;
-            const capture = () => {
+
+            // The live chat is a storefront feature and must never appear on the
+            // dashboard. wire:navigate persists DOM between pages, so on each
+            // navigation we re-attach + show the widget on storefront pages and
+            // hide it on any /dashboard page.
+            const onDashboard = () => window.location.pathname.startsWith('/dashboard');
+
+            const apply = () => {
                 const el = document.querySelector('.chatway--container');
                 if (el) {
                     container = el;
+                }
+                if (! container) {
+                    return;
+                }
+                if (onDashboard()) {
+                    container.style.display = 'none';
+                } else {
+                    container.style.display = '';
+                    if (! document.body.contains(container)) {
+                        document.body.appendChild(container);
+                    }
                 }
             };
 
             // Grab the container once the loader mounts it (~1s, slower on bad
             // networks). Poll gently, stop once captured or after 30s.
             const captureTimer = setInterval(() => {
-                capture();
+                apply();
                 if (container) {
                     clearInterval(captureTimer);
                 }
@@ -39,15 +57,10 @@
             setTimeout(() => clearInterval(captureTimer), 30000);
 
             document.addEventListener('livewire:navigated', () => {
-                // Give the swap a moment to settle, then restore the widget if
-                // the new body lost it. Re-attaching the same node keeps all of
-                // Chatway's listeners; the iframe reloads itself.
-                setTimeout(() => {
-                    capture();
-                    if (container && !document.body.contains(container)) {
-                        document.body.appendChild(container);
-                    }
-                }, 400);
+                // Give the swap a moment to settle, then show/hide for the page
+                // we landed on. Re-attaching the same node keeps all of Chatway's
+                // listeners; the iframe reloads itself.
+                setTimeout(apply, 400);
             });
         })();
     </script>

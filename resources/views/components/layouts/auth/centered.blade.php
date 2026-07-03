@@ -39,15 +39,15 @@
     <body class="min-h-screen bg-zinc-100 text-zinc-900 antialiased">
 
         <div class="flex min-h-screen items-end justify-center p-0 sm:items-center sm:p-6 lg:p-[60px]">
-            <div class="auth-slide-up w-full max-w-xl overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-zinc-900/20 ring-1 ring-zinc-900/5 sm:rounded-[10px] sm:shadow-xl sm:shadow-zinc-900/10 lg:shadow-2xl lg:shadow-zinc-900/15">
+            <div class="auth-slide-up w-full max-w-xl overflow-hidden rounded-t-3xl bg-white shadow-2xl shadow-zinc-900/20 ring-1 ring-zinc-900/5 sm:rounded-[12px] sm:shadow-xl sm:shadow-zinc-900/10 lg:shadow-2xl lg:shadow-zinc-900/15">
 
                 <main class="relative flex flex-col bg-white px-6 py-[50px] sm:px-10 sm:py-10">
                     {{-- Brand (centered at the top) --}}
-                    <a href="{{ route('home') }}" wire:navigate class="flex shrink-0 flex-col items-center rounded-[10px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                    <a href="{{ route('home') }}" wire:navigate class="flex shrink-0 flex-col items-center rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                         <span class="flex h-10 items-center">
                             <img
                                 src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                                alt="RshopRefills"
+                                alt="{{ $siteName }}"
                                 class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />
                         </span>

@@ -113,16 +113,16 @@ class extends Component {
     <div class="flex flex-col gap-6">
 
         @forelse ($this->settings as $group => $groupSettings)
-            <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
                 {{-- Group header pill --}}
-                <div class="mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+                <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                     <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $group }}</h2>
                 </div>
 
                 <ul class="divide-inset">
                     @foreach ($groupSettings as $setting)
                         @php $displayVal = $this->displayValue($setting->value); @endphp
-                        <li class="group relative mx-3 flex flex-col gap-3 rounded-[10px] px-5 py-4 transition-colors hover:bg-blue-50 sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15">
+                        <li class="group relative mx-3 flex flex-col gap-3 rounded-[12px] px-5 py-4 transition-colors hover:bg-blue-50 sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15">
                             {{-- Key + description --}}
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
@@ -188,7 +188,7 @@ class extends Component {
                                         type="text"
                                         x-model="value"
                                         @keydown.enter.prevent="value !== initial && ($wire.updateSetting('{{ $setting->key }}', value).then(() => initial = value))"
-                                        class="w-full rounded-[10px] border border-zinc-200 bg-white py-2.5 px-3 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 sm:w-72 lg:w-96 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
+                                        class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 px-3 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 sm:w-72 lg:w-96 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
                                         placeholder="null"
                                         aria-label="{{ $setting->key }}"
                                     />
@@ -196,7 +196,7 @@ class extends Component {
                                         type="button"
                                         :disabled="value === initial"
                                         @click="$wire.updateSetting('{{ $setting->key }}', value).then(() => initial = value)"
-                                        class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] bg-blue-600 px-3.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
+                                        class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] bg-blue-600 px-3.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
                                     >
                                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
@@ -210,7 +210,7 @@ class extends Component {
                 </ul>
             </div>
         @empty
-            <div class="rounded-[10px] border-[1.5px] border-white bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="rounded-[12px] border-[1.5px] border-white bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
                 <p class="text-sm font-semibold text-zinc-900 dark:text-white">No settings configured</p>
                 <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     Use <code class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">SiteSetting::put('key', $value, 'group')</code> to seed settings, or run the site settings seeder.

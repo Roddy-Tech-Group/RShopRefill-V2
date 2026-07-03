@@ -1,10 +1,10 @@
-<x-emails.layout :mail-message="$message ?? null" title="Welcome to RshopRefills" preheader="Your account is ready. Explore gift cards, eSIMs, top-ups and bills.">
+<x-emails.layout :mail-message="$message ?? null" title="Welcome to {{ $siteName }}" preheader="Your account is ready. Explore gift cards, eSIMs, top-ups and bills.">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">Welcome aboard, {{ $name }}.</h1>
 
     @if ($isGoogleAuth)
         <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Your account is ready, securely linked through Google Sign-In. You are all set to start shopping digital products in seconds.</p>
     @else
-        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Thanks for joining RshopRefills. Your account is ready, so you can start buying gift cards, eSIMs, mobile top-ups and bill payments in seconds.</p>
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Thanks for joining {{ $siteName }}. Your account is ready, so you can start buying gift cards, eSIMs, mobile top-ups and bill payments in seconds.</p>
     @endif
 
     <x-emails.panel title="What you can do">

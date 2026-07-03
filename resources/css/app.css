@@ -24,19 +24,19 @@ html {
    repaint the calendar to the admin navy palette (#1d3252 surface, blue accent)
    when <html> has the .dark class. */
 html.dark .flatpickr-calendar {
-    background: #1d3252;
+    background: #2a2a2a;
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     color: #e5e7eb;
 }
 html.dark .flatpickr-calendar.arrowTop::before,
-html.dark .flatpickr-calendar.arrowTop::after { border-bottom-color: #1d3252; }
+html.dark .flatpickr-calendar.arrowTop::after { border-bottom-color: #2a2a2a; }
 html.dark .flatpickr-calendar.arrowBottom::before,
-html.dark .flatpickr-calendar.arrowBottom::after { border-top-color: #1d3252; }
+html.dark .flatpickr-calendar.arrowBottom::after { border-top-color: #2a2a2a; }
 html.dark .flatpickr-months .flatpickr-month,
 html.dark .flatpickr-current-month input.cur-year,
 html.dark .flatpickr-current-month .flatpickr-monthDropdown-months { color: #fff; }
-html.dark .flatpickr-monthDropdown-months { background: #1d3252; }
+html.dark .flatpickr-monthDropdown-months { background: #2a2a2a; }
 html.dark .flatpickr-weekday { color: #9ca3af; }
 html.dark .flatpickr-day { color: #e5e7eb; }
 html.dark .flatpickr-day:hover,
@@ -100,7 +100,7 @@ html.dark .flatpickr-months .flatpickr-next-month:hover svg { fill: #fff; }
 }
 .flatpickr-modernSelect-opt:hover { background: #eff6ff; color: #2563eb; }
 .flatpickr-modernSelect-opt.is-selected { background: #2563eb; color: #fff; font-weight: 600; }
-html.dark .flatpickr-modernSelect-panel { background: #1d3252; border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+html.dark .flatpickr-modernSelect-panel { background: #2a2a2a; border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
 html.dark .flatpickr-modernSelect-opt { color: #e5e7eb; }
 html.dark .flatpickr-modernSelect-opt:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 html.dark .flatpickr-modernSelect-opt.is-selected { background: #2563eb; color: #fff; }
@@ -257,15 +257,18 @@ html.dark.pure-dark .nav-item-active {
 .divide-inset > *:not(:last-child)::after {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 1.25rem;  /* inset to match the row padding (px-5) so the line never touches the card edges */
+    right: 1.25rem;
     bottom: 0;
     height: 1px;
     background-color: rgb(229 229 229); /* zinc-200 - matches the card border */
     pointer-events: none;
 }
+@media (min-width: 640px) {
+    .divide-inset > *:not(:last-child)::after { left: 1.5rem; right: 1.5rem; } /* sm:px-6 */
+}
 html.dark .divide-inset > *:not(:last-child)::after {
-    background-color: #24364f; /* matches the dark card border (border-zinc-200 remap) */
+    background-color: #3a3a3a; /* grey divider, matches the dark card border remap */
 }
 /* Every section row inside a dashboard card highlights on hover, and the divider
    blends into that highlight so the hovered row reads as one seamless block -
@@ -275,12 +278,15 @@ html.dark .divide-inset > *:not(:last-child)::after {
     background-color: rgb(250 250 250 / 0.6);
 }
 html.dark .divide-inset > *:hover {
-    background-color: rgb(255 255 255 / 0.05);
+    background-color: #1f1f1f; /* hover uses the deeper grey; cards rest at #2a2a2a */
 }
 .divide-inset > *:hover::after,
 .divide-inset > *:has(+ *:hover)::after {
     background-color: transparent;
 }
+/* Card/row hover that used a white tint -> the deeper grey #1f1f1f, so every row
+   hovers to the same colour (cards rest at #2a2a2a, hover darkens one step). */
+html.dark .dark\:hover\:bg-white\/5:hover { background-color: #1f1f1f; }
 
 /* ── Admin table pattern ───────────────────────────────────────────────
    Mirrors the products-page variant list on every admin page that uses a
@@ -575,7 +581,7 @@ html.dark .trust-glow {
         0 10px 30px -10px rgba(15, 23, 42, 0.20);
 }
 html.dark .wallet-glass {
-    background: linear-gradient(180deg, #143170 0%, #15295e 100%);
+    background: #2a2a2a;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.14),
         inset 0 -1px 0 rgba(0, 0, 0, 0.35),
@@ -630,7 +636,7 @@ html.dark .wallet-glass {
 html.dark .liquid-pill {
     /* Dark active tab = page-bg with a thin border outline, no filled bead. */
     background: transparent;
-    box-shadow: inset 0 0 0 1px #24364f;
+    box-shadow: inset 0 0 0 1px #3a3a3a;
 }
 
 /* Floating bottom-nav bar — iOS "liquid glass". A soft top→bottom white gradient
@@ -649,7 +655,7 @@ html.dark .liquid-pill {
         0 12px 34px -8px rgba(15, 23, 42, 0.25);
 }
 html.dark .nav-glass {
-    background: linear-gradient(180deg, rgba(15, 27, 48, 0.88) 0%, rgba(8, 16, 34, 0.82) 100%);
+    background: linear-gradient(180deg, rgba(20, 20, 20, 0.88) 0%, rgba(10, 10, 10, 0.82) 100%);
     border-color: rgba(255, 255, 255, 0.12);
     box-shadow:
         inset 0 1px 0.5px rgba(255, 255, 255, 0.14),
@@ -669,7 +675,7 @@ html.dark .nav-glass {
     border: 1px solid rgb(228, 228, 231); /* zinc-200 */
 }
 html.dark .glass-panel {
-    background: rgba(12, 26, 54, 0.82); /* #0c1a36 page bg */
+    background: rgba(42, 42, 42, 0.82); /* card grey */
     border-color: rgba(255, 255, 255, 0.10);
 }
 
@@ -813,15 +819,91 @@ select:focus[data-flux-control] {
 }
 
 /* Surfaces — light backgrounds resolve to the navy dark ramp. */
-/* Deep Charcoal Blue palette. One base (#0c1a36) for chrome + page, one step
-   up (#162a4a) for cards/panels, a touch lighter again (#1d3252) for elevated
-   surfaces, and a dim grey-blue (#26416b) for chips / hovers. Sub-base (#070f1c)
-   is reserved for the deepest seam (sidebar hover, recessed inputs). */
-.dark .bg-white          { background-color: #162a4a; }   /* cards / panels */
-.dark .bg-zinc-50        { background-color: #1d3252; }   /* slightly elevated */
-.dark .bg-zinc-100       { background-color: #0c1a36; }   /* page-level surface */
-.dark .bg-zinc-200       { background-color: #26416b; }   /* chips, hover */
-.dark .bg-\[\#eff6ff\]   { background-color: #0c1a36; }   /* admin / customer page bg */
+/* Black palette. Near-black page/chrome, cards/panels step up to #1f1f1f,
+   elevated a touch lighter, chips/hovers lighter still. One consistent dark
+   theme - the old navy values below are folded into the same black tiers. */
+.dark .bg-white          { background-color: #2a2a2a; }   /* cards / panels */
+.dark .bg-zinc-50        { background-color: #2a2a2a; }   /* card surface (one grey) */
+.dark .bg-zinc-100       { background-color: #0d0d0d; }   /* page-level surface */
+.dark .bg-zinc-200       { background-color: #2a2a2a; }   /* card surface (one grey) */
+.dark .bg-\[\#eff6ff\]   { background-color: #2a2a2a; }   /* card (page bodies carry their own dark:bg-[#0c1a36]) */
+
+/* Hardcoded navy values used across components (overwhelmingly as dark:bg-[#hex],
+   none with !important) remapped to the same black tiers so every surface is
+   consistent. `html.dark` lifts specificity above Tailwind's generated dark: rule;
+   the plain bg-[#0c1a36] (always-dark pills/banners) is folded in too. */
+.dark .bg-\[\#0c1a36\],
+html.dark .dark\:bg-\[\#0c1a36\] { background-color: #2a2a2a; }   /* modals / panels / pills lift to card grey */
+/* Page-level surfaces (body / main / section / page-content / full-height wrappers)
+   keep the black page tone; the !important + higher specificity overrides the
+   card-grey flip above so only chrome stays black while every panel goes grey. */
+html.dark body.dark\:bg-\[\#0c1a36\],
+html.dark main.dark\:bg-\[\#0c1a36\],
+html.dark section.dark\:bg-\[\#0c1a36\],
+html.dark [data-page-content].dark\:bg-\[\#0c1a36\],
+html.dark [data-flux-main].dark\:bg-\[\#0c1a36\],
+html.dark footer.dark\:bg-\[\#0c1a36\],
+html.dark .min-h-screen.dark\:bg-\[\#0c1a36\],
+html.dark .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #0d0d0d !important; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   SOFT DARK (.dark WITHOUT .pure-dark): the lighter, comfortable dark
+   palette. Every surface steps one notch UP from the pure / Extra-Dark
+   ramp so toggling "Soft dark" on visibly lightens the whole UI - cards
+   #303030 (vs pure #2a2a2a), page #1a1a1a (vs pure #000/#0d0d0d).
+   :not(.pure-dark) means pure dark is left completely untouched. */
+.dark:not(.pure-dark) .bg-white,
+.dark:not(.pure-dark) .bg-zinc-50,
+.dark:not(.pure-dark) .bg-zinc-200,
+.dark:not(.pure-dark) .bg-\[\#eff6ff\],
+.dark:not(.pure-dark) .dark\:bg-\[\#0c1a36\],
+.dark:not(.pure-dark) .dark\:bg-\[\#162a4a\],
+.dark:not(.pure-dark) .dark\:bg-\[\#13294d\],
+.dark:not(.pure-dark) .dark\:bg-\[\#1d3252\],
+.dark:not(.pure-dark) .dash-shimmer { background-color: #303030; }
+.dark:not(.pure-dark) .bg-zinc-100 { background-color: #1a1a1a; }
+html.dark:not(.pure-dark) body.dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) main.dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) section.dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) [data-page-content].dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) [data-flux-main].dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) footer.dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) .min-h-screen.dark\:bg-\[\#0c1a36\],
+html.dark:not(.pure-dark) .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #1a1a1a !important; }
+html.dark:not(.pure-dark) [data-flux-header] { background-color: #1a1a1a !important; }
+
+/* The Flux top bar (<header data-flux-header>) is a full-width, border-less chrome
+   bar, so it takes the PAGE tone and blends seamlessly with the page behind it
+   (the search field + icons inside float on top). The sidebar is a margined,
+   rounded, bordered card panel, so it keeps the card grey via the flip above and
+   is intentionally NOT forced here. */
+html.dark [data-flux-header] { background-color: #0d0d0d !important; }
+html.dark .dark\:bg-\[\#070f1c\] { background-color: #000000; }   /* deepest seam */
+html.dark .dark\:bg-\[\#162a4a\] { background-color: #2a2a2a; }   /* card */
+html.dark .dark\:bg-\[\#13294d\] { background-color: #2a2a2a; }   /* card */
+html.dark .dark\:bg-\[\#1d3252\] { background-color: #2a2a2a; }   /* card / elevated */
+html.dark .dark\:bg-\[\#26416b\] { background-color: #2a2a2a; }   /* chip / input -> one grey */
+html.dark .dark\:bg-\[\#0a1729\] { background-color: #0d0d0d; }   /* admin recessed */
+/* Hover tints -> the deeper grey #1f1f1f, matching the card/row hover. */
+html.dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: #1f1f1f; }
+html.dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: #1f1f1f; }
+html.dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: #1f1f1f; }
+html.dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: #1f1f1f; }
+/* Navy borders / rings -> neutral grey so outlines match the black surfaces. */
+html.dark .dark\:border-\[\#24364f\] { border-color: #3a3a3a; }
+html.dark .dark\:ring-\[\#24364f\]   { --tw-ring-color: #3a3a3a; }
+html.dark .dark\:ring-\[\#0c1a36\]   { --tw-ring-color: #3a3a3a; }
+/* Opacity-suffixed navy panels/scrims (frosted dropdowns, sheets) -> grey panels /
+   near-black scrims, so soft-dark matches extra-dark. */
+html.dark .dark\:bg-\[\#0c1a36\]\/30 { background-color: rgb(13 13 13 / 0.3); }
+html.dark .dark\:bg-\[\#0c1a36\]\/50 { background-color: rgb(13 13 13 / 0.5); }
+html.dark .dark\:bg-\[\#0c1a36\]\/60 { background-color: rgb(13 13 13 / 0.6); }
+html.dark .dark\:bg-\[\#0c1a36\]\/70 { background-color: rgb(13 13 13 / 0.7); }
+html.dark .dark\:bg-\[\#0c1a36\]\/80 { background-color: rgb(13 13 13 / 0.8); }
+html.dark .dark\:bg-\[\#0c1a36\]\/95 { background-color: rgb(13 13 13 / 0.95); }
+html.dark .dark\:bg-\[\#1d3252\]\/70 { background-color: rgb(42 42 42 / 0.7); }
+html.dark .dark\:bg-\[\#1d3252\]\/80 { background-color: rgb(42 42 42 / 0.8); }
+html.dark .dark\:bg-\[\#26416b\]\/95 { background-color: rgb(42 42 42 / 0.95); }
 /* The customer dashboard puts `flux:main` at `lg:bg-white` so the curve element
    on top of it has something to round against. `bg-white` becomes `#0c1a2e` in
    dark mode (the sidebar colour), which made the curved corner reveal a wedge
@@ -829,25 +911,22 @@ select:focus[data-flux-control] {
    flux:main bg on desktop in dark mode to match the content's dark bg so the
    curve is invisible while the sidebar↔content contrast is preserved. */
 @media (min-width: 64rem) {
-    .dark .lg\:bg-white { background-color: #070f1c; }
+    .dark .lg\:bg-white { background-color: #000000; }
 }
-.dark .bg-\[\#f9fafb\]   { background-color: #070f1c; }
-.dark .bg-\[\#ededee\]   { background-color: #101f33; }   /* product hero plate */
+.dark .bg-\[\#f9fafb\]   { background-color: #050505; }
+.dark .bg-\[\#ededee\]   { background-color: #2a2a2a; }   /* product hero plate */
 
-/* Glass surfaces — semi-transparent white panels.
-   Dropdowns/panels (bg-white/80, /85) are remapped to the card surface colour
-   (#162a4a) so they appear elevated above the dark page background rather than
-   blending into it. Lower-opacity tints stay on the deeper base. */
-.dark .bg-white\/40 { background-color: rgb(12 26 46 / 0.55); }
-.dark .bg-white\/70 { background-color: rgb(12 26 46 / 0.80); }
-.dark .bg-white\/80 { background-color: rgba(22, 42, 74, 0.95); }
-.dark .bg-white\/85 { background-color: rgba(22, 42, 74, 0.97); }
-.dark .bg-white\/90 { background-color: rgba(22, 42, 74, 0.98); }
-.dark .bg-white\/95 { background-color: rgba(22, 42, 74, 1.0); }
+/* Glass surfaces — remap to the card colour at varying opacity. */
+.dark .bg-white\/40 { background-color: rgb(42 42 42 / 0.55); }
+.dark .bg-white\/70 { background-color: rgb(20 20 20 / 0.80); }
+.dark .bg-white\/80 { background-color: rgba(42, 42, 42, 0.95); }
+.dark .bg-white\/85 { background-color: rgba(42, 42, 42, 0.97); }
+.dark .bg-white\/90 { background-color: rgba(42, 42, 42, 0.98); }
+.dark .bg-white\/95 { background-color: rgba(42, 42, 42, 1.0); }
 
-/* Blue tints used as subtle highlights / selected states. */
-.dark .bg-blue-50  { background-color: #15273f; }
-.dark .bg-blue-100 { background-color: #1d3252; }
+/* Subtle highlights / selected states -> neutral grey (no blue tint). */
+.dark .bg-blue-50  { background-color: #2a2a2a; }
+.dark .bg-blue-100 { background-color: #2a2a2a; }
 
 /* Text — dark text resolves to near-white; muted greys lighten. */
 .dark .text-black,
@@ -871,17 +950,17 @@ select:focus[data-flux-control] {
 /* The thin-black (light-mode) cards/sidebars/pills use border-zinc-900; in dark
    mode they must read the SAME navy border as every other card, not a stray
    zinc-900/700. */
-.dark .border-zinc-900 { border-color: #24364f; }
+.dark .border-zinc-900 { border-color: #3a3a3a; }
 .dark .ring-zinc-100,
-.dark .ring-zinc-200   { --tw-ring-color: #24364f; }
+.dark .ring-zinc-200   { --tw-ring-color: #3a3a3a; }
 .dark .divide-zinc-100 > *,
-.dark .divide-zinc-200 > * { border-color: #24364f; }
+.dark .divide-zinc-200 > * { border-color: #3a3a3a; }
 /* Heavier borders (inputs) — a touch lighter so the field reads as a distinct
    control on the navy surface, not a bright grey line. */
 .dark .border-zinc-300,
 .dark .border-zinc-400,
-.dark .border-zinc-500 { border-color: #36496b; }
-.dark .hover\:border-zinc-500:hover { border-color: #44597d; }
+.dark .border-zinc-500 { border-color: #3a3a3a; }
+.dark .hover\:border-zinc-500:hover { border-color: #444444; }
 
 /* Nav search box — a white resting border in dark mode so the field stands
    out against the navy chrome. Focus still shows the blue border + ring
@@ -905,7 +984,7 @@ select:focus[data-flux-control] {
    from #1c2c44, which sat almost on top of the #162a4a card colour and made the
    bars nearly invisible; #28395a reads against every dark surface (page, card,
    elevated). The shimmer sweep is a touch stronger so the motion is legible. */
-.dark .skeleton { background-color: #28395a; }
+.dark .skeleton { background-color: #333333; }
 .dark .skeleton::after {
     background-image: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.16) 50%, transparent 100%);
 }
@@ -916,15 +995,15 @@ select:focus[data-flux-control] {
    ones to a subtle hover-lift (slightly lighter than the dark surface). */
 .dark .hover\:bg-white:hover,
 .dark .hover\:bg-zinc-50:hover,
-.dark .hover\:bg-zinc-100:hover  { background-color: #16273d; }
+.dark .hover\:bg-zinc-100:hover  { background-color: #1f1f1f; }
 .dark .hover\:bg-zinc-200:hover  { background-color: #1f3048; }
 .dark .hover\:bg-zinc-300:hover  { background-color: #243752; }
 .dark .hover\:bg-blue-50:hover   { background-color: #1f3354; }
 .dark .hover\:bg-blue-100:hover  { background-color: #274069; }
-.dark .hover\:bg-white\/70:hover { background-color: rgb(22 39 61 / 0.9); }
+.dark .hover\:bg-white\/70:hover { background-color: rgb(31 31 31 / 0.9); }
 .dark .focus\:bg-white:focus,
 .dark .focus\:bg-zinc-50:focus,
-.dark .focus\:bg-zinc-100:focus  { background-color: #16273d; }
+.dark .focus\:bg-zinc-100:focus  { background-color: #1f1f1f; }
 
 /* Blue accent text lightens so links / selected labels stay legible on dark. */
 .dark .text-blue-600,
@@ -956,6 +1035,8 @@ select:focus[data-flux-control] {
 .dark img[src$=".svg"][src*="ETH"],
 .dark img[src$=".svg"][src*="SOLANA"],
 .dark img[src$=".svg"][src*="USDT"],
+.dark img[src$=".svg"][src*="BNB"],
+.dark img[src$=".svg"][src*="LTC"],
 .dark img[src$="/USD.svg"] {
     filter: none !important;
 }
@@ -1076,25 +1157,29 @@ select:focus[data-flux-control] {
    black. Mirrors every navy value the dark block sets, plus the
    explicit `dark:*-[#hex]` utilities used directly in markup.
 
-   Black ramp: #000 page, #0d0d0d cards, #161616 elevated,
-   #1f1f1f chips, #2a2a2a borders, #333 input borders.
+   Black ramp: #000 page, #1f1f1f cards, #262626 elevated,
+   #2b2b2b chips, #2a2a2a borders, #333 input borders.
    ============================================================ */
 
 /* Surfaces (remapped light utilities) */
-.dark.pure-dark .bg-white          { background-color: #0d0d0d; }
-.dark.pure-dark .bg-zinc-50        { background-color: #161616; }
+.dark.pure-dark .bg-white          { background-color: #2a2a2a; }
+.dark.pure-dark .bg-zinc-50        { background-color: #2a2a2a; }
 .dark.pure-dark .bg-zinc-100       { background-color: #000000; }
-.dark.pure-dark .bg-zinc-200       { background-color: #1f1f1f; }
-.dark.pure-dark .bg-\[\#eff6ff\]   { background-color: #000000; }
+.dark.pure-dark .bg-zinc-200       { background-color: #2a2a2a; }
+.dark.pure-dark .bg-\[\#eff6ff\]   { background-color: #2a2a2a; }
 .dark.pure-dark .bg-\[\#f9fafb\]   { background-color: #000000; }
-.dark.pure-dark .bg-\[\#ededee\]   { background-color: #0a0a0a; }
+/* Page bodies / mains carry `dark:bg-[#0c1a36]` for the page tone; that variant
+   must beat the card-tone bg-[#eff6ff]/bg-white remaps (equal specificity, so it
+   sits later here). Keeps the page black while plain bg-[#eff6ff] cards lift to card. */
+.dark.pure-dark .dark\:bg-\[\#0c1a36\] { background-color: #2a2a2a; }
+.dark.pure-dark .bg-\[\#ededee\]   { background-color: #2a2a2a; }
 /* Plain (non-`dark:`) navy hex used for always-dark pills, banners and dropdown
    triggers (the mobile eSIM category picker, the eSIM promo banner cards). Only
    the dark: variant was remapped above, so these stayed navy on the black page;
    map them onto the card surface. Their text is already light, so it stays readable. */
-.dark.pure-dark .bg-\[\#0c1a36\]   { background-color: #0d0d0d; }
-.dark.pure-dark .bg-blue-50        { background-color: #0d0d0d; }
-.dark.pure-dark .bg-blue-100       { background-color: #161616; }
+.dark.pure-dark .bg-\[\#0c1a36\]   { background-color: #2a2a2a; }
+.dark.pure-dark .bg-blue-50        { background-color: #2a2a2a; }
+.dark.pure-dark .bg-blue-100       { background-color: #2a2a2a; }
 @media (min-width: 64rem) {
     .dark.pure-dark .lg\:bg-white  { background-color: #000000; }
 }
@@ -1125,19 +1210,34 @@ select:focus[data-flux-control] {
 .dark.pure-dark .bg-white\/95 { background-color: rgb(13 13 13 / 1.0); }
 
 /* Explicit navy utility hexes used directly in markup (bg + variants) */
-/* `#0c1a36` is also used with a trailing-bang (dark:bg-[#0c1a36]!) on a few
-   surfaces (e.g. the profile dropdown panel). Those compile to !important, so
-   the pure-dark override must be !important too, or they stay navy on black. */
-.dark.pure-dark .dark\:bg-\[\#0c1a36\] { background-color: #000000 !important; }
-.dark.pure-dark .dark\:bg-\[\#162a4a\] { background-color: #0d0d0d; }
-.dark.pure-dark .dark\:bg-\[\#1d3252\] { background-color: #161616; }
-.dark.pure-dark .dark\:bg-\[\#26416b\] { background-color: #1f1f1f; }
-.dark.pure-dark .dark\:bg-\[\#13294d\] { background-color: #121212; }
+/* `#0c1a36` lifts to the card grey for panels/modals/chrome. Page containers stay
+   black via the higher-specificity guard near the top of the dark block, so this
+   is intentionally NON-important (an !important here was forcing the nav, modals
+   and panels to pure black in extra-dark). Trailing-bang `dark:bg-[#0c1a36]!`
+   surfaces are handled by the dedicated rule below. */
+.dark.pure-dark .dark\:bg-\[\#0c1a36\] { background-color: #2a2a2a; }
+.dark.pure-dark .dark\:bg-\[\#0c1a36\]\! ,
+html.dark .dark\:bg-\[\#0c1a36\]\! { background-color: #2a2a2a !important; }
+.dark.pure-dark .dark\:bg-\[\#162a4a\] { background-color: #2a2a2a; }
+.dark.pure-dark .dark\:bg-\[\#1d3252\] { background-color: #2a2a2a; }
+.dark.pure-dark .dark\:bg-\[\#26416b\] { background-color: #2a2a2a; }
+
+/* Card surfaces that are transparent or use navy / light tints / gradients /
+   frosted glass map to pure black in Extra Dark, so on the black page they barely
+   read. `.esim-tile` (eSIM tiles, how-to band, modals) and `.pure-card` (cart +
+   checkout glass cards, and any other page that opts in) both get the card tone in
+   Extra Dark only; light and normal dark are untouched. !important + image:none so
+   this wins over the navy `dark:bg-[#0c1a36]!`, the glass `/60` `/70` tints and the
+   gradient stops all defined later in this block, and so a tagged gradient section
+   flattens to the card tone instead of a lighter band. */
+.dark .esim-tile,
+.dark .pure-card { background-color: #2a2a2a !important; background-image: none !important; }
+.dark.pure-dark .dark\:bg-\[\#13294d\] { background-color: #2a2a2a; }
 .dark.pure-dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: #1f1f1f; }
-.dark.pure-dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: #262626; }
+.dark.pure-dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: #1f1f1f; }
 /* Admin-only base + hover hexes (#0a1729 is the admin deep seam). */
 .dark.pure-dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: #000000; }
-.dark.pure-dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: #161616; }
+.dark.pure-dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: #1f1f1f; }
 
 /* Opacity-suffixed navy overlays (frosted panels, sheets, scrims) — keep the
    alpha, swap the navy base for black/charcoal. Each /NN variant is its own
@@ -1148,32 +1248,32 @@ select:focus[data-flux-control] {
 .dark.pure-dark .dark\:bg-\[\#0c1a36\]\/70 { background-color: rgb(0 0 0 / 0.7); }
 .dark.pure-dark .dark\:bg-\[\#0c1a36\]\/80 { background-color: rgb(0 0 0 / 0.8); }
 .dark.pure-dark .dark\:bg-\[\#0c1a36\]\/95 { background-color: rgb(0 0 0 / 0.95); }
-.dark.pure-dark .dark\:bg-\[\#1d3252\]\/70 { background-color: rgb(22 22 22 / 0.7); }
-.dark.pure-dark .dark\:bg-\[\#1d3252\]\/80 { background-color: rgb(22 22 22 / 0.8); }
-.dark.pure-dark .dark\:bg-\[\#26416b\]\/95 { background-color: rgb(31 31 31 / 0.95); }
+.dark.pure-dark .dark\:bg-\[\#1d3252\]\/70 { background-color: rgb(42 42 42 / 0.7); }
+.dark.pure-dark .dark\:bg-\[\#1d3252\]\/80 { background-color: rgb(42 42 42 / 0.8); }
+.dark.pure-dark .dark\:bg-\[\#26416b\]\/95 { background-color: rgb(42 42 42 / 0.95); }
 .dark.pure-dark .dark\:hover\:bg-\[\#26416b\]\/40:hover { background-color: rgb(31 31 31 / 0.4); }
 
 /* Gradient stops (wallet / chip cards) */
-.dark.pure-dark .dark\:from-\[\#1d3252\] { --tw-gradient-from: #161616 var(--tw-gradient-from-position); }
-.dark.pure-dark .dark\:via-\[\#1d3252\]  { --tw-gradient-via: #161616 var(--tw-gradient-via-position); }
-.dark.pure-dark .dark\:to-\[\#34507a\]   { --tw-gradient-to: #262626 var(--tw-gradient-to-position); }
+.dark.pure-dark .dark\:from-\[\#1d3252\] { --tw-gradient-from: #2a2a2a var(--tw-gradient-from-position); }
+.dark.pure-dark .dark\:via-\[\#1d3252\]  { --tw-gradient-via: #2a2a2a var(--tw-gradient-via-position); }
+.dark.pure-dark .dark\:to-\[\#34507a\]   { --tw-gradient-to: #2a2a2a var(--tw-gradient-to-position); }
 
 /* Borders, rings, dividers */
 .dark.pure-dark .border-zinc-100,
 .dark.pure-dark .border-zinc-200,
-.dark.pure-dark .border-zinc-900     { border-color: #2a2a2a; }
+.dark.pure-dark .border-zinc-900     { border-color: #3a3a3a; }
 .dark.pure-dark .ring-zinc-100,
-.dark.pure-dark .ring-zinc-200       { --tw-ring-color: #2a2a2a; }
+.dark.pure-dark .ring-zinc-200       { --tw-ring-color: #3a3a3a; }
 .dark.pure-dark .divide-zinc-100 > *,
-.dark.pure-dark .divide-zinc-200 > * { border-color: #2a2a2a; }
+.dark.pure-dark .divide-zinc-200 > * { border-color: #3a3a3a; }
 .dark.pure-dark .border-zinc-300,
 .dark.pure-dark .border-zinc-400,
-.dark.pure-dark .border-zinc-500     { border-color: #333333; }
+.dark.pure-dark .border-zinc-500     { border-color: #3a3a3a; }
 .dark.pure-dark .hover\:border-zinc-500:hover { border-color: #3d3d3d; }
-.dark.pure-dark .dark\:border-\[\#24364f\]      { border-color: #2a2a2a; }
-.dark.pure-dark .dark\:ring-\[\#24364f\]        { --tw-ring-color: #2a2a2a; }
+.dark.pure-dark .dark\:border-\[\#24364f\]      { border-color: #3a3a3a; }
+.dark.pure-dark .dark\:ring-\[\#24364f\]        { --tw-ring-color: #3a3a3a; }
 .dark.pure-dark .dark\:ring-\[\#0c1a36\]        { --tw-ring-color: #000000; }
-.dark.pure-dark .dark\:hover\:ring-\[\#24364f\]:hover { --tw-ring-color: #2a2a2a; }
+.dark.pure-dark .dark\:hover\:ring-\[\#24364f\]:hover { --tw-ring-color: #3a3a3a; }
 
 /* Inputs that paint their own surface */
 .dark.pure-dark input:not(.bg-transparent),
@@ -1185,24 +1285,24 @@ select:focus[data-flux-control] {
 .dark.pure-dark .hover\:bg-zinc-50:hover,
 .dark.pure-dark .hover\:bg-zinc-100:hover  { background-color: #1a1a1a; }
 /* Hover lift for the always-dark navy pill (mobile category picker trigger). */
-.dark.pure-dark .hover\:bg-\[\#1d3252\]:hover { background-color: #161616; }
+.dark.pure-dark .hover\:bg-\[\#1d3252\]:hover { background-color: #1f1f1f; }
 .dark.pure-dark .hover\:bg-zinc-200:hover  { background-color: #1f1f1f; }
-.dark.pure-dark .hover\:bg-zinc-300:hover  { background-color: #262626; }
-.dark.pure-dark .hover\:bg-blue-50:hover   { background-color: #1a1a1a; }
-.dark.pure-dark .hover\:bg-blue-100:hover  { background-color: #222222; }
+.dark.pure-dark .hover\:bg-zinc-300:hover  { background-color: #1f1f1f; }
+.dark.pure-dark .hover\:bg-blue-50:hover   { background-color: #1f1f1f; }
+.dark.pure-dark .hover\:bg-blue-100:hover  { background-color: #1f1f1f; }
 .dark.pure-dark .focus\:bg-white:focus,
 .dark.pure-dark .focus\:bg-zinc-50:focus,
-.dark.pure-dark .focus\:bg-zinc-100:focus  { background-color: #1a1a1a; }
+.dark.pure-dark .focus\:bg-zinc-100:focus  { background-color: #1f1f1f; }
 
 /* Skeleton shimmer block */
 .dark.pure-dark .skeleton { background-color: #262626; }
 
 /* Component surfaces (CSS classes, not utilities) */
 html.dark.pure-dark .wallet-glass {
-    background: linear-gradient(180deg, #161616 0%, #000000 100%);
+    background: #2a2a2a;
 }
 html.dark.pure-dark .liquid-pill {
-    box-shadow: inset 0 0 0 1px #2a2a2a;
+    box-shadow: inset 0 0 0 1px #3a3a3a;
 }
 html.dark.pure-dark .nav-glass {
     background: linear-gradient(180deg, rgba(20, 20, 20, 0.88) 0%, rgba(0, 0, 0, 0.82) 100%);
@@ -1219,7 +1319,7 @@ html.dark.pure-dark .glass-panel {
    override so it wins the equal-specificity tie. Colored cards (green/red promo)
    carry no .dash-shimmer, so they keep their tint. */
 html.dark.pure-dark .dash-shimmer {
-    background-color: #141414;
+    background-color: #2a2a2a; /* match the card grey; cards already sit at #2a2a2a above the black page */
 }
 
 /* ============================================================

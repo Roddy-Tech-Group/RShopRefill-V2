@@ -34,14 +34,14 @@
     ];
 @endphp
 
-<x-layouts.app.header :title="'Sitemap | RshopRefills'">
+<x-layouts.app.header :title="'Sitemap | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
             <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Sitemap</span>
             <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Find your way around</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">Every section of RshopRefills, all in one place.</p>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">Every section of {{ $siteName }}, all in one place.</p>
         </div>
     </section>
 

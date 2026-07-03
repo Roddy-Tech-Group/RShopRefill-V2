@@ -42,9 +42,9 @@
         </a>
 
         {{-- Profile header --}}
-        <div class="rounded-[10px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="flex flex-wrap items-center gap-4">
-                <img src="{{ $avatar }}" alt="" class="h-16 w-16 shrink-0 rounded-[10px] object-cover ring-1 ring-blue-100">
+                <img src="{{ $avatar }}" alt="" class="h-16 w-16 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100">
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="inline-flex items-center gap-1.5 text-lg font-bold text-zinc-900">
@@ -56,7 +56,7 @@
                         @if ($user->email_verified_at)
                             <span class="inline-flex items-center rounded-[5px] bg-emerald-400 px-2.5 py-0.5 text-xs font-semibold text-white">Active</span>
                         @else
-                            <span class="inline-flex items-center rounded-[10px] bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">Pending</span>
+                            <span class="inline-flex items-center rounded-[12px] bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">Pending</span>
                         @endif
                     </div>
                     <p class="mt-0.5 text-sm text-zinc-600">{{ $user->email }}</p>
@@ -95,13 +95,13 @@
             $kycRaw = strtolower((string) ($user->kyc_status ?? ''));
             $kycVerified = $kycRaw === 'verified';
         @endphp
-        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])) }" class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])) }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             @php
                 // Shared button shape. Compact + responsive:
                 //   - Mobile: full-width grid cells (two per row) so labels never truncate
                 //   - sm+:    inline auto-width chips that flex-wrap on overflow
                 // Toned variants are appended per-button.
-                $btn = 'inline-flex w-full sm:w-auto items-center justify-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors';
+                $btn = 'inline-flex w-full sm:w-auto items-center justify-center gap-1 rounded-[12px] px-2.5 py-1.5 text-[11px] font-semibold transition-colors';
                 $btnIcon = 'h-3 w-3 shrink-0';
             @endphp
             <div class="flex flex-col gap-3 border-b border-zinc-100 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -141,7 +141,7 @@
                             Set KYC
                             <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        <div x-show="open" x-transition style="display:none;" class="absolute right-0 z-30 mt-1.5 w-56 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60" role="menu">
+                        <div x-show="open" x-transition style="display:none;" class="absolute right-0 z-30 mt-1.5 w-56 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60" role="menu">
                             @php
                                 // Each row is a single-field POST. The blade renders an
                                 // unstyled <button> inside a <form> with data-confirm so
@@ -179,7 +179,7 @@
                                       data-confirm-tone="{{ $opt['tone'] }}">
                                     @csrf
                                     <input type="hidden" name="status" value="{{ $status }}">
-                                    <button type="submit" class="flex w-full flex-col items-start rounded-[10px] px-3 py-2 text-left text-xs font-medium transition-colors {{ $opt['classes'] }}">
+                                    <button type="submit" class="flex w-full flex-col items-start rounded-[12px] px-3 py-2 text-left text-xs font-medium transition-colors {{ $opt['classes'] }}">
                                         <span class="font-semibold">{{ $opt['label'] }}</span>
                                         <span class="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">{{ $opt['description'] }}</span>
                                     </button>
@@ -283,27 +283,27 @@
             {{-- Suspend modal - captures an optional reason shown to the customer. --}}
             <div x-show="suspending" x-cloak @keydown.escape.window="suspending = false" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
                 <div x-show="suspending" @click="suspending = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-zinc-950/70"></div>
-                <form x-show="suspending" x-transition method="POST" action="{{ route('admin.customer.suspend', $user) }}" class="relative w-full max-w-lg overflow-hidden rounded-[10px] bg-white shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60">
+                <form x-show="suspending" x-transition method="POST" action="{{ route('admin.customer.suspend', $user) }}" class="relative w-full max-w-lg overflow-hidden rounded-[12px] bg-white shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60">
                     @csrf
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                         <div>
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Suspend customer</h3>
                             <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300">They will stay signed in but cannot purchase, fund, or check out. They can request a review.</p>
                         </div>
-                        <button type="button" @click="suspending = false" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                        <button type="button" @click="suspending = false" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <div class="space-y-4 px-5 py-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-400">Reason (optional, shown to the customer)</label>
-                            <textarea name="reason" rows="4" maxlength="500" placeholder="e.g. We detected unusual activity on your account and need to review it before unlocking further purchases." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">{{ old('reason') }}</textarea>
+                            <textarea name="reason" rows="4" maxlength="500" placeholder="e.g. We detected unusual activity on your account and need to review it before unlocking further purchases." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">{{ old('reason') }}</textarea>
                             @error('reason') <p class="mt-1 text-[11px] font-medium text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div class="flex items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#162a4a]">
-                        <button type="button" @click="suspending = false" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
-                        <button type="submit" class="inline-flex items-center rounded-[10px] bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700">Suspend</button>
+                        <button type="button" @click="suspending = false" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
+                        <button type="submit" class="inline-flex items-center rounded-[12px] bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700">Suspend</button>
                     </div>
                 </form>
             </div>
@@ -311,14 +311,14 @@
             {{-- Notify / message modal --}}
             <div x-show="warning" x-cloak @keydown.escape.window="warning = false" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
                 <div x-show="warning" @click="warning = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-zinc-950/70"></div>
-                <form x-show="warning" x-transition method="POST" action="{{ route('admin.customer.message', $user) }}" class="relative w-full max-w-lg overflow-hidden rounded-[10px] bg-white shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60">
+                <form x-show="warning" x-transition method="POST" action="{{ route('admin.customer.message', $user) }}" class="relative w-full max-w-lg overflow-hidden rounded-[12px] bg-white shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60">
                     @csrf
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
                         <div>
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Send a message</h3>
                             <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300">Emails {{ $user->email }} and pushes a notification to their dashboard.</p>
                         </div>
-                        <button type="button" @click="warning = false" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                        <button type="button" @click="warning = false" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
@@ -342,7 +342,7 @@
                                     ];
                                 @endphp
                                 @foreach ($typeOptions as $value => $opt)
-                                    <label class="relative flex cursor-pointer items-center gap-2 rounded-[10px] border-2 border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 transition-colors dark:border-zinc-700/60 dark:text-zinc-200 {{ $opt['checked'] }}">
+                                    <label class="relative flex cursor-pointer items-center gap-2 rounded-[12px] border-2 border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 transition-colors dark:border-zinc-700/60 dark:text-zinc-200 {{ $opt['checked'] }}">
                                         <input type="radio" name="type" value="{{ $value }}" @checked(old('type', 'notification') === $value) class="h-4 w-4 cursor-pointer accent-blue-600">
                                         {{ $opt['label'] }}
                                     </label>
@@ -352,13 +352,13 @@
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-400">Message</label>
-                            <textarea name="body" rows="6" required minlength="5" maxlength="2000" placeholder="Write the message the customer will see in their email and dashboard…" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">{{ old('body') }}</textarea>
+                            <textarea name="body" rows="6" required minlength="5" maxlength="2000" placeholder="Write the message the customer will see in their email and dashboard…" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">{{ old('body') }}</textarea>
                             @error('body') <p class="mt-1 text-[11px] font-medium text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div class="flex items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#162a4a]">
-                        <button type="button" @click="warning = false" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
-                        <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">Send</button>
+                        <button type="button" @click="warning = false" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
+                        <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">Send</button>
                     </div>
                 </form>
             </div>
@@ -379,7 +379,7 @@
                 $kycBadge = $kycMap[$kycRaw] ?? ['label' => 'KYC not started', 'tone' => 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:ring-zinc-700/60'];
                 // Compact pill: smaller padding + tighter text so the row tucks
                 // close to the divider above instead of floating in dead space.
-                $badgeBase = 'inline-flex items-center gap-1 rounded-[10px] px-2 py-0.5 text-[11px] font-medium ring-1';
+                $badgeBase = 'inline-flex items-center gap-1 rounded-[12px] px-2 py-0.5 text-[11px] font-medium ring-1';
             @endphp
             @if ($isBanned || $isSuspended || $fundsHeld || ! $emailVerified || ! $kycVerified)
                 <div class="flex flex-wrap gap-1.5 px-5 py-2">
@@ -419,23 +419,23 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Name</label>
-                        <input name="name" value="{{ old('name', $user->name) }}" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                        <input name="name" value="{{ old('name', $user->name) }}" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @error('name') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Email</label>
-                        <input name="email" type="email" value="{{ old('email', $user->email) }}" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                        <input name="email" type="email" value="{{ old('email', $user->email) }}" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @error('email') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Phone</label>
-                        <input name="phone" value="{{ old('phone', $user->phone) }}" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                        <input name="phone" value="{{ old('phone', $user->phone) }}" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @error('phone') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Country</label>
                         <div class="relative mt-1.5">
-                            <select name="country" class="w-full appearance-none rounded-[10px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <select name="country" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <option value="">Not set</option>
                                 @foreach (array_keys(config('countries.codes', [])) as $cName)
                                     <option value="{{ $cName }}" @selected(old('country', $user->country) === $cName)>{{ $cName }}</option>
@@ -452,7 +452,7 @@
                         {{-- Native <select> kept for accessibility + form submission; the OS arrow
                              is hidden with appearance-none and replaced by a centred chevron SVG. --}}
                         <div class="relative mt-1.5">
-                            <select name="gender" class="w-full appearance-none rounded-[10px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <select name="gender" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <option value="">Not set</option>
                                 @foreach (['male', 'female', 'other'] as $g)
                                     <option value="{{ $g }}" @selected(old('gender', $user->gender) === $g)>{{ ucfirst($g) }}</option>
@@ -465,7 +465,7 @@
                         @error('gender') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
-                <button type="submit" class="mt-4 inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Save changes</button>
+                <button type="submit" class="mt-4 inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Save changes</button>
             </form>
         </div>
 
@@ -502,7 +502,7 @@
             $allWallets = $user->wallets;
             $rcoinWalletBalance = (int) ($allWallets->firstWhere('currency', \App\Domain\Shared\Enums\Currency::RCOIN)?->balance ?? 0);
         @endphp
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-zinc-900">Wallet balances</h3>
@@ -521,7 +521,7 @@
                             $isRcoin = $code === 'RCOIN';
                             $tone = $isRcoin ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-zinc-50 text-zinc-700 ring-zinc-200';
                         @endphp
-                        <div class="rounded-[10px] p-2.5 ring-1 {{ $tone }}">
+                        <div class="rounded-[12px] p-2.5 ring-1 {{ $tone }}">
                             <p class="text-[10px] font-bold uppercase tracking-wider opacity-70">{{ $code }}</p>
                             <p class="mt-0.5 text-base font-black tabular-nums">{{ number_format((float) $w->balance, $isRcoin ? 0 : 2) }}</p>
                         </div>
@@ -567,7 +567,7 @@
                         @click="open = ! open"
                         :aria-expanded="open.toString()"
                         aria-haspopup="listbox"
-                        class="mt-1 flex w-full items-center justify-between gap-3 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="mt-1 flex w-full items-center justify-between gap-3 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     >
                         <span class="flex min-w-0 items-center gap-2">
                             <span class="inline-flex items-center rounded-[6px] bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 ring-1 ring-blue-200" x-text="currency"></span>
@@ -582,7 +582,7 @@
                         x-show="open"
                         x-transition.origin.top
                         style="display:none;"
-                        class="absolute left-0 right-0 z-30 mt-1.5 max-h-72 overflow-y-auto rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200"
+                        class="absolute left-0 right-0 z-30 mt-1.5 max-h-72 overflow-y-auto rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200"
                         role="listbox"
                     >
                         @foreach ($walletOptions as $opt)
@@ -598,7 +598,7 @@
                                 type="button"
                                 @click="currency = '{{ $code }}'; open = false"
                                 :class="currency === '{{ $code }}' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' : 'text-zinc-700 hover:bg-zinc-50'"
-                                class="flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-xs font-medium transition-colors"
+                                class="flex w-full items-center justify-between gap-3 rounded-[12px] px-2.5 py-2 text-left text-xs font-medium transition-colors"
                                 role="option"
                                 :aria-selected="(currency === '{{ $code }}').toString()"
                             >
@@ -618,31 +618,31 @@
 
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     {{-- Credit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[10px] border border-zinc-100 p-3">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] border border-zinc-100 p-3">
                         @csrf
                         <input type="hidden" name="direction" value="credit">
                         <input type="hidden" name="currency" :value="currency">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Credit</p>
-                        <div class="mt-2 flex overflow-hidden rounded-[10px] border border-zinc-200">
+                        <div class="mt-2 flex overflow-hidden rounded-[12px] border border-zinc-200">
                             <input type="number" name="amount" min="0.0001" step="0.01" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
                             <span class="flex shrink-0 items-center bg-zinc-50 px-3 text-[11px] font-semibold text-zinc-600" x-text="currency"></span>
                         </div>
-                        <textarea name="reason" rows="2" required placeholder="Reason (audit log) - e.g. 'Refund for order RSR-… per finance ticket #1234'" class="mt-2 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>
-                        <button type="submit" class="mt-2 w-full rounded-[10px] bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Credit wallet</button>
+                        <textarea name="reason" rows="2" required placeholder="Reason (audit log) - e.g. 'Refund for order RSR-… per finance ticket #1234'" class="mt-2 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>
+                        <button type="submit" class="mt-2 w-full rounded-[12px] bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Credit wallet</button>
                     </form>
 
                     {{-- Debit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[10px] border border-zinc-100 p-3" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] border border-zinc-100 p-3" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
                         @csrf
                         <input type="hidden" name="direction" value="debit">
                         <input type="hidden" name="currency" :value="currency">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-red-700">Debit</p>
-                        <div class="mt-2 flex overflow-hidden rounded-[10px] border border-zinc-200">
+                        <div class="mt-2 flex overflow-hidden rounded-[12px] border border-zinc-200">
                             <input type="number" name="amount" min="0.0001" step="0.01" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
                             <span class="flex shrink-0 items-center bg-zinc-50 px-3 text-[11px] font-semibold text-zinc-600" x-text="currency"></span>
                         </div>
-                        <textarea name="reason" rows="2" required placeholder="Reason (audit log)" class="mt-2 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>
-                        <button type="submit" class="mt-2 w-full rounded-[10px] bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Debit wallet</button>
+                        <textarea name="reason" rows="2" required placeholder="Reason (audit log)" class="mt-2 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>
+                        <button type="submit" class="mt-2 w-full rounded-[12px] bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Debit wallet</button>
                     </form>
                 </div>
                 @error('amount')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
@@ -650,7 +650,7 @@
                 @error('reason')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
             </div>
         </div>
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-zinc-900">Rcoin earnings multiplier</h3>
@@ -663,7 +663,7 @@
                     @csrf
                     <label class="flex-1 min-w-[160px]">
                         <span class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-700">New multiplier</span>
-                        <div class="mt-1 flex overflow-hidden rounded-[10px] border border-zinc-200">
+                        <div class="mt-1 flex overflow-hidden rounded-[12px] border border-zinc-200">
                             <input
                                 type="number"
                                 name="rcoin_multiplier"
@@ -677,7 +677,7 @@
                         </div>
                         @error('rcoin_multiplier') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </label>
-                    <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Apply</button>
+                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Apply</button>
                 </form>
 
                 {{-- Quick presets for common dial settings. Each is a small form
@@ -698,7 +698,7 @@
                             <button type="submit"
                                 title="{{ $help }}"
                                 @class([
-                                    'rounded-[10px] px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                                    'rounded-[12px] px-2.5 py-1 text-[11px] font-semibold transition-colors',
                                     'bg-blue-600 text-white' => abs($currentMultiplier - (float) $value) < 0.01,
                                     'bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100' => abs($currentMultiplier - (float) $value) >= 0.01,
                                 ])
@@ -718,7 +718,7 @@
                 default    => 'zinc',
             };
         @endphp
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Identity verification (KYC)</h3>
                 <x-admin.badge :tone="$kycTone">{{ $user->kyc_status }}</x-admin.badge>
@@ -765,7 +765,7 @@
                                 };
                             @endphp
                             @if ($docPath)
-                                <a href="{{ route('admin.kyc.document', [$kyc, $docType]) }}" target="_blank" rel="noopener" class="group block overflow-hidden rounded-[10px] border border-zinc-200">
+                                <a href="{{ route('admin.kyc.document', [$kyc, $docType]) }}" target="_blank" rel="noopener" class="group block overflow-hidden rounded-[12px] border border-zinc-200">
                                     <img src="{{ route('admin.kyc.document', [$kyc, $docType]) }}" alt="{{ $docLabel }}" class="h-32 w-full bg-zinc-50 object-cover transition-transform duration-200 group-hover:scale-105">
                                     <p class="px-3 py-1.5 text-[11px] font-medium text-zinc-600">{{ $docLabel }}</p>
                                 </a>
@@ -779,19 +779,19 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <form method="POST" action="{{ route('admin.kyc.approve', $kyc) }}">
                                     @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-[10px] bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
+                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-[12px] bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                         Approve
                                     </button>
                                 </form>
-                                <button type="button" @click="rejecting = ! rejecting" class="inline-flex items-center gap-1.5 rounded-[10px] bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-100">Reject</button>
+                                <button type="button" @click="rejecting = ! rejecting" class="inline-flex items-center gap-1.5 rounded-[12px] bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-100">Reject</button>
                             </div>
 
                             <form x-show="rejecting" x-cloak method="POST" action="{{ route('admin.kyc.reject', $kyc) }}" class="mt-3">
                                 @csrf
-                                <textarea name="reason" rows="2" required placeholder="Reason for rejection (the customer will see this)" class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15">{{ old('reason') }}</textarea>
+                                <textarea name="reason" rows="2" required placeholder="Reason for rejection (the customer will see this)" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15">{{ old('reason') }}</textarea>
                                 @error('reason') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
-                                <button type="submit" class="mt-2 inline-flex items-center rounded-[10px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">Confirm rejection</button>
+                                <button type="submit" class="mt-2 inline-flex items-center rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">Confirm rejection</button>
                             </form>
                         </div>
                     @else
@@ -860,7 +860,7 @@
         </div>
 
         {{-- Wallets --}}
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Wallets ({{ $user->wallets->count() }})</h3>
             </div>
@@ -874,7 +874,7 @@
                                 · Locked @money((float) $wallet->locked_balance, $wallet->currency)
                             </p>
                         </div>
-                        <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $wallet->is_active ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
+                        <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $wallet->is_active ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
                             {{ $wallet->is_active ? 'Active' : 'Inactive' }}
                         </span>
                     </div>
@@ -885,7 +885,7 @@
         </div>
 
         {{-- Recent orders --}}
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Recent orders</h3>
             </div>
@@ -905,7 +905,7 @@
                             <tr>
                                 <td class="px-5 py-3 font-mono font-semibold text-zinc-900">#{{ $order->order_number }}</td>
                                 <td class="px-5 py-3">
-                                    <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($order->order_status?->value) }}">
+                                    <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($order->order_status?->value) }}">
                                         {{ $order->order_status?->label() ?? 'Pending' }}
                                     </span>
                                 </td>
@@ -917,7 +917,7 @@
                                 </td>
                                 <td class="px-5 py-3 text-zinc-600">{{ $fmtDate($order->placed_at ?? $order->created_at) }}</td>
                                 <td class="px-5 py-3 text-right">
-                                    <a href="{{ route('admin.order', $order) }}" class="inline-flex items-center rounded-[10px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50">View</a>
+                                    <a href="{{ route('admin.order', $order) }}" class="inline-flex items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50">View</a>
                                 </td>
                             </tr>
                         @empty
@@ -931,7 +931,7 @@
         </div>
 
         {{-- Recent wallet activity --}}
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Recent wallet activity</h3>
             </div>
@@ -951,7 +951,7 @@
                             @php $isCredit = $tx->type === \App\Domain\Shared\Enums\WalletTransactionType::Credit; @endphp
                             <tr>
                                 <td class="px-5 py-3">
-                                    <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $isCredit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
+                                    <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $isCredit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
                                         {{ $tx->type->label() }}
                                     </span>
                                 </td>

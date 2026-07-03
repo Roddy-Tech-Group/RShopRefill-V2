@@ -130,13 +130,13 @@ class extends Component {
             </p>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('admin.content.rewards.analytics') }}" wire:navigate class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+            <a href="{{ route('admin.content.rewards.analytics') }}" wire:navigate class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
                 View analytics
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                 </svg>
             </a>
-            <a href="/dashboard/rewards" target="_blank" class="inline-flex items-center gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]">
+            <a href="/dashboard/rewards" target="_blank" class="inline-flex items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]">
                 Customer view
             </a>
         </div>
@@ -145,7 +145,7 @@ class extends Component {
     {{-- Master kill-switch is rendered standalone at the top because it's
          the most impactful setting on the page. --}}
     @php $masterRow = ['key' => 'rcoin_enabled', 'label' => 'Rcoin engine', 'help' => 'When OFF no rewards are awarded, no redemptions accepted, no referrals counted. Storefront copy (the "earn X Rcoin" lines, the redeem toggle and the marketing page) auto-hides too. Existing balances stay spendable from the Rewards dashboard.']; @endphp
-    <section class="mb-6 flex items-start justify-between gap-4 rounded-[10px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-2 ring-blue-500 dark:border-white dark:bg-[#1d3252] dark:ring-blue-400">
+    <section class="mb-6 flex items-start justify-between gap-4 rounded-[12px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-2 ring-blue-500 dark:border-white dark:bg-[#1d3252] dark:ring-blue-400">
         <div>
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">{{ $masterRow['label'] }}</h2>
             <p class="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{{ $masterRow['help'] }}</p>
@@ -158,14 +158,14 @@ class extends Component {
 
     @foreach ($this->groups() as $groupName => $rows)
         @if ($groupName === 'General') @continue @endif {{-- General's only field (rcoin_enabled) is the master switch above. --}}
-        <section class="mb-5 overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <section class="mb-5 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             {{-- Header pill --}}
-            <header class="mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+            <header class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $groupName }}</h2>
             </header>
             <div class="divide-inset">
                 @foreach ($rows as $row)
-                    <div class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[10px] sm:flex-row sm:items-center sm:justify-between dark:hover:bg-blue-600/15 dark:hover:ring-blue-400" wire:key="setting-{{ $row['key'] }}">
+                    <div class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] sm:flex-row sm:items-center sm:justify-between dark:hover:bg-blue-600/15 dark:hover:ring-blue-400" wire:key="setting-{{ $row['key'] }}">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
                                 <label for="set-{{ $row['key'] }}" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $row['label'] }}</label>
@@ -198,7 +198,7 @@ class extends Component {
                                     <span class="text-sm font-semibold" :class="$wire.values['{{ $row['key'] }}'] ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'" x-text="$wire.values['{{ $row['key'] }}'] ? 'On' : 'Off'"></span>
                                 </label>
                             @else
-                                <div class="flex overflow-hidden rounded-[10px] border border-zinc-200 dark:border-zinc-700/60">
+                                <div class="flex overflow-hidden rounded-[12px] border border-zinc-200 dark:border-zinc-700/60">
                                     <input
                                         type="number"
                                         id="set-{{ $row['key'] }}"
@@ -221,7 +221,7 @@ class extends Component {
     @endforeach
 
     {{-- Helper math chip - shows the rate's real-world meaning. --}}
-    <aside class="mt-2 rounded-[10px] bg-blue-50 px-4 py-3 text-xs text-blue-800 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/20">
+    <aside class="mt-2 rounded-[12px] bg-blue-50 px-4 py-3 text-xs text-blue-800 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/20">
         @php
             $rate = (float) ($values['rcoin_usd_rate'] ?? 0.005);
             $rcoinPerDollar = $rate > 0 ? (int) round(1 / $rate) : 0;

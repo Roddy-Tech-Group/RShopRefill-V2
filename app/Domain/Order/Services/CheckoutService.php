@@ -193,6 +193,16 @@ class CheckoutService
                 $unitDisplayAmount = round(($item->display_amount / $item->quantity) * $exchangeRate, 4);
                 $unitSubtotal = round(($item->subtotal_snapshot / $item->quantity) * $exchangeRate, 4);
 
+                // Variable/custom-amount items: the cart's display_amount is the chosen
+                // face value in the offer's own currency (cart_items.display_currency =
+                // variant->currency, e.g. USD for a Visa card) and is NOT exchange-converted.
+                // Persist that per-unit offer-currency value so fulfilment sends the right
+                // figure to the provider - sending the converted display_amount made Zendit
+                // see a USD card's XAF amount as USD and reject it ("value is out of range").
+                $unitProviderFaceValue = $item->variant->is_variable
+                    ? round($item->display_amount / $item->quantity, 4)
+                    : null;
+
                 for ($i = 0; $i < $item->quantity; $i++) {
                     OrderItem::create([
                         'order_id' => $order->id,
@@ -214,6 +224,7 @@ class CheckoutService
                         'quantity' => 1,
                         'display_currency' => $displayCurrency,
                         'display_amount' => $unitDisplayAmount,
+                        'provider_face_value' => $unitProviderFaceValue,
                         'provider_cost_usd' => $item->provider_cost_usd,
                         'markup_amount' => $item->markup_amount,
                         'subtotal_amount' => $unitSubtotal,

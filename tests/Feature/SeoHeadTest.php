@@ -95,4 +95,15 @@ class SeoHeadTest extends TestCase
             ->assertOk()
             ->assertSee('<meta name="google-site-verification" content="verify-token-xyz">', false);
     }
+
+    public function test_site_name_setting_drives_brand_in_head(): void
+    {
+        SiteSetting::put('site.name', 'BrandX Market', 'site');
+        $this->withoutVite();
+
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('<meta property="og:site_name" content="BrandX Market">', $html);
+        $this->assertStringContainsString('<meta name="application-name" content="BrandX Market">', $html);
+    }
 }

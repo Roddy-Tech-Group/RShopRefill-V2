@@ -29,7 +29,7 @@
         <div class="flex w-max gap-4 sm:grid sm:w-full sm:grid-cols-3 sm:gap-5">
 
         {{-- Step 1 — Pick a product --}}
-        <article class="w-72 shrink-0 overflow-hidden rounded-[10px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
+        <article class="w-72 shrink-0 overflow-hidden rounded-[12px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
             <div class="flex aspect-[4/3] items-center justify-center overflow-hidden bg-zinc-100 dark:bg-[#1d3252]">
                 <x-illo name="cardFan" class="h-full w-full" />
             </div>
@@ -42,7 +42,7 @@
         </article>
 
         {{-- Step 2 — Pay with crypto --}}
-        <article class="w-72 shrink-0 overflow-hidden rounded-[10px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
+        <article class="w-72 shrink-0 overflow-hidden rounded-[12px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
             <div class="flex aspect-[4/3] items-center justify-center overflow-hidden bg-zinc-100 dark:bg-[#1d3252]">
                 <x-illo name="payWeb" class="h-full w-full" />
             </div>
@@ -55,7 +55,7 @@
         </article>
 
         {{-- Step 3 — Receive instantly --}}
-        <article class="w-72 shrink-0 overflow-hidden rounded-[10px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
+        <article class="w-72 shrink-0 overflow-hidden rounded-[12px] bg-zinc-100 dark:bg-[#1d3252] ring-1 ring-zinc-200 shadow-sm sm:w-auto">
             <div class="flex aspect-[4/3] items-center justify-center overflow-hidden bg-zinc-100 dark:bg-[#1d3252]">
                 <x-illo name="payout" class="h-full w-full" />
             </div>

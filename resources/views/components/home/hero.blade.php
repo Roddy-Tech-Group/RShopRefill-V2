@@ -89,7 +89,7 @@
         <div data-anim="hero-ctas" class="mt-8 flex flex-wrap items-center justify-center gap-4">
 
             {{-- Shop Gift Cards (primary) --}}
-            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
+            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
                 Shop Gift Cards
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3z"/>
@@ -102,7 +102,7 @@
                  dark text + zinc ring on light hero, white text + white ring on
                  dark hero. Backdrop blur stays the same; only the visible
                  contrast pieces flip. --}}
-            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[10px] bg-transparent backdrop-blur-md px-5 py-3 text-base font-semibold text-zinc-900 ring-1 ring-zinc-400 transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-zinc-500 dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
+            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-transparent backdrop-blur-md px-5 py-3 text-base font-semibold text-zinc-900 ring-1 ring-zinc-400 transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-zinc-500 dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
                 Explore eSIMs
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M6 3h8.5L19 7.5V20a1 1 0 0 1 -1 1H6a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1z"/>

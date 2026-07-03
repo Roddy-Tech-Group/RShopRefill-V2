@@ -59,11 +59,11 @@ new class extends Component
     }
 }; ?>
 
-<div class="rounded-[10px] bg-white p-4 ring-1 ring-zinc-200">
+<div class="rounded-[12px] bg-white p-4 ring-1 ring-zinc-200">
     @if ($subscribed)
         {{-- Already subscribed state --}}
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50">
                 <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                 </svg>
@@ -76,7 +76,7 @@ new class extends Component
     @else
         {{-- Subscribe CTA --}}
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-blue-100">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-100">
                 <svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
                 </svg>
@@ -96,7 +96,7 @@ new class extends Component
             wire:click="subscribe"
             wire:target="subscribe"
             wire:loading.attr="disabled"
-            class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
         >
             <svg wire:loading wire:target="subscribe" class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -121,7 +121,7 @@ new class extends Component
             </svg>
             Chat on WhatsApp
         </span>
-        <span class="inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
+        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
             CTRL <span class="opacity-70">+</span> J
         </span>
     </a>

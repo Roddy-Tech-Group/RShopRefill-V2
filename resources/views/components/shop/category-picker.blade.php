@@ -42,7 +42,7 @@
         @click="open = true"
         aria-haspopup="dialog"
         :aria-expanded="open.toString()"
-        class="flex w-full items-center justify-between gap-2 rounded-[10px] bg-[#0c1a36] px-4 py-3 text-left text-sm font-semibold text-white ring-1 ring-white/15 transition-colors hover:bg-[#1d3252]"
+        class="flex w-full items-center justify-between gap-2 rounded-[12px] bg-[#0c1a36] px-4 py-3 text-left text-sm font-semibold text-white ring-1 ring-white/15 transition-colors hover:bg-[#1d3252]"
     >
         <span class="flex min-w-0 items-center gap-2.5">
             <img src="{{ asset('assets/' . rawurlencode($current['icon'])) }}" alt="" class="h-5 w-5 shrink-0 object-contain brightness-0 invert" loading="lazy">
@@ -99,13 +99,13 @@
                         href="{{ $cat['url'] }}"
                         wire:navigate
                         @class([
-                            'flex items-center gap-3 rounded-[6px] px-3 py-3 text-sm transition-colors',
-                            'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30' => $isActive,
-                            'font-medium text-zinc-800 hover:ring-1 hover:ring-zinc-200 dark:text-zinc-200 dark:hover:ring-[#24364f]' => ! $isActive,
+                            'flex items-center gap-3 rounded-[15px] px-3 py-3 text-sm transition-colors',
+                            'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $isActive,
+                            'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! $isActive,
                         ])
                         @if ($isActive) aria-current="page" @endif
                     >
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100 dark:bg-white/10">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 dark:bg-white/10">
                             <img src="{{ asset('assets/' . rawurlencode($cat['icon'])) }}" alt="" class="h-5 w-5 object-contain dark:brightness-0 dark:invert" loading="lazy">
                         </span>
                         <span class="flex-1">{{ $cat['label'] }}</span>
@@ -132,9 +132,9 @@
                             href="{{ $item['url'] }}"
                             wire:navigate
                             @class([
-                                'flex items-center gap-3 rounded-[6px] px-3 py-2.5 text-sm transition-colors',
-                                'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30' => $item['active'] ?? false,
-                                'font-medium text-zinc-800 hover:ring-1 hover:ring-zinc-200 dark:text-zinc-200 dark:hover:ring-[#24364f]' => ! ($item['active'] ?? false),
+                                'flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm transition-colors',
+                                'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $item['active'] ?? false,
+                                'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! ($item['active'] ?? false),
                             ])
                         >
                             <span class="flex-1">{{ $item['label'] }}</span>

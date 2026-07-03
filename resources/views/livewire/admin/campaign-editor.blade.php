@@ -3,6 +3,7 @@
 use Livewire\Volt\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use App\Domain\Notification\Jobs\DispatchCampaignJob;
 use App\Models\NotificationCampaign;
 use App\Models\NotificationTemplate;
 
@@ -52,7 +53,11 @@ class extends Component {
             'category' => 'required|string',
             'pushTitle' => 'required|string|max:255',
             'pushBody' => 'required|string',
+            // Only enforce a (future) date when scheduling for later.
+            'scheduledFor' => $this->scheduleType === 'later' ? 'required|date|after:now' : 'nullable',
         ]);
+
+        $sendNow = $this->scheduleType === 'now';
 
         $campaignData = [
             'title' => $this->title,
@@ -63,8 +68,11 @@ class extends Component {
             'category' => $this->category,
             'audience_type' => $this->audience,
             'audience_filters' => $this->audience === 'all' ? [] : ['active_last_30_days' => true],
-            'status' => $this->scheduleType === 'now' ? 'scheduled' : 'draft',
-            'scheduled_at' => $this->scheduleType === 'later' && $this->scheduledFor ? $this->scheduledFor : now(),
+            // Send-now claims the campaign as 'processing' up front so the
+            // per-minute cron can never also pick it up; a scheduled send stays
+            // 'scheduled' for campaigns:dispatch to fire at the chosen time.
+            'status' => $sendNow ? 'processing' : 'scheduled',
+            'scheduled_at' => $sendNow ? now() : $this->scheduledFor,
         ];
 
         if ($this->campaign) {
@@ -75,7 +83,16 @@ class extends Component {
             $campaign = NotificationCampaign::create($campaignData);
         }
 
-        return redirect()->route('admin.campaigns')->with('success', 'Campaign saved successfully.');
+        if ($sendNow) {
+            // True send-now: hand the fan-out straight to the queue so it goes
+            // out within seconds (Horizon) rather than on the next cron tick.
+            DispatchCampaignJob::dispatch($campaign);
+
+            return redirect()->route('admin.campaigns')->with('success', 'Campaign is sending now.');
+        }
+
+        return redirect()->route('admin.campaigns')
+            ->with('success', 'Campaign scheduled for '.$campaign->scheduled_at->format('M j, Y g:i A').'.');
     }
 };
 ?>
@@ -87,7 +104,9 @@ class extends Component {
     <div class="flex flex-col gap-6">
         <div class="flex items-center justify-end gap-3">
             <flux:button href="{{ route('admin.campaigns') }}" wire:navigate variant="ghost">Cancel</flux:button>
-            <flux:button wire:click="save" variant="primary" icon="paper-airplane">Save & Schedule</flux:button>
+            <flux:button wire:click="save" variant="primary" icon="paper-airplane">
+                <span x-text="$wire.scheduleType === 'now' ? 'Send Now' : 'Schedule'">Send Now</span>
+            </flux:button>
         </div>
 
         <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -176,8 +195,8 @@ class extends Component {
                     <div class="rounded-xl bg-[#2b2b2b] p-4 text-left shadow-2xl ring-1 ring-white/10 overflow-hidden transform transition-all">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
-                                <img src="{{ asset('assets/icon-192.png') }}" class="w-4 h-4 rounded-sm" alt="RshopRefills">
-                                <span class="text-xs text-zinc-300 font-medium">RshopRefills</span>
+                                <img src="{{ asset('assets/icon-192.png') }}" class="w-4 h-4 rounded-sm" alt="{{ $siteName }}">
+                                <span class="text-xs text-zinc-300 font-medium">{{ $siteName }}</span>
                             </div>
                             <span class="text-xs text-zinc-400">{{ now()->format('h:i A') }}</span>
                         </div>

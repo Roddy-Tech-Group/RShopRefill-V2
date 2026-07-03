@@ -16,7 +16,7 @@
     data-scope="{{ $item['scope'] }}"
     data-pop="{{ $item['popular'] ? '1' : '0' }}"
     x-show="(locTab === 'all' || (locTab === 'popular' ? $el.dataset.pop === '1' : $el.dataset.scope === locTab)) && (locSearch === '' || $el.dataset.name.includes(locSearch.toLowerCase()))"
-    class="group flex items-center justify-between gap-3 rounded-[10px] bg-[#eff6ff] px-4 py-3.5 ring-1 ring-zinc-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-zinc-300 dark:ring-zinc-700/60 dark:hover:ring-zinc-600"
+    class="esim-tile group flex items-center justify-between gap-3 rounded-[12px] bg-[#eff6ff] px-4 py-3.5 ring-1 ring-zinc-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-zinc-300 dark:ring-zinc-700/60 dark:hover:ring-zinc-600"
 >
     <span class="flex min-w-0 items-center gap-3">
         @if ($item['flag'])

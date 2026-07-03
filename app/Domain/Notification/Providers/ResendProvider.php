@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notification\Providers;
 
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -11,13 +12,24 @@ class ResendProvider implements MailProviderInterface
 
     private readonly string $fromAddress;
 
-    private readonly string $fromName;
-
     public function __construct()
     {
         $this->apiKey = config('services.resend.key') ?? '';
         $this->fromAddress = config('services.resend.from_address') ?? 'noreply@rshoprefills.com';
-        $this->fromName = config('services.resend.from_name') ?? 'RshopRefills';
+    }
+
+    /**
+     * Sender display name, sourced from the admin "Email -> from name" setting
+     * so the website name on outgoing mail follows the panel. Falls back to
+     * config, then the literal brand. Read per-send (the setting is cached) so
+     * a name change applies without restarting the queue worker that holds this
+     * singleton.
+     */
+    private function fromName(): string
+    {
+        return SiteSetting::get('email.from_name')
+            ?: config('services.resend.from_name')
+            ?: 'RshopRefills';
     }
 
     public function send(string $to, string $subject, string $htmlBody, array $headers = [], array $attachments = []): array
@@ -35,8 +47,10 @@ class ResendProvider implements MailProviderInterface
             ];
         }
 
+        $fromName = $this->fromName();
+
         $body = [
-            'from' => "{$this->fromName} <{$this->fromAddress}>",
+            'from' => "{$fromName} <{$this->fromAddress}>",
             'to' => [$to],
             'subject' => $subject,
             'html' => $htmlBody,

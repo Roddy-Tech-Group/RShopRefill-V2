@@ -264,19 +264,19 @@
             {{-- Brand. Two stacked marks: the full wordmark when expanded,
                  the square favicon when collapsed (swap is CSS-driven via the
                  admin-sidebar-collapsed class on <html>). --}}
-            <a href="{{ route('admin.dashboard') }}" wire:navigate class="mr-5 -ml-1 flex flex-col rounded-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+            <a href="{{ route('admin.dashboard') }}" wire:navigate class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                 <span class="brand-full flex h-10 items-center">
                     <img
                         src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                        alt="RshopRefills"
+                        alt="{{ $siteName }}"
                         class="h-full w-auto object-contain"
                     />
                 </span>
                 <span class="brand-mark hidden w-14 flex-col items-center justify-center">
                     <img
                         src="{{ asset('assets/favicon.ico') }}"
-                        alt="RshopRefills"
-                        class="h-12 w-12 rounded-[10px] object-contain"
+                        alt="{{ $siteName }}"
+                        class="h-12 w-12 rounded-[12px] object-contain"
                     />
                     <span class="mt-0.5 text-[9px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
                 </span>
@@ -301,8 +301,8 @@
                 $adminUser = auth('admin')->user();
                 $can = fn (string $routeName) => $adminUser?->canAccessAdminRoute($routeName) ?? false;
                 $navItemClass = fn (bool $active) => $active
-                    ? 'group flex items-center gap-3 rounded-[10px] bg-zinc-200 px-3 py-3 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                    : 'group flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:hover:bg-[#0a1729] dark:hover:text-blue-400 dark:hover:font-semibold';
+                    ? 'group flex items-center gap-3 rounded-[12px] bg-zinc-200 px-3 py-3 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
+                    : 'group flex items-center gap-3 rounded-[12px] px-3 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                 $iconClass = fn (bool $active) => $active
                     ? 'h-5 w-5 shrink-0 text-black dark:text-white'
                     : 'h-5 w-5 shrink-0 text-zinc-600 transition-colors';
@@ -312,7 +312,7 @@
                 $imgIconClass = fn (bool $active) => 'h-5 w-5 shrink-0 transition';
             @endphp
 
-            <nav class="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-[10px] [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10" aria-label="Admin">
+            <nav class="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-[12px] [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10" aria-label="Admin">
                 {{-- Overview --}}
                 @php $active = $isCurrent('admin.dashboard'); @endphp
                 <a href="{{ route('admin.dashboard') }}" wire:navigate data-tip="Overview" class="{{ $navItemClass($active) }}">
@@ -328,26 +328,31 @@
                     $productPatterns = ['admin.products*', 'admin.gift-cards*', 'admin.esims*', 'admin.mobile-topups*', 'admin.bill-payments*', 'admin.flights*', 'admin.stays*'];
                     $productActive = $isCurrent(...$productPatterns);
                     $subItemClass = fn (bool $active) => $active
-                        ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                        : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#0a1729] dark:hover:text-blue-400 dark:hover:font-semibold';
+                        ? 'flex items-center rounded-[12px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
+                        : 'flex items-center rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                 @endphp
                 <div
-                    x-data="{ expanded: {{ $productActive ? 'true' : 'false' }} }"
-                    x-effect="expanded = $store.adminSidebar?.collapsed ? true : {{ $productActive ? 'true' : 'false' }}"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { expanded = false }"
+                    x-data="{
+                        open: {{ $productActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/products'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
                     class="nav-group flex flex-col gap-1"
                 >
                     <button
                         type="button"
-                        @click.stop="expanded = ! expanded"
-                        :aria-expanded="expanded.toString()"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
                         class="{{ $navItemClass($productActive) }} w-full justify-between"
                     >
                         <span class="flex items-center gap-3">
                             <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $imgIconClass($productActive) }}" loading="lazy">
                             Products
                         </span>
-                        <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $productActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $productActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
@@ -362,7 +367,7 @@
                         $isProductsRoot  = $isCurrent('admin.products') && $currentCategory === '';
                         $isCategory      = fn (string $slug) => $isCurrent('admin.products') && $currentCategory === $slug;
                     @endphp
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.products') }}" wire:navigate class="{{ $subItemClass($isProductsRoot) }}">All Products</a>
                         <a href="{{ route('admin.products', ['category' => 'gift-cards']) }}" wire:navigate class="{{ $subItemClass($isCategory('gift-cards')) }}">Gift Cards</a>
                         <a href="{{ route('admin.products', ['category' => 'esims']) }}" wire:navigate class="{{ $subItemClass($isCategory('esims')) }}">eSIMs</a>
@@ -407,15 +412,20 @@
                     $gcActive = $isCurrent('admin.gift-cards.trades*', 'admin.gift-cards.brands*', 'admin.gift-cards.rates*');
                 @endphp
                 <div
-                    x-data="{ expanded: {{ $gcActive ? 'true' : 'false' }} }"
-                    x-effect="expanded = $store.adminSidebar?.collapsed ? true : {{ $gcActive ? 'true' : 'false' }}"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { expanded = false }"
+                    x-data="{
+                        open: {{ $gcActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/gift-cards'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
                     class="nav-group flex flex-col gap-1"
                 >
                     <button
                         type="button"
-                        @click.stop="expanded = ! expanded"
-                        :aria-expanded="expanded.toString()"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
                         class="{{ $navItemClass($gcActive) }} w-full justify-between"
                     >
                         <span class="flex items-center gap-3">
@@ -425,7 +435,7 @@
                             </svg>
                             Gift Card Trading
                         </span>
-                        <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $gcActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $gcActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
@@ -433,9 +443,9 @@
                     @php
                         $subItemClass = fn (bool $active) => $active
                             ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#0a1729] dark:hover:text-blue-400 dark:hover:font-semibold';
+                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                     @endphp
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.gift-cards.trades.index') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.trades*')) }}">Trades Queue</a>
                         <a href="{{ route('admin.gift-cards.brands') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.brands*')) }}">Brands</a>
                         <a href="{{ route('admin.gift-cards.rates') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.rates*')) }}">Rates</a>
@@ -494,11 +504,16 @@
                 @if ($can('admin.content.blog'))
                 @php $contentActive = $isCurrent('admin.content.*'); @endphp
                 <div
-                    x-data="{ open: {{ $contentActive ? 'true' : 'false' }} }"
-                    {{-- Force open while collapsed (so the hover popup renders) but restore
-                         to the closed/active state when expanded — otherwise re-opening the
-                         sidebar would leave this dropdown stuck open. --}}
-                    x-effect="open = $store.adminSidebar?.collapsed ? true : {{ $contentActive ? 'true' : 'false' }}"
+                    x-data="{
+                        open: {{ $contentActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/content'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    {{-- Open state is derived from the live URL and re-synced on every
+                         wire:navigate, so a group can't stay stuck open after you move to
+                         another page. Collapsed sidebar forces open for the hover flyout. --}}
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
                     class="nav-group flex flex-col"
                 >
                     <button
@@ -522,8 +537,8 @@
                     <div x-show="open" x-collapse class="nav-submenu mt-1 ml-3 flex flex-col gap-0.5 border-l border-zinc-200 pl-3">
                         @php
                             $subItem = fn (bool $active) => $active
-                                ? 'block rounded-[10px] bg-zinc-200 px-3 py-2 text-xs font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                                : 'block rounded-[10px] px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#0a1729] dark:hover:text-blue-400 dark:hover:font-semibold';
+                                ? 'block rounded-[12px] bg-zinc-200 px-3 py-2 text-xs font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
+                                : 'block rounded-[12px] px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                         @endphp
                         <a href="{{ route('admin.content.blog') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.blog')) }}">Blog Posts</a>
                         <a href="{{ route('admin.content.press') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.press')) }}">Press Articles</a>
@@ -619,7 +634,7 @@
                 x-data
                 x-on:click="$dispatch('open-mobile-menu')"
                 aria-label="Open menu"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] transition-colors hover:bg-zinc-100 active:scale-95 lg:hidden"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] transition-colors hover:bg-zinc-100 active:scale-95 lg:hidden"
             >
                 <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-6 w-6" style="filter: brightness(0) saturate(100%);" loading="lazy">
             </button>
@@ -658,7 +673,7 @@
                     @submit.prevent="if (results.length) { window.location.href = results[0].url; }"
                     @click="$refs.search.focus()"
                     :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-400 hover:border-zinc-500 dark:border-white/10 dark:hover:border-white/20'"
-                    class="group flex items-center gap-3 cursor-text rounded-[10px] border-2 bg-white px-4 py-2 transition-all duration-200 dark:bg-[#162a4a]"
+                    class="group flex items-center gap-3 cursor-text rounded-[12px] border-2 bg-white px-4 py-2 transition-all duration-200 dark:bg-[#162a4a]"
                 >
                     <svg class="h-5 w-5 shrink-0 text-zinc-900 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -680,10 +695,10 @@
                          button once the user starts typing. Matches the dashboard
                          search style: neutral zinc surround on light, deep navy
                          in dark mode. --}}
-                    <span x-show="query.length === 0" class="hidden items-center gap-1 rounded-[10px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 sm:inline-flex dark:border-white/10 dark:bg-[#0c1a36] dark:text-zinc-400" aria-hidden="true">
+                    <span x-show="query.length === 0" class="hidden items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 sm:inline-flex dark:border-white/10 dark:bg-[#0c1a36] dark:text-zinc-400" aria-hidden="true">
                         CTRL <span class="text-zinc-600 dark:text-zinc-500">+</span> K
                     </span>
-                    <button type="button" x-show="query.length > 0" @click="clear()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[10px] bg-zinc-200 transition-colors hover:bg-zinc-300 dark:bg-transparent dark:hover:bg-white/15" aria-label="Clear">
+                    <button type="button" x-show="query.length > 0" @click="clear()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300 dark:bg-transparent dark:hover:bg-white/15" aria-label="Clear">
                         <svg class="h-3 w-3 text-zinc-600 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
@@ -698,7 +713,7 @@
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
                     style="display:none;"
-                    class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-[10px] bg-white/65 ring-1 ring-white/60 backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-white/15"
+                    class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-[12px] bg-white/65 ring-1 ring-white/60 backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-white/15"
                     style="box-shadow: 0 24px 50px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.55);"
                 >
                     <div x-show="loading" class="flex items-center gap-2 px-4 py-3 text-[12px] text-zinc-500 dark:text-zinc-400">
@@ -715,17 +730,17 @@
                                 <a
                                     :href="row.url"
                                     wire:navigate
-                                    class="block rounded-[10px] px-3 py-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                                    class="block rounded-[12px] px-3 py-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-500/10"
                                 >
                                     {{-- Customer hit — avatar + name + email, links straight to the customer page. --}}
                                     <template x-if="row.type === 'customer'">
                                         <span class="flex items-center gap-3">
-                                            <img :src="row.avatar" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
+                                            <img :src="row.avatar" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
                                             <span class="min-w-0 flex-1 leading-tight">
                                                 <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.name"></span>
                                                 <span class="block truncate text-[11px] text-zinc-500 dark:text-zinc-400" x-text="row.email"></span>
                                             </span>
-                                            <span class="shrink-0 rounded-[10px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">Customer</span>
+                                            <span class="shrink-0 rounded-[12px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">Customer</span>
                                         </span>
                                     </template>
 
@@ -733,10 +748,10 @@
                                     <template x-if="row.type === 'product'">
                                         <span class="flex items-center gap-3">
                                             <template x-if="row.logo">
-                                                <img :src="row.logo" alt="" class="h-9 w-9 shrink-0 rounded-[10px] object-contain bg-white ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
+                                                <img :src="row.logo" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-contain bg-white ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
                                             </template>
                                             <template x-if="! row.logo">
-                                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200" x-text="(row.brand || row.name || row.sku || '').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase() || '—'"></span>
+                                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200" x-text="(row.brand || row.name || row.sku || '').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase() || '—'"></span>
                                             </template>
                                             <span class="min-w-0 flex-1 leading-tight">
                                                 <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.brand || row.name || row.sku"></span>
@@ -810,7 +825,7 @@
 
             {{-- Theme toggle — admin's own light/dark/system control, saved per
                  admin account and kept separate from the customer side. --}}
-            <x-theme-toggle class="h-11 w-11 rounded-[10px] text-zinc-600 hover:bg-blue-100" />
+            <x-theme-toggle class="h-11 w-11 rounded-[12px] text-zinc-600 hover:bg-blue-100" />
 
             {{-- Extra Dark now lives inside the theme toggle's popup (the
                  component renders an "Extra dark" row), so no separate admin
@@ -863,15 +878,15 @@
 
                     @php $iconBlack = 'filter: brightness(0) saturate(100%);'; @endphp
                     <div class="p-1.5">
-                        <a href="{{ route('admin.account') }}" wire:navigate class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('admin.account') }}" wire:navigate class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('user.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Account information
                         </a>
-                        <a href="{{ route('admin.account-activity') }}" wire:navigate class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('admin.account-activity') }}" wire:navigate class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('account avtivities 3.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Account activity
                         </a>
-                        <a href="{{ route('admin.notifications') }}" wire:navigate class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('admin.notifications') }}" wire:navigate class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Notifications Log
                         </a>
@@ -880,7 +895,7 @@
                     <div class="border-t border-zinc-100 p-1.5">
                         <form method="POST" action="{{ route('admin.logout') }}" class="w-full">
                             @csrf
-                            <button type="submit" class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
+                            <button type="submit" class="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
                                 <x-ui.logout-icon class="h-5 w-5" />
                                 Log Out
                             </button>
@@ -890,12 +905,12 @@
             </div>
         </flux:header>
 
-        {{-- Content area with rounded-[10px] top-left corner. Padding is provided here so pages just provide their content.
+        {{-- Content area with rounded-[12px] top-left corner. Padding is provided here so pages just provide their content.
              Inner uses flex-column + min-h-full so the footer always pins to the bottom of the viewport, even on
              short pages — same footer renders on every admin page since it lives in this layout.
-             The page bg lives on `<flux:main>` itself so the rounded-[10px] curve never "straightens" on scroll — the
+             The page bg lives on `<flux:main>` itself so the rounded-[12px] curve never "straightens" on scroll — the
              curve is a real edge between two same-colour panels, not an outline that can be clipped. --}}
-        <flux:main class="!p-0 bg-[#eff6ff]">
+        <flux:main class="!p-0 bg-[#eff6ff] dark:bg-[#0c1a36]">
             <div class="flex min-h-full flex-col rounded-tl-[15px] rounded-tr-[15px] bg-[#eff6ff] p-3 pb-2 sm:p-4 sm:pb-2 lg:rounded-tr-none lg:p-6 lg:pb-2 dark:bg-[#0c1a36]">
                 <div class="w-full flex-1">
                     {{-- Page heading — moved out of the top nav bar into the page itself. --}}
@@ -919,7 +934,7 @@
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <span>version 2.0.0</span>
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <span>©RshopRefills {{ date('Y') }}</span>
+                    <span>©{{ $siteName }} {{ date('Y') }}</span>
                 </footer>
             </div>
         </flux:main>
@@ -983,7 +998,7 @@
                 aria-labelledby="admin-mobile-menu-title"
             >
                 <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[10px] bg-zinc-300"></span>
+                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300"></span>
                 </div>
 
                 <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
@@ -998,9 +1013,9 @@
                                 @if ($item['href'] !== '#') wire:navigate @endif
                                 @click="menuOpen = false"
                                 style="--i: {{ $i }}"
-                                class="group flex flex-col items-center justify-center gap-2 rounded-[10px] bg-zinc-100 px-2 py-3 text-center transition-transform duration-200 active:scale-95"
+                                class="group flex flex-col items-center justify-center gap-2 rounded-[12px] bg-zinc-100 px-2 py-3 text-center transition-transform duration-200 active:scale-95"
                             >
-                                <span class="flex h-12 w-12 items-center justify-center rounded-[10px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
+                                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
                                     <img src="{{ asset('assets/' . rawurlencode($item['icon'])) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
                                 </span>
                                 <span class="text-[11px] font-semibold leading-tight text-zinc-900">{{ $item['label'] }}</span>
@@ -1012,7 +1027,7 @@
                         @csrf
                         <button
                             type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-[10px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                            class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
                         >
                             <x-ui.logout-icon class="h-4 w-4" />
                             Log out

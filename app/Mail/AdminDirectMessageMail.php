@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,9 +32,10 @@ class AdminDirectMessageMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
         $subject = $this->type === 'warning'
-            ? '⚠️ Account warning from RshopRefills'
-            : 'A message from RshopRefills';
+            ? '⚠️ Account warning from '.$brand
+            : 'A message from '.$brand;
 
         return new Envelope(subject: $subject);
     }

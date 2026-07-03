@@ -3,6 +3,7 @@
 namespace App\Domain\Notification\Mail;
 
 use App\Models\Order;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -21,8 +22,10 @@ class OrderPlacedMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
+
         return new Envelope(
-            subject: "Your RshopRefills Order confirmation - #{$this->order->order_number}",
+            subject: "Your {$brand} Order confirmation - #{$this->order->order_number}",
         );
     }
 

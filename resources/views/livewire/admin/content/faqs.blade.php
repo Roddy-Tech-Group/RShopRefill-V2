@@ -157,25 +157,25 @@ class extends Component {
             <h1 class="text-2xl font-bold text-zinc-900">FAQs</h1>
             <p class="mt-1 text-sm text-zinc-600">Help Center questions, grouped by topic. Shown at <a href="/help" target="_blank" class="text-blue-600 hover:underline">/help</a>.</p>
         </div>
-        <button wire:click="newFaq" type="button" class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+        <button wire:click="newFaq" type="button" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
             New FAQ
         </button>
     </header>
 
     @if (session('status'))
-        <div class="mb-4 rounded-[10px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">{{ session('status') }}</div>
+        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">{{ session('status') }}</div>
     @endif
 
     @forelse ($this->faqs as $topic => $items)
-        <section class="mb-6 overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <section class="mb-6 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
             {{-- Header pill --}}
-            <div class="mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+            <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $topic }}</h2>
             </div>
             <ul class="divide-inset">
                 @foreach ($items as $faq)
-                    <li class="group relative mx-3 flex items-start justify-between gap-4 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[10px] dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
+                    <li class="group relative mx-3 flex items-start justify-between gap-4 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-zinc-900">{{ $faq->question }}</p>
                             <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">{{ $faq->answer }}</p>
@@ -197,8 +197,8 @@ class extends Component {
             </ul>
         </section>
     @empty
-        <div class="rounded-[10px] border-[1.5px] border-white bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
-            <p class="text-sm text-zinc-600 dark:text-zinc-400">No FAQs yet. Click "New FAQ" to create one, or run <code class="rounded-[10px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan db:seed --class=FaqSeeder</code>.</p>
+        <div class="rounded-[12px] border-[1.5px] border-white bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">No FAQs yet. Click "New FAQ" to create one, or run <code class="rounded-[12px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan db:seed --class=FaqSeeder</code>.</p>
         </div>
     @endforelse
 
@@ -206,10 +206,10 @@ class extends Component {
     @if ($showForm)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="$set('showForm', false)" class="absolute inset-0 bg-zinc-900/40"></div>
-            <form wire:submit="save" class="relative w-full max-w-xl overflow-hidden rounded-[10px] bg-white shadow-2xl">
+            <form wire:submit="save" class="relative w-full max-w-xl overflow-hidden rounded-[12px] bg-white shadow-2xl">
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
                     <h3 class="text-sm font-bold text-zinc-900">{{ $editingId ? 'Edit FAQ' : 'New FAQ' }}</h3>
-                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
+                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -220,14 +220,14 @@ class extends Component {
                         {{-- Mode toggle: pick an existing topic or define a new one.
                              Disabled when there are no existing topics (first-run). --}}
                         @if (! empty($this->existingTopics))
-                            <div class="mt-1.5 inline-flex items-center rounded-[10px] bg-zinc-100 p-1" role="tablist" aria-label="Topic source">
+                            <div class="mt-1.5 inline-flex items-center rounded-[12px] bg-zinc-100 p-1" role="tablist" aria-label="Topic source">
                                 <button
                                     type="button"
                                     wire:click="setTopicMode('existing')"
                                     role="tab"
                                     aria-selected="{{ $topicMode === 'existing' ? 'true' : 'false' }}"
                                     @class([
-                                        'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                                        'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                                         'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' => $topicMode === 'existing',
                                         'text-zinc-600 hover:text-zinc-900' => $topicMode !== 'existing',
                                     ])
@@ -238,7 +238,7 @@ class extends Component {
                                     role="tab"
                                     aria-selected="{{ $topicMode === 'new' ? 'true' : 'false' }}"
                                     @class([
-                                        'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                                        'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                                         'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' => $topicMode === 'new',
                                         'text-zinc-600 hover:text-zinc-900' => $topicMode !== 'new',
                                     ])
@@ -250,24 +250,24 @@ class extends Component {
                             @php $topicChoices = array_combine($this->existingTopics, $this->existingTopics); @endphp
                             <x-admin.select wire:model="topic" :options="$topicChoices" />
                         @else
-                            <input wire:model="topic" type="text" placeholder="e.g. Orders and delivery" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="topic" type="text" placeholder="e.g. Orders and delivery" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @endif
                         @error('topic') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Question</label>
-                        <input wire:model="question" type="text" placeholder="What does this answer?" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                        <input wire:model="question" type="text" placeholder="What does this answer?" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @error('question') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Answer</label>
-                        <textarea wire:model="answer" rows="5" placeholder="Write the answer the customer will see." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
+                        <textarea wire:model="answer" rows="5" placeholder="Write the answer the customer will see." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
                         @error('answer') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sort order</label>
-                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                             @error('sortOrder') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <label class="flex items-end gap-2 pb-2">
@@ -277,8 +277,8 @@ class extends Component {
                     </div>
                 </div>
                 <div class="flex items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3">
-                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
-                    <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create FAQ' }}</button>
+                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
+                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create FAQ' }}</button>
                 </div>
             </form>
         </div>

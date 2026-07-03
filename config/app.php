@@ -56,6 +56,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Canonical Host & Alternate Hosts
+    |--------------------------------------------------------------------------
+    |
+    | The single host every request should live on (defaults to the APP_URL
+    | host). Any request arriving on one of the alternate hosts is 301-redirected
+    | to the canonical host by RedirectAlternateHosts, preserving the path so all
+    | traffic and search-ranking signals consolidate onto one domain.
+    |
+    | Dormant until alternate_hosts is non-empty. To fold a secondary domain in
+    | (e.g. the plural rshoprefills.com onto www.rshoprefill.com), you must own
+    | that domain and point its DNS here first, then set:
+    |   APP_CANONICAL_HOST=www.rshoprefill.com
+    |   APP_ALTERNATE_HOSTS=rshoprefills.com,www.rshoprefills.com
+    |
+    */
+
+    'canonical_host' => env('APP_CANONICAL_HOST') ?: parse_url((string) env('APP_URL', ''), PHP_URL_HOST),
+
+    'alternate_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('APP_ALTERNATE_HOSTS', ''))
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
@@ -65,7 +90,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Africa/Douala',
 
     /*
     |--------------------------------------------------------------------------

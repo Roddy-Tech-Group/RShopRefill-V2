@@ -69,4 +69,21 @@ class PaymentSessionTransitionTest extends TestCase
 
         $this->assertSame('confirmed', $session->fresh()->status);
     }
+
+    /**
+     * Every state PaymentSessionService::expire() treats as expirable must be
+     * permitted to reach 'expired' in the transition matrix - otherwise
+     * ExpireStalePaymentSessionsJob throws on it every run (the awaiting_method
+     * / awaiting_customer_action prod-log flood this regression-guards).
+     */
+    public function test_every_expirable_state_can_transition_to_expired(): void
+    {
+        foreach (['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action'] as $state) {
+            $session = $this->sessionWithStatus($state);
+
+            $session->transitionTo('expired');
+
+            $this->assertSame('expired', $session->fresh()->status, "Could not expire from {$state}");
+        }
+    }
 }

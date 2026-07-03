@@ -173,14 +173,14 @@ class extends Component {
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">Reviews</h1>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Customer reviews shown on the homepage carousel and the public <a href="/reviews" target="_blank" class="text-blue-600 hover:underline dark:text-blue-300">reviews page</a>.</p>
         </div>
-        <button wire:click="newReview" type="button" class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+        <button wire:click="newReview" type="button" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
             New review
         </button>
     </header>
 
     @if (session('status'))
-        <div class="mb-4 rounded-[10px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
+        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
     @endif
 
     {{-- Aggregate stats — same KPI strip pattern used across every admin
@@ -192,7 +192,7 @@ class extends Component {
             ['label' => 'Since',        'value' => $this->aggregate['since'],                             'dot' => 'bg-emerald-500'],
             ['label' => 'Source',       'value' => $this->aggregate['source'],                            'dot' => 'bg-fuchsia-500'],
         ] as $stat)
-            <div class="rounded-[10px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="rounded-[12px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
                 <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                     <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                     {{ $stat['label'] }}
@@ -211,7 +211,7 @@ class extends Component {
                 type="search"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search by customer name or review text"
-                class="w-full rounded-[10px] border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-600 dark:bg-[#0c1a36] dark:text-white dark:placeholder:text-zinc-500"
+                class="w-full rounded-[12px] border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-600 dark:bg-[#0c1a36] dark:text-white dark:placeholder:text-zinc-500"
             >
         </div>
         @if (trim($this->search) !== '')
@@ -220,7 +220,7 @@ class extends Component {
         @endif
     </div>
 
-    <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
@@ -287,10 +287,10 @@ class extends Component {
     @if ($showForm)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="$set('showForm', false)" class="absolute inset-0 bg-zinc-900/40"></div>
-            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-xl overflow-hidden rounded-[10px] bg-white shadow-2xl flex flex-col">
+            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-xl overflow-hidden rounded-[12px] bg-white shadow-2xl flex flex-col">
                 <div class="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
                     <h3 class="text-sm font-bold text-zinc-900">{{ $editingId ? 'Edit review' : 'New review' }}</h3>
-                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
+                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -298,17 +298,17 @@ class extends Component {
                     <div class="grid grid-cols-3 gap-4">
                         <div class="col-span-2">
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Author name</label>
-                            <input wire:model="authorName" type="text" placeholder="e.g. Sarah J." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="authorName" type="text" placeholder="e.g. Sarah J." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                             @error('authorName') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Initials</label>
-                            <input wire:model="initials" type="text" maxlength="4" placeholder="auto" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm uppercase text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="initials" type="text" maxlength="4" placeholder="auto" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm uppercase text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         </div>
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Body</label>
-                        <textarea wire:model="body" rows="4" placeholder="The review text the customer left." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
+                        <textarea wire:model="body" rows="4" placeholder="The review text the customer left." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
                         @error('body') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-3 gap-4">
@@ -325,14 +325,14 @@ class extends Component {
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Reviewed on</label>
-                            <input wire:model="reviewedAt" type="date" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="reviewedAt" type="date" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                             @error('reviewedAt') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sort order</label>
-                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         </div>
                         <label class="flex items-end gap-2 pb-2">
                             <input wire:model="isPublished" type="checkbox" class="h-4 w-4 cursor-pointer accent-blue-600">
@@ -341,8 +341,8 @@ class extends Component {
                     </div>
                 </div>
                 <div class="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3">
-                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
-                    <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create review' }}</button>
+                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
+                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create review' }}</button>
                 </div>
             </form>
         </div>

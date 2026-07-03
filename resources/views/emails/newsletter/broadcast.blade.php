@@ -19,7 +19,7 @@
     @endif
 
     <p style="margin: 32px 0 0 0; padding-top: 24px; border-top: 1px solid #e4e4e7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; line-height: 1.6; color: #71717a;">
-        You received this email because you subscribed to RshopRefills updates.
+        You received this email because you subscribed to {{ $siteName }} updates.
         Don't want these anymore?
         <a href="{{ url('/') }}" style="color: #2563eb;">Visit the site</a> to manage your preferences.
     </p>

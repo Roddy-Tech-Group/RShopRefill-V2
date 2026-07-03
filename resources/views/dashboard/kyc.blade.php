@@ -59,10 +59,10 @@
 
         {{-- ─── Current status ─── --}}
         <section>
-            <div class="rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
+            <div class="rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-blue-50">
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-blue-50">
                             <img src="{{ asset('assets/customer.svg') }}" alt="" class="h-6 w-6" style="{{ $icon }}">
                         </span>
                         <div>
@@ -105,9 +105,9 @@
 
         {{-- Email verification --}}
         <section>
-            <div class="flex items-center justify-between gap-4 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+            <div class="flex items-center justify-between gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
                 <div class="flex items-center gap-4">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] {{ $emailVerified ? 'bg-emerald-50' : 'bg-amber-50' }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] {{ $emailVerified ? 'bg-emerald-50' : 'bg-amber-50' }}">
                         <svg class="h-5 w-5 {{ $emailVerified ? 'text-emerald-600' : 'text-amber-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
                         </svg>
@@ -121,7 +121,7 @@
                     <span class="shrink-0 rounded-[5px] bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">Done</span>
                 @else
                     {{-- Backend hook: point this at the email verification notice / resend route. --}}
-                    <a href="{{ route('verification.notice') }}" wire:navigate class="shrink-0 rounded-[10px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    <a href="{{ route('verification.notice') }}" wire:navigate class="shrink-0 rounded-[12px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                         Verify email
                     </a>
                 @endif
@@ -131,8 +131,8 @@
         {{-- ID verification (KYC) --}}
         <section>
             @if ($kycStatus === 'verified')
-                <div class="flex items-center gap-4 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50">
+                <div class="flex items-center gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50">
                         <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                         </svg>
@@ -144,8 +144,8 @@
                 </div>
 
             @elseif ($kycStatus === 'pending')
-                <div class="mt-3 flex items-center gap-4 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-amber-50">
+                <div class="mt-3 flex items-center gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-amber-50">
                         <svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -159,7 +159,7 @@
             @else
                 {{-- 'unsubmitted' or 'rejected' — show the submission form. --}}
                 @if ($kycStatus === 'rejected')
-                    <div class="mt-3 flex items-start gap-3 rounded-[10px] bg-red-50 px-4 py-3">
+                    <div class="mt-3 flex items-start gap-3 rounded-[12px] bg-red-50 px-4 py-3">
                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                         </svg>
@@ -171,12 +171,12 @@
                     method="POST"
                     action="{{ route('kyc.submit') }}"
                     enctype="multipart/form-data"
-                    class="mt-3 rounded-[10px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6"
+                    class="mt-3 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6"
                 >
                     @csrf
 
                     @if ($errors->any())
-                        <div class="mb-4 rounded-[10px] bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+                        <div class="mb-4 rounded-[12px] bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
                             <p class="font-semibold">Please fix the following:</p>
                             <ul class="mt-1 list-disc pl-5 text-xs">
                                 @foreach ($errors->all() as $err)
@@ -196,7 +196,7 @@
                                 type="text"
                                 value="{{ $user?->name }}"
                                 placeholder="As shown on your ID"
-                                class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                             >
                         </div>
 
@@ -214,7 +214,7 @@
                                     type="button"
                                     @click="open = !open"
                                     :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
                                 >
                                     <span :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="displayValue || 'Select your date of birth'"></span>
                                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
@@ -228,24 +228,24 @@
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-[300px] rounded-[10px] bg-[#eff6ff] p-3 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
+                                    class="absolute left-0 z-30 mt-1 w-[300px] rounded-[12px] bg-[#eff6ff] p-3 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
                                 >
                                     {{-- Month / year stepper --}}
                                     <div class="flex items-center justify-between">
                                         <div class="flex gap-0.5">
-                                            <button type="button" @click="shiftYear(-1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous year">
+                                            <button type="button" @click="shiftYear(-1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous year">
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5M11.25 19.5l-7.5-7.5 7.5-7.5"/></svg>
                                             </button>
-                                            <button type="button" @click="shiftMonth(-1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous month">
+                                            <button type="button" @click="shiftMonth(-1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous month">
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
                                             </button>
                                         </div>
                                         <span class="text-sm font-bold text-zinc-900" x-text="monthLabel"></span>
                                         <div class="flex gap-0.5">
-                                            <button type="button" @click="shiftMonth(1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next month">
+                                            <button type="button" @click="shiftMonth(1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next month">
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                                             </button>
-                                            <button type="button" @click="shiftYear(1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next year">
+                                            <button type="button" @click="shiftYear(1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next year">
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 4.5l7.5 7.5-7.5 7.5M12.75 4.5l7.5 7.5-7.5 7.5"/></svg>
                                             </button>
                                         </div>
@@ -269,7 +269,7 @@
                                                     'cursor-not-allowed text-zinc-300': cell && isFuture(cell),
                                                     'text-zinc-700 hover:bg-zinc-100': cell && !isSelected(cell) && !isFuture(cell),
                                                 }"
-                                                class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm transition-colors"
+                                                class="flex h-8 w-8 items-center justify-center rounded-[12px] text-sm transition-colors"
                                                 x-text="cell"
                                             ></button>
                                         </template>
@@ -292,7 +292,7 @@
                                     type="button"
                                     @click="toggle()"
                                     :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
                                 >
                                     <span :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="selectedLabel || 'Select a country'"></span>
                                     <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -306,7 +306,7 @@
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[10px] bg-[#eff6ff] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
+                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
                                 >
                                     <div class="border-b border-zinc-100 p-2">
                                         <input
@@ -314,7 +314,7 @@
                                             x-model="query"
                                             type="text"
                                             placeholder="Search countries"
-                                            class="w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                            class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                                         >
                                     </div>
                                     <ul class="max-h-52 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -324,7 +324,7 @@
                                                     type="button"
                                                     @click="pick(opt.value)"
                                                     :class="opt.value === value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-sm transition-colors"
+                                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
                                                 >
                                                     <span x-text="opt.label"></span>
                                                     <svg x-show="opt.value === value" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -353,7 +353,7 @@
                                     type="button"
                                     @click="toggle()"
                                     :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
                                 >
                                     <span class="text-zinc-900" x-text="selectedLabel"></span>
                                     <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -367,14 +367,14 @@
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[10px] bg-[#eff6ff] p-1 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
+                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[12px] bg-[#eff6ff] p-1 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
                                 >
                                     <template x-for="opt in options" :key="opt.value">
                                         <button
                                             type="button"
                                             @click="pick(opt.value)"
                                             :class="opt.value === value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                            class="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-sm transition-colors"
+                                            class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
                                         >
                                             <span x-text="opt.label"></span>
                                             <svg x-show="opt.value === value" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -394,7 +394,7 @@
                                 name="kyc_document_number"
                                 type="text"
                                 placeholder="The number printed on your document"
-                                class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                             >
                         </div>
                     </div>
@@ -412,7 +412,7 @@
                             <div x-data="{ fileName: '' }">
                                 <label
                                     for="{{ $field }}"
-                                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[10px] border-2 border-dashed border-zinc-200 bg-zinc-50 px-3 py-5 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
+                                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-zinc-200 bg-zinc-50 px-3 py-5 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
                                 >
                                     <svg class="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
@@ -432,14 +432,14 @@
                         @endforeach
                     </div>
 
-                    <div class="mt-5 flex items-start gap-2 rounded-[10px] bg-zinc-50 px-3 py-2.5">
+                    <div class="mt-5 flex items-start gap-2 rounded-[12px] bg-zinc-50 px-3 py-2.5">
                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
                         </svg>
                         <p class="text-xs text-zinc-600">Your documents are used only to verify your identity and are stored securely.</p>
                     </div>
 
-                    <button type="submit" class="mt-4 w-full rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    <button type="submit" class="mt-4 w-full rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                         {{ $kycStatus === 'rejected' ? 'Resubmit for verification' : 'Submit for verification' }}
                     </button>
                 </form>
@@ -454,7 +454,7 @@
             <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {{-- Standard limits --}}
                 <div @class([
-                    'rounded-[10px] p-5 ring-1 transition-colors',
+                    'rounded-[12px] p-5 ring-1 transition-colors',
                     'bg-blue-600 text-white ring-blue-600' => ! $kycVerified,
                     'bg-white text-zinc-900 ring-zinc-100' => $kycVerified,
                 ])>
@@ -477,7 +477,7 @@
 
                 {{-- KYC limits --}}
                 <div @class([
-                    'rounded-[10px] p-5 ring-1 transition-colors',
+                    'rounded-[12px] p-5 ring-1 transition-colors',
                     'bg-blue-600 text-white ring-blue-600' => $kycVerified,
                     'bg-white text-zinc-900 ring-zinc-100' => ! $kycVerified,
                 ])>

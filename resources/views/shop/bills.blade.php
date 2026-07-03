@@ -130,7 +130,7 @@
     );
 @endphp
 
-<x-shop.layout :title="'Bill Payments | RshopRefills'">
+<x-shop.layout :title="'Bill Payments | '.$siteName">
 
     <section class="min-h-full bg-zinc-100">
         <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
@@ -164,7 +164,7 @@
                         </div>
 
                         {{-- Sort selector --}}
-                        <div class="inline-flex shrink-0 items-center rounded-[10px] bg-zinc-100 p-1 sm:justify-self-end" role="tablist" aria-label="Sort billers">
+                        <div class="inline-flex shrink-0 items-center rounded-[12px] bg-zinc-100 p-1 sm:justify-self-end" role="tablist" aria-label="Sort billers">
                             @foreach ([
                                 ['value' => 'popular',   'label' => 'Popularity'],
                                 ['value' => 'name-asc',  'label' => 'A → Z'],
@@ -175,7 +175,7 @@
                                     wire:navigate
                                     role="tab"
                                     aria-selected="{{ $sort === $opt['value'] ? 'true' : 'false' }}"
-                                    class="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
+                                    class="inline-flex items-center justify-center rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
                                 >
                                     {{ $opt['label'] }}
                                 </a>
@@ -190,7 +190,7 @@
                                 <a
                                     href="{{ $filterUrl(['subcategory' => null]) }}"
                                     wire:navigate
-                                    class="inline-flex shrink-0 items-center rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                    class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                 >
                                     All billers
                                 </a>
@@ -198,7 +198,7 @@
                                     <a
                                         href="{{ $filterUrl(['subcategory' => $s->slug]) }}"
                                         wire:navigate
-                                        class="inline-flex shrink-0 items-center rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                        class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                     >
                                         {{ $s->name }}
                                     </a>
@@ -243,7 +243,7 @@
                                                 @endif
 
                                                 @if ($isOut)
-                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-[10px] bg-zinc-900/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-[12px] bg-zinc-900/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
                                                         Unavailable
                                                     </span>
                                                 @elseif ($product->is_popular)
@@ -271,7 +271,7 @@
                             </ul>
 
                         @else
-                            <div class="rounded-[10px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
+                            <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
                                 <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
                                 @if ($search !== '' || $countryFiltered || $sub !== '')
                                     <p class="mt-4 text-base font-semibold text-zinc-900">No billers match these filters</p>

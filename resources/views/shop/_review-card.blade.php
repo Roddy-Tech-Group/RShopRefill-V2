@@ -30,7 +30,7 @@
 
     <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100 text-sm font-bold text-zinc-600 dark:bg-[#26416b] dark:text-zinc-200">{{ $review->initials }}</span>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 text-sm font-bold text-zinc-600 dark:bg-[#26416b] dark:text-zinc-200">{{ $review->initials }}</span>
             <div class="min-w-0 leading-tight">
                 <p class="flex items-center gap-1 text-sm font-semibold text-zinc-900 dark:text-white">
                     <span class="truncate">{{ $review->author_name }}</span>

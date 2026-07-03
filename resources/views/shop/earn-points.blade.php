@@ -9,7 +9,7 @@
     ];
 @endphp
 
-<x-layouts.app.header :title="'Earn Points | RshopRefills'">
+<x-layouts.app.header :title="'Earn Points | '.$siteName">
 
     @unless ($rcoinEnabled)
         {{-- Engine is off. Show a single hero explaining the programme is
@@ -24,7 +24,7 @@
                     The Rcoin earning programme is temporarily off. Any Rcoin already in your wallet stays yours and can still be used at checkout when the programme resumes.
                 </p>
                 <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    <a href="{{ route('home') }}" class="inline-flex items-center justify-center rounded-[10px] bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Back to home</a>
+                    <a href="{{ route('home') }}" class="inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Back to home</a>
                 </div>
             </div>
         </section>
@@ -48,8 +48,8 @@
 
         <div class="mt-9 grid grid-cols-1 gap-5 sm:grid-cols-3">
             @foreach ($ways as $i => $way)
-                <div class="rounded-[10px] bg-white p-6 text-center ring-1 ring-zinc-100">
-                    <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
+                <div class="rounded-[12px] bg-white p-6 text-center ring-1 ring-zinc-100">
+                    <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
                         <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $way['path'] }}"/></svg>
                     </span>
                     <p class="mt-4 text-xs font-bold uppercase tracking-wider text-blue-600">Step {{ $i + 1 }}</p>
@@ -60,7 +60,7 @@
         </div>
 
         {{-- Earn-rate highlight --}}
-        <div class="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+        <div class="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
             <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
             <div>
                 <p class="text-sm font-bold text-blue-700">Earn as you spend</p>

@@ -8,6 +8,7 @@ use App\Models\GiftCardRate;
 use App\Domain\GiftCardTrading\Services\TradeSubmissionService;
 use App\Domain\GiftCardTrading\Services\RateEngine;
 use App\Models\BankAccount;
+use Illuminate\Validation\Rule;
 
 new
 #[Layout('components.layouts.dashboard')]
@@ -214,7 +215,14 @@ class extends Component {
             'rate_id' => 'required|exists:gift_card_rates,id',
             'declared_value' => 'required|numeric|min:1',
             'payout_method' => 'required|in:wallet,bank',
-            'bank_account_id' => 'required_if:payout_method,bank',
+            // For a bank payout the account must exist AND belong to this user - stops a
+            // tampered bank_account_id from redirecting the payout to someone else.
+            'bank_account_id' => [
+                'required_if:payout_method,bank',
+                Rule::when($this->payout_method === 'bank', [
+                    Rule::exists('bank_accounts', 'id')->where('user_id', auth()->id()),
+                ]),
+            ],
             'code_pin' => 'required|string',
             'card_image' => 'required|image|max:5120', // 5MB max
             'receipt_image' => 'nullable|image|max:5120',
@@ -312,7 +320,7 @@ class extends Component {
     <form wire:submit="submitTrade" class="mt-6 flex flex-col gap-6">
         
         {{-- Card Selection --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+        <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-6 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
             <h3 class="mb-4 text-base font-semibold text-zinc-900 dark:text-white">1. Card Details</h3>
             
             <div class="flex flex-col gap-4">
@@ -343,7 +351,7 @@ class extends Component {
                 />
 
                 @if($rate_id && $declared_value)
-                    <div class="mt-2 rounded-lg bg-blue-50 p-4 dark:bg-blue-500/10">
+                    <div class="mt-2 rounded-[12px] bg-blue-50 p-4 dark:bg-blue-500/10">
                         <div class="flex items-center justify-between">
                             <span class="text-sm font-medium text-blue-900 dark:text-blue-300">You will receive:</span>
                             <span class="text-2xl font-bold text-blue-700 dark:text-blue-400">
@@ -356,7 +364,7 @@ class extends Component {
         </div>
 
         {{-- E-Code / PIN --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+        <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-6 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
             <h3 class="mb-4 text-base font-semibold text-zinc-900 dark:text-white">2. Card Code / PIN</h3>
             <p class="mb-4 text-sm text-zinc-500">Enter the redemption code or PIN exactly as it appears on the card.</p>
             
@@ -364,7 +372,7 @@ class extends Component {
         </div>
 
         {{-- Image Uploads --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+        <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-6 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
             <h3 class="mb-4 text-base font-semibold text-zinc-900 dark:text-white">3. Upload Image</h3>
             <p class="mb-4 text-sm text-zinc-500">Upload a clear image of the gift card showing the scratched code.</p>
             
@@ -412,7 +420,7 @@ class extends Component {
         </div>
 
         {{-- Payout Details --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900/50" x-data="{ method: @entangle('payout_method') }">
+        <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-6 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none" x-data="{ method: @entangle('payout_method') }">
             <h3 class="mb-4 text-base font-semibold text-zinc-900 dark:text-white">4. How do you want to be paid?</h3>
             
             <div class="flex flex-col gap-4">
@@ -485,16 +493,16 @@ class extends Component {
                         }" @click.away="open = false" class="relative w-full">
                             <flux:label>Select Bank / Network</flux:label>
                             
-                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between mt-1 px-3 py-2 border rounded-lg text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between mt-1 px-3 py-2 border rounded-[12px] text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
                                 <span x-text="selectedBankName"></span>
                                 <svg class="h-5 w-5 text-zinc-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                                 </svg>
                             </button>
                             
-                            <div x-show="open" x-transition.opacity class="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg" style="display: none;">
+                            <div x-show="open" x-transition.opacity class="absolute z-50 w-full mt-1 bg-[#eff6ff] border border-zinc-200 dark:border-zinc-700 rounded-[12px] shadow-lg" style="display: none;">
                                 <div class="p-2 border-b border-zinc-200 dark:border-zinc-700">
-                                    <input type="text" x-model="search" placeholder="Search banks..." class="w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                                    <input type="text" x-model="search" placeholder="Search banks..." class="w-full px-3 py-1.5 text-sm border rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
                                 </div>
                                 <ul class="max-h-60 overflow-y-auto py-1 text-sm text-zinc-700 dark:text-zinc-300">
                                     <template x-for="bank in filteredBanks" :key="bank.code">
@@ -525,7 +533,7 @@ class extends Component {
                 @elseif($manual_name_entry)
                     <flux:input wire:model="resolved_account_name" label="Account Name" placeholder="Enter the account holder's name" required />
                 @elseif($resolved_account_name)
-                    <div class="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                    <div class="rounded-[12px] bg-green-50 p-3 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">
                         Verified: <strong>{{ $resolved_account_name }}</strong>
                     </div>
                 @endif

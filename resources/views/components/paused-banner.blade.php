@@ -16,7 +16,7 @@
 
 @if ($visible)
     <div {{ $attributes->class([
-        'flex items-start gap-3 rounded-[10px] border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900',
+        'flex items-start gap-3 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900',
         'dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200',
     ]) }} role="status" aria-live="polite">
         <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

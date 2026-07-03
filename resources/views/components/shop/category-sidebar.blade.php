@@ -41,7 +41,7 @@
                         href="{{ $cat['url'] }}"
                         wire:navigate
                         @class([
-                            'flex items-center justify-between rounded-[10px] px-3 py-1.5 transition-colors',
+                            'flex items-center justify-between rounded-[12px] px-3 py-1.5 transition-colors',
                             'bg-blue-100 font-bold text-blue-700 dark:bg-white/10 dark:text-white' => $active === $cat['slug'],
                             'text-zinc-700 hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white' => $active !== $cat['slug'],
                         ])
@@ -50,7 +50,7 @@
                         <span>{{ $cat['label'] }}</span>
                     </a>
                 @else
-                    <span class="flex cursor-not-allowed items-center justify-between rounded-[10px] px-3 py-1.5 text-zinc-400 dark:text-zinc-500">
+                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-1.5 text-zinc-400 dark:text-zinc-500">
                         <span>{{ $cat['label'] }}</span>
                         <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Soon</span>
                     </span>
@@ -67,7 +67,7 @@
                         href="{{ $item['url'] }}"
                         wire:navigate
                         @class([
-                            'block rounded-[10px] px-3 py-1.5 transition-colors',
+                            'block rounded-[12px] px-3 py-1.5 transition-colors',
                             'bg-blue-100 font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' => $item['active'] ?? false,
                             'text-zinc-700 hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white' => ! ($item['active'] ?? false),
                         ])

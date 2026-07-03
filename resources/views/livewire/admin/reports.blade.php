@@ -140,10 +140,10 @@ class extends Component {
     @endphp
 
     {{-- ── Filter card ─────────────────────────────────────────── --}}
-    <section class="rounded-[10px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="rounded-[12px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <header class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Sales Overview by Date</h2>
-            <a href="{{ $this->exportUrl() }}" class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-600/25">
+            <a href="{{ $this->exportUrl() }}" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-600/25">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                 </svg>
@@ -162,7 +162,7 @@ class extends Component {
             $segmentActive = 'bg-blue-600 text-white shadow-sm';
         @endphp
         <div class="flex flex-wrap items-center gap-2">
-            <div class="inline-flex flex-wrap items-center gap-0.5 rounded-[10px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
+            <div class="inline-flex flex-wrap items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
                 @foreach ($presets as $key => $label)
                     @php $active = $preset === $key; @endphp
                     <button
@@ -178,10 +178,10 @@ class extends Component {
                         {{ $granularities[$granularity] ?? 'Daily' }}
                         <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open" x-transition style="display:none;" class="absolute left-0 z-30 mt-1.5 w-36 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                    <div x-show="open" x-transition style="display:none;" class="absolute left-0 z-30 mt-1.5 w-36 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                         @foreach ($granularities as $key => $label)
                             <button type="button" wire:click="setGranularity('{{ $key }}')" @click="open = false" @class([
-                                'flex w-full items-center rounded-[10px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
+                                'flex w-full items-center rounded-[12px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
                                 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $granularity === $key,
                                 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $granularity !== $key,
                             ])>{{ $label }}</button>
@@ -195,15 +195,15 @@ class extends Component {
                         {{ $activeCategoryLabel }}
                         <svg class="h-3 w-3 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open" x-transition style="display:none;" class="absolute left-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[10px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                    <div x-show="open" x-transition style="display:none;" class="absolute left-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                         <button type="button" wire:click="setCategory(null)" @click="open = false" @class([
-                            'flex w-full items-center rounded-[10px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
+                            'flex w-full items-center rounded-[12px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
                             'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $categoryId === null,
                             'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $categoryId !== null,
                         ])>All Products</button>
                         @foreach ($this->categories as $cat)
                             <button type="button" wire:click="setCategory({{ $cat->id }})" @click="open = false" @class([
-                                'flex w-full items-center rounded-[10px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
+                                'flex w-full items-center rounded-[12px] px-3 py-1.5 text-left text-[12px] font-medium transition-colors',
                                 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $categoryId === $cat->id,
                                 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $categoryId !== $cat->id,
                             ])>{{ $cat->name }}</button>
@@ -216,9 +216,9 @@ class extends Component {
                  inputs that only appear when preset = custom. --}}
             @if ($preset === 'custom')
                 <div class="flex items-center gap-1.5">
-                    <input type="date" wire:model.live="start" class="rounded-[10px] border border-zinc-200 bg-white px-2 py-1.5 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                    <input type="date" wire:model.live="start" class="rounded-[12px] border border-zinc-200 bg-white px-2 py-1.5 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                     <span class="text-zinc-500">→</span>
-                    <input type="date" wire:model.live="end" class="rounded-[10px] border border-zinc-200 bg-white px-2 py-1.5 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
+                    <input type="date" wire:model.live="end" class="rounded-[12px] border border-zinc-200 bg-white px-2 py-1.5 text-[12px] text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">
                 </div>
             @endif
         </div>
@@ -275,7 +275,7 @@ class extends Component {
                 class="mt-3"
             >
                 @if (count($this->series) === 0 || $this->totals['transactions'] === 0)
-                    <div class="flex h-72 items-center justify-center rounded-[10px] bg-zinc-50 text-sm text-zinc-600 dark:bg-[#26416b] dark:text-zinc-400">
+                    <div class="flex h-72 items-center justify-center rounded-[12px] bg-zinc-50 text-sm text-zinc-600 dark:bg-[#26416b] dark:text-zinc-400">
                         No completed orders in {{ strtolower($rangeLabel) }} yet.
                     </div>
                 @else
@@ -315,7 +315,7 @@ class extends Component {
     </section>
 
     {{-- ── Data table ──────────────────────────────────────────── --}}
-    <section class="mt-4 overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="mt-4 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-[12px]">
                 <thead>

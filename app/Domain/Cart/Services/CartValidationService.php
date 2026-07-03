@@ -4,10 +4,19 @@ namespace App\Domain\Cart\Services;
 
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\CurrencyRate;
 use App\Models\ProductVariant;
+use Illuminate\Validation\ValidationException;
 
 class CartValidationService
 {
+    /**
+     * Slack (in the variant's native currency) allowed on a min/max range check,
+     * to absorb the USD<->native float round-trip so an exact boundary entry is
+     * never falsely rejected.
+     */
+    private const RANGE_TOLERANCE = 0.01;
+
     public function __construct(private CartPricingService $pricingService) {}
 
     /**
@@ -51,16 +60,20 @@ class CartValidationService
             return $issues;
         }
 
-        // 2. Check min/max limits for variable items
+        // 2. Check min/max limits for variable items. display_amount is the USD
+        // line total (requested face value x quantity); min_amount/max_amount are
+        // per-unit figures in the variant's native currency. Convert the per-unit
+        // USD amount back to native so the comparison is unit-consistent.
         if ($variant->is_variable) {
-            // Variable items typically have display_amount mapping to face_value
-            // Wait, for variable items, the user chooses a face value.
-            // In Zendit, variable products have min_amount and max_amount.
-            $requestedValue = (float) $item->display_amount; // Assuming display amount is the requested face value
-            if ($variant->min_amount && $requestedValue < (float) $variant->min_amount) {
+            $perUnitUsd = $item->quantity > 0
+                ? (float) $item->display_amount / $item->quantity
+                : (float) $item->display_amount;
+            $requestedNative = $perUnitUsd * $this->nativeUnitsPerUsd($variant);
+
+            if ($variant->min_amount && $requestedNative < (float) $variant->min_amount - self::RANGE_TOLERANCE) {
                 $issues[] = 'below_minimum_amount';
             }
-            if ($variant->max_amount && $requestedValue > (float) $variant->max_amount) {
+            if ($variant->max_amount && $requestedNative > (float) $variant->max_amount + self::RANGE_TOLERANCE) {
                 $issues[] = 'above_maximum_amount';
             }
         }
@@ -90,20 +103,49 @@ class CartValidationService
         $product = $variant->product;
 
         if (! $product || ! $product->is_active) {
-            throw new \Exception('This product is no longer available.');
+            throw ValidationException::withMessages([
+                'product_variant_id' => 'This product is no longer available.',
+            ]);
         }
 
         if (! $variant->is_available) {
-            throw new \Exception('This specific variant is currently unavailable.');
+            throw ValidationException::withMessages([
+                'product_variant_id' => 'This specific variant is currently unavailable.',
+            ]);
         }
 
         if ($variant->is_variable && $requestedValue !== null) {
-            if ($variant->min_amount && $requestedValue < (float) $variant->min_amount) {
-                throw new \Exception("The minimum amount is {$variant->min_amount}.");
+            // $requestedValue arrives in USD (the cart's settlement currency), but
+            // min_amount/max_amount are stored in the variant's native currency.
+            // Convert the request back to native with the same rate the storefront
+            // applied so the range check is unit-consistent and the message reads
+            // in the currency the buyer typed.
+            $requestedNative = $requestedValue * $this->nativeUnitsPerUsd($variant);
+            $min = (float) $variant->min_amount;
+            $max = (float) $variant->max_amount;
+
+            if ($variant->min_amount && $requestedNative < $min - self::RANGE_TOLERANCE) {
+                throw ValidationException::withMessages([
+                    'requested_value' => "The minimum amount is {$min} {$variant->currency}.",
+                ]);
             }
-            if ($variant->max_amount && $requestedValue > (float) $variant->max_amount) {
-                throw new \Exception("The maximum amount is {$variant->max_amount}.");
+            if ($variant->max_amount && $requestedNative > $max + self::RANGE_TOLERANCE) {
+                throw ValidationException::withMessages([
+                    'requested_value' => "The maximum amount is {$max} {$variant->currency}.",
+                ]);
             }
         }
+    }
+
+    /**
+     * The variant's native-currency units per 1 USD. Variable amounts are entered
+     * and stored (min_amount/max_amount) in this currency while the cart settles
+     * in USD, so range checks convert the USD figure back with this rate. Falls
+     * back to 1.0 when no rate row exists (mirrors the storefront's `|| 1`).
+     */
+    private function nativeUnitsPerUsd(ProductVariant $variant): float
+    {
+        return (float) (CurrencyRate::where('code', strtoupper((string) $variant->currency))
+            ->value('rate_per_usd') ?: 1.0);
     }
 }

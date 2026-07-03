@@ -7,10 +7,12 @@ use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Providers\AiraloFulfillmentProvider;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
+use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Jobs\FulfillOrderItemJob;
@@ -40,6 +42,7 @@ class EsimTopupController extends Controller
         private readonly AiraloFulfillmentProvider $provider,
         private readonly WalletService $walletService,
         private readonly CartPricingService $pricingService,
+        private readonly CurrencyRateService $currencyRateService,
     ) {}
 
     /**
@@ -100,14 +103,33 @@ class EsimTopupController extends Controller
         $iccid = $this->extractIccid($orderItem);
         abort_if(! $iccid, 404, 'No ICCID on file for this eSIM yet.');
 
-        // Re-verify the package + price by re-fetching the live list. Defends
-        // against stale client state and price tampering.
-        $packages = $this->provider->listTopupsForIccid($iccid);
+        // Re-verify the package + price against the live list. Defends against
+        // stale client state and price tampering. These are all RECOVERABLE
+        // states (provider hiccup, package gone, no funds) - they must surface a
+        // friendly message on the top-up page, never a raw 422 error page.
+        try {
+            $packages = $this->provider->listTopupsForIccid($iccid);
+        } catch (\Throwable $e) {
+            Log::warning('eSIM top-up: could not fetch live packages', ['iccid' => $iccid, 'error' => $e->getMessage()]);
+
+            return $this->topupError($orderItem, 'We could not reach the eSIM provider just now. Please try again in a moment.');
+        }
+
         $package = collect($packages)->firstWhere('id', $validated['package_id']);
-        abort_if(! $package, 422, 'That top-up package is no longer available.');
+        if (! $package) {
+            Log::warning('eSIM top-up: selected package no longer in live list', [
+                'iccid' => $iccid,
+                'package_id' => $validated['package_id'],
+                'available' => count($packages),
+            ]);
+
+            return $this->topupError($orderItem, 'That top-up package is no longer available. Please choose another.');
+        }
 
         $netCost = (float) ($package['net_price'] ?? $package['price'] ?? 0);
-        abort_if($netCost <= 0, 422, 'Invalid package price.');
+        if ($netCost <= 0) {
+            return $this->topupError($orderItem, 'That package has an invalid price right now. Please choose another.');
+        }
 
         // Reuse the canonical markup chain (rule hierarchy, safety floor)
         // — same maths as the rest of the catalog.
@@ -119,18 +141,50 @@ class EsimTopupController extends Controller
         $user = $request->user();
 
         if (! $user->hasTransactionPin()) {
-            throw new MissingTransactionPinException('You must set up a Wallet Transaction PIN in your profile settings before you can top up with your wallet.');
+            return $this->topupError($orderItem, 'Set up a Wallet Transaction PIN in your profile settings before topping up with your wallet.');
         }
 
         // Verify the provided PIN (throws ValidationException if incorrect or locked)
         app(TransactionPinService::class)->verifyPin($user, $validated['wallet_pin']);
 
-        $wallet = $user->wallets()->where('currency', 'USD')->where('is_active', true)->first();
-        abort_if(! $wallet, 422, 'You need an active USD wallet to top up.');
-        abort_if((float) $wallet->balance < $retail, 422, 'Insufficient wallet balance.');
+        // Pay from ANY of the customer's active wallets, as long as its balance
+        // covers the USD price converted into that wallet's currency. Prefer the
+        // USD wallet (no conversion), then fall back to the others. RCOIN is a
+        // rewards balance, not a spendable top-up wallet, so it is excluded.
+        $wallets = $user->wallets()
+            ->where('is_active', true)
+            ->get()
+            ->reject(fn ($w) => $w->currency === Currency::RCOIN)
+            ->sortBy(fn ($w) => $w->currency === Currency::USD ? 0 : 1)
+            ->values();
+
+        $chosenWallet = null;
+        $chargeAmount = 0.0;
+        foreach ($wallets as $candidate) {
+            try {
+                $needed = $candidate->currency === Currency::USD
+                    ? $retail
+                    : round($this->currencyRateService->convert($retail, 'USD', $candidate->currency->value), 2);
+            } catch (\Throwable $e) {
+                // No usable exchange rate for this currency right now - skip it.
+                continue;
+            }
+
+            if ($needed > 0 && (float) $candidate->balance >= $needed) {
+                $chosenWallet = $candidate;
+                $chargeAmount = $needed;
+                break;
+            }
+        }
+
+        if (! $chosenWallet) {
+            Log::warning('eSIM top-up: no wallet covers the price', ['user_id' => $user->id, 'retail_usd' => $retail]);
+
+            return $this->topupError($orderItem, 'None of your wallets has enough to cover this $'.number_format($retail, 2).' top-up. Add funds and try again.');
+        }
 
         try {
-            $order = DB::transaction(function () use ($user, $wallet, $orderItem, $package, $iccid, $netCost, $retail) {
+            $order = DB::transaction(function () use ($user, $chosenWallet, $chargeAmount, $orderItem, $package, $iccid, $netCost, $retail) {
                 // 1. Order shell
                 $order = Order::create([
                     'user_id' => $user->id,
@@ -149,6 +203,10 @@ class EsimTopupController extends Controller
                         'delivery_email' => $user->email,
                         'top_up_of_order_item' => $orderItem->id,
                         'top_up_iccid' => $iccid,
+                        // The wallet actually charged (may differ from the USD
+                        // settlement currency when paying from a local wallet).
+                        'paid_from_wallet_currency' => $chosenWallet->currency->value,
+                        'paid_amount' => $chargeAmount,
                     ],
                 ]);
 
@@ -182,16 +240,20 @@ class EsimTopupController extends Controller
                     ],
                 ]);
 
-                // 3. Debit the wallet
+                // 3. Debit the chosen wallet in its own currency (chargeAmount is
+                // the USD price already converted). The debit re-locks + re-checks
+                // the balance under a row lock, so a race just throws and rolls back.
+                // Order is linked via the reference (order_number). We deliberately
+                // do NOT pass sourceType/sourceId: wallet_transactions.source_id is
+                // an unsignedBigInteger and orders use UUIDs, so passing $order->id
+                // there throws a TypeError (this was silently breaking every top-up).
                 $this->walletService->debit(
-                    wallet: $wallet,
-                    amount: $retail,
+                    wallet: $chosenWallet,
+                    amount: $chargeAmount,
                     category: TransactionCategory::Purchase,
-                    description: "Top-up for eSIM {$iccid}",
+                    description: "Top-up for eSIM {$iccid} (\${$retail} USD)",
                     reference: $order->order_number,
                     idempotencyKey: 'esim-topup-'.$newItem->id,
-                    sourceType: 'orders',
-                    sourceId: $order->id,
                 );
 
                 // 4. Kick off fulfilment (Airalo /orders/topups call)
@@ -217,6 +279,19 @@ class EsimTopupController extends Controller
 
         return redirect()->route('shop.order', $order->order_number)
             ->with('status', 'Top-up ordered. Your eSIM is being refilled.');
+    }
+
+    /**
+     * Send the customer back to the top-up page with a friendly, specific
+     * message instead of a raw abort() error page, for recoverable states
+     * (provider hiccup, package gone, no/low funds). The page renders these
+     * from the error bag (shop/esim-topup.blade.php).
+     */
+    private function topupError(OrderItem $orderItem, string $message): RedirectResponse
+    {
+        return redirect()
+            ->route('dashboard.esim.topup', $orderItem)
+            ->withErrors(['package_id' => $message]);
     }
 
     /**

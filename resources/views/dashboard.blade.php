@@ -142,7 +142,7 @@
                             type="button"
                             @click="goTo({{ $i }})"
                             :class="$store.wallet.active === {{ $i }} ? 'w-5 bg-white' : 'w-1.5 bg-white/40'"
-                            class="h-1.5 rounded-full transition-all duration-200"
+                            class="theme-static h-1.5 rounded-full transition-all duration-200"
                             aria-label="Wallet {{ $i + 1 }}"
                         ></button>
                     @endforeach

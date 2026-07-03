@@ -60,7 +60,9 @@
     $cardCode = null;
     $cardPin = null;
     if (! $esim && ! $isTopup) {
-        $cardPin = $scalar($payload['pin'] ?? null);
+        // pin-redemptionURL cards (virtual prepaid Visa, etc.) carry the PIN under
+        // `epin`; fall back to it so it renders as the PIN, not the generic code.
+        $cardPin = $scalar($payload['pin'] ?? $payload['epin'] ?? null);
         foreach (['code', 'voucher_code', 'redeem_code', 'card_number', 'serial'] as $key) {
             if ($cardCode = $scalar($payload[$key] ?? null)) {
                 break;
@@ -81,6 +83,9 @@
     }
 
     $redeemHtml = $snap['redeem_instructions'] ?? null;
+    // The registration/redemption link the buyer must open to claim the card.
+    // Captured but historically never shown - surface it as the primary CTA.
+    $redemptionUrl = $scalar($payload['redemption_url'] ?? null);
 
     // Rcoin cashback for this order, shown here instead of a separate
     // "you earned Rcoin" email. Prefer the credited wallet transaction
@@ -283,6 +288,10 @@
 
         <p style="margin:18px 0 0; font-size:13px; line-height:1.6; color:#a1a1aa;">Airtime lands on the phone directly, so there is nothing to redeem. If it has not arrived within a few minutes, reply to this email and we will sort it out.</p>
     @else
+        @if ($redemptionUrl)
+            <x-emails.button :url="$redemptionUrl" align="center">Redeem your card</x-emails.button>
+        @endif
+
         @if ($redeemHtml)
             <x-emails.panel title="How to redeem">
                 <div style="font-size:14px; line-height:1.6; color:#3f3f46;">{!! $redeemHtml !!}</div>

@@ -22,7 +22,7 @@
     <x-slot:subheading>
         Placed {{ $fmtDate($order->placed_at ?? $order->created_at) }}
         @if ($order->hasSuspectPricing())
-            · <span class="inline-flex items-center gap-1 rounded-[10px] bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
+            · <span class="inline-flex items-center gap-1 rounded-[12px] bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
                 </svg>
@@ -51,7 +51,7 @@
             ] as [$label, $value, $text])
                 <div class="rounded-[16px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
                     <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">{{ $label }}</p>
-                    <span class="mt-2 inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $toneFor($value) }}">
+                    <span class="mt-2 inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $toneFor($value) }}">
                         {{ $text ?? 'Pending' }}
                     </span>
                 </div>
@@ -62,7 +62,7 @@
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
             {{-- Customer --}}
-            <div class="rounded-[10px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
                 <h3 class="text-sm font-bold text-zinc-900">Customer</h3>
                 <dl class="mt-3 space-y-2.5 text-xs">
                     <div class="flex justify-between gap-4">
@@ -81,7 +81,7 @@
             </div>
 
             {{-- Order info --}}
-            <div class="rounded-[10px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
                 <h3 class="text-sm font-bold text-zinc-900">Order</h3>
                 <dl class="mt-3 space-y-2.5 text-xs">
                     <div class="flex justify-between gap-4">
@@ -129,7 +129,7 @@
         </div>
 
         {{-- Items --}}
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Items ({{ $order->items->count() }})</h3>
             </div>
@@ -157,71 +157,9 @@
                                 </p>
                             </div>
                             <div class="flex flex-col items-end gap-1">
-                                    @if ($item->fulfillment_status?->value !== 'fulfilled')
-                                        <div x-data="{ open: false, loading: false, manualPin: '' }" class="inline-block relative z-10">
-                                            <button 
-                                                type="button" 
-                                                x-on:click="open = true"
-                                                class="inline-flex items-center rounded-[10px] bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-white"
-                                            >
-                                                Mark Fulfilled
-                                            </button>
-
-                                            <!-- Modal Backdrop -->
-                                            <template x-teleport="body">
-                                                <div x-show="open" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm transition-opacity" x-transition.opacity>
-                                                    <!-- Modal Panel -->
-                                                    <div x-show="open" @click.outside="if(!loading) open = false" x-transition class="w-full max-w-md transform overflow-hidden rounded-[20px] bg-white p-6 text-left align-middle shadow-2xl ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-white/10 m-4">
-                                                        <h3 class="text-lg font-semibold leading-6 text-zinc-900 dark:text-white">Confirm Manual Fulfillment</h3>
-                                                        <div class="mt-2">
-                                                            <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                                                                Are you sure you want to mark this item as manually fulfilled? This cannot be undone.
-                                                            </p>
-                                                        </div>
-
-                                                        <!-- Input Field for PIN -->
-                                                        <div class="mt-4">
-                                                            <input 
-                                                                type="text" 
-                                                                x-model="manualPin"
-                                                                placeholder="Enter PIN / Code" 
-                                                                class="w-full rounded-xl border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400"
-                                                            >
-                                                        </div>
-
-                                                        <div class="mt-6 flex justify-end gap-3">
-                                                            <button 
-                                                                type="button" 
-                                                                @click="open = false"
-                                                                class="inline-flex justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:ring-zinc-700 dark:focus:ring-offset-zinc-900"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                            <button 
-                                                                type="button" 
-                                                                x-on:click="loading = true; fetch('{{ route('admin.api.commerce.mark-manually-fulfilled', $item->id) }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: JSON.stringify({ pin: manualPin }) }).then(r => { window.location.reload(); }).catch(() => loading = false)"
-                                                                :disabled="loading"
-                                                                class="inline-flex justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <span x-show="!loading">Confirm & Fulfill</span>
-                                                                <span x-show="loading" class="flex items-center gap-2">
-                                                                    <svg class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                    </svg>
-                                                                    Processing...
-                                                                </span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    @endif
-                                    <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
-                                        {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
-                                    </span>
-                                </div>
+                                <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
+                                    {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
+                                </span>
                                 {{-- Item subtotal — primary USD figure (truth), customer's
                                      display amount underneath as context. --}}
                                 @php
@@ -268,8 +206,8 @@
 
                         {{-- Delivered payload (redemption codes / pins / links) --}}
                         @if ($payload->isNotEmpty())
-                            <div class="mt-3 rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-zinc-800 dark:ring-zinc-700">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-300">Delivered details</p>
+                            <div class="mt-3 rounded-[12px] bg-zinc-50 p-3 ring-1 ring-zinc-100">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Delivered details</p>
                                 <dl class="mt-1.5 space-y-1 text-[11px]">
                                     @foreach ($payload as $key => $value)
                                         <div class="flex justify-between gap-4">
@@ -328,7 +266,7 @@
         </div>
 
         {{-- Payment attempts --}}
-        <div class="rounded-[10px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Payment attempts ({{ $order->paymentAttempts->count() }})</h3>
             </div>
@@ -350,7 +288,7 @@
                                 <td class="px-5 py-3 capitalize text-zinc-600">{{ $attempt->gateway }}</td>
                                 <td class="px-5 py-3 font-semibold text-zinc-900">{{ $attempt->currency }} {{ number_format((float) $attempt->amount, 2) }}</td>
                                 <td class="px-5 py-3">
-                                    <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($attempt->payment_status?->value) }}">
+                                    <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($attempt->payment_status?->value) }}">
                                         {{ $attempt->payment_status?->label() ?? 'Pending' }}
                                     </span>
                                 </td>

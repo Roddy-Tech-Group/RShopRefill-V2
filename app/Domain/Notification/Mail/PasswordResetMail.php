@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notification\Mail;
 
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -20,8 +21,10 @@ class PasswordResetMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $brand = SiteSetting::get('site.name', 'RshopRefills');
+
         return new Envelope(
-            subject: 'Reset Password Request - RshopRefills',
+            subject: 'Reset Password Request - '.$brand,
         );
     }
 

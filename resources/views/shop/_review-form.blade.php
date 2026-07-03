@@ -59,20 +59,20 @@
     <div x-show="open && ! submitted" x-collapse x-cloak class="mx-auto mt-5 max-w-md text-left">
         @auth
             {{-- Signed in: name is taken from the account, not typed. --}}
-            <p class="rounded-[10px] bg-blue-50 px-3 py-2 text-xs text-zinc-600 dark:bg-blue-500/10 dark:text-zinc-300">
+            <p class="rounded-[12px] bg-blue-50 px-3 py-2 text-xs text-zinc-600 dark:bg-blue-500/10 dark:text-zinc-300">
                 Posting as <span class="font-semibold text-zinc-900 dark:text-white">{{ auth()->user()->name }}</span>
             </p>
         @else
             <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Your name</label>
-            <input x-model="name" type="text" maxlength="80" placeholder="e.g. Sarah J." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white">
+            <input x-model="name" type="text" maxlength="80" placeholder="e.g. Sarah J." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white">
         @endauth
 
         <label class="mt-3 block text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Your review</label>
-        <textarea x-model="body" rows="4" maxlength="1000" placeholder="What did you like? Was delivery fast?" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"></textarea>
+        <textarea x-model="body" rows="4" maxlength="1000" placeholder="What did you like? Was delivery fast?" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"></textarea>
 
         <p x-show="error" x-cloak x-text="error" class="mt-2 text-xs font-medium text-red-600"></p>
 
-        <button type="button" @click="submit()" :disabled="loading" class="mt-4 w-full rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" @click="submit()" :disabled="loading" class="mt-4 w-full rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
             <span x-show="! loading">Submit review</span>
             <span x-show="loading" x-cloak>Submitting...</span>
         </button>

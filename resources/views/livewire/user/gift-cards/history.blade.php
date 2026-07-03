@@ -37,7 +37,7 @@ class extends Component {
         </div>
     </div>
 
-    <div class="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+    <div class="w-full overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
         @if($trades->isEmpty())
             <div class="flex flex-col items-center justify-center py-12 text-center">
                 <div class="rounded-full bg-zinc-100 p-3 dark:bg-zinc-800">

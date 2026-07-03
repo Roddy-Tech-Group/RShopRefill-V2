@@ -77,6 +77,16 @@
             // but not third-party iframes. Not HttpOnly - JS writes it.
             document.cookie = `${name}=${isDark ? '1' : '0'}; path=/; max-age=31536000; SameSite=Lax`;
         }
+        // Mirror the resolved pure-dark (Extra Dark / black) decision into its own
+        // cookie too, so the server can paint .pure-dark from the first byte.
+        // Customer side defaults to ON when the cookie is absent (see head.blade.php),
+        // so the default black page never flashes navy first.
+        function writePureDarkCookie(on) {
+            const name = location.pathname.startsWith('/admin')
+                ? 'theme_admin_puredark'
+                : 'theme_web_puredark';
+            document.cookie = `${name}=${on ? '1' : '0'}; path=/; max-age=31536000; SameSite=Lax`;
+        }
 
         // Flux UI ships its own theme engine (loaded by the appearance
         // directive in the head) that runs AFTER our script. It reads
@@ -106,15 +116,23 @@
         function pureDarkOn() {
             const v = localStorage.getItem(pureDarkKey());
             if (v !== null) { return v === '1'; }   // the user's own choice always wins
-            return !! cfg.globalExtraDark;            // else fall back to the admin default
+            // No explicit choice → the default dark palette:
+            //  - customer side: pure black IS the default dark mode (navy is the
+            //    opt-in "Soft dark" appearance).
+            //  - admin side: unchanged — navy by default, unless the admin's
+            //    global Extra Dark setting is on.
+            if (location.pathname.startsWith('/admin')) { return !! cfg.globalExtraDark; }
+            return true;
         }
 
         function applyTheme() {
             const choice = themeChoice();
             const isDark = resolveDark();
+            const pure = pureDarkOn();
             root.classList.toggle('dark', isDark);
-            root.classList.toggle('pure-dark', isDark && pureDarkOn());
+            root.classList.toggle('pure-dark', isDark && pure);
             writeCookie(isDark);
+            writePureDarkCookie(pure);
             syncFlux(choice);
         }
 
@@ -147,8 +165,9 @@
         window.themeIsDark = resolveDark;
         window.themeChoice = themeChoice;
 
-        // Appearance -> Extra dark toggles the true-black variant. Stored locally
-        // (no server round-trip); applyTheme re-evaluates the .pure-dark class.
+        // Pure-dark (true black) is the default dark palette; the "Soft dark"
+        // appearance toggle stores its inverse here. Local only (no server
+        // round-trip); applyTheme re-evaluates the .pure-dark class + cookie.
         window.setPureDark = function (on) {
             try { localStorage.setItem(pureDarkKey(), on ? '1' : '0'); } catch (_) {}
             applyTheme();

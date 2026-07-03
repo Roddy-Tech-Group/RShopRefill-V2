@@ -673,10 +673,14 @@ document.addEventListener('alpine:init', () => {
             return '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         },
 
-        // Pull current cart state (called once on page load).
+        // Pull current cart state (called once on page load). Signals checkout
+        // context so the server only KEEPS ephemeral "Buy now" items while the
+        // shopper is on a checkout page; reading the cart from anywhere else
+        // purges them (see CartWebController::show).
         async refresh() {
             try {
-                const res = await fetch(this._url('/cart/data'), {
+                const onCheckout = window.location.pathname.includes('checkout');
+                const res = await fetch(this._url('/cart/data') + (onCheckout ? '&ctx=checkout' : ''), {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
@@ -688,8 +692,11 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Add a variant to the cart, then drop the nav popup open.
-        async add(variantId, quantity = 1, requestedValue = null, metadata = null) {
+        // Add a variant to the cart, then drop the nav popup open. `buyNow`
+        // tags the item as ephemeral: it rides through to checkout but is
+        // purged the moment the shopper reads the cart from anywhere else, so
+        // an abandoned Buy now never lingers in the persistent cart.
+        async add(variantId, quantity = 1, requestedValue = null, metadata = null, buyNow = false) {
             this.loading = true;
             try {
                 const body = { product_variant_id: variantId, quantity };
@@ -702,6 +709,9 @@ document.addEventListener('alpine:init', () => {
                 // order item at checkout so fulfilment can act on it.
                 if (metadata && typeof metadata === 'object') {
                     body.metadata = metadata;
+                }
+                if (buyNow) {
+                    body.buy_now = true;
                 }
                 const res = await fetch(this._url('/cart/items'), {
                     method: 'POST',
@@ -726,7 +736,52 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async setQty(itemId, quantity) {
+        // Recompute the derived totals locally from the line items so the +/-
+        // steppers update instantly; the server response then reconciles any
+        // quantity-based pricing. Unit prices are per-unit, so line = unit x qty.
+        _recompute() {
+            let count = 0;
+            let subtotal = 0;
+            let subtotalUsd = 0;
+            for (const it of this.items) {
+                const q = Number(it.quantity) || 0;
+                it.line_total = (Number(it.unit_price) || 0) * q;
+                it.line_total_usd = (Number(it.unit_price_usd) || 0) * q;
+                count += q;
+                subtotal += it.line_total;
+                subtotalUsd += it.line_total_usd;
+            }
+            this.count = count;
+            this.subtotal = subtotal;
+            this.subtotalUsd = subtotalUsd;
+        },
+
+        // Optimistic quantity change: the UI updates on the same tick, and the
+        // server PATCH is debounced per item so a burst of +/- taps sends one
+        // request. Reaching 0 removes the line (matches the server).
+        setQty(itemId, quantity) {
+            quantity = Math.floor(Number(quantity));
+            if (! Number.isFinite(quantity)) { return; }
+
+            const item = this.items.find((i) => i.id === itemId);
+            if (! item) { return; }
+
+            if (quantity <= 0) {
+                this.remove(itemId);
+                return;
+            }
+
+            item.quantity = quantity;
+            this._recompute();
+
+            this._qtyTimers = this._qtyTimers || {};
+            clearTimeout(this._qtyTimers[itemId]);
+            this._qtyTimers[itemId] = setTimeout(() => this._syncQty(itemId), 300);
+        },
+
+        async _syncQty(itemId) {
+            const item = this.items.find((i) => i.id === itemId);
+            if (! item) { return; }
             try {
                 const res = await fetch(this._url('/cart/items/' + itemId), {
                     method: 'PATCH',
@@ -736,15 +791,22 @@ document.addEventListener('alpine:init', () => {
                         'X-CSRF-TOKEN': this._csrf(),
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ quantity }),
+                    body: JSON.stringify({ quantity: item.quantity }),
                 });
                 if (res.ok) {
                     this._apply(await res.json());
+                } else {
+                    this.refresh(); // server rejected — fall back to its truth
                 }
-            } catch (_) { /* ignore */ }
+            } catch (_) {
+                this.refresh();
+            }
         },
 
         async remove(itemId) {
+            // Optimistic removal so the line disappears instantly.
+            this.items = this.items.filter((i) => i.id !== itemId);
+            this._recompute();
             try {
                 const res = await fetch(this._url('/cart/items/' + itemId), {
                     method: 'DELETE',
@@ -753,8 +815,12 @@ document.addEventListener('alpine:init', () => {
                 });
                 if (res.ok) {
                     this._apply(await res.json());
+                } else {
+                    this.refresh();
                 }
-            } catch (_) { /* ignore */ }
+            } catch (_) {
+                this.refresh();
+            }
         },
     });
 
@@ -932,10 +998,8 @@ window.dashboardSearch = function () {
  */
 window.customerReviewsCarousel = function () {
     return {
-        navigating: false,
         cardW: 288,
         gap: 20,
-        padLeft: 0,
         timer: null,
 
         // Measure the card width + content-column padding so the arrow steps by
@@ -947,16 +1011,12 @@ window.customerReviewsCarousel = function () {
             if (! viewport || ! list) return;
 
             const card   = list.querySelector('article');
-            const header = this.$refs.header;
             this.cardW   = card ? card.offsetWidth : 288;
             this.gap     = window.innerWidth >= 640 ? 20 : 16;
-            // Measure the header content column (not the full-bleed section)
-            // so the first review card lines up with the "What our customers
-            // say" title on every viewport, including mobile.
-            this.padLeft = header
-                ? Math.round(header.getBoundingClientRect().left)
-                : Math.round(this.$el.getBoundingClientRect().left);
-            list.style.paddingLeft = this.padLeft + 'px';
+            // First-card alignment with the header is handled in CSS now (the
+            // list's responsive pl-[...] matches the content column), so there's
+            // no measured padding here — that measurement raced the reveal
+            // animation and could land the first card off the header line.
             list.style.transform = '';
         },
 

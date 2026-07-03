@@ -106,7 +106,7 @@ class extends Component {
             
 
             {{-- Payout Details --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-6 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Payout Information</h2>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
@@ -128,7 +128,7 @@ class extends Component {
                     </div>
                     
                     @if($trade->payout_method === 'bank' && $trade->bankAccount)
-                        <div class="sm:col-span-2 mt-2 p-4 rounded-lg border border-zinc-100 bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
+                        <div class="sm:col-span-2 mt-2 p-4 rounded-[12px] border border-zinc-100 bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
                             <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Bank Account Details</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div>
@@ -156,7 +156,7 @@ class extends Component {
         <div class="space-y-6">
             
             {{-- Chat / Communication --}}
-            <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900 flex flex-col h-[600px]">
+            <div class="rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none flex flex-col h-[600px]">
                 <div class="p-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
                     <h2 class="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <flux:icon.chat-bubble-left-right class="size-5 text-zinc-500" /> Trade Support
@@ -175,7 +175,7 @@ class extends Component {
                             <div class="px-4 py-2 rounded-2xl max-w-[85%] text-sm {{ $isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-bl-none shadow-sm' }}">
                                 @if($msg->image_path)
                                     <a href="{{ Storage::url($msg->image_path) }}" target="_blank" class="block mb-2">
-                                        <img src="{{ Storage::url($msg->image_path) }}" class="rounded-lg max-w-full h-auto object-cover max-h-48 border border-white/20" alt="Attachment">
+                                        <img src="{{ Storage::url($msg->image_path) }}" class="rounded-[12px] max-w-full h-auto object-cover max-h-48 border border-white/20" alt="Attachment">
                                     </a>
                                 @endif
                                 {{ $msg->message }}
@@ -206,14 +206,14 @@ class extends Component {
                 <form wire:submit="sendMessage" class="p-4 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
                     @if($chat_image)
                         <div class="mb-3 relative inline-block">
-                            <img src="{{ $chat_image->temporaryUrl() }}" class="h-20 w-20 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700">
+                            <img src="{{ $chat_image->temporaryUrl() }}" class="h-20 w-20 object-cover rounded-[12px] border border-zinc-200 dark:border-zinc-700">
                             <button type="button" wire:click="$set('chat_image', null)" class="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow">
                                 <flux:icon.x-mark class="size-3" />
                             </button>
                         </div>
                     @endif
                     <div class="flex gap-2 items-center">
-                        <label class="cursor-pointer text-zinc-400 hover:text-blue-500 transition p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                        <label class="cursor-pointer text-zinc-400 hover:text-blue-500 transition p-2 bg-zinc-100 dark:bg-zinc-800 rounded-[12px]">
                             <flux:icon.photo class="size-5" />
                             <input type="file" wire:model="chat_image" accept="image/*" class="hidden">
                         </label>

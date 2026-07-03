@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Webhooks;
 
+use App\Domain\GiftCardTrading\Services\PayoutOrchestrator;
 use App\Domain\Payment\Exceptions\InvalidWebhookException;
 use App\Domain\Payment\Services\FlutterwaveService;
 use App\Domain\Wallet\Jobs\ProcessFundingWebhookJob;
@@ -63,6 +64,27 @@ class FlutterwaveWebhookController extends Controller
             ]);
 
             return response()->json(['message' => 'Unauthorized signature'], 401);
+        }
+
+        // 2b. Transfer (payout) webhooks carry no PaymentAttempt - they reconcile a
+        // gift-card trade Payout by its reference. Route them to the payout
+        // orchestrator (which is idempotent on already-terminal payouts) and stop.
+        $transferReference = $data['reference'] ?? null;
+        if ($eventType === 'transfer.completed'
+            || (is_string($transferReference) && str_starts_with($transferReference, 'FW-PAYOUT-'))) {
+            app(PayoutOrchestrator::class)->handleWebhook($payload);
+
+            $webhook->update([
+                'processed' => true,
+                'processing_status' => 'processed',
+                'reference' => $transferReference ?? $txRef,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Transfer webhook processed',
+                'webhook_id' => $webhook->id,
+            ], 200);
         }
 
         // 3. Dispatch the processing job asynchronously based on payable type

@@ -71,7 +71,7 @@ new class extends Component {
     @if (! $editing)
         {{-- Display: the referral link + copy + edit affordance --}}
         <div x-data="{ copied: false }">
-            <div class="flex items-center gap-2 rounded-[10px] bg-zinc-100 px-4 py-3">
+            <div class="flex items-center gap-2 rounded-[12px] bg-zinc-100 px-4 py-3">
                 <input
                     type="text"
                     readonly
@@ -83,7 +83,7 @@ new class extends Component {
                 <button
                     type="button"
                     @click="navigator.clipboard.writeText($refs.refUrl.value).then(() => { copied = true; setTimeout(() => copied = false, 1500) })"
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-[12px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                     <svg x-show="!copied" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25"/>
@@ -105,7 +105,7 @@ new class extends Component {
         </div>
     @else
         {{-- Edit: pick a custom code --}}
-        <div class="rounded-[10px] bg-zinc-100 p-4">
+        <div class="rounded-[12px] bg-zinc-100 p-4">
             <label for="referral_code" class="text-sm font-semibold text-zinc-900">Your custom referral code</label>
             <p class="mt-0.5 text-xs text-zinc-600">Make it memorable, like your name. Letters, numbers, dashes and underscores only.</p>
             <div class="mt-2 flex items-center gap-2">
@@ -115,12 +115,12 @@ new class extends Component {
                     wire:model="code"
                     wire:keydown.enter="save"
                     maxlength="24"
-                    class="flex-1 rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                    class="flex-1 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                 >
-                <button type="button" wire:click="save" class="shrink-0 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                <button type="button" wire:click="save" class="shrink-0 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                     Save
                 </button>
-                <button type="button" wire:click="cancel" class="shrink-0 rounded-[10px] bg-white px-4 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50">
+                <button type="button" wire:click="cancel" class="shrink-0 rounded-[12px] bg-white px-4 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50">
                     Cancel
                 </button>
             </div>

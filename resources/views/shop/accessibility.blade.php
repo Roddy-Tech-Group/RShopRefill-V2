@@ -5,7 +5,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Accessibility Statement | RshopRefills'">
+<x-layouts.app.header :title="'Accessibility Statement | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -20,7 +20,7 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            RshopRefills is committed to making our platform usable by as many people as possible, including people with
+            {{ $siteName }} is committed to making our platform usable by as many people as possible, including people with
             disabilities. We aim to meet the Web Content Accessibility Guidelines (WCAG) 2.1 at Level AA, and we keep working
             to improve the experience for everyone.
         </p>
@@ -66,7 +66,7 @@
                 this seriously and will do our best to help.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Contact us about accessibility</p>

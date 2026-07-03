@@ -1,4 +1,4 @@
-<x-emails.layout :mail-message="$message ?? null" title="New order alert" preheader="A new order was placed on RshopRefills.">
+<x-emails.layout :mail-message="$message ?? null" title="New order alert" preheader="A new order was placed on {{ $siteName }}.">
     @if ($isLargeTransaction)
         <span style="display:inline-block; margin:0 0 12px; padding:6px 12px; background:#fee2e2; color:#b91c1c; border-radius:6px; font-size:12px; font-weight:700;">Large transaction</span>
         <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#b91c1c;">A large order was placed.</h1>

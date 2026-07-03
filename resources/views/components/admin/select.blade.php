@@ -80,7 +80,7 @@
             :class="open
                 ? 'bg-blue-50 ring-2 ring-blue-500 text-blue-700 dark:bg-blue-600/15 dark:ring-blue-400 dark:text-blue-300'
                 : 'bg-white border border-zinc-200 text-zinc-900 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white'"
-            class="flex w-full items-center justify-between rounded-[10px] px-3 py-2 text-left text-sm outline-none transition-colors focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2 text-left text-sm outline-none transition-colors focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-60"
         >
             <span x-text="label" class="truncate font-semibold"></span>
             <svg class="ml-2 h-4 w-4 shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -95,14 +95,14 @@
             x-transition:enter-start="opacity-0 -translate-y-1"
             x-transition:enter-end="opacity-100 translate-y-0"
             :style="panelStyle"
-            class="fixed z-[60] overflow-y-auto rounded-[10px] bg-white p-1 shadow-xl shadow-zinc-900/20 ring-2 ring-blue-500 dark:bg-[#0c1a36] dark:ring-blue-400"
+            class="fixed z-[60] overflow-y-auto rounded-[12px] bg-white p-1 shadow-xl shadow-zinc-900/20 ring-2 ring-blue-500 dark:bg-[#0c1a36] dark:ring-blue-400"
         >
             @if ($placeholder)
                 <button
                     type="button"
                     @click="select('')"
                     :class="value === '' || value === null ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-[#1d3252]'"
-                    class="block w-full rounded-[10px] px-3 py-2 text-left text-sm transition-colors"
+                    class="block w-full rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
                 >{{ $placeholder }}</button>
             @endif
             @foreach ($options as $optValue => $optLabel)
@@ -110,7 +110,7 @@
                     type="button"
                     @click="select('{{ addslashes((string) $optValue) }}')"
                     :class="String(value) === '{{ addslashes((string) $optValue) }}' ? 'bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-[#1d3252]'"
-                    class="block w-full rounded-[10px] px-3 py-2 text-left text-sm transition-colors"
+                    class="block w-full rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
                 >{{ $optLabel }}</button>
             @endforeach
         </div>
@@ -122,7 +122,7 @@
          panel itself in dark mode so options aren't unreadable. --}}
     <div class="relative {{ $wrapperClass }}">
         <select {{ $attributes->class([
-            'w-full appearance-none rounded-[10px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white [color-scheme:light] dark:[color-scheme:dark]',
+            'w-full appearance-none rounded-[12px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white [color-scheme:light] dark:[color-scheme:dark]',
         ]) }}>
             {{ $slot }}
         </select>

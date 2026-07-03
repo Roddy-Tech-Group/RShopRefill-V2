@@ -102,7 +102,7 @@
     $shopRoute = fn (string $name, $params = []) => route(($inDashboard ? 'dashboard.shop.' : 'shop.').$name, $params);
 @endphp
 
-<x-shop.layout :title="'Order ' . $order->order_number . ' | RshopRefills'">
+<x-shop.layout :title="'Order ' . $order->order_number . ' | '.$siteName">
 
 @if ($status->value === 'completed')
     {{-- ── Clean success view for completed orders ──────────────────────
@@ -168,7 +168,7 @@
 
                         {{-- Gift card - mirrors the dashboard orders page card so the
                              customer sees the same gift-card visual on both surfaces. --}}
-                        <div class="theme-static mx-auto max-w-[340px] rounded-[10px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
+                        <div class="theme-static mx-auto max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
                             <div class="flex items-start justify-between gap-3 px-2 pt-2">
                                 <div class="flex min-w-0 flex-col items-start gap-2.5">
                                     @if ($logo)
@@ -195,13 +195,13 @@
                             <div class="h-14"></div>
 
                             @if ($qrUrl)
-                                <div class="flex flex-col items-center gap-2 rounded-[10px] border-2 border-zinc-100 bg-white p-4">
+                                <div class="flex flex-col items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white p-4">
                                     <img src="{{ $qrUrl }}" alt="eSIM activation QR code" class="h-44 w-44 object-contain" loading="lazy">
                                     <p class="text-center text-xs font-medium text-zinc-600">Scan this QR from another device to install your eSIM.</p>
                                 </div>
                             @elseif ($phone)
-                                <div class="flex items-center gap-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                                <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
                                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                                         </svg>
@@ -214,7 +214,7 @@
                             @elseif ($cardCode || $cardPin)
                                 <div class="space-y-2">
                                     @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
-                                        <div class="flex items-center gap-3 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
+                                        <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
                                             <span class="w-9 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
                                             <span class="min-w-0 flex-1 truncate text-base font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                             <button
@@ -233,7 +233,7 @@
                                     @endforeach
                                 </div>
                             @else
-                                <div class="flex items-center gap-2 rounded-[10px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">
+                                <div class="flex items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">
                                     <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
@@ -264,7 +264,7 @@
                 </div>
 
                 {{-- Inline collapsible panels - one renders at a time below the links. --}}
-                <div x-show="open === 'redeem'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[10px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
+                <div x-show="open === 'redeem'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[12px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
                     @if ($orderHasGiftCards)
                         <p class="font-semibold text-zinc-900 dark:text-white">Gift cards</p>
                         <ol class="ml-4 mt-1 list-decimal space-y-1">
@@ -289,12 +289,9 @@
                     @endif
                 </div>
 
-                <div x-show="open === 'terms'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[10px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
+                <div x-show="open === 'terms'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[12px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
                     <ul class="ml-4 list-disc space-y-1">
-                        <li>Codes are equivalent to cash. RshopRefills cannot reissue codes that have been viewed, shared or used.</li>
-                        @if ($orderHasGiftCards)
-                            <li>Gift cards are region-locked. They can only be redeemed by accounts registered in the matching country.</li>
-                        @endif
+                        <li>Codes are equivalent to cash. {{ $siteName }} cannot reissue codes that have been viewed, shared or used.</li>
                         @if ($orderHasEsims)
                             <li>eSIM data plans activate on first network connection. The validity period (where applicable) starts from that point.</li>
                         @endif
@@ -318,6 +315,9 @@
                 <a href="{{ route('dashboard.orders') }}" wire:navigate class="text-xs font-semibold text-blue-700 underline-offset-4 hover:underline dark:text-blue-300">View all my orders</a>
             </div>
 
+            {{-- Google Customer Reviews opt-in (instant digital delivery). --}}
+            @include('shop._google-customer-reviews', ['order' => $order])
+
         </div>
     </div>
 
@@ -330,7 +330,7 @@
 
     {{-- Status hero --}}
     <section class="rounded-[20px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
-        <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-[10px] {{ $tone['bg'] }} ring-8 {{ $tone['ring'] }}">
+        <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] {{ $tone['bg'] }} ring-8 {{ $tone['ring'] }}">
             <svg class="h-8 w-8 {{ $tone['fg'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
                 @if ($ui['icon'] === 'check')
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
@@ -345,7 +345,7 @@
         <h1 class="mt-5 text-2xl font-bold text-zinc-900">{{ $ui['title'] }}</h1>
         <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">{{ $ui['line'] }}</p>
 
-        <div class="mt-4 inline-flex items-center gap-2 rounded-[10px] bg-zinc-50 px-4 py-1.5 ring-1 ring-zinc-200">
+        <div class="mt-4 inline-flex items-center gap-2 rounded-[12px] bg-zinc-50 px-4 py-1.5 ring-1 ring-zinc-200">
             <span class="text-xs font-medium text-zinc-500">Order</span>
             <span class="text-sm font-bold tabular-nums text-zinc-900">{{ $order->order_number }}</span>
         </div>
@@ -572,9 +572,9 @@
                         <button
                             type="button"
                             @click="selectPaymentMethod(method)"
-                            class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[10px] hover:border-blue-500 hover:bg-blue-50/30 text-left transition duration-150"
+                            class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[12px] hover:border-blue-500 hover:bg-blue-50/30 text-left transition duration-150"
                         >
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-900 font-bold text-xs uppercase" x-text="method.type.substring(0,2)"></span>
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-900 font-bold text-xs uppercase" x-text="method.type.substring(0,2)"></span>
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-semibold text-zinc-950" x-text="method.label"></p>
                                 <p class="text-xs text-zinc-500 truncate" x-text="method.description"></p>
@@ -599,29 +599,29 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">Cardholder Name</label>
-                        <input type="text" x-model="cardDetails.card_holder" placeholder="e.g. John Doe" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" x-model="cardDetails.card_holder" placeholder="e.g. John Doe" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">Card Number</label>
-                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                     </div>
 
                     <div class="grid grid-cols-3 gap-3">
                         <div class="col-span-2">
                             <label class="block text-xs font-semibold text-zinc-700">Expiry (MM/YY)</label>
                             <div class="flex gap-2">
-                                <input type="text" x-model="cardDetails.expiry_month" placeholder="MM" maxlength="2" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
-                                <input type="text" x-model="cardDetails.expiry_year" placeholder="YY" maxlength="2" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                                <input type="text" x-model="cardDetails.expiry_month" placeholder="MM" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                                <input type="text" x-model="cardDetails.expiry_year" placeholder="YY" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-700 text-center">CVV</label>
-                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
                         </div>
                     </div>
 
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
                         Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
@@ -632,8 +632,8 @@
                 <h3 class="text-sm font-bold text-zinc-900 mb-2">Card PIN Required</h3>
                 <p class="text-xs text-zinc-600 mb-4">Enter your card 4-digit security PIN to authorize payment.</p>
                 <div class="space-y-4">
-                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[10px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         Confirm PIN
                     </button>
                 </div>
@@ -644,8 +644,8 @@
                 <h3 class="text-sm font-bold text-zinc-900 mb-2">OTP Verification</h3>
                 <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
                 <div class="space-y-4">
-                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[10px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         Verify OTP
                     </button>
                 </div>
@@ -656,11 +656,11 @@
                 <h3 class="text-sm font-bold text-zinc-900 mb-2">Secure Verification</h3>
                 <p class="text-xs text-zinc-600 mb-4">Please complete the secure authentication inside the window below.</p>
                 
-                <div class="w-full border border-zinc-200 rounded-[10px] overflow-hidden bg-zinc-50" style="height: 380px;">
+                <div class="w-full border border-zinc-200 rounded-[12px] overflow-hidden bg-zinc-50" style="height: 380px;">
                     <iframe :src="session?.payment_payload?.redirect_url" class="w-full h-full border-0"></iframe>
                 </div>
 
-                <button @click="startStatusPolling()" class="w-full mt-4 rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                <button @click="startStatusPolling()" class="w-full mt-4 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                     I Have Completed Payment
                 </button>
             </div>
@@ -676,13 +676,13 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">Phone Number</label>
-                        <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[10px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">Network</label>
                         <div class="relative mt-1.5">
-                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-[10px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <template x-for="net in selectedMethod?.supported_networks" :key="net">
                                     <option :value="net" x-text="net"></option>
                                 </template>
@@ -693,7 +693,7 @@
                         </div>
                     </div>
 
-                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[10px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
@@ -707,7 +707,7 @@
                         <h3 class="text-sm font-bold text-zinc-900 mb-2">Virtual Bank Transfer</h3>
                         <p class="text-xs text-zinc-600 mb-4">Please make a transfer to the temporary virtual account below:</p>
 
-                        <div class="bg-zinc-50 border border-zinc-200 rounded-[10px] p-4 space-y-3">
+                        <div class="bg-zinc-50 border border-zinc-200 rounded-[12px] p-4 space-y-3">
                             <div class="flex justify-between items-center text-xs">
                                 <span class="text-zinc-500">Bank Name</span>
                                 <span class="font-bold text-zinc-900" x-text="bankDetails?.bank_name"></span>
@@ -737,9 +737,9 @@
                         <h3 class="text-sm font-bold text-zinc-900 text-center mb-2">Crypto Payment Details</h3>
                         <p class="text-xs text-zinc-600 text-center mb-4">Send the exact amount of cryptocurrency shown to the address below:</p>
 
-                        <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start bg-zinc-50 p-4 border border-zinc-200 rounded-[10px]">
+                        <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start bg-zinc-50 p-4 border border-zinc-200 rounded-[12px]">
                             <!-- QR Code -->
-                            <div class="flex shrink-0 flex-col items-center rounded-[10px] bg-white p-2 border border-zinc-150">
+                            <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-2 border border-zinc-150">
                                 <img 
                                     :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(session?.payment_payload?.qr_payload || '')" 
                                     alt="Payment QR Code" 
@@ -753,7 +753,7 @@
                                 <div>
                                     <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Cryptocurrency</span>
                                     <div class="flex items-center gap-1.5">
-                                        <span class="rounded-[10px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
+                                        <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
                                         <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || 'bitcoin')"></span>
                                     </div>
                                 </div>
@@ -765,7 +765,7 @@
                                 <div>
                                     <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Deposit Address</span>
                                     <div class="mt-1 flex items-center gap-1">
-                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-[10px] text-[10px] text-zinc-800 font-mono select-all outline-none">
+                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-[12px] text-[10px] text-zinc-800 font-mono select-all outline-none">
                                         <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold shrink-0">Copy</button>
                                     </div>
                                 </div>
@@ -790,7 +790,7 @@
                 <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
 
                 <div class="flex flex-col items-center py-6 text-center">
-                    <span class="flex h-14 w-14 items-center justify-center rounded-[10px] bg-blue-50 ring-8 ring-blue-100/50 mb-4">
+                    <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 ring-8 ring-blue-100/50 mb-4">
                         <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                         </svg>
@@ -827,7 +827,7 @@
                 <h3 class="mt-4 text-sm font-bold text-zinc-900">Payment Failed</h3>
                 <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
                 
-                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[10px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                     Try Another Method
                 </button>
             </div>
@@ -838,7 +838,7 @@
     <section class="mt-6 rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-bold text-zinc-900">Order summary</h2>
-            <span class="inline-flex items-center rounded-[10px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
+            <span class="inline-flex items-center rounded-[12px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
                 {{ $status->label() }}
             </span>
         </div>
@@ -907,11 +907,11 @@
                         {{-- Render redemption details for each individual unit (each has its own unique code) --}}
                         @foreach ($variantItems as $item)
                             @if (! empty($item->fulfillment_payload))
-                                <div class="mt-2 rounded-[10px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-200">
+                                <div class="mt-2 rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-200">
                                     <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $groupQty > 1 ? 'Code ' . ($loop->iteration) . ' of ' . $groupQty : 'Redemption details' }}</p>
                                     
                                     @if(!empty($item->fulfillment_payload['phone_number']))
-                                        <div class="mt-2 mb-2 flex items-center gap-2 rounded-[10px] bg-blue-100 px-3 py-2 text-blue-800">
+                                        <div class="mt-2 mb-2 flex items-center gap-2 rounded-[12px] bg-blue-100 px-3 py-2 text-blue-800">
                                             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                             </svg>
@@ -921,7 +921,7 @@
 
                                     @if(!empty($item->fulfillment_payload['qrcode_url']))
                                         <div class="mt-2 mb-2">
-                                            <img src="{{ $item->fulfillment_payload['qrcode_url'] }}" alt="eSIM QR" class="h-32 w-32 rounded-[10px] bg-white p-2 ring-1 ring-zinc-200">
+                                            <img src="{{ $item->fulfillment_payload['qrcode_url'] }}" alt="eSIM QR" class="h-32 w-32 rounded-[12px] bg-white p-2 ring-1 ring-zinc-200">
                                         </div>
                                     @endif
 
@@ -1007,7 +1007,7 @@
                     [$deliveryLabel, $deliveryDesc],
                 ] as $i => $step)
                     <li class="flex gap-3">
-                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">{{ $i + 1 }}</span>
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">{{ $i + 1 }}</span>
                         <div>
                             <p class="text-sm font-semibold text-zinc-900">{{ $step[0] }}</p>
                             <p class="mt-0.5 text-sm text-zinc-600">{{ $step[1] }}</p>
@@ -1018,26 +1018,14 @@
         </section>
     @endif
 
-    {{-- Region notice — only meaningful for gift-card orders. Top-up + eSIM
-         orders aren't region-locked in the same way, so the notice would only
-         confuse the buyer. --}}
-    @if ($orderHasGiftCards)
-        <div class="mt-6 flex items-start gap-2.5 rounded-[10px] bg-amber-50 px-4 py-3.5">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-            </svg>
-            <p class="text-sm text-amber-800">Gift cards are region-locked. Make sure to update the region of the device you want to redeem the gift card with. For more information visit our learning page.</p>
-        </div>
-    @endif
-
     {{-- Actions --}}
     <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <a href="{{ route('dashboard.orders') }}" wire:navigate
-            class="flex items-center justify-center rounded-[10px] border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
+            class="flex items-center justify-center rounded-[12px] border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
             Go to orders
         </a>
         <a href="{{ $shopRoute('gift-cards') }}" wire:navigate
-            class="flex items-center justify-center rounded-[10px] bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
+            class="flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
             Continue shopping
         </a>
     </div>

@@ -250,8 +250,8 @@ class extends Component {
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Newsroom posts shown at <a href="/press" target="_blank" class="text-blue-600 hover:underline dark:text-blue-300">/press</a>.</p>
         </div>
         <div class="flex items-center gap-2">
-            <span class="rounded-[10px] bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-300">{{ $this->articles->count() }} {{ \Illuminate\Support\Str::plural('article', $this->articles->count()) }}</span>
-            <button wire:click="newArticle" type="button" class="inline-flex items-center gap-1.5 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+            <span class="rounded-[12px] bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-300">{{ $this->articles->count() }} {{ \Illuminate\Support\Str::plural('article', $this->articles->count()) }}</span>
+            <button wire:click="newArticle" type="button" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                 New article
             </button>
@@ -259,10 +259,10 @@ class extends Component {
     </header>
 
     @if (session('status'))
-        <div class="mb-4 rounded-[10px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
+        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
     @endif
 
-    <div class="overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
@@ -310,23 +310,23 @@ class extends Component {
     @if ($showForm)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
             <div wire:click="$set('showForm', false)" class="absolute inset-0 bg-zinc-900/40"></div>
-            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-[10px] bg-white shadow-2xl flex flex-col">
+            <form wire:submit="save" class="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-[12px] bg-white shadow-2xl flex flex-col">
                 <div class="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
                     <h3 class="text-sm font-bold text-zinc-900">{{ $editingId ? 'Edit article' : 'New article' }}</h3>
-                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
+                    <button type="button" wire:click="$set('showForm', false)" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
                 <div class="space-y-4 overflow-y-auto px-5 py-4">
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Title</label>
-                        <input wire:model.live.debounce.300ms="title" type="text" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                        <input wire:model.live.debounce.300ms="title" type="text" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         @error('title') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Slug</label>
-                            <input wire:model="slug" type="text" placeholder="auto-generated from title" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="slug" type="text" placeholder="auto-generated from title" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                             @error('slug') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -334,14 +334,14 @@ class extends Component {
 
                             {{-- Mode toggle: pick from existing categories or create new --}}
                             @if (! empty($this->existingCategories))
-                                <div class="mt-1.5 inline-flex items-center rounded-[10px] bg-zinc-100 p-1" role="tablist" aria-label="Category source">
+                                <div class="mt-1.5 inline-flex items-center rounded-[12px] bg-zinc-100 p-1" role="tablist" aria-label="Category source">
                                     <button
                                         type="button"
                                         wire:click="setCategoryMode('existing')"
                                         role="tab"
                                         aria-selected="{{ $categoryMode === 'existing' ? 'true' : 'false' }}"
                                         @class([
-                                            'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                                            'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                                             'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' => $categoryMode === 'existing',
                                             'text-zinc-600 hover:text-zinc-900' => $categoryMode !== 'existing',
                                         ])
@@ -352,7 +352,7 @@ class extends Component {
                                         role="tab"
                                         aria-selected="{{ $categoryMode === 'new' ? 'true' : 'false' }}"
                                         @class([
-                                            'rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors',
+                                            'rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors',
                                             'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' => $categoryMode === 'new',
                                             'text-zinc-600 hover:text-zinc-900' => $categoryMode !== 'new',
                                         ])
@@ -364,20 +364,20 @@ class extends Component {
                                 @php $categoryChoices = array_combine($this->existingCategories, $this->existingCategories); @endphp
                                 <x-admin.select wire:model="category" :options="$categoryChoices" />
                             @else
-                                <input wire:model="category" type="text" placeholder="e.g. Newsroom" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                                <input wire:model="category" type="text" placeholder="e.g. Newsroom" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                             @endif
                             @error('category') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Excerpt</label>
-                        <textarea wire:model="excerpt" rows="2" placeholder="Short summary shown on the press index." class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
+                        <textarea wire:model="excerpt" rows="2" placeholder="Short summary shown on the press index." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
                         @error('excerpt') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Body</label>
                         <p class="text-[11px] text-zinc-500">Separate paragraphs with a blank line.</p>
-                        <textarea wire:model="bodyText" rows="10" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
+                        <textarea wire:model="bodyText" rows="10" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"></textarea>
                         @error('bodyText') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     {{-- Hero image upload --}}
@@ -385,7 +385,7 @@ class extends Component {
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Hero image</label>
                         <div class="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center">
                             {{-- Existing image preview --}}
-                            <div class="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/60">
+                            <div class="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/60">
                                 @if ($imageUpload)
                                     <img src="{{ $imageUpload->temporaryUrl() }}" alt="" class="h-full w-full object-cover">
                                 @elseif ($image)
@@ -395,7 +395,7 @@ class extends Component {
                                 @endif
                             </div>
                             <div class="min-w-0 flex-1">
-                                <input wire:model="imageUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[10px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300">
+                                <input wire:model="imageUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[12px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300">
                                 <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">PNG / JPG / WebP / GIF, up to 5MB. Stored at <code class="rounded bg-zinc-100 px-1 dark:bg-zinc-700/50">public/assets/press/</code>.</p>
                                 <div wire:loading wire:target="imageUpload" class="mt-1 text-[11px] font-medium text-blue-600">Uploading…</div>
                             </div>
@@ -404,12 +404,12 @@ class extends Component {
                     </div>
 
                     {{-- Optional download attachment (PDF / press kit / etc.) --}}
-                    <div class="rounded-[10px] border border-dashed border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
+                    <div class="rounded-[12px] border border-dashed border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Downloadable attachment <span class="text-zinc-500 dark:text-zinc-400">(optional)</span></label>
                         <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">Adds a "Download" button to the public press post. PDF, ZIP, DOC, PNG, JPG, MP4 — up to 20MB.</p>
 
                         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-white ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/60">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-white ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/60">
                                 @if ($attachmentUpload || $attachment)
                                     <svg class="h-5 w-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z"/>
@@ -424,7 +424,7 @@ class extends Component {
                                 @if ($attachment && ! $attachmentUpload)
                                     <p class="truncate text-xs font-mono text-zinc-700 dark:text-zinc-300">{{ $attachment }}</p>
                                 @endif
-                                <input wire:model="attachmentUpload" type="file" accept=".pdf,.zip,.doc,.docx,.png,.jpg,.jpeg,.mp4" class="mt-1 block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[10px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300">
+                                <input wire:model="attachmentUpload" type="file" accept=".pdf,.zip,.doc,.docx,.png,.jpg,.jpeg,.mp4" class="mt-1 block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[12px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300">
                                 <div wire:loading wire:target="attachmentUpload" class="mt-1 text-[11px] font-medium text-blue-600">Uploading…</div>
                             </div>
                         </div>
@@ -433,7 +433,7 @@ class extends Component {
                         @if ($attachmentUpload || $attachment)
                             <div class="mt-3">
                                 <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Button label</label>
-                                <input wire:model="attachmentLabel" type="text" placeholder="e.g. Download press kit" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                                <input wire:model="attachmentLabel" type="text" placeholder="e.g. Download press kit" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                                 <p class="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">Defaults to "Download file" when left blank.</p>
                             </div>
                         @endif
@@ -441,13 +441,13 @@ class extends Component {
 
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Published at</label>
-                        <input wire:model="publishedAt" type="date" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
+                        <input wire:model="publishedAt" type="date" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white">
                         @error('publishedAt') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sort order</label>
-                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[10px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <input wire:model="sortOrder" type="number" min="0" max="10000" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                         </div>
                         <label class="flex items-end gap-2 pb-2">
                             <input wire:model="isPublished" type="checkbox" class="h-4 w-4 cursor-pointer accent-blue-600">
@@ -456,8 +456,8 @@ class extends Component {
                     </div>
                 </div>
                 <div class="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3">
-                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[10px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
-                    <button type="submit" class="inline-flex items-center rounded-[10px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create article' }}</button>
+                    <button type="button" wire:click="$set('showForm', false)" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">Cancel</button>
+                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create article' }}</button>
                 </div>
             </form>
         </div>

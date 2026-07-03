@@ -38,17 +38,17 @@
     <body class="min-h-screen bg-zinc-100 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
 
         <div class="flex min-h-screen items-start p-4 sm:items-stretch sm:p-6 lg:p-[60px]">
-            <div class="my-auto grid w-full overflow-hidden rounded-[10px] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-900/5 sm:my-0 lg:grid-cols-2 lg:shadow-2xl lg:shadow-zinc-900/15 dark:ring-zinc-800">
+            <div class="my-auto grid w-full overflow-hidden rounded-[12px] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-900/5 sm:my-0 lg:grid-cols-2 lg:shadow-2xl lg:shadow-zinc-900/15 dark:ring-zinc-800">
 
             {{-- Left panel: marketing / phone mockup --}}
             <aside class="relative hidden flex-col overflow-hidden bg-blue-950 p-10 text-white lg:flex">
 
                 {{-- Brand --}}
-                <a href="{{ route('home') }}" wire:navigate class="relative z-10 flex flex-col rounded-[10px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/40">
+                <a href="{{ route('home') }}" wire:navigate class="relative z-10 flex flex-col rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/40">
                     <span class="flex h-12 items-center">
                         <img
                             src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                            alt="RshopRefills"
+                            alt="{{ $siteName }}"
                             fetchpriority="high"
                             class="h-full w-auto object-contain brightness-0 invert transition-opacity duration-200 group-hover:opacity-90"
                         />
@@ -76,7 +76,7 @@
                                 ['24/7 Support',     'We\'re here to help anytime, anywhere',     'support.svg'],
                             ] as [$title, $desc, $icon])
                                 <li class="flex items-center gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-white/10 ring-1 ring-white/15">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white/10 ring-1 ring-white/15">
                                         <img
                                             src="{{ asset('assets/' . rawurlencode($icon)) }}"
                                             alt=""
@@ -147,7 +147,7 @@
                 {{-- Footer. Year auto-updates; legal + help links route to the
                      real storefront pages instead of dead anchors. --}}
                 <div class="relative z-10 mt-6 flex flex-wrap items-center justify-between gap-4 text-[12px] text-blue-200/70">
-                    <p>&copy; {{ date('Y') }} RshopRefills. All rights reserved.</p>
+                    <p>&copy; {{ date('Y') }} {{ $siteName }}. All rights reserved.</p>
                     <div class="flex flex-wrap gap-6">
                         <a href="{{ route('shop.privacy') }}" wire:navigate class="transition-colors hover:text-white">Privacy Policy</a>
                         <a href="{{ route('shop.terms') }}" wire:navigate class="transition-colors hover:text-white">Terms of Service</a>
@@ -168,7 +168,7 @@
                     <a
                         href="{{ route('home') }}"
                         wire:navigate
-                        class="inline-flex items-center gap-1.5 rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        class="inline-flex items-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                     >
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
@@ -178,11 +178,11 @@
                 </div>
 
                 {{-- Mobile brand (inside the card) --}}
-                <a href="{{ route('home') }}" wire:navigate class="flex shrink-0 flex-col items-center rounded-[10px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 lg:hidden">
+                <a href="{{ route('home') }}" wire:navigate class="flex shrink-0 flex-col items-center rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 lg:hidden">
                     <span class="flex h-10 items-center">
                         <img
                             src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                            alt="RshopRefills"
+                            alt="{{ $siteName }}"
                             class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
                         />
                     </span>

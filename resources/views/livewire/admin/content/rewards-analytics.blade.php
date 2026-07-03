@@ -118,7 +118,7 @@ class extends Component {
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">Rcoin Analytics</h1>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Live supply, redemption and referral metrics from the Rcoin ledger.</p>
         </div>
-        <a href="{{ route('admin.content.rewards') }}" wire:navigate class="inline-flex items-center gap-2 rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]">
+        <a href="{{ route('admin.content.rewards') }}" wire:navigate class="inline-flex items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]">
             Tune settings
             <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
@@ -139,7 +139,7 @@ class extends Component {
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         @foreach ($kpiCards as $card)
-            <div class="flex flex-col gap-3 rounded-[10px] border border-zinc-100 bg-white p-5 shadow-sm shadow-zinc-900/[0.03] dark:border-zinc-700/60 dark:bg-[#1d3252]">
+            <div class="flex flex-col gap-3 rounded-[12px] border border-zinc-100 bg-white p-5 shadow-sm shadow-zinc-900/[0.03] dark:border-zinc-700/60 dark:bg-[#1d3252]">
                 <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 {{ $card['tone'] }}">
                     {{ $card['label'] }}
                 </span>
@@ -156,7 +156,7 @@ class extends Component {
         $maxRedeemed = max(1, max(array_column($series, 'redeemed')));
         $maxAny      = max($maxMinted, $maxRedeemed);
     @endphp
-    <section class="mt-5 rounded-[10px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="mt-5 rounded-[12px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Last 7 days</h2>
             <div class="flex items-center gap-4 text-[11px] text-zinc-600 dark:text-zinc-400">
@@ -179,9 +179,9 @@ class extends Component {
     </section>
 
     {{-- Top referrers leaderboard. --}}
-    <section class="mt-5 overflow-hidden rounded-[10px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="mt-5 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
         {{-- Header pill --}}
-        <header class="mx-3 my-3 rounded-[10px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+        <header class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
             <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Top referrers</h2>
             <p class="mt-0.5 text-xs text-blue-700/70 dark:text-blue-300/70">Customers who've earned the most Rcoin through referrals.</p>
         </header>
@@ -190,8 +190,8 @@ class extends Component {
         @else
             <ul class="divide-inset">
                 @foreach ($this->topReferrers as $i => $row)
-                    <li class="group relative mx-3 flex items-center gap-4 px-5 py-3 transition-all hover:bg-blue-50 hover:rounded-[10px] dark:hover:bg-blue-600/15 dark:hover:ring-blue-400" wire:key="ref-{{ $row->referrer_id }}">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-xs font-black text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                    <li class="group relative mx-3 flex items-center gap-4 px-5 py-3 transition-all hover:bg-blue-50 hover:rounded-[12px] dark:hover:bg-blue-600/15 dark:hover:ring-blue-400" wire:key="ref-{{ $row->referrer_id }}">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-xs font-black text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
                             {{ $i + 1 }}
                         </span>
                         <div class="min-w-0 flex-1">

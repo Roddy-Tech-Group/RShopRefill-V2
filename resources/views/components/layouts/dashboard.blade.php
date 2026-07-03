@@ -233,7 +233,7 @@
              customer (admin guard still authenticated). Floating bottom pill so
              it never disrupts the layout; sits above the mobile bottom nav. --}}
         @auth('admin')
-            <div class="fixed bottom-20 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[10px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30 lg:bottom-4">
+            <div class="fixed bottom-20 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30 lg:bottom-4">
                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span>Viewing as {{ Auth::user()?->name }}</span>
                 <form method="POST" action="{{ route('impersonation.leave') }}">
@@ -308,18 +308,18 @@
             </button>
 
             {{-- Brand — full wordmark when expanded, square favicon when collapsed. --}}
-            <a href="{{ route('dashboard') }}" wire:navigate.hover class="mr-5 -ml-1 flex flex-col rounded-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 shrink-0">
+            <a href="{{ route('dashboard') }}" wire:navigate.hover class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 shrink-0">
                 <span class="brand-full flex h-10 items-center">
                     <img
                         src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                        alt="RshopRefills"
+                        alt="{{ $siteName }}"
                         class="h-full w-auto object-contain"
                     />
                 </span>
                 <span class="brand-mark hidden w-14 flex-col items-center justify-center">
                     <img
                         src="{{ asset('assets/favicon.ico') }}"
-                        alt="RshopRefills"
+                        alt="{{ $siteName }}"
                         class="h-12 w-12 rounded-full object-contain"
                     />
                     <span class="mt-0.5 text-[9px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
@@ -491,15 +491,8 @@
 
             </div> {{-- /scrollable middle --}}
 
-            {{-- Newsletter signup card — auth user's email, one-tap subscribe.
-                 Sticks to the bottom because the flex-1 wrapper above eats all remaining space.
-                 dash-footer-card class hides the whole block in collapsed mode where there's
-                 no horizontal room to render usefully. --}}
-            @feature('newsletter_signup')
-            <div class="dash-footer-card shrink-0 pt-6">
-                <livewire:newsletter-card />
-            </div>
-            @endfeature
+            {{-- Newsletter signup card removed from the sidebar; its WhatsApp
+                 shortcut now lives inside the Need Help card below. --}}
 
             {{-- Need Help card. Opens a small support modal with two paths:
                  immediate WhatsApp chat, or a formal support ticket via the
@@ -509,24 +502,45 @@
                 x-data="{ helpOpen: false }"
                 @keydown.escape.window="helpOpen = false"
             >
-                <button
-                    type="button"
-                    @click="helpOpen = true"
-                    class="flex w-full items-center gap-3 rounded-[10px] bg-blue-50 p-3 text-left transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:hover:bg-blue-500/25"
-                >
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-white dark:bg-[#1d3252]">
-                        <img src="{{ asset('assets/support.svg') }}" alt="" class="h-5 w-5" loading="lazy">
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Need help?</p>
-                        <p class="truncate text-xs text-zinc-600 dark:text-zinc-300">Chat with support</p>
-                    </div>
-                    {{-- Shortcut hint: the global Ctrl+F shortcut opens a support
-                         ticket from anywhere on the site (see partials/shortcuts). --}}
-                    <span class="inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
-                        CTRL <span class="opacity-70">+</span> F
-                    </span>
-                </button>
+                <div class="overflow-hidden rounded-[12px] bg-white ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                    <button
+                        type="button"
+                        @click="helpOpen = true"
+                        class="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-white/5"
+                    >
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                            <img src="{{ asset('assets/support.svg') }}" alt="" class="h-5 w-5" loading="lazy">
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-zinc-900 dark:text-white">Need help?</p>
+                            <p class="truncate text-xs text-zinc-600 dark:text-zinc-300">Chat with support</p>
+                        </div>
+                        {{-- Shortcut hint: the global Ctrl+F shortcut opens a support
+                             ticket from anywhere on the site (see partials/shortcuts). --}}
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
+                            CTRL <span class="opacity-70">+</span> F
+                        </span>
+                    </button>
+
+                    {{-- Direct WhatsApp shortcut (moved here from the removed newsletter
+                         card). Mirrors the global Ctrl+J shortcut for a quick support chat. --}}
+                    <a
+                        href="https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F"
+                        target="_blank"
+                        rel="noopener"
+                        class="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-2.5 text-[11px] font-medium text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-emerald-600 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-emerald-400"
+                    >
+                        <span class="inline-flex items-center gap-1.5">
+                            <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479s1.065 2.875 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
+                            </svg>
+                            Chat on WhatsApp
+                        </span>
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
+                            CTRL <span class="opacity-70">+</span> J
+                        </span>
+                    </a>
+                </div>
 
                 {{-- Support picker modal. Lives inside the same x-data so the
                      button's click toggles it without a global event. Backdrop
@@ -555,7 +569,7 @@
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                         x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-                        class="w-full max-w-sm rounded-[10px] bg-white p-6 shadow-2xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                        class="w-full max-w-sm rounded-[12px] bg-white p-6 shadow-2xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
@@ -566,7 +580,7 @@
                                 type="button"
                                 @click="helpOpen = false"
                                 aria-label="Close"
-                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10"
+                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10"
                             >
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
@@ -581,9 +595,9 @@
                                 target="_blank"
                                 rel="noopener"
                                 @click="helpOpen = false"
-                                class="group flex items-center gap-3 rounded-[10px] bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30 dark:hover:bg-emerald-500/25"
+                                class="group flex items-center gap-3 rounded-[12px] bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30 dark:hover:bg-emerald-500/25"
                             >
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white text-emerald-600 dark:bg-[#0c1a36]">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-emerald-600 dark:bg-[#0c1a36]">
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.149-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.611-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479s1.065 2.875 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
                                     </svg>
@@ -601,9 +615,9 @@
                                 href="{{ route('shop.contact') }}"
                                 wire:navigate.hover
                                 @click="helpOpen = false"
-                                class="group flex items-center gap-3 rounded-[10px] bg-blue-50 px-4 py-3 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/30 dark:hover:bg-blue-500/25"
+                                class="group flex items-center gap-3 rounded-[12px] bg-blue-50 px-4 py-3 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/30 dark:hover:bg-blue-500/25"
                             >
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white text-blue-600 dark:bg-[#0c1a36] dark:text-blue-300">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-blue-600 dark:bg-[#0c1a36] dark:text-blue-300">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/>
                                     </svg>
@@ -665,7 +679,7 @@
                         data-lpignore="true"
                         class="flex-1 min-w-0 bg-transparent text-base text-zinc-800 placeholder:text-zinc-600 outline-none"
                     />
-                    <span class="hidden items-center gap-1 rounded-[10px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 sm:inline-flex">
+                    <span class="hidden items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 sm:inline-flex">
                         CTRL <span class="text-zinc-600">+</span> K
                     </span>
                 </div>
@@ -680,7 +694,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
                     style="display:none;"
-                    class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[10px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+                    class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
                 >
                     {{-- Filter tabs --}}
                     <div class="border-b border-zinc-100 p-3">
@@ -690,7 +704,7 @@
                                     type="button"
                                     @click="activeTab = tab"
                                     :class="activeTab === tab ? 'bg-zinc-900 text-white' : 'bg-zinc-50 text-zinc-700 hover:bg-blue-100 hover:text-blue-700'"
-                                    class="rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors"
+                                    class="rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors"
                                     x-text="tab"
                                 ></button>
                             </template>
@@ -713,9 +727,9 @@
 
                         {{-- Matches --}}
                         <template x-for="r in results" :key="r.url">
-                            <a :href="r.url" class="flex items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-blue-100">
+                            <a :href="r.url" class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-blue-100">
                                 <span class="flex min-w-0 items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white ring-1 ring-zinc-200">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white ring-1 ring-zinc-200">
                                         <template x-if="r.logo"><img :src="r.logo" alt="" class="h-full w-full object-cover"></template>
                                         <template x-if="! r.logo"><span class="text-[10px] font-bold uppercase text-zinc-500" x-text="r.name.slice(0, 2)"></span></template>
                                     </span>
@@ -739,7 +753,7 @@
                         <a
                             x-show="! loading && results.length > 0"
                             :href="'/gift-cards?q=' + encodeURIComponent(query)"
-                            class="mt-1 flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+                            class="mt-1 flex items-center justify-center gap-1.5 rounded-[12px] px-3 py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50"
                         >
                             See all results
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -763,9 +777,9 @@
                         @endphp
 
                         @foreach ($searchItems as [$title, $subtitle, $icon, $href])
-                            <a href="{{ $href }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-blue-100">
+                            <a href="{{ $href }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-blue-100">
                                 <span class="flex items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100 ring-1 ring-zinc-200">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200">
                                         <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-4 w-4" loading="lazy">
                                     </span>
                                     <span class="leading-tight">
@@ -827,7 +841,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[10px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200"
+                    class="absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[12px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200"
                     role="menu"
                 >
                     {{-- Empty state --}}
@@ -846,8 +860,8 @@
 
                         <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             <template x-for="item in $store.cart.items" :key="item.id">
-                                <li class="flex items-center gap-3 rounded-[10px] px-3 py-2.5">
-                                    <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white shadow-sm ring-1 ring-zinc-200">
+                                <li class="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
+                                    <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
                                         <template x-if="item.logo">
                                             <img :src="item.logo" alt="" class="h-full w-full object-cover">
                                         </template>
@@ -860,11 +874,11 @@
                                         <span class="mt-0.5 block text-xs font-semibold text-zinc-700" x-text="$store.cart.pay(item.unit_price)"></span>
                                     </span>
                                     <span class="flex shrink-0 items-center gap-1.5">
-                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Decrease">
+                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Decrease">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
                                         </button>
                                         <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900" x-text="item.quantity"></span>
-                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[10px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Increase">
+                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Increase">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
                                         </button>
                                     </span>
@@ -872,11 +886,11 @@
                             </template>
                         </ul>
 
-                        <div class="mt-3 flex gap-2 rounded-[10px] bg-zinc-50 px-3 py-3">
-                            <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false; locked = false" class="flex-1 inline-flex items-center justify-center rounded-[10px] bg-white px-4 py-3.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100">
+                        <div class="mt-3 flex gap-2 rounded-[12px] bg-zinc-50 px-3 py-3">
+                            <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false; locked = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white px-4 py-3.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100">
                                 View cart
                             </a>
-                            <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[10px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                            <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                                 Checkout
                             </a>
                         </div>
@@ -954,15 +968,15 @@
                         $iconBlack = 'filter: brightness(0) saturate(100%);';
                     @endphp
                     <div class="p-1.5">
-                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/user.svg') }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Profile
                         </a>
-                        <a href="{{ route('dashboard.password') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('dashboard.password') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Security
                         </a>
-                        <a href="{{ route('dashboard.appearance') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('dashboard.appearance') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('Appearance.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Appearance
                         </a>
@@ -970,7 +984,7 @@
                         {{-- (Regional country/language switcher removed from the
                              dashboard - it belongs on shop/category pages only.) --}}
 
-                        <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <span class="flex items-center gap-3">
                                 <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                                 Notifications
@@ -979,7 +993,7 @@
                                 <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] bg-red-500 px-1 text-[10px] font-bold text-white">{{ $notificationCount }}</span>
                             @endif
                         </a>
-                        <a href="{{ route('home') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('home') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('Back to shop.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Back to store
                         </a>
@@ -988,7 +1002,7 @@
                     <div class="border-t border-zinc-200 p-1.5">
                         <form method="POST" action="{{ route('logout') }}" class="w-full">
                             @csrf
-                            <button type="submit" class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
+                            <button type="submit" class="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
                                 <x-ui.logout-icon class="h-5 w-5" />
                                 Log out
                             </button>
@@ -1002,13 +1016,19 @@
             // The blue hero shows ONLY on the dashboard overview. Every other dashboard
             // page uses the slim white inner top bar (hamburger + title + bell) below.
             $skipMobileHero = ! request()->routeIs('dashboard');
+
+            // The floating TOP chrome (cart / country switcher / notification, plus the
+            // hamburger) only rides along on the browse hub (overview) and the shop pages.
+            // Task/inner pages (orders, wallet, history, settings, ...) stay clean. The
+            // bottom floating nav bar is NOT gated by this - it stays on every page.
+            $showMobileTopChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
         @endphp
 
         {{-- flux:main is the single main-axis child of Flux's layout container.
              ANYTHING that should stack vertically with the page content (mobile blue hero,
              slim inner-page bar, the page slot) goes INSIDE it — otherwise Flux's flex
              container puts them side-by-side with flux:main on mobile. --}}
-        <flux:main class="!p-0 bg-[#eff6ff] lg:bg-white">
+        <flux:main class="!p-0 bg-[#eff6ff] lg:bg-white dark:bg-[#0c1a36] dark:lg:bg-[#0c1a36]">
 
         {{-- Mobile header (blue hero, visible only on mobile).
              Pages can extend the blue area by filling the $mobileHero slot
@@ -1018,7 +1038,7 @@
         {{-- Blue hero — overview only. Scrolls away with the page; the floating
              wallet chip + Top Up button inside <x-slot:mobileHero> take over once
              the hero leaves the viewport. --}}
-        <header class="relative z-10 px-5 pb-6 lg:hidden" style="padding-top: max(1rem, env(safe-area-inset-top));">
+        <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden" style="padding-top: max(1rem, env(safe-area-inset-top));">
             {{-- Compact identity strip - avatar + small online dot on the left,
                  notification bell on the right. Replaces the old "Hello /
                  Welcome back" greeting so the wallet card sits closer to the
@@ -1106,6 +1126,88 @@
         </header>
         @endunless
 
+        {{-- Mobile cart sheet. The desktop cart popup lives in the lg:flex header
+             (hidden on phones), so on mobile the shared $store.cart.open state needs
+             its own surface. Teleported to <body> and pinned above the mobile bottom
+             nav, it drops open the moment an item is added - mirroring the storefront
+             nav so adding to cart on a phone gives the same feedback. --}}
+        <div x-data>
+            <template x-teleport="body">
+                <div class="lg:hidden">
+                    <div
+                        x-show="$store.cart.open"
+                        x-transition.opacity.duration.150ms
+                        @click="$store.cart.open = false"
+                        style="display:none;"
+                        class="fixed inset-0 z-[80]"
+                    ></div>
+                    <div
+                        x-show="$store.cart.open"
+                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 translate-y-2"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 translate-y-2"
+                        style="display:none;"
+                        class="fixed inset-x-3 bottom-20 z-[80] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[14px] bg-white/80 px-3 py-2 backdrop-blur-2xl backdrop-saturate-150 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#0c1a36]/80 dark:ring-white/10"
+                        role="menu"
+                    >
+                        {{-- Empty state --}}
+                        <div x-show="$store.cart.count === 0" class="flex flex-col items-center px-3 py-5 text-center">
+                            <h3 class="text-xl font-bold text-zinc-900 dark:text-white">Your cart is empty</h3>
+                            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Your cart needs items</p>
+                        </div>
+
+                        {{-- Populated state --}}
+                        <div x-show="$store.cart.count > 0" x-cloak>
+                            <div class="flex items-center justify-between px-3 pt-3">
+                                <h3 class="text-lg font-bold text-zinc-900 dark:text-white">Your cart</h3>
+                                <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="$store.cart.count + ' item' + ($store.cart.count === 1 ? '' : 's')"></span>
+                            </div>
+
+                            <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <template x-for="item in $store.cart.items" :key="item.id">
+                                    <li class="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
+                                        <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
+                                            <template x-if="item.logo">
+                                                <img :src="item.logo" alt="" class="h-full w-full object-cover">
+                                            </template>
+                                            <template x-if="!item.logo">
+                                                <span class="text-sm font-black uppercase text-zinc-700" x-text="item.name.substring(0,2).toUpperCase()"></span>
+                                            </template>
+                                        </span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate text-sm font-bold text-zinc-900 dark:text-white" x-text="item.name"></span>
+                                            <span class="mt-0.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300" x-text="$store.cart.pay(item.unit_price)"></span>
+                                        </span>
+                                        <span class="flex shrink-0 items-center gap-1.5">
+                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Decrease">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
+                                            </button>
+                                            <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="item.quantity"></span>
+                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Increase">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+                                            </button>
+                                        </span>
+                                    </li>
+                                </template>
+                            </ul>
+
+                            <div class="mt-3 flex gap-2 rounded-[12px] bg-zinc-50 dark:bg-white/5 px-3 py-3">
+                                <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white dark:bg-white/10 px-4 py-3.5 text-sm font-semibold text-zinc-700 dark:text-zinc-200 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/15">
+                                    View cart
+                                </a>
+                                <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                                    Checkout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
         {{-- Sticky mobile top bar for inner pages (settings, password, appearance).
              Acts as the single mobile chrome on those pages — title derived from the route
              so individual pages don't need to render their own sticky header. --}}
@@ -1124,9 +1226,10 @@
                     default                                       => 'Settings',
                 };
             @endphp
-            {{-- Inner-page top bar. NOT sticky - scrolls away with the page; the
-                 floating hamburger + locale chip + bell below pin to the viewport
-                 once the user scrolls past, keeping the essentials always reachable. --}}
+            {{-- Inner-page top bar (top cart / country switcher / notification).
+                 Shown on the shop pages only; hidden on task/inner pages so they
+                 stay clean. The bottom nav bar stays on every page for navigation. --}}
+            @if ($showMobileTopChrome)
             <div class="relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 lg:hidden">
                 {{-- Hamburger opens the Connect panel (social + contact channels).
                      The app menu itself is the bottom-bar centre FAB. --}}
@@ -1172,13 +1275,15 @@
                     </div>
                 </div>
             </div>
+            @endif
         @endif
 
             {{-- ─────────────────────────────────────────────────────── --}}
-            {{-- FLOATING MOBILE CHROME (all dashboard pages, mobile)    --}}
-            {{-- Hamburger | locale | cart | bell. Pins to the viewport   --}}
-            {{-- once the page scrolls past the header, on every page.    --}}
+            {{-- FLOATING TOP CHROME (top cart / country switcher / bell) --}}
+            {{-- Pins to the viewport once the page scrolls past the      --}}
+            {{-- header. Overview + shop pages only; hidden elsewhere.     --}}
             {{-- ─────────────────────────────────────────────────────── --}}
+            @if ($showMobileTopChrome)
             <div
                 x-data="{
                     scrolled: false,
@@ -1247,6 +1352,7 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <div data-page-content class="flex flex-col bg-[#eff6ff] px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
                 <div class="w-full min-w-0 lg:flex-1">
@@ -1270,7 +1376,7 @@
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <span>version 2.0.0</span>
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <span>©RshopRefills {{ date('Y') }}</span>
+                    <span>©{{ $siteName }} {{ date('Y') }}</span>
                 </footer>
             </div>
         </flux:main>
@@ -1302,7 +1408,7 @@
         @endphp
         {{-- Floating rounded nav bar (neobank style): detached from the edges with
              a pill highlight behind the active tab. The wrapper's bottom padding
-             keeps it clear of the iOS home indicator. --}}
+             keeps it clear of the iOS home indicator. Shown on every page. --}}
         <div
             x-data="{
                 active: {{ $activeIndex }},
@@ -1436,7 +1542,7 @@
                 ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
                 // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
                 // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
-                ['label' => 'Gift Cards',    'href' => route('dashboard.gift-cards.history'), 'icon' => 'gift cards.svg', 'tone' => 'bg-orange-500', 'nav' => true],
+                ['label' => 'Trade Card',    'href' => route('dashboard.gift-cards.history'), 'icon' => 'gift cards.svg', 'tone' => 'bg-orange-500', 'nav' => true],
                 ['label' => 'Referrals',     'href' => route('dashboard.rewards'),    'icon' => 'referals.webp',       'tone' => 'bg-yellow-500',   'nav' => true],
                 ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'tone' => 'bg-cyan-500', 'nav' => false],
             ];
@@ -1482,7 +1588,7 @@
             >
                 {{-- Drag handle (visual affordance) --}}
                 <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[10px] bg-zinc-300 dark:bg-white/25"></span>
+                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300 dark:bg-white/25"></span>
                 </div>
 
                 <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
@@ -1500,7 +1606,7 @@
                                 style="--i: {{ $i }}"
                                 class="group flex flex-col items-center justify-center gap-2 rounded-[6px] px-2 py-3 text-center transition-transform duration-200 active:scale-95"
                             >
-                                <span class="flex h-12 w-12 items-center justify-center rounded-[10px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
+                                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
                                     <img src="{{ asset('assets/' . rawurlencode($item['icon'])) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
                                 </span>
                                 <span class="text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">{{ $item['label'] }}</span>
@@ -1513,7 +1619,7 @@
                         @csrf
                         <button
                             type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-[10px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                            class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
                         >
                             <x-ui.logout-icon class="h-4 w-4" />
                             Log out
@@ -1618,7 +1724,7 @@
                     <div class="mb-5 flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <h2 id="connect-title" class="text-lg font-bold text-zinc-900">Connect with us</h2>
-                            <p class="mt-0.5 text-xs text-zinc-600">Reach RshopRefills on your favourite channel.</p>
+                            <p class="mt-0.5 text-xs text-zinc-600">Reach {{ $siteName }} on your favourite channel.</p>
                         </div>
                         {{-- Glass grey close button — same recipe as the admin sidebar's
                              collapse toggle. Translucent fill + backdrop blur picks up the
@@ -1655,7 +1761,7 @@
                                          dark-mode CSS remaps that would otherwise turn the
                                          tile navy and the icon invisible (see app.css
                                          .dark .bg-white / .dark .text-zinc-950 mappings). --}}
-                                    <span class="no-dark-invert flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px]" style="background: #ffffff; color: #09090b;">
+                                    <span class="no-dark-invert flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]" style="background: #ffffff; color: #09090b;">
                                         @switch ($channel['type'])
                                             @case ('instagram')
                                                 <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.07 1.644.07 4.849 0 3.205-.012 3.584-.07 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
@@ -1681,7 +1787,7 @@
                                         @endswitch
                                     </span>
                                     @if (! empty($channel['badge']))
-                                        <span class="rounded-[10px] bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">{{ $channel['badge'] }}</span>
+                                        <span class="rounded-[12px] bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">{{ $channel['badge'] }}</span>
                                     @endif
                                 </div>
 
@@ -1694,7 +1800,7 @@
                                      and the button vanishes into the brand card in dark mode.
                                      hover:brightness-95 gives a press affordance that survives
                                      the locked inline background. --}}
-                                <span class="mt-4 inline-flex items-center rounded-[10px] px-4 py-2 text-sm font-bold transition-[filter] hover:brightness-95" style="background: #ffffff; color: #09090b;">
+                                <span class="mt-4 inline-flex items-center rounded-[12px] px-4 py-2 text-sm font-bold transition-[filter] hover:brightness-95" style="background: #ffffff; color: #09090b;">
                                     {{ $channel['cta'] }}
                                 </span>
                             </a>

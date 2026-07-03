@@ -6,7 +6,7 @@
     $lastUpdated = 'May 23, 2026';
 @endphp
 
-<x-layouts.app.header :title="'Cookie Policy | RshopRefills'">
+<x-layouts.app.header :title="'Cookie Policy | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
@@ -21,14 +21,14 @@
 
         {{-- Intro --}}
         <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
-            This Cookie Policy explains how RshopRefills uses cookies and similar technologies when you use our website and
+            This Cookie Policy explains how {{ $siteName }} uses cookies and similar technologies when you use our website and
             app. It should be read together with our
             <a href="{{ route('shop.privacy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Privacy Policy</a>.
-            By using RshopRefills, you agree to our use of cookies as described here.
+            By using {{ $siteName }}, you agree to our use of cookies as described here.
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[10px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#what" class="font-medium text-blue-600 hover:underline">1. What are cookies</a></li>
@@ -57,7 +57,7 @@
                 We use four main groups of cookies. Here is what each one does.
             </p>
 
-            <div class="mt-5 overflow-x-auto rounded-[10px] ring-1 ring-zinc-100">
+            <div class="mt-5 overflow-x-auto rounded-[12px] ring-1 ring-zinc-100">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -86,7 +86,7 @@
                 </table>
             </div>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Essential cookies are always on</p>
@@ -118,7 +118,7 @@
                 <li><span class="font-semibold text-zinc-900">Our cookie settings.</span> Where available, use the cookie settings link in the footer to adjust your choices.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Blocking essential cookies breaks core features</p>
@@ -136,7 +136,7 @@
                 agree with them.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[10px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">We never sell your data through cookies</p>

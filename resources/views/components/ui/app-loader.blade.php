@@ -1,7 +1,8 @@
 {{--
-    Dashboard preloader. Motion Code x hostinger-style: a faint static ring with a rotating
-    brand-blue arc and the R icon centred. Used only by the admin and customer
-    dashboard layouts (never the storefront).
+    Site preloader. Motion Code x hostinger-style: a faint static ring with a rotating
+    brand-blue arc and the R icon centred. Used by the admin + customer dashboard
+    layouts AND the storefront shell, so a hard reload anywhere follows the active
+    theme (light / dark / Extra Dark) instead of flashing unbranded.
 
     Everything here is inline (critical CSS + a tiny vanilla script) on purpose:
     the overlay must paint on the first byte of HTML, before the Vite bundles
@@ -81,16 +82,19 @@
        Two independent animations compose: a constant rotation + an eased dash
        cycle. circumference (2*PI*54) ~= 339.29, so 340 is used as the gap. */
     .app-loader__progress {
+        --glow: rgba(37, 99, 235, 0.7);   /* brand-blue halo colour */
         stroke: #2563eb;
         stroke-linecap: round;
         transform-box: fill-box;
         transform-origin: center;
         animation:
             app-loader-rotate 1.6s linear infinite,
-            app-loader-dash 1.6s ease-in-out infinite;
+            app-loader-dash 1.6s ease-in-out infinite,
+            app-loader-glow 1.6s ease-in-out infinite;
     }
     .dark .app-loader__progress {
         stroke: #60a5fa;
+        --glow: rgba(96, 165, 250, 0.85);
     }
     .app-loader__logo {
         position: absolute;
@@ -120,10 +124,16 @@
             stroke-dashoffset: -300;
         }
     }
-    /* Reduced motion: a gentle steady rotation, no growing/shrinking. */
+    /* Neon halo that breathes as the arc spins - a soft glow tracking the arc. */
+    @keyframes app-loader-glow {
+        0%, 100% { filter: drop-shadow(0 0 3px var(--glow)); }
+        50%      { filter: drop-shadow(0 0 11px var(--glow)); }
+    }
+    /* Reduced motion: a gentle steady rotation + a static glow, no pulsing. */
     @media (prefers-reduced-motion: reduce) {
         .app-loader__progress {
             stroke-dasharray: 230 340;
+            filter: drop-shadow(0 0 6px var(--glow));
             animation: app-loader-rotate 2.6s linear infinite;
         }
     }

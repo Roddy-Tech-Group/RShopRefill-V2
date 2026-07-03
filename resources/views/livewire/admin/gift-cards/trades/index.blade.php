@@ -52,7 +52,7 @@ class extends Component {
             @endphp
             
             @foreach($metrics as $metric)
-                <div class="flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+                <div class="flex flex-col justify-between rounded-[12px] border border-zinc-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
                     <span class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ $metric['label'] }}</span>
                     <div class="mt-4 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
                         {{ $metric['value'] }}
@@ -82,7 +82,8 @@ class extends Component {
         </div>
 
         {{-- Trades Table --}}
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
                     <tr>
@@ -145,9 +146,10 @@ class extends Component {
                     @endforelse
                 </tbody>
             </table>
+            </div>
 
             @if($trades->hasPages())
-                <div class="border-t border-zinc-200 px-4 py-3 dark:border-white/10">
+                <div class="border-t border-zinc-100 px-4 py-3 dark:border-white/10">
                     {{ $trades->links() }}
                 </div>
             @endif

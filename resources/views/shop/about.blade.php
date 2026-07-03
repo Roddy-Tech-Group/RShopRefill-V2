@@ -35,12 +35,12 @@
     ];
 @endphp
 
-<x-layouts.app.header :title="'About Us | RshopRefills'">
+<x-layouts.app.header :title="'About Us | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-zinc-100 bg-blue-50">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">About RshopRefills</span>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">About {{ $siteName }}</span>
             <h1 class="mt-5 text-3xl font-bold tracking-tight text-blue-600 sm:text-4xl lg:text-5xl">The Global Digital Ecosystem</h1>
             <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
                 One unified platform where commerce, travel, connectivity and payments work seamlessly together, for everyone, everywhere.
@@ -105,27 +105,27 @@
                     <div class="absolute inset-0" style="clip-path: polygon(0 60%, 100% 35%, 100% 100%, 0 100%); background-color: rgba(37, 99, 235, 0.12);" aria-hidden="true"></div>
                     <div class="relative p-7 sm:p-10">
                     <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Our story</span>
-                    <h2 class="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">About RShopRefill</h2>
+                    <h2 class="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">About {{ $siteName }}</h2>
 
                     <div class="mt-5 space-y-4 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                        <p>RShopRefill was founded in 2024 with a simple but powerful vision: make global digital commerce accessible, instant, and stress-free for everyone, everywhere. What started as a small operation manually selling digital products quickly revealed a bigger problem in the global market. Millions of people across different countries faced the same challenges every day: failed international payments, region restrictions, limited access to global brands, unreliable top-up services, and the constant struggle of finding trusted platforms to complete simple digital purchases. The idea behind RShopRefill was born from solving these real-world frustrations. In the early stages, orders were processed manually, customer by customer, with a strong focus on trust, speed, and reliability. As demand grew, the founder crossed paths with a young, ambitious, and highly innovative technology visionary who would later become the company's Chief Technology Officer (CTO). United by a shared mission and relentless drive to build something meaningful, they combined operational experience with advanced technology to transform a small digital service into a scalable international platform. Together, they built RShopRefills, a 24/7 global digital marketplace designed to simplify modern life.</p>
+                        <p>{{ $siteName }} was founded in 2024 with a simple but powerful vision: make global digital commerce accessible, instant, and stress-free for everyone, everywhere. What started as a small operation manually selling digital products quickly revealed a bigger problem in the global market. Millions of people across different countries faced the same challenges every day: failed international payments, region restrictions, limited access to global brands, unreliable top-up services, and the constant struggle of finding trusted platforms to complete simple digital purchases. The idea behind {{ $siteName }} was born from solving these real-world frustrations. In the early stages, orders were processed manually, customer by customer, with a strong focus on trust, speed, and reliability. As demand grew, the founder crossed paths with a young, ambitious, and highly innovative technology visionary who would later become the company's Chief Technology Officer (CTO). United by a shared mission and relentless drive to build something meaningful, they combined operational experience with advanced technology to transform a small digital service into a scalable international platform. Together, they built {{ $siteName }}, a 24/7 global digital marketplace designed to simplify modern life.</p>
 
-                        <p>Today, RShopRefill connects users to digital products and essential services across multiple countries and regions. From gift cards purchased directly from global brands, to instant eSIM activation that keeps travelers connected anywhere in the world, to airtime and utility top-ups that remove dependence on physical stores, the platform is designed around convenience, accessibility, and speed. Beyond digital products, RShopRefill continues expanding its ecosystem to include flights, global stays, and modern financial accessibility tools that help users move, shop, travel, and live without borders. By supporting crypto and multiple payment methods, the platform empowers users to spend value in the way most convenient to them, whether paying bills, sending gifts, purchasing services, or managing everyday digital needs. RShopRefill is more than a marketplace. It is infrastructure for a connected generation. The company's mission is to eliminate the stress of failed payments, region limitations, and fragmented digital services by creating one unified platform where technology, commerce, travel, and connectivity work seamlessly together.</p>
+                        <p>Today, {{ $siteName }} connects users to digital products and essential services across multiple countries and regions. From gift cards purchased directly from global brands, to instant eSIM activation that keeps travelers connected anywhere in the world, to airtime and utility top-ups that remove dependence on physical stores, the platform is designed around convenience, accessibility, and speed. Beyond digital products, {{ $siteName }} continues expanding its ecosystem to include flights, global stays, and modern financial accessibility tools that help users move, shop, travel, and live without borders. By supporting crypto and multiple payment methods, the platform empowers users to spend value in the way most convenient to them, whether paying bills, sending gifts, purchasing services, or managing everyday digital needs. {{ $siteName }} is more than a marketplace. It is infrastructure for a connected generation. The company's mission is to eliminate the stress of failed payments, region limitations, and fragmented digital services by creating one unified platform where technology, commerce, travel, and connectivity work seamlessly together.</p>
 
-                        <div class="rounded-[10px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
                             <p class="text-base font-bold text-blue-700">Built for speed.</p>
                             <p class="text-base font-bold text-blue-700">Designed for convenience.</p>
                             <p class="text-base font-bold text-blue-700">Powered by innovation.</p>
                         </div>
 
-                        <p class="font-semibold text-blue-600">RShopRefill is redefining how the world accesses digital services, making everyday life smarter, simpler, and truly borderless.</p>
+                        <p class="font-semibold text-blue-600">{{ $siteName }} is redefining how the world accesses digital services, making everyday life smarter, simpler, and truly borderless.</p>
                     </div>
                     </div>
                 </div>
 
                 {{-- Right: image (full-bleed photo filling the panel) --}}
                 <div class="relative order-first bg-blue-50 lg:order-none" style="min-height: 20rem;">
-                    <img src="{{ $img('About Us.webp') }}" alt="The people behind RshopRefills" class="object-cover" style="position: absolute; inset: 0; height: 100%; width: 100%;" loading="lazy">
+                    <img src="{{ $img('About Us.webp') }}" alt="The people behind {{ $siteName }}" class="object-cover" style="position: absolute; inset: 0; height: 100%; width: 100%;" loading="lazy">
                 </div>
             </div>
         </div>

@@ -63,7 +63,7 @@ class SendFulfillmentNotificationListener
         );
 
         // Fetch the exact API error from the fulfillment log
-        $log = FulfillmentLog::where('order_item_id', $item->id)->latest()->first();
+        $log = FulfillmentLog::where('order_item_id', $item->id)->latest('processed_at')->first();
         $apiErrorLog = $log ? ($log->error_message ?? json_encode($log->response_payload, JSON_PRETTY_PRINT)) : 'No API log found.';
 
         $this->dispatcher->dispatch(

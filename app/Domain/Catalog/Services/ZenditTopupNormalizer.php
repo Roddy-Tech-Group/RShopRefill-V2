@@ -19,15 +19,13 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
             ['name' => 'Mobile Airtime', 'type' => 'digital']
         );
 
-        // 2. Normalize subType -> Subcategory. Zendit returns subTypes as an array;
-        // pick the first one (or fall back to a generic "Airtime").
-        $subTypes = $rawItem['subTypes'] ?? [];
-        $subtypeName = is_array($subTypes) && ! empty($subTypes) ? $subTypes[0] : ($rawItem['subtype'] ?? 'Airtime');
-        $subcategorySlug = Str::slug($subtypeName);
-
+        // 2. Top-ups are no longer split into Data/Bundle subcategories - the storefront
+        // distinguishes them per-offer (network badges + the Credit/Data/Bundle switcher),
+        // reading each offer's subType from variant.metadata. Keep every operator under a
+        // single "Mobile Top Up" subcategory.
         $subcategory = Subcategory::firstOrCreate(
-            ['category_id' => $category->id, 'slug' => $subcategorySlug],
-            ['name' => $subtypeName, 'is_featured' => false]
+            ['category_id' => $category->id, 'slug' => 'mobile-top-up'],
+            ['name' => 'Mobile Top Up', 'is_featured' => false]
         );
 
         // 3. Brand = the mobile operator (e.g. "MTN", "Vodafone"). Zendit exposes a
@@ -71,8 +69,11 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
                 'country_code' => $existing?->country_code ?? $countryCode,
                 'currency_code' => $currencyCode,
                 'name' => $existing?->name ?? "{$brandLabel} ({$countryCode})",
-                'description' => $existing?->description
-                    ?: ($rawItem['shortNotes'] ?? $rawItem['notes'] ?? $rawItem['description'] ?? "{$brandLabel} mobile top-up for {$countryCode}"),
+                // A top-up product groups every operator offer, so a single offer's
+                // per-bundle shortNotes ("3GB + Call (30d)") must never stand in for
+                // the brand-level description. Leave it unset on sync so the storefront
+                // renders its own top-up tagline; preserve any admin-edited copy.
+                'description' => $existing?->description,
                 'redeem_instructions' => $existing?->redeem_instructions ?: ($rawItem['redeem_instructions'] ?? null),
                 'terms_and_conditions' => $existing?->terms_and_conditions ?: ($rawItem['terms'] ?? null),
                 'logo_url' => $existing?->logo_url ?: ($rawItem['logoUrl'] ?? null),

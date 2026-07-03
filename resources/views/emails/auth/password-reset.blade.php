@@ -1,7 +1,7 @@
-<x-emails.layout :mail-message="$message ?? null" title="Reset your password" preheader="Reset your RshopRefills password. This link expires in 60 minutes.">
+<x-emails.layout :mail-message="$message ?? null" title="Reset your password" preheader="Reset your {{ $siteName }} password. This link expires in 60 minutes.">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">Reset your password</h1>
 
-    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hi {{ $name }}, we received a request to reset the password for your RshopRefills account. Tap the button below to choose a new one.</p>
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hi {{ $name }}, we received a request to reset the password for your {{ $siteName }} account. Tap the button below to choose a new one.</p>
 
     <x-emails.button :url="$resetUrl" align="center">Reset password</x-emails.button>
 
