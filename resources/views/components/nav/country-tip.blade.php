@@ -76,14 +76,12 @@
                 Can't find what you're looking for? Tap the <span class="font-semibold text-zinc-900 dark:text-white">country pill</span> at the top of the page to switch to your country, and the store updates to what's available in your region.
             </p>
 
-            {{-- How-it-works flow pill: the cross-region buying flow at a glance. --}}
-            <div class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full bg-blue-50 px-4 py-2.5 text-center text-[11px] font-semibold text-blue-900 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-500/20">
+            {{-- How-it-works flow: the cross-region buying flow at a glance,
+                 one step per line, left-aligned. --}}
+            <div class="mt-4 flex flex-col items-start gap-y-1 rounded-[10px] bg-blue-50 px-4 py-3 text-left text-[13px] font-semibold text-blue-900 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-500/20">
                 <span>Buy from any country/region</span>
-                <span class="text-blue-400 dark:text-blue-500/70" aria-hidden="true">&middot;</span>
                 <span>Pay in your currency</span>
-                <span class="text-blue-400 dark:text-blue-500/70" aria-hidden="true">&middot;</span>
                 <span>Switch your account to the country you bought from</span>
-                <span class="text-blue-400 dark:text-blue-500/70" aria-hidden="true">&middot;</span>
                 <span>Redeem it, pay &amp; enjoy</span>
             </div>
 

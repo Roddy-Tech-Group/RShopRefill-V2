@@ -132,7 +132,7 @@
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">Recent reviews</h2>
-                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Reviews collected from our system, Trustpilot and Google Business. Scroll each row to read more.</p>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Reviews collected from Google Business, Trustpilot and our system. Scroll each row to read more.</p>
                 </div>
                 <a href="{{ $tp['profile_url'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-400">
                     View all on {{ $aggregate['source'] }}

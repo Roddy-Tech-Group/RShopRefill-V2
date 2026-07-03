@@ -329,6 +329,15 @@ $resolveBillBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
 Route::get('bills/{brandSlug}', $resolveBillBrand)->name('shop.bill');
 
+// Legacy URL redirects. Old path shapes Google still has indexed (surfacing as
+// 404s in Search Console) folded onto the current structure with a 301, so their
+// crawl equity lands on a live page instead of dying on a not-found. The
+// top-ups/{brand} wildcard catches the old hyphenated brand pages too.
+Route::redirect('giftcards', '/gift-cards', 301);
+Route::redirect('top-ups', '/topups', 301);
+Route::get('top-ups/{brand}', fn (string $brand) => redirect('/topups/'.$brand, 301))->where('brand', '.*');
+Route::redirect('en', '/', 301);
+
 // Flights & Stays - branded "coming soon" pages until the booking catalog ships.
 // One shared view, the `service` data flag drives the per-service copy + art.
 Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('shop.flights');
@@ -416,6 +425,21 @@ Route::get('robots.txt', function () {
         'Disallow: /cart',
         'Disallow: /checkout',
         'Disallow: /order',
+        // Internal endpoints Googlebot kept hitting (showing up as 404s / crawl
+        // waste in Search Console): the ajax brand-search backend and the region
+        // switch action. Neither is a page. (Brand pages like /gift-cards/ajax -
+        // the football club - are unaffected: they don't start with /ajax.)
+        'Disallow: /ajax',
+        'Disallow: /country',
+        // Faceted-navigation params. sort= (same products, reordered) and
+        // subcategory= filters generate endless duplicate listing URLs that all
+        // canonicalise back to the base page - Google reports them as "Alternate
+        // page with proper canonical tag". Block them from crawl so Googlebot
+        // spends its budget on real pages; every clean canonical URL is already
+        // listed in sitemap.xml, so indexing is unaffected. (?country= stays
+        // crawlable - it's the region switch, not a duplicate filter.)
+        'Disallow: /*sort=',
+        'Disallow: /*subcategory=',
         '',
         'Sitemap: '.url('/sitemap.xml'),
         '',

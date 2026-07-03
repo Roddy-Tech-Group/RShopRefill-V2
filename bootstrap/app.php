@@ -7,6 +7,7 @@ use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureAccountNotSuspended;
 use App\Http\Middleware\NegotiateMarkdown;
+use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\ResolveRegion;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
@@ -95,6 +96,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Locks the storefront catalog to the customer's chosen country/region.
         // CaptureReferralCookie persists `?ref=…` for 90 days so the referral
         // survives the visitor leaving and signing up later.
+        // Runs first on every web request: folds any configured alternate domain
+        // (e.g. the plural rshoprefills.com) onto the canonical host with a 301.
+        // No-op until APP_ALTERNATE_HOSTS is set, so it's safe to ship dormant.
+        $middleware->web(prepend: [
+            RedirectAlternateHosts::class,
+        ]);
+
         $middleware->web(append: [
             ResolveRegion::class,
             EnsureAccountActive::class,

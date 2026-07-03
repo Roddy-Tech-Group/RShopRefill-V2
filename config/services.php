@@ -110,6 +110,17 @@ return [
         // (paths 2/3 in the integration plan). Leave null until set up.
         'place_id' => env('GOOGLE_PLACE_ID'),
         'places_api_key' => env('GOOGLE_PLACES_API_KEY'),
+
+        // Google Customer Reviews program (Merchant Center -> Merchant programs
+        // -> Customer Reviews -> Set up integration). The merchant ID drives both
+        // the order-confirmation opt-in survey and the floating seller-rating
+        // badge; empty = both stay off, so dev/staging render nothing. Safe to
+        // commit the default since the same ID renders in the page JS anyway
+        // (same rationale as the Trustpilot IDs above).
+        'merchant_id' => env('GOOGLE_REVIEWS_MERCHANT_ID', '5808056900'),
+        'badge_enabled' => env('GOOGLE_REVIEWS_BADGE_ENABLED', true),
+        // BOTTOM_LEFT keeps the badge clear of the bottom-right live-chat widget.
+        'badge_position' => env('GOOGLE_REVIEWS_BADGE_POSITION', 'BOTTOM_LEFT'),
     ],
 
     'turnstile' => [

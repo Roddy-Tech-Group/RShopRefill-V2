@@ -1,7 +1,8 @@
 {{--
-    Dashboard preloader. Motion Code x hostinger-style: a faint static ring with a rotating
-    brand-blue arc and the R icon centred. Used only by the admin and customer
-    dashboard layouts (never the storefront).
+    Site preloader. Motion Code x hostinger-style: a faint static ring with a rotating
+    brand-blue arc and the R icon centred. Used by the admin + customer dashboard
+    layouts AND the storefront shell, so a hard reload anywhere follows the active
+    theme (light / dark / Extra Dark) instead of flashing unbranded.
 
     Everything here is inline (critical CSS + a tiny vanilla script) on purpose:
     the overlay must paint on the first byte of HTML, before the Vite bundles

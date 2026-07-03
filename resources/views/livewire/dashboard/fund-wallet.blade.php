@@ -859,12 +859,20 @@ new class extends Component
                             </button>
                         </div>
                     @else
-                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4 text-center">
+                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4 text-center dark:border-white/10 dark:bg-white/5">
+                            {{-- White chips keep the brand logos legible on the dark
+                                 modal panel; no-dark-invert stops the global image
+                                 dark-mode filter from recolouring the SVGs. Mirrors
+                                 the checkout payment block. --}}
                             <div class="flex justify-center gap-3 mb-3">
-                                <img src="/assets/visa.svg" alt="Visa" class="h-8 object-contain">
-                                <img src="/assets/mastercard.svg" alt="Mastercard" class="h-8 object-contain">
+                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                    <img src="/assets/visa.svg" alt="Visa" class="no-dark-invert h-6 object-contain">
+                                </span>
+                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                    <img src="/assets/mastercard.svg" alt="Mastercard" class="no-dark-invert h-6 object-contain">
+                                </span>
                             </div>
-                            <p class="text-sm font-medium text-zinc-700">
+                            <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                 Secure and encrypted payment with bank-level security.
                             </p>
                         </div>

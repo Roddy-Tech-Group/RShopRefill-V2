@@ -159,13 +159,31 @@
         ? $canonical
         : $canonicalRoot.($canonicalPath === '' ? '' : '/'.$canonicalPath);
 
+    // Brand-entity signals so Google resolves every spelling of the name to ONE
+    // entity (this site) and ranks us for brand searches. alternateName covers
+    // the singular/plural + .com variants people actually type (the site brand is
+    // "RshopRefills" but the domain is rshoprefill.com); sameAs points at the
+    // official profiles, read from the same settings the footer uses so there's a
+    // single place to edit them.
+    $brandAliases = ['Rshop Refills', 'rshoprefills', 'rshoprefills.com', 'rshoprefill', 'rshoprefill.com'];
+
+    $brandProfiles = array_values(array_filter([
+        \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills'),
+        \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills'),
+        \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills'),
+        \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills'),
+        config('services.trustpilot.profile_url'),
+    ]));
+
     // Organization schema: the brand, the founders, and the mission - written so
     // search engines and AI crawlers can pick up who built RshopRefills and why.
     $orgJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'Organization',
         'name' => $siteName,
+        'alternateName' => $brandAliases,
         'url' => url('/'),
+        'sameAs' => $brandProfiles,
         'logo' => asset('assets/icon-512.png'),
         'image' => asset('assets/og-image.png'),
         'description' => $siteName.' is the first product of Roddy Technologies. It makes gift cards, eSIMs, mobile top-ups and bill payments instant and affordable. Founded and built in Cameroon by CEO Divine Ofeh and CTO Johnpaul, the team keeps shipping updates and solving problems for the community while building an Africa-to-international digital ecosystem - from Cameroon to the world.',
@@ -188,6 +206,7 @@
         '@context' => 'https://schema.org',
         '@type' => 'WebSite',
         'name' => $siteName,
+        'alternateName' => $brandAliases,
         'url' => url('/'),
     ];
 @endphp

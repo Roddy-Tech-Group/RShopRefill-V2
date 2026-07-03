@@ -31,11 +31,20 @@ class SiteSetting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $cached = Cache::remember(
-            self::cacheKey($key),
-            now()->addHour(),
-            fn () => self::query()->where('key', $key)->value('value'),
-        );
+        try {
+            $cached = Cache::remember(
+                self::cacheKey($key),
+                now()->addHour(),
+                fn () => self::query()->where('key', $key)->value('value'),
+            );
+        } catch (\Throwable $e) {
+            // A DB or cache blip must never 500 a page: these reads happen ~10x in
+            // <head> on every render (SEO directives, brand name, social profiles),
+            // so an unguarded failure took down the whole page for crawlers. Fall
+            // back to the caller's default and let the page serve. Nothing is
+            // cached, so the real value returns as soon as the store recovers.
+            return $default;
+        }
 
         return $cached !== null ? $cached : $default;
     }

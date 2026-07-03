@@ -332,22 +332,27 @@
                         : 'flex items-center rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                 @endphp
                 <div
-                    x-data="{ expanded: {{ $productActive ? 'true' : 'false' }} }"
-                    x-effect="expanded = $store.adminSidebar?.collapsed ? true : {{ $productActive ? 'true' : 'false' }}"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { expanded = false }"
+                    x-data="{
+                        open: {{ $productActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/products'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
                     class="nav-group flex flex-col gap-1"
                 >
                     <button
                         type="button"
-                        @click.stop="expanded = ! expanded"
-                        :aria-expanded="expanded.toString()"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
                         class="{{ $navItemClass($productActive) }} w-full justify-between"
                     >
                         <span class="flex items-center gap-3">
                             <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $imgIconClass($productActive) }}" loading="lazy">
                             Products
                         </span>
-                        <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $productActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $productActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
@@ -362,7 +367,7 @@
                         $isProductsRoot  = $isCurrent('admin.products') && $currentCategory === '';
                         $isCategory      = fn (string $slug) => $isCurrent('admin.products') && $currentCategory === $slug;
                     @endphp
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.products') }}" wire:navigate class="{{ $subItemClass($isProductsRoot) }}">All Products</a>
                         <a href="{{ route('admin.products', ['category' => 'gift-cards']) }}" wire:navigate class="{{ $subItemClass($isCategory('gift-cards')) }}">Gift Cards</a>
                         <a href="{{ route('admin.products', ['category' => 'esims']) }}" wire:navigate class="{{ $subItemClass($isCategory('esims')) }}">eSIMs</a>
@@ -407,15 +412,20 @@
                     $gcActive = $isCurrent('admin.gift-cards.trades*', 'admin.gift-cards.brands*', 'admin.gift-cards.rates*');
                 @endphp
                 <div
-                    x-data="{ expanded: {{ $gcActive ? 'true' : 'false' }} }"
-                    x-effect="expanded = $store.adminSidebar?.collapsed ? true : {{ $gcActive ? 'true' : 'false' }}"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { expanded = false }"
+                    x-data="{
+                        open: {{ $gcActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/gift-cards'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
                     class="nav-group flex flex-col gap-1"
                 >
                     <button
                         type="button"
-                        @click.stop="expanded = ! expanded"
-                        :aria-expanded="expanded.toString()"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
                         class="{{ $navItemClass($gcActive) }} w-full justify-between"
                     >
                         <span class="flex items-center gap-3">
@@ -425,7 +435,7 @@
                             </svg>
                             Gift Card Trading
                         </span>
-                        <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $gcActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $gcActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
@@ -435,7 +445,7 @@
                             ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
                             : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                     @endphp
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.gift-cards.trades.index') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.trades*')) }}">Trades Queue</a>
                         <a href="{{ route('admin.gift-cards.brands') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.brands*')) }}">Brands</a>
                         <a href="{{ route('admin.gift-cards.rates') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.rates*')) }}">Rates</a>
@@ -494,11 +504,16 @@
                 @if ($can('admin.content.blog'))
                 @php $contentActive = $isCurrent('admin.content.*'); @endphp
                 <div
-                    x-data="{ open: {{ $contentActive ? 'true' : 'false' }} }"
-                    {{-- Force open while collapsed (so the hover popup renders) but restore
-                         to the closed/active state when expanded — otherwise re-opening the
-                         sidebar would leave this dropdown stuck open. --}}
-                    x-effect="open = $store.adminSidebar?.collapsed ? true : {{ $contentActive ? 'true' : 'false' }}"
+                    x-data="{
+                        open: {{ $contentActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/content'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    {{-- Open state is derived from the live URL and re-synced on every
+                         wire:navigate, so a group can't stay stuck open after you move to
+                         another page. Collapsed sidebar forces open for the hover flyout. --}}
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
                     class="nav-group flex flex-col"
                 >
                     <button

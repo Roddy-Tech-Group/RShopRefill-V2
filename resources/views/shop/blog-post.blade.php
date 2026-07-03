@@ -23,8 +23,8 @@
             {{ $post->author }} &middot; {{ $post->published_at->format('M j, Y') }}@if ($post->read_time) &middot; {{ $post->read_time }}@endif
         </p>
 
-        <div class="mt-8 flex items-center justify-center overflow-hidden rounded-[12px] bg-blue-50 p-8 ring-1 ring-zinc-100" style="height: 18rem;">
-            <img src="{{ $img($post->image) }}" alt="" class="max-h-full w-auto object-contain" loading="lazy">
+        <div class="mt-8 overflow-hidden rounded-[12px] ring-1 ring-zinc-100">
+            <img src="{{ $img($post->image) }}" alt="" class="h-auto w-full object-contain" loading="lazy">
         </div>
 
         <div class="mt-8 space-y-4 text-sm leading-relaxed text-zinc-600 sm:text-base">

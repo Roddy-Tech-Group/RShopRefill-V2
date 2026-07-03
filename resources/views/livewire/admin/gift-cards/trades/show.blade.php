@@ -161,7 +161,7 @@ class extends Component {
         <div class="lg:col-span-2 space-y-6">
             
             {{-- Card Details --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Gift Card Details</h2>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
@@ -187,7 +187,7 @@ class extends Component {
             </div>
 
             {{-- User Contact Details --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">User Contact Details</h2>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
@@ -215,7 +215,7 @@ class extends Component {
             </div>
 
             {{-- Payout Details --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Payout Information</h2>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
@@ -285,7 +285,7 @@ class extends Component {
             </div>
 
             {{-- Uploaded Images --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Uploaded Images</h2>
                 
                 @if($trade->media->count() > 0)
@@ -310,7 +310,7 @@ class extends Component {
         <div class="space-y-6">
             
             {{-- Action Controls --}}
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+            <div class="rounded-[12px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Trade Actions</h2>
                 
                 <form wire:submit="updateStatus" class="space-y-4">
@@ -342,7 +342,7 @@ class extends Component {
             </div>
 
             {{-- Chat / Communication --}}
-            <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900 flex flex-col h-[500px]">
+            <div class="rounded-[12px] border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900 flex flex-col h-[500px]">
                 <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
                     <h2 class="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <flux:icon.chat-bubble-left-right class="size-5 text-zinc-500" /> Trade Communication

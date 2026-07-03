@@ -315,6 +315,9 @@
                 <a href="{{ route('dashboard.orders') }}" wire:navigate class="text-xs font-semibold text-blue-700 underline-offset-4 hover:underline dark:text-blue-300">View all my orders</a>
             </div>
 
+            {{-- Google Customer Reviews opt-in (instant digital delivery). --}}
+            @include('shop._google-customer-reviews', ['order' => $order])
+
         </div>
     </div>
 

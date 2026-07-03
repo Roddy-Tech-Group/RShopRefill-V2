@@ -189,7 +189,7 @@
                         type="button"
                         @click="mobileSearchOpen = !mobileSearchOpen; if (mobileSearchOpen) $nextTick(() => $refs.mobileSearchInput?.focus())"
                         :aria-expanded="mobileSearchOpen.toString()"
-                        class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-900 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                        class="flex h-11 w-11 items-center justify-center rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="Search"
                     >
                         <svg x-show="! mobileSearchOpen" class="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -316,7 +316,7 @@
                     <a
                         href="{{ route('dashboard') }}"
                         wire:navigate
-                        class="group hidden md:inline-flex h-10 items-center gap-2 rounded-full bg-zinc-100 px-4 text-sm font-semibold text-zinc-900 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                        class="group hidden md:inline-flex h-10 items-center gap-2 rounded-full bg-zinc-200 px-4 text-sm font-semibold text-zinc-900 dark:text-zinc-200 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="{{ $walletSummary['combined'] ? 'Total wallet balance in USD' : 'Wallet balance in USD' }}"
                         title="${{ number_format((float) $walletAmount, 2) }}"
                     >
@@ -327,7 +327,7 @@
                     <button
                         type="button"
                         @click="$dispatch('open-auth-modal', { mode: 'login' })"
-                        class="group hidden md:inline-flex h-10 items-center gap-2 rounded-full bg-zinc-100 px-4 text-sm font-semibold text-zinc-900 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                        class="group hidden md:inline-flex h-10 items-center gap-2 rounded-full bg-zinc-200 px-4 text-sm font-semibold text-zinc-900 dark:text-zinc-200 transition-colors duration-150 hover:bg-blue-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="Wallet - sign in to view balance"
                     >
                         <img src="{{ asset('assets/' . rawurlencode('transactions.svg')) }}" alt="" class="h-4 w-4 shrink-0 transition group-hover:brightness-0 group-hover:invert" loading="lazy">
@@ -352,7 +352,7 @@
                             @click="locked = !locked; open = locked"
                             :aria-expanded="open.toString()"
                             aria-haspopup="menu"
-                            class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 overflow-hidden rounded-full bg-zinc-100 transition-all duration-150 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                            class="flex items-center justify-center w-11 h-11 md:w-10 md:h-10 overflow-hidden rounded-[10px] bg-zinc-200 transition-all duration-150 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                             aria-label="Your account"
                         >
                             <img src="{{ $accountAvatar }}" alt="{{ $authUser?->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
@@ -437,7 +437,7 @@
                             @click="locked = !locked; open = locked; tip = false"
                             :aria-expanded="open.toString()"
                             aria-haspopup="menu"
-                            class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full bg-zinc-100 text-zinc-900 hover:bg-blue-600 hover:text-white/70 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                            class="flex items-center justify-center w-11 h-11 md:w-10 md:h-10 rounded-[10px] bg-zinc-200 text-zinc-900 hover:bg-blue-600 hover:text-white/70 dark:text-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                             aria-label="Sign in"
                         >
                             {{-- Same profile glyph as the user dashboard (assets/user.svg), inlined so
@@ -520,7 +520,7 @@
                         @click="$store.cart.open = ! $store.cart.open; locked = $store.cart.open"
                         :aria-expanded="$store.cart.open.toString()"
                         aria-haspopup="menu"
-                        class="relative flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full bg-zinc-100 text-zinc-900 hover:bg-blue-600 hover:text-white/70 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                        class="relative flex items-center justify-center w-11 h-11 md:w-10 md:h-10 rounded-[10px] bg-zinc-200 text-zinc-900 hover:bg-blue-600 hover:text-white/70 dark:text-zinc-200 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         aria-label="Shopping cart"
                     >
                         {{-- Inline cart glyph (assets/new cart.svg) so it inherits the button

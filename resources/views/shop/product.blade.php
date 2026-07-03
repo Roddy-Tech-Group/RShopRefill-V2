@@ -286,12 +286,17 @@
      * Structured data for this brand page. A Product schema (with an
      * AggregateOffer spanning the cheapest -> priciest denomination) lets search
      * engines and AI crawlers surface the page as a buyable product, and a
-     * BreadcrumbList gives the listing -> brand trail. Prices use the catalog's
-     * own retail_price + currency so the schema is internally consistent
-     * regardless of the visitor's display currency.
+     * BreadcrumbList gives the listing -> brand trail.
+     *
+     * Offers are priced in USD - the marked-up amount the customer actually pays
+     * (price_usd), not the card's local face value. USD is the settlement
+     * currency for every order, so this keeps the schema consistent with the
+     * real charge AND with Google Merchant's single shipping currency. Emitting a
+     * local priceCurrency (EUR, NGN, ...) is exactly what trips Merchant's
+     * "mismatched shipping currency" disapproval.
      */
-    $schemaPrices = $variants
-        ->pluck('retail_price')
+    $schemaPrices = $variantsForJs
+        ->pluck('price_usd')
         ->map(fn ($p) => round((float) $p, 2))
         ->filter(fn ($p) => $p > 0)
         ->values();
@@ -354,7 +359,7 @@
         '@context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => $brandName.' '.$kindTitle,
-        'description' => 'Buy a '.$brandName.' '.strtolower($kindTitle).' on '.$siteName.' with instant digital delivery, great prices and 24/7 support.',
+        'description' => 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName.($rangeText ? ' from '.$rangeText : '').' on '.$siteName.'. Instant digital delivery, pay with card, mobile money or crypto.',
         'brand' => ['@type' => 'Brand', 'name' => $brandName],
         'category' => $kindTitle,
         'url' => url()->current(),
@@ -367,7 +372,7 @@
     if ($schemaPrices->isNotEmpty()) {
         $productJsonLd['offers'] = [
             '@type' => 'AggregateOffer',
-            'priceCurrency' => $currency,
+            'priceCurrency' => 'USD',
             'lowPrice' => (string) $schemaPrices->min(),
             'highPrice' => (string) $schemaPrices->max(),
             'offerCount' => (string) $schemaPrices->count(),
@@ -421,11 +426,15 @@
     ];
 
     $pageJsonLd = [$productJsonLd, $breadcrumbJsonLd];
+
+    $metaDescription = 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName
+        .($rangeText ? ' from '.$rangeText : '')
+        .' on '.$siteName.'. Instant email delivery, pay with card, mobile money or crypto.';
 @endphp
 
 <x-shop.layout
     :title="$brandName . ' ' . $kindTitle . ' | '.$siteName"
-    :description="'Buy a ' . $brandName . ' ' . strtolower($kindTitle) . ' on '.$siteName.' - instant delivery, great prices and 24/7 support. Pay with cards, mobile money, crypto and more.'"
+    :description="$metaDescription"
     :keywords="$brandName . ', ' . $brandName . ' ' . strtolower($kindTitle) . ', buy ' . $brandName . ' ' . strtolower($kindTitle) . ' online, '.$siteName"
     :og-image="$logoSrc ?: asset('assets/og-image.png')"
     og-type="product"
@@ -1207,6 +1216,36 @@
                 </div>
             </section>
         @endif
+
+        {{-- Long-form, data-driven brand copy. Everything here is derived from
+             THIS brand's real catalog data (denomination range, the countries it
+             sells in, category), so every brand page carries genuinely unique,
+             indexable text instead of a shared template - the fix for Search
+             Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
+        <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
+            <div class="max-w-3xl">
+                <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
+                    Buy {{ $brandName }} {{ $kindTitle }} in {{ $countryName }}
+                </h2>
+
+                <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                    {{ $brandName }} {{ $kindNoun }}s on {{ $siteName }} are delivered instantly{{ $rangeText ? ', with amounts from '.$rangeText : '' }}. Pay with a debit or credit card, mobile money, or crypto, and your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} lands in your email within seconds of a confirmed payment. Every order is backed by our fair refund policy.
+                </p>
+
+                @if ($brandCountries->count() > 1)
+                    <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        This {{ $brandName }} {{ $kindNoun }} is for {{ $countryName }}. {{ $brandName }} {{ $kindNoun }}s are also available in {{ $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' and ') }}. Switch country at the top of the page to shop them.
+                    </p>
+                @endif
+
+                <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">How to {{ $isTopup ? 'top up' : ($isBill ? 'pay' : 'buy') }} {{ $brandName }} {{ $kindNoun }}</h3>
+                <ol class="mt-3 list-decimal space-y-2 pl-5 text-base leading-relaxed text-zinc-600 marker:font-semibold marker:text-zinc-400 dark:text-zinc-300">
+                    <li>Choose your amount{{ $isTopup ? ' and enter the '.$brandName.' phone number' : ($isBill ? ' and enter your '.$brandName.' account number' : '') }}.</li>
+                    <li>Pay securely with card, mobile money or crypto.</li>
+                    <li>Receive your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} by email instantly{{ $isGiftCard ? ', then redeem it at '.$brandName : '' }}.</li>
+                </ol>
+            </div>
+        </section>
     </div>
 
     <script>
