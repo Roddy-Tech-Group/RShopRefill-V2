@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\NotificationCampaign;
 use App\Domain\Notification\Services\CampaignService;
+use App\Models\NotificationCampaign;
+use Illuminate\Console\Command;
 
 class DispatchScheduledCampaignsCommand extends Command
 {
@@ -37,7 +37,7 @@ class DispatchScheduledCampaignsCommand extends Command
 
         foreach ($campaigns as $campaign) {
             $this->info("Processing campaign ID: {$campaign->id} - {$campaign->title}");
-            
+
             // Mark as processing to prevent overlapping cron runs from picking it up
             $campaign->update(['status' => 'processing']);
 
@@ -45,7 +45,7 @@ class DispatchScheduledCampaignsCommand extends Command
                 $campaignService->dispatchCampaign($campaign);
                 $this->info("Successfully dispatched campaign ID: {$campaign->id}");
             } catch (\Exception $e) {
-                $this->error("Failed to dispatch campaign ID: {$campaign->id}. Error: " . $e->getMessage());
+                $this->error("Failed to dispatch campaign ID: {$campaign->id}. Error: ".$e->getMessage());
                 $campaign->update(['status' => 'scheduled']); // Revert so it can be retried
             }
         }

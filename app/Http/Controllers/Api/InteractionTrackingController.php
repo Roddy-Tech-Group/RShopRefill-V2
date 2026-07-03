@@ -20,7 +20,7 @@ class InteractionTrackingController extends Controller
         ]);
 
         $typeEnum = InteractionType::tryFrom($request->type);
-        if (!$typeEnum) {
+        if (! $typeEnum) {
             return response()->json(['error' => 'Invalid type'], 400);
         }
 

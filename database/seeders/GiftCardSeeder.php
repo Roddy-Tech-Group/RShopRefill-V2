@@ -42,7 +42,7 @@ class GiftCardSeeder extends Seeder
                     ['country_code' => 'US', 'currency' => 'NGN', 'min_value' => 20, 'max_value' => 200, 'rate' => 1200],
                     ['country_code' => 'GB', 'currency' => 'XAF', 'min_value' => 20, 'max_value' => 200, 'rate' => 580],
                 ],
-            ]
+            ],
         ];
 
         foreach ($brands as $b) {

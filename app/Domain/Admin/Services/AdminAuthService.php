@@ -79,7 +79,7 @@ class AdminAuthService
         ]);
 
         // If the admin doesn't have TOTP enabled, send an Email OTP
-        if (!$admin->hasTotpEnabled()) {
+        if (! $admin->hasTotpEnabled()) {
             $otp = $this->twoFactorService->generateAndSaveEmailOtp($admin);
             Mail::to($admin->email)->send(new AdminTwoFactorOtpMail($admin, $otp));
         }

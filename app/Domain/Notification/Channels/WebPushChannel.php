@@ -4,8 +4,10 @@ namespace App\Domain\Notification\Channels;
 
 use App\Domain\Notification\DTOs\NotificationPayload;
 use App\Domain\Notification\Enums\DeliveryStatus;
+use App\Domain\Notification\Enums\NotificationChannel;
 use App\Domain\Notification\Providers\WebPushProvider;
 use App\Domain\Notification\Services\DeviceManager;
+use App\Models\Notification;
 use App\Models\NotificationDelivery;
 
 class WebPushChannel implements NotificationChannelInterface
@@ -15,15 +17,16 @@ class WebPushChannel implements NotificationChannelInterface
         private readonly DeviceManager $deviceManager
     ) {}
 
-    public function send(NotificationPayload $payload, ?\App\Models\Notification $dbNotification = null): void
+    public function send(NotificationPayload $payload, ?Notification $dbNotification = null): void
     {
         $user = $payload->user;
-        
+
         // 1. Get user's push subscriptions
         $subscriptions = $this->deviceManager->getSubscriptionsFor($user);
 
         if ($subscriptions->isEmpty()) {
             $this->recordDelivery($payload, DeliveryStatus::Failed, 'No active push subscriptions for user');
+
             return;
         }
 
@@ -65,7 +68,7 @@ class WebPushChannel implements NotificationChannelInterface
         }
 
         // 3. Clean up expired subscriptions
-        if (!empty($expiredEndpoints)) {
+        if (! empty($expiredEndpoints)) {
             $this->deviceManager->deleteSubscriptionsByEndpoint($expiredEndpoints);
         }
 
@@ -83,7 +86,7 @@ class WebPushChannel implements NotificationChannelInterface
             'user_id' => $payload->user->id,
             'title' => $payload->title,
             'message' => $payload->message,
-            'channel' => \App\Domain\Notification\Enums\NotificationChannel::Push,
+            'channel' => NotificationChannel::Push,
             'provider' => 'web-push',
             'recipient' => 'browser-endpoints',
             'status' => $status,

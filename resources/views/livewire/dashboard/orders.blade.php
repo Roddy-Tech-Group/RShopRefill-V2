@@ -321,6 +321,11 @@ class extends Component {
                                         ];
                                     }
                                     if (! $esim && ! $topup && $cardCode === null && $cardPin === null) { $cardCode = $extractCode($item); }
+                                    
+                                    // Prevent duplicate rendering
+                                    if ($cardPin !== null && $cardCode === $cardPin) {
+                                        $cardPin = null;
+                                    }
                                     $redeemHtml = $snap['redeem_instructions'] ?? null;
                                     $termsHtml  = $snap['terms_and_conditions'] ?? null;
                                     // Apple gift cards: build the redeem deep-link so iPhone customers can

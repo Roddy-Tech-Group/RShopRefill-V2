@@ -2,7 +2,6 @@
 
 namespace App\Domain\Notification\Services;
 
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
 use App\Models\NotificationCampaign;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -18,18 +17,19 @@ class CampaignService
     {
         if ($campaign->status !== 'processing' && $campaign->status !== 'active') {
             Log::warning("Campaign {$campaign->id} not in processing/active status (is {$campaign->status}).");
+
             return;
         }
 
         // Simplistic audience evaluation (extend as needed)
         $query = User::query();
-        
-        if (!empty($campaign->audience_filters['country'])) {
+
+        if (! empty($campaign->audience_filters['country'])) {
             $query->where('country', $campaign->audience_filters['country']);
         }
-        
+
         // Active 30 days filter example
-        if (!empty($campaign->audience_filters['active_last_30_days'])) {
+        if (! empty($campaign->audience_filters['active_last_30_days'])) {
             $query->where('last_seen_at', '>=', now()->subDays(30));
         }
 
@@ -54,7 +54,7 @@ class CampaignService
                     ],
                     idempotencyKey: 'campaign_'.$campaign->id.'_user_'.$user->id
                 );
-                
+
                 $sentCount++;
             }
         });

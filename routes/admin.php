@@ -295,6 +295,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('payments', [AdminCommerceController::class, 'listPayments'])->name('payments');
             Route::get('fulfillments', [AdminCommerceController::class, 'listFulfillmentLogs'])->name('fulfillments');
             Route::post('orders/{itemId}/retry-fulfillment', [AdminCommerceController::class, 'retryFulfillment'])->name('retry-fulfillment');
+            Route::post('orders/{itemId}/mark-manually-fulfilled', [AdminCommerceController::class, 'markItemManuallyFulfilled'])->name('mark-manually-fulfilled');
             Route::post('orders/{orderId}/refund', [AdminCommerceController::class, 'refundOrder'])->name('refund');
         });
 

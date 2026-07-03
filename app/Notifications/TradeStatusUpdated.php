@@ -25,9 +25,9 @@ class TradeStatusUpdated extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $statusLabel = $this->trade->status->label();
-        
+
         $mail = (new MailMessage)
-            ->subject("Update on your Gift Card Trade #".substr($this->trade->uuid, 0, 8))
+            ->subject('Update on your Gift Card Trade #'.substr($this->trade->uuid, 0, 8))
             ->greeting("Hello {$notifiable->name},")
             ->line("The status of your gift card trade has been updated to: **{$statusLabel}**.");
 
@@ -44,10 +44,10 @@ class TradeStatusUpdated extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Trade Status Updated',
-            'message' => "Your trade #".substr($this->trade->uuid, 0, 8)." is now ".$this->trade->status->label().".",
+            'message' => 'Your trade #'.substr($this->trade->uuid, 0, 8).' is now '.$this->trade->status->label().'.',
             'reason' => $this->reason,
             'url' => '/dashboard/gift-cards/trades/'.$this->trade->id,
-            'icon' => 'arrow-path'
+            'icon' => 'arrow-path',
         ];
     }
 }

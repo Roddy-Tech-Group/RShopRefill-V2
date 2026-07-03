@@ -264,7 +264,7 @@ class Admin extends Authenticatable
      */
     public function hasTotpEnabled(): bool
     {
-        return !is_null($this->two_factor_secret) && !is_null($this->two_factor_confirmed_at);
+        return ! is_null($this->two_factor_secret) && ! is_null($this->two_factor_confirmed_at);
     }
 
     /**
@@ -272,6 +272,6 @@ class Admin extends Authenticatable
      */
     public function pushSubscriptions()
     {
-        return $this->morphMany(\App\Models\PushSubscription::class, 'subscribable');
+        return $this->morphMany(PushSubscription::class, 'subscribable');
     }
 }

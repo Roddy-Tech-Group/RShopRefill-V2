@@ -1,10 +1,24 @@
 @php
     use App\Models\Order;
 
-    // Hide never-paid orders (abandoned / failed checkouts) so the list shows real orders only.
-    $hiddenStatuses = ['pending', 'cancelled', 'failed'];
-    $orders = Order::with(['user', 'items'])->whereNotIn('order_status', $hiddenStatuses)->latest()->limit(50)->get();
-    $totalOrders = Order::whereNotIn('order_status', $hiddenStatuses)->count();
+    $tab = request()->query('tab', 'completed');
+    $query = Order::with(['user', 'items']);
+
+    if ($tab === 'completed') {
+        $query->whereIn('order_status', ['completed', 'partially_completed']);
+    } elseif ($tab === 'processing') {
+        $query->where('order_status', 'processing');
+    } elseif ($tab === 'failed-fulfillment') {
+        $query->whereIn('payment_status', ['paid', 'reserved'])
+              ->where('order_status', 'failed');
+    } elseif ($tab === 'unpaid') {
+        $query->whereNotIn('payment_status', ['paid', 'reserved', 'refunded']);
+    } else { // 'all-paid'
+        $query->whereIn('payment_status', ['paid', 'reserved', 'refunded']);
+    }
+
+    $orders = $query->latest()->limit(50)->get();
+    $totalOrders = $query->count();
 
     // Status pill tone — maps OrderStatus values to the canonical x-admin.badge
     // tone palette so every list page reads the same.
@@ -24,11 +38,27 @@
     <x-slot:heading>Orders</x-slot:heading>
     <x-slot:subheading>{{ number_format($totalOrders) }} orders total. Showing the latest 50.</x-slot:subheading>
 
-    {{-- Export the full order history (excludes never-paid checkouts, matching
-         the list below) as a CSV for record-keeping / accounting. --}}
-    <div class="mb-4 flex justify-end">
-        <a href="{{ route('admin.api.commerce.orders.export') }}"
-            class="inline-flex items-center gap-2 rounded-[10px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="inline-flex overflow-x-auto rounded-[12px] bg-zinc-100 p-1 font-medium text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+            @php
+                $tabs = [
+                    'completed' => 'Completed',
+                    'processing' => 'Processing',
+                    'failed-fulfillment' => 'Failed Fulfillment',
+                    'unpaid' => 'Unpaid / Abandoned',
+                    'all-paid' => 'All Paid',
+                ];
+            @endphp
+            @foreach($tabs as $key => $label)
+                <a href="{{ route('admin.orders', ['tab' => $key]) }}"
+                   class="whitespace-nowrap rounded-[10px] px-4 py-2 text-sm transition-all {{ $tab === $key ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-900/5 dark:bg-[#1d3252] dark:text-white dark:ring-white/10' : 'hover:text-zinc-900 hover:bg-zinc-200/50 dark:hover:text-white dark:hover:bg-zinc-700/50' }}">
+                    {{ $label }}
+                </a>
+            @endforeach
+        </div>
+
+        <a href="{{ route('admin.api.commerce.orders.export', ['tab' => $tab]) }}"
+            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/>
             </svg>

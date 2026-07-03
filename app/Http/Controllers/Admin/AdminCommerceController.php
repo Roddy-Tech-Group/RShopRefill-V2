@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Events\FulfillmentSucceeded;
 use App\Domain\Order\Events\RefundIssued;
+use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Http\Controllers\Controller;
@@ -13,6 +16,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminCommerceController extends Controller
@@ -169,5 +173,76 @@ class AdminCommerceController extends Controller
         } catch (\Exception $e) {
             return response()->json(['message' => 'Refund operation failed: '.$e->getMessage()], 400);
         }
+    }
+
+    public function markItemManuallyFulfilled(Request $request, string $itemId, OrderService $orderService)
+    {
+        $item = OrderItem::findOrFail($itemId);
+
+        if ($item->fulfillment_status->value === 'fulfilled') {
+            return response()->json(['message' => 'This item is already successfully fulfilled.'], 400);
+        }
+
+        DB::transaction(function () use ($item, $orderService, $request) {
+            $item = OrderItem::where('id', $item->id)->lockForUpdate()->first();
+
+            if ($item->fulfillment_status->value === 'fulfilled') {
+                return;
+            }
+
+            $item->fulfillment_status = FulfillmentStatus::Fulfilled;
+            $item->delivered_at = now();
+            $item->failed_at = null;
+            $item->fulfillment_reference = 'MANUAL-'.uniqid();
+
+            $payload = (array) $item->fulfillment_payload;
+
+            if ($request->filled('pin')) {
+                $payload['pin'] = $request->input('pin');
+            }
+
+            $item->fulfillment_payload = $payload;
+
+            $item->save();
+
+            FulfillmentLog::create([
+                'order_item_id' => $item->id,
+                'provider_name' => 'manual',
+                'request_payload' => ['action' => 'manual_fulfillment', 'admin_id' => auth('admin')->id()],
+                'response_payload' => ['status' => 'success'],
+                'status' => 'fulfilled',
+                'processed_at' => now(),
+            ]);
+
+            FulfillmentSucceeded::dispatch($item);
+
+            // Replicate FulfillOrderItemJob's checkOrderCompletion
+            $order = Order::where('id', $item->order_id)->lockForUpdate()->first();
+            if (! $order) {
+                return;
+            }
+
+            $isOrderFinished = $order->items->every(fn ($i) => in_array($i->fulfillment_status, [
+                FulfillmentStatus::Fulfilled,
+                FulfillmentStatus::Failed,
+            ]));
+
+            if ($isOrderFinished) {
+                $allFailed = $order->items->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Failed);
+                $allFulfilled = $order->items->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Fulfilled);
+
+                if ($allFailed) {
+                    $orderService->transitionFulfillmentStatus($order, FulfillmentStatus::Failed);
+                } elseif ($allFulfilled) {
+                    $orderService->transitionFulfillmentStatus($order, FulfillmentStatus::Fulfilled);
+                } else {
+                    $orderService->transitionFulfillmentStatus($order, FulfillmentStatus::PartiallyFulfilled);
+                }
+            }
+        });
+
+        session()->flash('success', 'Item successfully marked as manually fulfilled.');
+
+        return response()->json(['message' => 'Item successfully marked as manually fulfilled.']);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notification\Services;
 
+use App\Domain\Notification\Providers\WebPushProvider;
 use App\Models\Admin;
 use App\Models\AdminNotification;
 use Illuminate\Support\Facades\Log;
@@ -13,8 +14,8 @@ use Illuminate\Support\Facades\Log;
 class AdminNotificationService
 {
     public function __construct(
-        private readonly \App\Domain\Notification\Providers\WebPushProvider $webPushProvider,
-        private readonly \App\Domain\Notification\Services\DeviceManager $deviceManager
+        private readonly WebPushProvider $webPushProvider,
+        private readonly DeviceManager $deviceManager
     ) {}
 
     /**
@@ -45,7 +46,7 @@ class AdminNotificationService
             'body' => $message ?? '',
             'icon' => '/icon-192x192.png',
             'badge' => '/badge-72x72.png',
-            'url' => $url ?? config('app.url') . '/admin',
+            'url' => $url ?? config('app.url').'/admin',
         ];
 
         foreach ($admins as $admin) {
@@ -64,13 +65,13 @@ class AdminNotificationService
                 $results = $this->webPushProvider->send($subArray, $payload);
 
                 foreach ($results as $result) {
-                    if (!$result['success'] && $result['expired']) {
+                    if (! $result['success'] && $result['expired']) {
                         $expiredEndpoints[] = $result['endpoint'];
                     }
                 }
             }
 
-            if (!empty($expiredEndpoints)) {
+            if (! empty($expiredEndpoints)) {
                 $this->deviceManager->deleteSubscriptionsByEndpoint($expiredEndpoints);
             }
         }

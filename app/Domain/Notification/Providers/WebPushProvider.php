@@ -3,8 +3,8 @@
 namespace App\Domain\Notification\Providers;
 
 use Illuminate\Support\Facades\Log;
-use Minishlink\WebPush\WebPush;
 use Minishlink\WebPush\Subscription;
+use Minishlink\WebPush\WebPush;
 
 class WebPushProvider
 {
@@ -29,7 +29,7 @@ class WebPushProvider
             'C:\\xampp\\php\\extras\\ssl\\openssl.cnf',
         ];
         foreach ($opensslCandidates as $cnf) {
-            if (is_file($cnf) && !getenv('OPENSSL_CONF')) {
+            if (is_file($cnf) && ! getenv('OPENSSL_CONF')) {
                 putenv("OPENSSL_CONF={$cnf}");
                 break;
             }
@@ -44,8 +44,8 @@ class WebPushProvider
         ];
 
         // Only pass VAPID if we have a public key, otherwise this breaks during testing
-        $this->webPush = new WebPush(!empty($auth['VAPID']['publicKey']) ? $auth : []);
-        
+        $this->webPush = new WebPush(! empty($auth['VAPID']['publicKey']) ? $auth : []);
+
         // Setup rate limiting or bulk behavior if needed
         $this->webPush->setReuseVAPIDHeaders(true);
 
@@ -59,7 +59,7 @@ class WebPushProvider
     {
         try {
             $subscription = Subscription::create($subscriptionArray);
-            
+
             // Queue the notification
             $this->client()->queueNotification(
                 $subscription,
@@ -70,7 +70,7 @@ class WebPushProvider
             $results = [];
             foreach ($this->client()->flush() as $report) {
                 $endpoint = $report->getRequest()->getUri()->__toString();
-                
+
                 if ($report->isSuccess()) {
                     $results[] = [
                         'endpoint' => $endpoint,
@@ -83,11 +83,11 @@ class WebPushProvider
                         'expired' => $report->isSubscriptionExpired(),
                         'reason' => $report->getReason(),
                     ];
-                    
+
                     Log::warning('Web Push failed.', [
                         'endpoint' => $endpoint,
                         'reason' => $report->getReason(),
-                        'expired' => $report->isSubscriptionExpired()
+                        'expired' => $report->isSubscriptionExpired(),
                     ]);
                 }
             }
@@ -96,12 +96,13 @@ class WebPushProvider
 
         } catch (\Throwable $e) {
             Log::error('WebPushProvider exception.', ['error' => $e->getMessage()]);
+
             return [
                 [
                     'success' => false,
                     'expired' => false,
                     'reason' => $e->getMessage(),
-                ]
+                ],
             ];
         }
     }

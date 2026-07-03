@@ -48,9 +48,8 @@ class CryptoFeeService
     /**
      * Build a full fee breakdown for a crypto payment.
      *
-     * @param  float   $productPriceUsd  The order total in USD (markup included).
-     * @param  string  $payCurrency      NOWPayments currency code (e.g. 'usdttrc20').
-     * @return CryptoFeeBreakdown
+     * @param  float  $productPriceUsd  The order total in USD (markup included).
+     * @param  string  $payCurrency  NOWPayments currency code (e.g. 'usdttrc20').
      */
     public function estimateBreakdown(float $productPriceUsd, string $payCurrency): CryptoFeeBreakdown
     {
@@ -61,7 +60,7 @@ class CryptoFeeService
 
         // Get the crypto exchange rate from NOWPayments /estimate endpoint.
         // Cache for 60 seconds to avoid hammering the API on rapid coin switches.
-        $cacheKey = "crypto_estimate:{$payCurrency}:" . round($totalDueUsd, 2);
+        $cacheKey = "crypto_estimate:{$payCurrency}:".round($totalDueUsd, 2);
         $estimate = Cache::remember($cacheKey, 60, function () use ($totalDueUsd, $payCurrency) {
             return $this->nowPaymentsProvider->estimatePayment($totalDueUsd, 'USD', $payCurrency);
         });

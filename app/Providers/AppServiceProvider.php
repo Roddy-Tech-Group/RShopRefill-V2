@@ -13,6 +13,7 @@ use App\Domain\Notification\Listeners\SendWalletFundingFailedNotificationListene
 use App\Domain\Notification\Listeners\SendWelcomeEmailListener;
 use App\Domain\Notification\Providers\MailProviderInterface;
 use App\Domain\Notification\Providers\ResendProvider;
+use App\Domain\Notification\Providers\WebPushProvider;
 use App\Domain\Wallet\Events\FundingFailed;
 use App\Domain\Wallet\Events\WalletCredited;
 use App\Domain\Wallet\Events\WalletDebited;
@@ -43,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(
-            \App\Domain\Notification\Providers\WebPushProvider::class
+            WebPushProvider::class
         );
     }
 

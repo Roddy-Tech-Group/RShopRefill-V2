@@ -73,6 +73,11 @@
                 }
             }
         }
+        
+        // Prevent duplicate rendering
+        if ($cardPin !== null && $cardCode === $cardPin) {
+            $cardPin = null;
+        }
     }
 
     $redeemHtml = $snap['redeem_instructions'] ?? null;

@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Admin\Auth;
 
 use App\Domain\Admin\Services\AdminTwoFactorService;
 use App\Http\Controllers\Controller;
+use App\Mail\AdminTwoFactorOtpMail;
 use App\Models\Admin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class AdminTwoFactorController extends Controller
@@ -20,15 +22,16 @@ class AdminTwoFactorController extends Controller
 
     public function create(Request $request)
     {
-        if (!$request->session()->has('admin_2fa_id')) {
+        if (! $request->session()->has('admin_2fa_id')) {
             return redirect()->route('admin.login');
         }
 
         $adminId = $request->session()->get('admin_2fa_id');
         $admin = Admin::find($adminId);
 
-        if (!$admin || !$admin->isActive()) {
+        if (! $admin || ! $admin->isActive()) {
             $request->session()->forget(['admin_2fa_id', 'admin_2fa_remember']);
+
             return redirect()->route('admin.login');
         }
 
@@ -50,7 +53,7 @@ class AdminTwoFactorController extends Controller
             'code' => ['required', 'string'],
         ]);
 
-        if (!$request->session()->has('admin_2fa_id')) {
+        if (! $request->session()->has('admin_2fa_id')) {
             return redirect()->route('admin.login');
         }
 
@@ -58,8 +61,9 @@ class AdminTwoFactorController extends Controller
         $admin = Admin::find($adminId);
         $code = $request->code;
 
-        if (!$admin || !$admin->isActive()) {
+        if (! $admin || ! $admin->isActive()) {
             $request->session()->forget(['admin_2fa_id', 'admin_2fa_remember']);
+
             return redirect()->route('admin.login');
         }
 
@@ -70,11 +74,11 @@ class AdminTwoFactorController extends Controller
         }
 
         // If TOTP wasn't enabled, or if they used the email code instead
-        if (!$isValid) {
+        if (! $isValid) {
             $isValid = $this->twoFactorService->verifyEmailOtp($admin, $code);
         }
 
-        if (!$isValid) {
+        if (! $isValid) {
             throw ValidationException::withMessages([
                 'code' => __('The provided code is invalid or expired.'),
             ]);
@@ -108,15 +112,16 @@ class AdminTwoFactorController extends Controller
 
     public function resend(Request $request): RedirectResponse
     {
-        if (!$request->session()->has('admin_2fa_id')) {
+        if (! $request->session()->has('admin_2fa_id')) {
             return redirect()->route('admin.login');
         }
 
         $adminId = $request->session()->get('admin_2fa_id');
         $admin = Admin::find($adminId);
 
-        if (!$admin || !$admin->isActive()) {
+        if (! $admin || ! $admin->isActive()) {
             $request->session()->forget(['admin_2fa_id', 'admin_2fa_remember']);
+
             return redirect()->route('admin.login');
         }
 
@@ -134,13 +139,13 @@ class AdminTwoFactorController extends Controller
             }
         }
 
-        if (!Cache::has($attemptsKey)) {
+        if (! Cache::has($attemptsKey)) {
             Cache::put($attemptsKey, 1, now()->addHours(1));
             $attempts = 1;
         } else {
             $attempts = Cache::increment($attemptsKey);
         }
-        
+
         $delaySeconds = match (true) {
             $attempts === 1 => 30,
             $attempts === 2 => 60,
@@ -156,7 +161,7 @@ class AdminTwoFactorController extends Controller
 
         // Generate and send new OTP
         $otp = $this->twoFactorService->generateAndSaveEmailOtp($admin);
-        \Illuminate\Support\Facades\Mail::to($admin->email)->send(new \App\Mail\AdminTwoFactorOtpMail($admin, $otp));
+        Mail::to($admin->email)->send(new AdminTwoFactorOtpMail($admin, $otp));
 
         return back()->with('status', 'A new code has been sent to your email.');
     }

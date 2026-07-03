@@ -17,10 +17,10 @@ class TradeChatService
     public function sendMessage(GiftCardTrade $trade, Model $sender, string $messageText, ?UploadedFile $attachment = null): TradeMessage
     {
         return DB::transaction(function () use ($trade, $sender, $messageText, $attachment) {
-            
+
             $attachmentPath = null;
             if ($attachment) {
-                $attachmentPath = $attachment->store('gift-cards/chats/' . date('Y/m'), 'public');
+                $attachmentPath = $attachment->store('gift-cards/chats/'.date('Y/m'), 'public');
             }
 
             $message = TradeMessage::create([
@@ -38,7 +38,7 @@ class TradeChatService
                 'action' => 'message_sent',
                 'metadata' => [
                     'message_id' => $message->id,
-                    'has_attachment' => !is_null($attachmentPath),
+                    'has_attachment' => ! is_null($attachmentPath),
                 ],
             ]);
 

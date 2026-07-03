@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\Api\CheckoutApiController;
+use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentSessionController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\Storefront\CartController;
 use App\Http\Controllers\Api\Storefront\CatalogController;
 use App\Http\Controllers\Api\Storefront\ConfigController;
+use App\Http\Controllers\Api\Storefront\CryptoFeeController;
 use App\Http\Controllers\Api\Storefront\EsimCatalogController;
 use App\Http\Controllers\Api\UserDashboardController;
 use App\Http\Controllers\Api\UserTransactionController;
@@ -48,7 +51,7 @@ Route::prefix('storefront')->name('api.storefront.')->group(function () {
     Route::get('esims/countries', [EsimCatalogController::class, 'countries'])->name('esims.countries');
     Route::get('esims/{slug}', [EsimCatalogController::class, 'show'])->name('esims.show');
 
-    Route::get('crypto/fee-estimate', [\App\Http\Controllers\Api\Storefront\CryptoFeeController::class, 'estimate'])->name('crypto.fee-estimate');
+    Route::get('crypto/fee-estimate', [CryptoFeeController::class, 'estimate'])->name('crypto.fee-estimate');
 
     // Cart Flow. `not-suspended` is a no-op for guests (cart access is open);
     // it only blocks an authenticated suspended user from writing to the cart.
@@ -111,12 +114,12 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('push')->name('api.push.')->group(function () {
-        Route::post('subscribe', [\App\Http\Controllers\Api\PushSubscriptionController::class, 'subscribe'])->name('subscribe');
-        Route::post('unsubscribe', [\App\Http\Controllers\Api\PushSubscriptionController::class, 'unsubscribe'])->name('unsubscribe');
+        Route::post('subscribe', [PushSubscriptionController::class, 'subscribe'])->name('subscribe');
+        Route::post('unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('unsubscribe');
     });
 
     // Public interaction tracking (e.g. from service worker click)
-    Route::post('push/track', [\App\Http\Controllers\Api\InteractionTrackingController::class, 'record'])->name('api.push.track');
+    Route::post('push/track', [InteractionTrackingController::class, 'record'])->name('api.push.track');
 
     Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function () {
         // status is polled by the checkout UI while awaiting confirmation, so it

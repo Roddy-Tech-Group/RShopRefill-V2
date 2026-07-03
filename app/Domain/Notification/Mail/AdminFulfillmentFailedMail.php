@@ -22,7 +22,7 @@ class AdminFulfillmentFailedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'CRITICAL: Fulfillment Failed for Order #' . ($this->item->order->order_number ?? 'Unknown'),
+            subject: 'CRITICAL: Fulfillment Failed for Order #'.($this->item->order->order_number ?? 'Unknown'),
         );
     }
 
@@ -34,7 +34,7 @@ class AdminFulfillmentFailedMail extends Mailable
                 'item' => $this->item,
                 'reason' => $this->reason,
                 'apiErrorLog' => $this->apiErrorLog,
-                'orderNumber' => $this->item->order->order_number ?? 'Unknown'
+                'orderNumber' => $this->item->order->order_number ?? 'Unknown',
             ]
         );
     }

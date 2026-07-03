@@ -36,9 +36,9 @@ class TradeReviewService
             }
 
             if ($internalNote) {
-                $trade->admin_notes = $trade->admin_notes 
-                    ? $trade->admin_notes . "\n---\n" . now()->toDateTimeString() . " [{$admin->name}]: " . $internalNote
-                    : now()->toDateTimeString() . " [{$admin->name}]: " . $internalNote;
+                $trade->admin_notes = $trade->admin_notes
+                    ? $trade->admin_notes."\n---\n".now()->toDateTimeString()." [{$admin->name}]: ".$internalNote
+                    : now()->toDateTimeString()." [{$admin->name}]: ".$internalNote;
             }
 
             $trade->save();
@@ -71,8 +71,8 @@ class TradeReviewService
      */
     public function requestMoreInfo(GiftCardTrade $trade, Admin $admin, string $message): GiftCardTrade
     {
-        $this->updateStatus($trade, TradeStatus::NeedMoreInfo, $admin, null, "Requested more info from user");
-        
+        $this->updateStatus($trade, TradeStatus::NeedMoreInfo, $admin, null, 'Requested more info from user');
+
         // Use Chat service to send the actual message
         app(TradeChatService::class)->sendMessage($trade, $admin, $message);
 

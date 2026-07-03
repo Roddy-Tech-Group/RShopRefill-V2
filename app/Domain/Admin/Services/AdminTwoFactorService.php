@@ -42,7 +42,7 @@ class AdminTwoFactorService
     {
         // 6 digit secure code
         $otp = (string) random_int(100000, 999999);
-        
+
         $admin->update([
             'email_otp' => $otp,
             'email_otp_expires_at' => now()->addMinutes(10),
@@ -56,7 +56,7 @@ class AdminTwoFactorService
      */
     public function verifyEmailOtp(Admin $admin, string $code): bool
     {
-        if (!$admin->email_otp || !$admin->email_otp_expires_at) {
+        if (! $admin->email_otp || ! $admin->email_otp_expires_at) {
             return false;
         }
 

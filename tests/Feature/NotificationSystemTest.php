@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Notification\Channels\DatabaseChannel;
 use App\Domain\Notification\Channels\EmailChannel;
+use App\Domain\Notification\Channels\WebPushChannel;
 use App\Domain\Notification\Enums\NotificationPriority;
 use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
 use App\Domain\Notification\Mail\WelcomeMail;
@@ -108,7 +109,7 @@ class NotificationSystemTest extends TestCase
         $job->handle(
             app(EmailChannel::class),
             app(DatabaseChannel::class),
-            app(\App\Domain\Notification\Channels\WebPushChannel::class)
+            app(WebPushChannel::class)
         );
 
         // Verify notification saved in database
@@ -152,7 +153,7 @@ class NotificationSystemTest extends TestCase
         $job1->handle(
             app(EmailChannel::class),
             app(DatabaseChannel::class),
-            app(\App\Domain\Notification\Channels\WebPushChannel::class)
+            app(WebPushChannel::class)
         );
 
         $initialDeliveryCount = NotificationDelivery::count();
@@ -169,7 +170,7 @@ class NotificationSystemTest extends TestCase
         $job2->handle(
             app(EmailChannel::class),
             app(DatabaseChannel::class),
-            app(\App\Domain\Notification\Channels\WebPushChannel::class)
+            app(WebPushChannel::class)
         );
 
         // Verify no extra deliveries recorded

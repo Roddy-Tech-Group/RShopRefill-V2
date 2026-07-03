@@ -16,7 +16,7 @@ class DeviceManager
         return $subscribable->pushSubscriptions()
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                    ->orWhere('expires_at', '>', now());
             })
             ->get();
     }
@@ -40,6 +40,7 @@ class DeviceManager
                 'user_agent' => request()->userAgent(),
                 'expires_at' => $subscriptionData['expirationTime'] ?? null,
             ]);
+
             return $existing;
         }
 

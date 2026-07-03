@@ -14,7 +14,7 @@ enum TradeStatus: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::PendingReview => 'Pending Review',
             self::UnderReview => 'Under Review',
             self::NeedMoreInfo => 'Need More Information',
@@ -27,7 +27,7 @@ enum TradeStatus: string
 
     public function color(): string
     {
-        return match($this) {
+        return match ($this) {
             self::PendingReview => 'gray',
             self::UnderReview => 'blue',
             self::NeedMoreInfo => 'orange',

@@ -18,7 +18,7 @@ class TestWebPushCommand extends Command
 
         if ($userId = $this->option('user')) {
             $query->where('subscribable_id', $userId)
-                  ->where('subscribable_type', $this->option('admin') ? 'App\\Models\\Admin' : 'App\\Models\\User');
+                ->where('subscribable_type', $this->option('admin') ? 'App\\Models\\Admin' : 'App\\Models\\User');
         }
 
         $subscriptions = $query->get();
@@ -32,6 +32,7 @@ class TestWebPushCommand extends Command
             $this->line('  3. Enable the "Web Push" toggle');
             $this->line('  4. Accept the browser permission prompt');
             $this->line('  5. Re-run this command');
+
             return 1;
         }
 
@@ -39,11 +40,11 @@ class TestWebPushCommand extends Command
 
         $payload = [
             'title' => '🎉 RshopRefills Push Test',
-            'body'  => 'If you see this, Web Push is working! ' . now()->format('H:i:s'),
-            'icon'  => '/assets/icon-512.png',
+            'body' => 'If you see this, Web Push is working! '.now()->format('H:i:s'),
+            'icon' => '/assets/icon-512.png',
             'badge' => '/assets/icon-192.png',
-            'url'   => '/dashboard',
-            'data'  => [
+            'url' => '/dashboard',
+            'data' => [
                 'url' => '/dashboard',
                 'test' => true,
             ],
@@ -57,7 +58,7 @@ class TestWebPushCommand extends Command
                 'endpoint' => $sub->endpoint,
                 'keys' => [
                     'p256dh' => $sub->p256dh,
-                    'auth'   => $sub->auth,
+                    'auth' => $sub->auth,
                 ],
             ];
 
@@ -69,9 +70,9 @@ class TestWebPushCommand extends Command
                     $this->line("  ✓ Sent to {$sub->subscribable_type}#{$sub->subscribable_id}");
                 } else {
                     $failCount++;
-                    $this->error("  ✗ Failed: " . ($result['reason'] ?? 'Unknown'));
-                    if (!empty($result['expired'])) {
-                        $this->warn("    Subscription expired — cleaning up.");
+                    $this->error('  ✗ Failed: '.($result['reason'] ?? 'Unknown'));
+                    if (! empty($result['expired'])) {
+                        $this->warn('    Subscription expired — cleaning up.');
                         $sub->delete();
                     }
                 }

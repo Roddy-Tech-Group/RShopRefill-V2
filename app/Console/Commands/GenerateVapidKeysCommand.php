@@ -28,23 +28,26 @@ class GenerateVapidKeysCommand extends Command
         try {
             $keys = $this->generateVapidKeys();
         } catch (\Throwable $e) {
-            $this->error('Failed to generate keys: ' . $e->getMessage());
+            $this->error('Failed to generate keys: '.$e->getMessage());
             $this->warn('Ensure the gmp or bcmath PHP extension is enabled.');
             $this->warn('On XAMPP, ensure openssl.cnf is accessible (usually at C:\\xampp\\apache\\conf\\openssl.cnf).');
+
             return 1;
         }
 
         if ($this->option('show')) {
-            $this->line('<info>VAPID_PUBLIC_KEY=</info>' . $keys['publicKey']);
-            $this->line('<info>VAPID_PRIVATE_KEY=</info>' . $keys['privateKey']);
+            $this->line('<info>VAPID_PUBLIC_KEY=</info>'.$keys['publicKey']);
+            $this->line('<info>VAPID_PRIVATE_KEY=</info>'.$keys['privateKey']);
+
             return 0;
         }
 
         $this->setEnvKey('VAPID_PUBLIC_KEY', $keys['publicKey']);
         $this->setEnvKey('VAPID_PRIVATE_KEY', $keys['privateKey']);
-        $this->setEnvKey('VAPID_SUBJECT', 'mailto:' . config('mail.from.address', 'hello@rshoprefills.com'));
+        $this->setEnvKey('VAPID_SUBJECT', 'mailto:'.config('mail.from.address', 'hello@rshoprefills.com'));
 
         $this->info('VAPID keys generated and set successfully.');
+
         return 0;
     }
 
@@ -63,7 +66,7 @@ class GenerateVapidKeysCommand extends Command
         $opensslCnf = $this->resolveOpensslConfig();
 
         $config = [
-            'curve_name'       => 'prime256v1',
+            'curve_name' => 'prime256v1',
             'private_key_type' => OPENSSL_KEYTYPE_EC,
         ];
 
@@ -73,7 +76,7 @@ class GenerateVapidKeysCommand extends Command
 
         $key = openssl_pkey_new($config);
         if ($key === false) {
-            throw new \RuntimeException('Unable to create the EC key: ' . openssl_error_string());
+            throw new \RuntimeException('Unable to create the EC key: '.openssl_error_string());
         }
 
         $details = openssl_pkey_get_details($key);
@@ -83,10 +86,10 @@ class GenerateVapidKeysCommand extends Command
 
         // Uncompressed public key = 0x04 || x || y, then base64url-encode
         $publicKeyBin = "\x04"
-            . str_pad($x, 32, "\x00", STR_PAD_LEFT)
-            . str_pad($y, 32, "\x00", STR_PAD_LEFT);
+            .str_pad($x, 32, "\x00", STR_PAD_LEFT)
+            .str_pad($y, 32, "\x00", STR_PAD_LEFT);
 
-        $publicKey  = rtrim(strtr(base64_encode($publicKeyBin), '+/', '-_'), '=');
+        $publicKey = rtrim(strtr(base64_encode($publicKeyBin), '+/', '-_'), '=');
         $privateKey = rtrim(strtr(base64_encode(str_pad($d, 32, "\x00", STR_PAD_LEFT)), '+/', '-_'), '=');
 
         return compact('publicKey', 'privateKey');
@@ -97,7 +100,7 @@ class GenerateVapidKeysCommand extends Command
         $path = app()->environmentFilePath();
         $env = file_get_contents($path);
 
-        if (str_contains($env, $key . '=')) {
+        if (str_contains($env, $key.'=')) {
             $env = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $env);
         } else {
             $env .= "\n{$key}={$value}";

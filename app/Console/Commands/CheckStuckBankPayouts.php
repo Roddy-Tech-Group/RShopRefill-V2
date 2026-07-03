@@ -2,11 +2,12 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Payout;
-use App\Enums\TradeStatus;
 use App\Domain\GiftCardTrading\Services\TradeReviewService;
+use App\Domain\Notification\Services\AdminNotificationService;
+use App\Enums\TradeStatus;
 use App\Models\Admin;
+use App\Models\Payout;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
 class CheckStuckBankPayouts extends Command
@@ -37,6 +38,7 @@ class CheckStuckBankPayouts extends Command
 
         if ($stuckPayouts->isEmpty()) {
             $this->info('No stuck payouts found.');
+
             return;
         }
 
@@ -51,18 +53,18 @@ class CheckStuckBankPayouts extends Command
                 $response = Http::timeout(10)
                     ->withToken($secretKey)
                     ->get('https://api.flutterwave.com/v3/transfers', [
-                        'reference' => $payout->reference
+                        'reference' => $payout->reference,
                     ]);
 
                 if ($response->successful()) {
                     $data = $response->json('data');
 
                     // If Flutterwave HAS a record of this transfer, we must be careful!
-                    if (!empty($data) && isset($data[0])) {
+                    if (! empty($data) && isset($data[0])) {
                         $fwStatus = strtoupper($data[0]['status']);
-                        
+
                         if ($fwStatus === 'SUCCESSFUL') {
-                            $this->info("Flutterwave actually succeeded. Updating payout to successful.");
+                            $this->info('Flutterwave actually succeeded. Updating payout to successful.');
                             // It succeeded! The webhook might have been lost.
                             $payout->update([
                                 'status' => 'successful',
@@ -75,20 +77,23 @@ class CheckStuckBankPayouts extends Command
                                     TradeStatus::Paid,
                                     $systemAdmin,
                                     null,
-                                    "Bank transfer completed successfully (recovered by system check)."
+                                    'Bank transfer completed successfully (recovered by system check).'
                                 );
                             }
+
                             continue; // Move to next payout
                         } elseif (in_array($fwStatus, ['PENDING', 'PROCESSING', 'NEW'])) {
-                            $this->info("Flutterwave is still processing this transfer. Skipping fallback to prevent double payout.");
+                            $this->info('Flutterwave is still processing this transfer. Skipping fallback to prevent double payout.');
+
                             // We MUST NOT fallback, otherwise admin might manually pay it while FW is still trying.
-                            continue; 
+                            continue;
                         }
                         // If it's FAILED, we can safely proceed with fallback below.
                     }
                 }
             } catch (\Exception $e) {
-                $this->error("Failed to verify with Flutterwave: " . $e->getMessage());
+                $this->error('Failed to verify with Flutterwave: '.$e->getMessage());
+
                 // If we can't verify with the gateway, do NOT blindly fallback, it's too dangerous.
                 continue;
             }
@@ -108,24 +113,24 @@ class CheckStuckBankPayouts extends Command
                     TradeStatus::Approved,
                     $systemAdmin,
                     null,
-                    "Automated bank payout timed out (over 15 mins). Reverted to Approved for manual processing."
+                    'Automated bank payout timed out (over 15 mins). Reverted to Approved for manual processing.'
                 );
 
                 $payout->trade->messages()->create([
                     'sender_type' => Admin::class,
                     'sender_id' => $systemAdmin->id,
-                    'message' => "Automated bank payout timed out. Reverted to Approved for manual transfer.",
+                    'message' => 'Automated bank payout timed out. Reverted to Approved for manual transfer.',
                 ]);
 
-                app(\App\Domain\Notification\Services\AdminNotificationService::class)->push(
+                app(AdminNotificationService::class)->push(
                     'payout_reverted',
                     'Automated Payout Reverted',
-                    "Trade #" . substr($payout->trade->uuid, 0, 8) . " automated payout failed. It has been safely reverted to Approved for manual payment.",
+                    'Trade #'.substr($payout->trade->uuid, 0, 8).' automated payout failed. It has been safely reverted to Approved for manual payment.',
                     route('admin.gift-cards.trades.show', $payout->trade)
                 );
             }
         }
 
-        $this->info("Completed checking stuck payouts.");
+        $this->info('Completed checking stuck payouts.');
     }
 }

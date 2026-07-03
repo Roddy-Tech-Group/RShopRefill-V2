@@ -5,11 +5,12 @@ namespace App\Domain\GiftCardTrading\Services;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\WalletService;
+use App\Enums\TradeStatus;
+use App\Models\Admin;
 use App\Models\GiftCardTrade;
 use App\Models\Payout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class PayoutOrchestrator
 {
@@ -45,24 +46,24 @@ class PayoutOrchestrator
                 amount: $trade->calculated_payout,
                 category: TransactionCategory::Funding,
                 description: "Gift Card Trade Payout ({$trade->rate->brand->name})",
-                reference: 'GC-PAYOUT-' . $trade->uuid,
+                reference: 'GC-PAYOUT-'.$trade->uuid,
                 sourceType: get_class($trade),
                 sourceId: $trade->id
             );
 
             Payout::create([
                 'trade_id' => $trade->id,
-                'reference' => 'GC-PAYOUT-' . $trade->uuid,
+                'reference' => 'GC-PAYOUT-'.$trade->uuid,
                 'amount' => $trade->calculated_payout,
                 'status' => 'successful',
             ]);
 
             app(TradeReviewService::class)->updateStatus(
                 $trade,
-                \App\Enums\TradeStatus::Paid,
-                \App\Models\Admin::first(), // Or System actor if supported
+                TradeStatus::Paid,
+                Admin::first(), // Or System actor if supported
                 null,
-                "Wallet credited automatically."
+                'Wallet credited automatically.'
             );
         });
     }
@@ -73,7 +74,7 @@ class PayoutOrchestrator
     protected function payoutToBank(GiftCardTrade $trade): void
     {
         DB::transaction(function () use ($trade) {
-            $reference = 'FW-PAYOUT-' . $trade->uuid;
+            $reference = 'FW-PAYOUT-'.$trade->uuid;
 
             Payout::create([
                 'trade_id' => $trade->id,
@@ -84,16 +85,16 @@ class PayoutOrchestrator
 
             app(TradeReviewService::class)->updateStatus(
                 $trade,
-                \App\Enums\TradeStatus::PayingOut,
-                \App\Models\Admin::first(),
+                TradeStatus::PayingOut,
+                Admin::first(),
                 null,
-                "Initiated Flutterwave transfer."
+                'Initiated Flutterwave transfer.'
             );
 
             // Dispatch a job to actually call Flutterwave API to prevent blocking
             dispatch(function () use ($trade, $reference) {
                 $bankAccount = $trade->bankAccount;
-                
+
                 $response = Http::timeout(30)->withToken(config('services.flutterwave.secret_key'))
                     ->post('https://api.flutterwave.com/v3/transfers', [
                         'account_bank' => $bankAccount->bank_code,
@@ -104,7 +105,7 @@ class PayoutOrchestrator
                         'reference' => $reference,
                     ]);
 
-                if (!$response->successful()) {
+                if (! $response->successful()) {
                     // Log failure or trigger alert
                     // The webhook will handle the final status anyway if it was queued by FW
                 }
@@ -122,13 +123,13 @@ class PayoutOrchestrator
         $reference = $payload['data']['reference'] ?? null;
         $status = $payload['data']['status'] ?? null;
 
-        if (!$reference || !$status) {
+        if (! $reference || ! $status) {
             return;
         }
 
         $payout = Payout::where('reference', $reference)->first();
 
-        if (!$payout) {
+        if (! $payout) {
             return;
         }
 
@@ -140,10 +141,10 @@ class PayoutOrchestrator
 
             app(TradeReviewService::class)->updateStatus(
                 $payout->trade,
-                \App\Enums\TradeStatus::Paid,
-                \App\Models\Admin::first(),
+                TradeStatus::Paid,
+                Admin::first(),
                 null,
-                "Bank transfer completed successfully."
+                'Bank transfer completed successfully.'
             );
 
         } elseif ($status === 'FAILED') {
@@ -154,10 +155,10 @@ class PayoutOrchestrator
 
             app(TradeReviewService::class)->updateStatus(
                 $payout->trade,
-                \App\Enums\TradeStatus::Approved, // Revert to approved so it can be retried or changed to wallet
-                \App\Models\Admin::first(),
+                TradeStatus::Approved, // Revert to approved so it can be retried or changed to wallet
+                Admin::first(),
                 null,
-                "Bank transfer failed. Please check bank details or switch payout method."
+                'Bank transfer failed. Please check bank details or switch payout method.'
             );
         }
     }

@@ -22,7 +22,7 @@ class PushSubscriptionController extends Controller
 
         $user = Auth::user() ?? Auth::guard('admin')->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 

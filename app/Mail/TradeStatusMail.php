@@ -4,7 +4,6 @@ namespace App\Mail;
 
 use App\Models\GiftCardTrade;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
@@ -26,7 +25,7 @@ class TradeStatusMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Update on your Gift Card Trade #' . substr($this->trade->uuid, 0, 8),
+            subject: 'Update on your Gift Card Trade #'.substr($this->trade->uuid, 0, 8),
         );
     }
 

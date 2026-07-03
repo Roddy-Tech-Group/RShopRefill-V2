@@ -157,9 +157,71 @@
                                 </p>
                             </div>
                             <div class="flex flex-col items-end gap-1">
-                                <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
-                                    {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
-                                </span>
+                                    @if ($item->fulfillment_status?->value !== 'fulfilled')
+                                        <div x-data="{ open: false, loading: false, manualPin: '' }" class="inline-block relative z-10">
+                                            <button 
+                                                type="button" 
+                                                x-on:click="open = true"
+                                                class="inline-flex items-center rounded-[10px] bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-white"
+                                            >
+                                                Mark Fulfilled
+                                            </button>
+
+                                            <!-- Modal Backdrop -->
+                                            <template x-teleport="body">
+                                                <div x-show="open" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm transition-opacity" x-transition.opacity>
+                                                    <!-- Modal Panel -->
+                                                    <div x-show="open" @click.outside="if(!loading) open = false" x-transition class="w-full max-w-md transform overflow-hidden rounded-[20px] bg-white p-6 text-left align-middle shadow-2xl ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-white/10 m-4">
+                                                        <h3 class="text-lg font-semibold leading-6 text-zinc-900 dark:text-white">Confirm Manual Fulfillment</h3>
+                                                        <div class="mt-2">
+                                                            <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                                                                Are you sure you want to mark this item as manually fulfilled? This cannot be undone.
+                                                            </p>
+                                                        </div>
+
+                                                        <!-- Input Field for PIN -->
+                                                        <div class="mt-4">
+                                                            <input 
+                                                                type="text" 
+                                                                x-model="manualPin"
+                                                                placeholder="Enter PIN / Code" 
+                                                                class="w-full rounded-xl border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400"
+                                                            >
+                                                        </div>
+
+                                                        <div class="mt-6 flex justify-end gap-3">
+                                                            <button 
+                                                                type="button" 
+                                                                @click="open = false"
+                                                                class="inline-flex justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:ring-zinc-700 dark:focus:ring-offset-zinc-900"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                x-on:click="loading = true; fetch('{{ route('admin.api.commerce.mark-manually-fulfilled', $item->id) }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: JSON.stringify({ pin: manualPin }) }).then(r => { window.location.reload(); }).catch(() => loading = false)"
+                                                                :disabled="loading"
+                                                                class="inline-flex justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <span x-show="!loading">Confirm & Fulfill</span>
+                                                                <span x-show="loading" class="flex items-center gap-2">
+                                                                    <svg class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                    </svg>
+                                                                    Processing...
+                                                                </span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    @endif
+                                    <span class="inline-flex items-center rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
+                                        {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
+                                    </span>
+                                </div>
                                 {{-- Item subtotal — primary USD figure (truth), customer's
                                      display amount underneath as context. --}}
                                 @php
@@ -206,17 +268,30 @@
 
                         {{-- Delivered payload (redemption codes / pins / links) --}}
                         @if ($payload->isNotEmpty())
-                            <div class="mt-3 rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Delivered details</p>
+                            <div class="mt-3 rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-zinc-800 dark:ring-zinc-700">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-300">Delivered details</p>
                                 <dl class="mt-1.5 space-y-1 text-[11px]">
                                     @foreach ($payload as $key => $value)
                                         <div class="flex justify-between gap-4">
-                                            <dt class="capitalize text-zinc-800">{{ str_replace('_', ' ', $key) }}</dt>
-                                            <dd class="font-mono font-semibold text-zinc-900">{{ $value }}</dd>
+                                            <dt class="capitalize text-zinc-800 dark:text-zinc-400">{{ str_replace('_', ' ', $key) }}</dt>
+                                            <dd class="font-mono font-semibold text-zinc-900 dark:text-zinc-200">{{ $value }}</dd>
                                         </div>
                                     @endforeach
                                 </dl>
                             </div>
+                        @endif
+
+                        {{-- Failed reason --}}
+                        @if ($item->fulfillment_status?->value === 'failed')
+                            @php
+                                $errorLog = \App\Models\FulfillmentLog::where('order_item_id', $item->id)->whereNotNull('error_message')->orderByDesc('processed_at')->first();
+                            @endphp
+                            @if ($errorLog)
+                                <div class="mt-3 rounded-[10px] bg-red-50 p-3 ring-1 ring-red-100 dark:bg-red-500/10 dark:ring-red-500/20">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-red-800 dark:text-red-400">Fulfillment Error</p>
+                                    <p class="mt-1.5 text-[11px] font-mono text-red-900 dark:text-red-300 break-words">{{ $errorLog->error_message }}</p>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 @empty

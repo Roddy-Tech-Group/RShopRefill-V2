@@ -2,12 +2,17 @@
 
 namespace App\Domain\GiftCardTrading\Services;
 
+use App\Domain\Notification\Services\AdminNotificationService;
 use App\Enums\TradeStatus;
+use App\Mail\AdminNewTradeMail;
+use App\Models\Admin;
 use App\Models\GiftCardRate;
 use App\Models\GiftCardTrade;
 use App\Models\TradeAuditLog;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class TradeSubmissionService
 {
@@ -30,7 +35,7 @@ class TradeSubmissionService
         array $images // array of ['file' => UploadedFile, 'type' => 'front'|'back'|'receipt']
     ): GiftCardTrade {
         return DB::transaction(function () use ($userId, $rate, $declaredValue, $payoutMethod, $bankAccountId, $codePin, $whatsappNumber, $images) {
-            
+
             $calculatedPayout = $this->rateEngine->calculatePayout($rate, $declaredValue);
 
             $trade = GiftCardTrade::create([
@@ -55,7 +60,7 @@ class TradeSubmissionService
                     $trade->update(['admin_notes' => 'SYSTEM FLAG: Duplicate image detected.']);
                 }
 
-                $path = $file->store('gift-cards/' . date('Y/m'), 'public');
+                $path = $file->store('gift-cards/'.date('Y/m'), 'public');
 
                 $trade->media()->create([
                     'file_path' => $path,
@@ -66,24 +71,24 @@ class TradeSubmissionService
 
             TradeAuditLog::create([
                 'trade_id' => $trade->id,
-                'actor_type' => \App\Models\User::class,
+                'actor_type' => User::class,
                 'actor_id' => $userId,
                 'action' => 'trade_submitted',
                 'new_status' => TradeStatus::PendingReview->value,
             ]);
 
             // Dispatch push and dashboard notification to all admins
-            app(\App\Domain\Notification\Services\AdminNotificationService::class)->push(
+            app(AdminNotificationService::class)->push(
                 type: 'new_trade',
                 title: 'New Trade Submitted',
                 message: "A new trade ({$trade->rate->brand->name}) was submitted by {$trade->user->name}.",
-                url: '/admin/gift-cards/trades/' . $trade->id
+                url: '/admin/gift-cards/trades/'.$trade->id
             );
 
             // Send Email notification to all admins
-            $admins = \App\Models\Admin::all();
+            $admins = Admin::all();
             if ($admins->isNotEmpty()) {
-                \Illuminate\Support\Facades\Mail::to($admins)->send(new \App\Mail\AdminNewTradeMail($trade));
+                Mail::to($admins)->send(new AdminNewTradeMail($trade));
             }
 
             // Dispatch events here (e.g., TradeSubmitted)

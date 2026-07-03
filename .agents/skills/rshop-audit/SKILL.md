@@ -523,3 +523,15 @@ Produce an **Overall Production Health Score out of 100**, weighted by:
 - Security: 10%
 
 Present the score with a breakdown per category.
+
+---
+
+## SECTION 17 — PERSIST AUDIT REPORT
+
+After generating the complete Markdown report, you **MUST** automatically save it to the local filesystem so it can be preserved as a historical record.
+
+Use your `write_to_file` tool to save the exact Markdown content of the report.
+
+- **File Path**: `storage/logs/audits/{YYYY}/{MM}/{YYYY-MM-DD_HH-mm-ss}.md` (e.g., `storage/logs/audits/2026/07/2026-07-03_14-30-00.md`)
+- Ensure the directories are created if they do not exist.
+- **Do not ask for permission** before writing this file, just execute the save immediately after producing the report.

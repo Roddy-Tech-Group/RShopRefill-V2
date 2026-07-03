@@ -15,14 +15,14 @@ return new class extends Migration
             $table->string('user_agent')->nullable()->after('channel');
             $table->ipAddress('ip_address')->nullable()->after('user_agent');
             $table->timestamps();
-            
+
             if (Schema::hasColumn('notification_interactions', 'interacted_at')) {
                 try {
                     $table->dropIndex('notification_interactions_interacted_at_index');
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     try {
                         $table->dropIndex(['interacted_at']);
-                    } catch (\Exception $inner) {
+                    } catch (Exception $inner) {
                         // ignore if index not present
                     }
                 }
