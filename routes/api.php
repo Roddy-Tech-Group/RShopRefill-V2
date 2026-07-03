@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentSessionController;
-use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\Storefront\CartController;
 use App\Http\Controllers\Api\Storefront\CatalogController;
 use App\Http\Controllers\Api\Storefront\ConfigController;
