@@ -438,7 +438,12 @@
                             x-show="open"
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             style="display:none;"
-                            class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-white/80 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/80 dark:shadow-black/40 dark:ring-1 dark:ring-white/10"
+                            {{-- Solid surface on purpose: a `backdrop-filter` here plus
+                                 the `overflow-hidden` needed for the rounded corners is a
+                                 known iOS Safari combo that kills touch-scrolling of the
+                                 list inside. Opaque bg (matching the selector card below)
+                                 keeps the country list natively scrollable on mobile. --}}
+                            class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-white shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:shadow-black/40 dark:ring-1 dark:ring-white/10"
                         >
                             <div class="border-b border-zinc-200 p-2 dark:border-white/10">
                                 <div class="relative">
@@ -513,7 +518,7 @@
                                 @click="setTab(t)"
                                 :class="activeTab === t ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'"
                                 class="relative z-10 flex-1 rounded-[8px] px-4 py-2.5 text-sm font-bold transition-colors"
-                                x-text="t === 'voice' ? 'Unlimited Voice' : 'Data Only'"
+                                x-text="t === 'voice' ? 'Voice Plans' : 'Data Only'"
                             ></button>
                         </template>
                     </div>

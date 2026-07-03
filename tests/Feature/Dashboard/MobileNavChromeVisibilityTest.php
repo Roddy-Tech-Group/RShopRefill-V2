@@ -7,21 +7,26 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The mobile floating bottom-nav pill (its centre Menu button dispatches
- * 'open-mobile-menu') and the mobile hamburger (dispatches 'open-connect-panel')
- * ride along ONLY on the browse hub - the overview and the dashboard shop pages.
- * On task/inner pages (orders, wallet, settings, ...) they are hidden so those
- * pages stay clean.
+ * Mobile chrome visibility:
+ *   - The floating bottom nav bar (its centre Menu button dispatches
+ *     'open-mobile-menu') stays on EVERY dashboard page - it is the primary
+ *     navigation and must always be reachable.
+ *   - The top chrome (cart / country switcher / notification, plus the hamburger
+ *     that dispatches 'open-connect-panel') rides along ONLY on the browse hub -
+ *     the overview and the dashboard shop pages - and is hidden on task/inner
+ *     pages (orders, wallet, settings, ...) so they stay clean.
  */
 class MobileNavChromeVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const PILL_MARKER = "\$dispatch('open-mobile-menu')";
+    /** Bottom nav bar's Menu FAB - present on every page. */
+    private const NAV_BAR_MARKER = "\$dispatch('open-mobile-menu')";
 
-    private const HAMBURGER_MARKER = "\$dispatch('open-connect-panel')";
+    /** Top-chrome hamburger - present only on overview + shop pages. */
+    private const TOP_CHROME_MARKER = "\$dispatch('open-connect-panel')";
 
-    public function test_overview_shows_the_floating_pill_and_hamburger(): void
+    public function test_overview_shows_the_bottom_nav_bar_and_the_top_chrome(): void
     {
         $this->withoutVite();
 
@@ -29,11 +34,11 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->get('/dashboard')
             ->assertOk();
 
-        $response->assertSee(self::PILL_MARKER, false);
-        $response->assertSee(self::HAMBURGER_MARKER, false);
+        $response->assertSee(self::NAV_BAR_MARKER, false);
+        $response->assertSee(self::TOP_CHROME_MARKER, false);
     }
 
-    public function test_shop_pages_show_the_floating_pill_and_hamburger(): void
+    public function test_shop_pages_show_the_bottom_nav_bar_and_the_top_chrome(): void
     {
         $this->withoutVite();
 
@@ -41,11 +46,11 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->get('/dashboard/shop/cart')
             ->assertOk();
 
-        $response->assertSee(self::PILL_MARKER, false);
-        $response->assertSee(self::HAMBURGER_MARKER, false);
+        $response->assertSee(self::NAV_BAR_MARKER, false);
+        $response->assertSee(self::TOP_CHROME_MARKER, false);
     }
 
-    public function test_inner_pages_hide_the_floating_pill_and_hamburger(): void
+    public function test_inner_pages_keep_the_bottom_nav_bar_but_hide_the_top_chrome(): void
     {
         $this->withoutVite();
 
@@ -53,7 +58,9 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->get('/dashboard/orders')
             ->assertOk();
 
-        $response->assertDontSee(self::PILL_MARKER, false);
-        $response->assertDontSee(self::HAMBURGER_MARKER, false);
+        // The bottom nav bar (navigation) stays...
+        $response->assertSee(self::NAV_BAR_MARKER, false);
+        // ...but the top cart / country switcher / notification + hamburger are gone.
+        $response->assertDontSee(self::TOP_CHROME_MARKER, false);
     }
 }
