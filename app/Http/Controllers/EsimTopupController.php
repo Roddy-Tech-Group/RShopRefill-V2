@@ -66,9 +66,14 @@ class EsimTopupController extends Controller
         // about pricing rules. We also re-validate this server-side on POST.
         $parentProduct = $orderItem->product;
         $packages = collect($rawPackages)->map(function (array $pkg) use ($parentProduct) {
-            $netCost = (float) ($pkg['net_price'] ?? $pkg['price'] ?? 0);
-            $retail = $netCost > 0
-                ? $this->pricingService->resolveRetailPrice($parentProduct, $netCost)
+            // Airalo returns BOTH a wholesale `net_price` (our true cost) and its
+            // recommended retail `price`. The store marks up `price` (stored as
+            // face_value), NOT net_price - Airalo bakes ~30-50% margin into `price`,
+            // so pricing top-ups off net_price sold them well below the store and
+            // even below Airalo's own retail. Mirror the store: mark up the retail base.
+            $retailBase = (float) ($pkg['price'] ?? $pkg['net_price'] ?? 0);
+            $retail = $retailBase > 0
+                ? $this->pricingService->resolveRetailPrice($parentProduct, $retailBase)
                 : 0.0;
             $pkg['retail_usd'] = round($retail, 2);
 
@@ -131,10 +136,13 @@ class EsimTopupController extends Controller
             return $this->topupError($orderItem, 'That package has an invalid price right now. Please choose another.');
         }
 
-        // Reuse the canonical markup chain (rule hierarchy, safety floor)
-        // — same maths as the rest of the catalog.
+        // Mark up Airalo's recommended retail `price` (the SAME base the store uses -
+        // face_value), NOT the wholesale net_price. Airalo bakes its margin into
+        // `price`, so pricing off net_price sold top-ups ~30% below the store and
+        // below Airalo's own retail. net_price stays the true cost for margin/records.
+        $retailBase = (float) ($package['price'] ?? $netCost);
         $retail = round(
-            $this->pricingService->resolveRetailPrice($orderItem->product, $netCost),
+            $this->pricingService->resolveRetailPrice($orderItem->product, $retailBase),
             2
         );
 

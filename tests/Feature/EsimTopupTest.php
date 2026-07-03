@@ -143,4 +143,43 @@ class EsimTopupTest extends TestCase
         $response->assertSessionHasErrors('package_id');
         $this->assertNotSame(422, $response->status());
     }
+
+    public function test_topup_is_priced_off_airalo_retail_price_not_the_wholesale_net_price(): void
+    {
+        Queue::fake();
+        CurrencyRate::create(['code' => 'USD', 'name' => 'US Dollar', 'type' => 'fiat', 'rate_per_usd' => 1.0, 'is_active' => true]);
+
+        $user = $this->pinnedUser();
+        $wallet = Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 50.0, 'is_active' => true]);
+
+        $item = $this->fulfilledEsimItem($user);
+
+        // Airalo package: $5 wholesale (net_price) but $10 recommended retail (price).
+        // The store marks up `price`; the top-up must do the same, not undercut it.
+        $this->mock(AiraloFulfillmentProvider::class)
+            ->shouldReceive('listTopupsForIccid')
+            ->andReturn([['id' => 'topup_1gb', 'net_price' => 5.0, 'price' => 10.0]]);
+
+        $response = $this->actingAs($user)->post(
+            route('dashboard.esim.topup.purchase', $item),
+            ['package_id' => 'topup_1gb', 'net_price' => 5.0, 'wallet_pin' => '1234'],
+        );
+
+        $response->assertSessionHasNoErrors();
+
+        $topupOrder = Order::where('user_id', $user->id)
+            ->where('order_number', '!=', 'RSR-PARENT-ESIM-1')
+            ->latest()->first();
+        $this->assertNotNull($topupOrder);
+
+        // Priced off the $10 retail base (marked up), NOT the $5 wholesale net_price.
+        // A net_price basis would land ~$5.50; a retail basis is always >= $10.
+        $this->assertGreaterThanOrEqual(10.0, (float) $topupOrder->subtotal_amount);
+
+        // net_price is still recorded as the true cost, and margin is measured
+        // against that cost - not against the retail base.
+        $topupItem = OrderItem::where('order_id', $topupOrder->id)->first();
+        $this->assertSame(5.0, (float) $topupItem->provider_cost_usd);
+        $this->assertEqualsWithDelta((float) $topupOrder->subtotal_amount - 5.0, (float) $topupItem->markup_amount, 0.01);
+    }
 }
