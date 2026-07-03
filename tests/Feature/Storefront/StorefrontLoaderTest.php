@@ -24,5 +24,8 @@ class StorefrontLoaderTest extends TestCase
         // Light + dark + Extra Dark (pure-dark) backgrounds are all defined.
         $this->assertStringContainsString('.dark .app-loader', $html);
         $this->assertStringContainsString('.dark.pure-dark .app-loader', $html);
+        // The spinner spins (rotate) and glows (halo).
+        $this->assertStringContainsString('app-loader-rotate', $html);
+        $this->assertStringContainsString('app-loader-glow', $html);
     }
 }
