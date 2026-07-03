@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Cart\Services\CartPricingService;
+use App\Domain\Catalog\Services\AiraloTopupCatalogService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Providers\AiraloFulfillmentProvider;
 use App\Domain\Order\Enums\OrderStatus;
@@ -18,6 +19,7 @@ use App\Domain\Wallet\Services\WalletService;
 use App\Jobs\FulfillOrderItemJob;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -43,6 +45,7 @@ class EsimTopupController extends Controller
         private readonly WalletService $walletService,
         private readonly CartPricingService $pricingService,
         private readonly CurrencyRateService $currencyRateService,
+        private readonly AiraloTopupCatalogService $topupCatalog,
     ) {}
 
     /**
@@ -65,20 +68,26 @@ class EsimTopupController extends Controller
         // package so the view can render the final figure without knowing
         // about pricing rules. We also re-validate this server-side on POST.
         $parentProduct = $orderItem->product;
-        $packages = collect($rawPackages)->map(function (array $pkg) use ($parentProduct) {
-            // Airalo returns BOTH a wholesale `net_price` (our true cost) and its
-            // recommended retail `price`. The store marks up `price` (stored as
-            // face_value), NOT net_price - Airalo bakes ~30-50% margin into `price`,
-            // so pricing top-ups off net_price sold them well below the store and
-            // even below Airalo's own retail. Mirror the store: mark up the retail base.
-            $retailBase = (float) ($pkg['price'] ?? $pkg['net_price'] ?? 0);
-            $retail = $retailBase > 0
-                ? $this->pricingService->resolveRetailPrice($parentProduct, $retailBase)
-                : 0.0;
-            $pkg['retail_usd'] = round($retail, 2);
+
+        // Mirror every live top-up into the catalog (Admin -> Products, "Airalo
+        // Top-Up") so it can be seen + priced, then price each package from its
+        // catalog variant - honouring an admin per-variant price override, the
+        // markup rule, and the availability toggle (a disabled top-up is hidden).
+        $variantMap = $this->topupCatalog->upsertForParent($parentProduct, $rawPackages);
+
+        $packages = collect($rawPackages)->map(function (array $pkg) use ($variantMap, $parentProduct) {
+            $variant = $variantMap[(string) ($pkg['id'] ?? '')] ?? null;
+
+            if ($variant && ! $variant->is_available) {
+                return null; // Admin disabled this top-up.
+            }
+
+            $pkg['retail_usd'] = $variant
+                ? round((float) $this->pricingService->calculatePricing($variant, 1)['unit_price_snapshot'], 2)
+                : $this->fallbackRetail($parentProduct, $pkg);
 
             return $pkg;
-        })->all();
+        })->filter()->values()->all();
 
         return view('shop.esim-topup', [
             'orderItem' => $orderItem,
@@ -136,15 +145,18 @@ class EsimTopupController extends Controller
             return $this->topupError($orderItem, 'That package has an invalid price right now. Please choose another.');
         }
 
-        // Mark up Airalo's recommended retail `price` (the SAME base the store uses -
-        // face_value), NOT the wholesale net_price. Airalo bakes its margin into
-        // `price`, so pricing off net_price sold top-ups ~30% below the store and
-        // below Airalo's own retail. net_price stays the true cost for margin/records.
-        $retailBase = (float) ($package['price'] ?? $netCost);
-        $retail = round(
-            $this->pricingService->resolveRetailPrice($orderItem->product, $retailBase),
-            2
-        );
+        // Price from the catalog variant (same figure the store/admin controls):
+        // honours a per-variant price override, the markup rule, and availability.
+        // Upserting here keeps a straight-to-purchase (uncached) flow in sync too.
+        $variant = $this->topupCatalog->upsertForParent($orderItem->product, [$package])[(string) $package['id']] ?? null;
+
+        if ($variant && ! $variant->is_available) {
+            return $this->topupError($orderItem, 'That top-up is not available right now. Please choose another.');
+        }
+
+        $retail = $variant
+            ? round((float) $this->pricingService->calculatePricing($variant, 1)['unit_price_snapshot'], 2)
+            : $this->fallbackRetail($orderItem->product, $package);
 
         $user = $request->user();
 
@@ -300,6 +312,22 @@ class EsimTopupController extends Controller
         return redirect()
             ->route('dashboard.esim.topup', $orderItem)
             ->withErrors(['package_id' => $message]);
+    }
+
+    /**
+     * Retail USD price for a top-up that isn't in the catalog yet (belt-and-braces
+     * fallback). Marks up Airalo's recommended retail `price` (the same base the
+     * store uses - face_value), NOT the wholesale net_price, so it never undercuts.
+     *
+     * @param  array<string, mixed>  $package
+     */
+    private function fallbackRetail(?Product $product, array $package): float
+    {
+        $retailBase = (float) ($package['price'] ?? $package['net_price'] ?? 0);
+
+        return $retailBase > 0
+            ? round($this->pricingService->resolveRetailPrice($product, $retailBase), 2)
+            : 0.0;
     }
 
     /**
