@@ -7,10 +7,12 @@ use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Providers\AiraloFulfillmentProvider;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
+use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Jobs\FulfillOrderItemJob;
@@ -40,6 +42,7 @@ class EsimTopupController extends Controller
         private readonly AiraloFulfillmentProvider $provider,
         private readonly WalletService $walletService,
         private readonly CartPricingService $pricingService,
+        private readonly CurrencyRateService $currencyRateService,
     ) {}
 
     /**
@@ -144,18 +147,44 @@ class EsimTopupController extends Controller
         // Verify the provided PIN (throws ValidationException if incorrect or locked)
         app(TransactionPinService::class)->verifyPin($user, $validated['wallet_pin']);
 
-        $wallet = $user->wallets()->where('currency', 'USD')->where('is_active', true)->first();
-        if (! $wallet) {
-            Log::warning('eSIM top-up: user has no active USD wallet', ['user_id' => $user->id]);
+        // Pay from ANY of the customer's active wallets, as long as its balance
+        // covers the USD price converted into that wallet's currency. Prefer the
+        // USD wallet (no conversion), then fall back to the others. RCOIN is a
+        // rewards balance, not a spendable top-up wallet, so it is excluded.
+        $wallets = $user->wallets()
+            ->where('is_active', true)
+            ->get()
+            ->reject(fn ($w) => $w->currency === Currency::RCOIN)
+            ->sortBy(fn ($w) => $w->currency === Currency::USD ? 0 : 1)
+            ->values();
 
-            return $this->topupError($orderItem, 'You need funds in your USD wallet to top up. Add money to your wallet and try again.');
+        $chosenWallet = null;
+        $chargeAmount = 0.0;
+        foreach ($wallets as $candidate) {
+            try {
+                $needed = $candidate->currency === Currency::USD
+                    ? $retail
+                    : round($this->currencyRateService->convert($retail, 'USD', $candidate->currency->value), 2);
+            } catch (\Throwable $e) {
+                // No usable exchange rate for this currency right now - skip it.
+                continue;
+            }
+
+            if ($needed > 0 && (float) $candidate->balance >= $needed) {
+                $chosenWallet = $candidate;
+                $chargeAmount = $needed;
+                break;
+            }
         }
-        if ((float) $wallet->balance < $retail) {
-            return $this->topupError($orderItem, 'Insufficient wallet balance. This top-up costs $'.number_format($retail, 2).' - please add funds and try again.');
+
+        if (! $chosenWallet) {
+            Log::warning('eSIM top-up: no wallet covers the price', ['user_id' => $user->id, 'retail_usd' => $retail]);
+
+            return $this->topupError($orderItem, 'None of your wallets has enough to cover this $'.number_format($retail, 2).' top-up. Add funds and try again.');
         }
 
         try {
-            $order = DB::transaction(function () use ($user, $wallet, $orderItem, $package, $iccid, $netCost, $retail) {
+            $order = DB::transaction(function () use ($user, $chosenWallet, $chargeAmount, $orderItem, $package, $iccid, $netCost, $retail) {
                 // 1. Order shell
                 $order = Order::create([
                     'user_id' => $user->id,
@@ -174,6 +203,10 @@ class EsimTopupController extends Controller
                         'delivery_email' => $user->email,
                         'top_up_of_order_item' => $orderItem->id,
                         'top_up_iccid' => $iccid,
+                        // The wallet actually charged (may differ from the USD
+                        // settlement currency when paying from a local wallet).
+                        'paid_from_wallet_currency' => $chosenWallet->currency->value,
+                        'paid_amount' => $chargeAmount,
                     ],
                 ]);
 
@@ -207,16 +240,20 @@ class EsimTopupController extends Controller
                     ],
                 ]);
 
-                // 3. Debit the wallet
+                // 3. Debit the chosen wallet in its own currency (chargeAmount is
+                // the USD price already converted). The debit re-locks + re-checks
+                // the balance under a row lock, so a race just throws and rolls back.
+                // Order is linked via the reference (order_number). We deliberately
+                // do NOT pass sourceType/sourceId: wallet_transactions.source_id is
+                // an unsignedBigInteger and orders use UUIDs, so passing $order->id
+                // there throws a TypeError (this was silently breaking every top-up).
                 $this->walletService->debit(
-                    wallet: $wallet,
-                    amount: $retail,
+                    wallet: $chosenWallet,
+                    amount: $chargeAmount,
                     category: TransactionCategory::Purchase,
-                    description: "Top-up for eSIM {$iccid}",
+                    description: "Top-up for eSIM {$iccid} (\${$retail} USD)",
                     reference: $order->order_number,
                     idempotencyKey: 'esim-topup-'.$newItem->id,
-                    sourceType: 'orders',
-                    sourceId: $order->id,
                 );
 
                 // 4. Kick off fulfilment (Airalo /orders/topups call)
