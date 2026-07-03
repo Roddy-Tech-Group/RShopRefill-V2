@@ -419,12 +419,14 @@
                 {{-- Region switcher --}}
                 <div class="w-full shrink-0 sm:w-64">
                     <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-zinc-200">Change country or region</label>
-                    <div x-data="{ open: false, search: '' }" @click.outside="open = false; search = ''" class="relative">
+                    <div x-data="{ open: false, search: '' }" @click.outside="open = false; search = ''" @keydown.escape.window="open = false; search = ''" class="relative">
                         <button
                             type="button"
                             @click="open = ! open; if (open) $nextTick(() => $refs.regionSearch?.focus())"
                             :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600'"
                             class="flex h-[46px] w-full items-center gap-2 rounded-[12px] border bg-transparent px-3 text-sm font-medium text-zinc-900 outline-none transition-colors dark:text-white"
+                            aria-haspopup="listbox"
+                            :aria-expanded="open.toString()"
                         >
                             @if ($flag)
                                 <img src="{{ $flag }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700">
@@ -436,29 +438,37 @@
                             x-show="open"
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             style="display:none;"
-                            class="glass-panel absolute right-0 left-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] shadow-xl shadow-zinc-900/10 dark:shadow-black/40"
-                            role="listbox"
+                            class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-white/80 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/80 dark:shadow-black/40 dark:ring-1 dark:ring-white/10"
                         >
-                            <div class="border-b border-zinc-100 p-2 dark:border-zinc-700">
-                                <input x-ref="regionSearch" x-model="search" type="text" placeholder="Search a country or region" aria-label="Search a country or region" class="w-full rounded-[12px] border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:bg-zinc-900">
+                            <div class="border-b border-zinc-200 p-2 dark:border-white/10">
+                                <div class="relative">
+                                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <input x-ref="regionSearch" x-model="search" type="text" placeholder="Search a country or region" aria-label="Search a country or region" class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">
+                                </div>
                             </div>
-                            <div class="max-h-72 overflow-y-auto p-1">
+                            <div
+                                class="max-h-72 overflow-y-auto overscroll-contain p-1 [-webkit-overflow-scrolling:touch]"
+                                role="listbox"
+                                aria-label="Choose a country or region"
+                            >
                                 @foreach ($esimRegions as $r)
                                     <a
                                         href="{{ $shopRoute('esim', $r['slug']) }}"
                                         wire:navigate
+                                        role="option"
+                                        aria-selected="{{ $r['key'] === $currentKey ? 'true' : 'false' }}"
                                         data-name="{{ Str::lower($r['name']) }}"
                                         x-show="search === '' || $el.dataset.name.includes(search.toLowerCase())"
                                         @class([
                                             'flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors',
                                             'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $r['key'] === $currentKey,
-                                            'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800' => $r['key'] !== $currentKey,
+                                            'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]' => $r['key'] !== $currentKey,
                                         ])
                                     >
                                         @if ($r['flag'])
                                             <img src="{{ $r['flag'] }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" loading="lazy">
                                         @else
-                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-zinc-700"></span>
+                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-white/10"></span>
                                         @endif
                                         <span class="flex-1 truncate">{{ $r['name'] }}</span>
                                     </a>
