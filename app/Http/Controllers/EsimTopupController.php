@@ -100,14 +100,33 @@ class EsimTopupController extends Controller
         $iccid = $this->extractIccid($orderItem);
         abort_if(! $iccid, 404, 'No ICCID on file for this eSIM yet.');
 
-        // Re-verify the package + price by re-fetching the live list. Defends
-        // against stale client state and price tampering.
-        $packages = $this->provider->listTopupsForIccid($iccid);
+        // Re-verify the package + price against the live list. Defends against
+        // stale client state and price tampering. These are all RECOVERABLE
+        // states (provider hiccup, package gone, no funds) - they must surface a
+        // friendly message on the top-up page, never a raw 422 error page.
+        try {
+            $packages = $this->provider->listTopupsForIccid($iccid);
+        } catch (\Throwable $e) {
+            Log::warning('eSIM top-up: could not fetch live packages', ['iccid' => $iccid, 'error' => $e->getMessage()]);
+
+            return $this->topupError($orderItem, 'We could not reach the eSIM provider just now. Please try again in a moment.');
+        }
+
         $package = collect($packages)->firstWhere('id', $validated['package_id']);
-        abort_if(! $package, 422, 'That top-up package is no longer available.');
+        if (! $package) {
+            Log::warning('eSIM top-up: selected package no longer in live list', [
+                'iccid' => $iccid,
+                'package_id' => $validated['package_id'],
+                'available' => count($packages),
+            ]);
+
+            return $this->topupError($orderItem, 'That top-up package is no longer available. Please choose another.');
+        }
 
         $netCost = (float) ($package['net_price'] ?? $package['price'] ?? 0);
-        abort_if($netCost <= 0, 422, 'Invalid package price.');
+        if ($netCost <= 0) {
+            return $this->topupError($orderItem, 'That package has an invalid price right now. Please choose another.');
+        }
 
         // Reuse the canonical markup chain (rule hierarchy, safety floor)
         // — same maths as the rest of the catalog.
@@ -119,15 +138,21 @@ class EsimTopupController extends Controller
         $user = $request->user();
 
         if (! $user->hasTransactionPin()) {
-            throw new MissingTransactionPinException('You must set up a Wallet Transaction PIN in your profile settings before you can top up with your wallet.');
+            return $this->topupError($orderItem, 'Set up a Wallet Transaction PIN in your profile settings before topping up with your wallet.');
         }
 
         // Verify the provided PIN (throws ValidationException if incorrect or locked)
         app(TransactionPinService::class)->verifyPin($user, $validated['wallet_pin']);
 
         $wallet = $user->wallets()->where('currency', 'USD')->where('is_active', true)->first();
-        abort_if(! $wallet, 422, 'You need an active USD wallet to top up.');
-        abort_if((float) $wallet->balance < $retail, 422, 'Insufficient wallet balance.');
+        if (! $wallet) {
+            Log::warning('eSIM top-up: user has no active USD wallet', ['user_id' => $user->id]);
+
+            return $this->topupError($orderItem, 'You need funds in your USD wallet to top up. Add money to your wallet and try again.');
+        }
+        if ((float) $wallet->balance < $retail) {
+            return $this->topupError($orderItem, 'Insufficient wallet balance. This top-up costs $'.number_format($retail, 2).' - please add funds and try again.');
+        }
 
         try {
             $order = DB::transaction(function () use ($user, $wallet, $orderItem, $package, $iccid, $netCost, $retail) {
@@ -217,6 +242,19 @@ class EsimTopupController extends Controller
 
         return redirect()->route('shop.order', $order->order_number)
             ->with('status', 'Top-up ordered. Your eSIM is being refilled.');
+    }
+
+    /**
+     * Send the customer back to the top-up page with a friendly, specific
+     * message instead of a raw abort() error page, for recoverable states
+     * (provider hiccup, package gone, no/low funds). The page renders these
+     * from the error bag (shop/esim-topup.blade.php).
+     */
+    private function topupError(OrderItem $orderItem, string $message): RedirectResponse
+    {
+        return redirect()
+            ->route('dashboard.esim.topup', $orderItem)
+            ->withErrors(['package_id' => $message]);
     }
 
     /**
