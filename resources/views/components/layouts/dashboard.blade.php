@@ -1016,6 +1016,12 @@
             // The blue hero shows ONLY on the dashboard overview. Every other dashboard
             // page uses the slim white inner top bar (hamburger + title + bell) below.
             $skipMobileHero = ! request()->routeIs('dashboard');
+
+            // The floating bottom-nav pill + the mobile hamburger only ride along on the
+            // browse hub (overview) and the shop pages. Task/inner pages (orders, wallet,
+            // history, settings, ...) stay clean - people reach them from the hub and use
+            // back to return - so the pill + hamburger are hidden there.
+            $showMobileNavChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
         @endphp
 
         {{-- flux:main is the single main-axis child of Flux's layout container.
@@ -1225,16 +1231,22 @@
                  once the user scrolls past, keeping the essentials always reachable. --}}
             <div class="relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 lg:hidden">
                 {{-- Hamburger opens the Connect panel (social + contact channels).
-                     The app menu itself is the bottom-bar centre FAB. --}}
-                <button
-                    type="button"
-                    x-data
-                    x-on:click="$dispatch('open-connect-panel')"
-                    aria-label="Connect with us"
-                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                >
-                    <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                </button>
+                     The app menu itself is the bottom-bar centre FAB. Only the shop
+                     pages carry the hamburger; other inner pages get an invisible
+                     spacer so the locale/cart/bell chips stay pinned to the right. --}}
+                @if ($showMobileNavChrome)
+                    <button
+                        type="button"
+                        x-data
+                        x-on:click="$dispatch('open-connect-panel')"
+                        aria-label="Connect with us"
+                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
+                    >
+                        <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
+                    </button>
+                @else
+                    <div class="h-11 w-11 shrink-0" aria-hidden="true"></div>
+                @endif
                 <div class="flex items-center gap-1" x-data>
                     {{-- Language + currency toggle (opens the locale modal). --}}
                     <button
@@ -1300,15 +1312,20 @@
                 style="top: max(0.5rem, env(safe-area-inset-top));"
             >
                 {{-- Hamburger chip (left) - glass treatment so the page bleeds
-                     through (works on light + dark surfaces). --}}
-                <button
-                    type="button"
-                    @click="$dispatch('open-connect-panel')"
-                    aria-label="Connect with us"
-                    class="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                >
-                    <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                </button>
+                     through (works on light + dark surfaces). Overview + shop pages
+                     only; elsewhere an invisible spacer keeps the right chips pinned. --}}
+                @if ($showMobileNavChrome)
+                    <button
+                        type="button"
+                        @click="$dispatch('open-connect-panel')"
+                        aria-label="Connect with us"
+                        class="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
+                    >
+                        <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
+                    </button>
+                @else
+                    <div class="h-11 w-11 shrink-0" aria-hidden="true"></div>
+                @endif
 
                 {{-- Locale + cart + notification chips (right) - same glass treatment, pinned. --}}
                 <div class="pointer-events-auto flex items-center gap-2" x-data>
@@ -1398,7 +1415,9 @@
         @endphp
         {{-- Floating rounded nav bar (neobank style): detached from the edges with
              a pill highlight behind the active tab. The wrapper's bottom padding
-             keeps it clear of the iOS home indicator. --}}
+             keeps it clear of the iOS home indicator.
+             Overview + shop pages only; hidden on task/inner pages. --}}
+        @if ($showMobileNavChrome)
         <div
             x-data="{
                 active: {{ $activeIndex }},
@@ -1486,6 +1505,7 @@
                 </div>
             </nav>
         </div>
+        @endif
 
         {{-- Action flashes pop as a floating pill toast (status / success / error /
              wallet_created), so pages don't need their own inline banners. --}}
