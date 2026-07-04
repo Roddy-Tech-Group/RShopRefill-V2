@@ -309,6 +309,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('sync/zendit-topups', [AdminCatalogController::class, 'syncZenditTopups'])->name('sync.zendit-topups');
             Route::get('products', [AdminCatalogController::class, 'products'])->name('products');
             Route::patch('products/{product}/toggle-active', [AdminCatalogController::class, 'toggleActive']);
+            Route::patch('products/{product}/out-of-stock', [AdminCatalogController::class, 'setOutOfStock'])->name('products.out-of-stock');
             Route::patch('products/{product}/toggle-featured', [AdminCatalogController::class, 'toggleFeatured']);
             Route::patch('products/{product}/toggle-popular', [AdminCatalogController::class, 'togglePopular']);
 

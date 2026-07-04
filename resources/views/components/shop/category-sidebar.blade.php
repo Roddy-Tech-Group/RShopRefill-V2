@@ -36,7 +36,8 @@
         <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Categories</p>
         <nav class="space-y-0.5 text-sm" aria-label="Product categories">
             @foreach ($categories as $cat)
-                @if ($cat['url'])
+                @php $catEnabled = \App\Support\FeatureFlag::categoryEnabled($cat['slug']); @endphp
+                @if ($cat['url'] && $catEnabled)
                     <a
                         href="{{ $cat['url'] }}"
                         wire:navigate
@@ -49,6 +50,12 @@
                     >
                         <span>{{ $cat['label'] }}</span>
                     </a>
+                @elseif ($cat['url'] && ! $catEnabled)
+                    {{-- Feature off: stays visible but greyed and non-clickable. --}}
+                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-1.5 text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="Temporarily unavailable">
+                        <span>{{ $cat['label'] }}</span>
+                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Off</span>
+                    </span>
                 @else
                     <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-1.5 text-zinc-400 dark:text-zinc-500">
                         <span>{{ $cat['label'] }}</span>

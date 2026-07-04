@@ -19,6 +19,11 @@
     $hasPlans = $variants->isNotEmpty();
     $pricing  = app(CartPricingService::class);
 
+    // Feature A/B: keep the region + plans visible but disable buying when the eSIMs
+    // feature is off or the product is out of stock. The purchase is blocked server-side.
+    $esimsEnabled   = \App\Support\FeatureFlag::on('esims');
+    $productBuyable = $esimsEnabled && ! $product->is_out_of_stock;
+
     // Region name + scope from the shared classifier (suppliers mislabel every
     // region "Global eSIM", so non-country products derive their name from the slug).
     $regionMeta  = \App\Http\Controllers\EsimStoreController::regionMeta($product->country_code, $product->slug, $product->name);
@@ -315,6 +320,7 @@
                 'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
             ]),
             checkoutUrl: '{{ route('shop.checkout') }}',
+            purchasable: @js($productBuyable),
         })"
         x-init="init()"
         translate="no"
@@ -498,6 +504,18 @@
                 </div>
             </div>
         </div>
+
+        @unless ($productBuyable)
+            <div class="mx-auto mt-6 flex w-full max-w-[800px] items-start gap-3 rounded-[12px] border px-4 py-3 {{ $product->is_out_of_stock ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-white/5' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 {{ $product->is_out_of_stock ? 'text-zinc-400' : 'text-amber-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                </svg>
+                <div>
+                    <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? 'Out of stock' : 'eSIMs are temporarily unavailable' }}</p>
+                    <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">You can view the plans, but purchases are paused right now. Please check back soon.</p>
+                </div>
+            </div>
+        @endunless
 
         @if ($hasPlans)
             {{-- ── Selector card (glass): holds the Data/Voice + Standard/Unlimited
@@ -934,9 +952,9 @@
                         <button
                             type="button"
                             @click="addToCart()"
-                            :disabled="! selectedId"
+                            :disabled="! selectedId || ! purchasable"
                             :class="cartState === 'success' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-blue-600 bg-white/70 text-blue-600 backdrop-blur-md hover:bg-blue-600 hover:text-white dark:bg-white/10 dark:text-blue-300 dark:hover:bg-blue-600 dark:hover:text-white'"
-                            class="hidden h-12 items-center justify-center rounded-[12px] border-2 px-6 text-sm font-semibold transition-colors disabled:opacity-50 sm:flex"
+                            class="hidden h-12 items-center justify-center rounded-[12px] border-2 px-6 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:flex"
                         >
                             <span x-show="cartState !== 'success'">Add to cart</span>
                             <span x-show="cartState === 'success'" style="display:none;">Added</span>
@@ -944,7 +962,7 @@
                         <button
                             type="button"
                             @click="buyNow()"
-                            :disabled="! selectedId || $store.cart.loading"
+                            :disabled="! selectedId || ! purchasable || $store.cart.loading"
                             class="flex h-12 items-center justify-center rounded-[12px] bg-blue-600 px-7 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-50 disabled:hover:bg-blue-600"
                         >
                             Buy now
@@ -1245,12 +1263,13 @@
     </div>
 
     <script>
-        window.esimStore = function ({ plans, cryptos, defaultCrypto, checkoutUrl, rcoinConfig }) {
+        window.esimStore = function ({ plans, cryptos, defaultCrypto, checkoutUrl, rcoinConfig, purchasable }) {
             const cryptoMap = {};
             (cryptos || []).forEach((c) => { cryptoMap[c.code] = c; });
 
             return {
                 rcoinConfig,
+                purchasable,          // server truth: eSIMs feature on AND product in stock
                 plans: plans || [],
                 checkoutUrl,
                 cryptos: cryptoMap,
@@ -1346,7 +1365,7 @@
 
                 // ---- cart ----
                 async addToCart() {
-                    if (this.cartState !== 'idle' || ! this.selectedId) { return false; }
+                    if (! this.purchasable || this.cartState !== 'idle' || ! this.selectedId) { return false; }
                     this.cartState = 'loading';
                     const ok = await this.$store.cart.add(this.selectedId, 1);
                     if (ok) {
@@ -1359,7 +1378,7 @@
                     return ok;
                 },
                 async buyNow() {
-                    if (! this.selectedId) { return; }
+                    if (! this.purchasable || ! this.selectedId) { return; }
                     const ok = await this.$store.cart.add(this.selectedId, 1, null, null, true);
                     if (ok) { window.location.href = this.checkoutUrl; }
                 },

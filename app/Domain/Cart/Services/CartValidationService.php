@@ -55,6 +55,18 @@ class CartValidationService
             $issues[] = 'product_unavailable';
         }
 
+        // A product marked out of stock, or one whose category feature has been
+        // switched off since it was added, must not be checked out - even if it is
+        // still sitting in a stale cart. Both flag the line so checkout re-validation
+        // rejects it rather than fulfilling a now-unavailable product.
+        if ($product && $product->is_out_of_stock) {
+            $issues[] = 'out_of_stock';
+        }
+
+        if ($product && ! $product->isCategoryEnabled()) {
+            $issues[] = 'category_disabled';
+        }
+
         if (! empty($issues)) {
             // If it's unavailable, no need to check pricing limits
             return $issues;
@@ -111,6 +123,21 @@ class CartValidationService
         if (! $variant->is_available) {
             throw ValidationException::withMessages([
                 'product_variant_id' => 'This specific variant is currently unavailable.',
+            ]);
+        }
+
+        // Feature A / B server-side block. Greying the UI is cosmetic; this is what
+        // actually stops a forged or stale add-to-cart for an out-of-stock product
+        // or one whose category feature the admin has switched off.
+        if ($product->is_out_of_stock) {
+            throw ValidationException::withMessages([
+                'product_variant_id' => 'This product is out of stock.',
+            ]);
+        }
+
+        if (! $product->isCategoryEnabled()) {
+            throw ValidationException::withMessages([
+                'product_variant_id' => 'This product is currently unavailable.',
             ]);
         }
 

@@ -4,7 +4,9 @@
     use App\Models\Subcategory;
     use Illuminate\Support\Facades\DB;
 
-    abort_if(! \App\Support\FeatureFlag::on('gift_cards'), 404);
+    // Feature A: when the category feature is off we keep the catalog VISIBLE but
+    // greyed and non-purchasable (it used to 404). The buy itself is blocked server-side.
+    $categoryEnabled = \App\Support\FeatureFlag::on('gift_cards');
 
     $giftCardsCategory = Category::where('slug', 'gift-cards')->first();
 
@@ -266,6 +268,18 @@
                         </div>
                     @endif
 
+                    @unless ($categoryEnabled)
+                        <div class="mb-5 flex items-start gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                            <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                            </svg>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Gift cards are temporarily unavailable</p>
+                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">You can browse the catalog, but purchases are paused right now. Please check back soon.</p>
+                            </div>
+                        </div>
+                    @endunless
+
                     {{-- Product grid. Skeleton overlay removed — it was rendering misaligned with the real
                          grid and flashing on every navigation. wire:navigate transitions are fast enough
                          without a synthetic loading state. --}}
@@ -277,16 +291,24 @@
                                         $variants   = $product->variants;
                                         $available  = $variants->where('is_available', true);
                                         $isOut      = $variants->isNotEmpty() && $available->isEmpty();
+                                        // Out of stock = no available variant OR the admin's product-level flag.
+                                        $outOfStock = $isOut || $product->is_out_of_stock;
+                                        // Not buyable = category off OR out of stock. The card then renders
+                                        // greyed and inert (an <a> with no href does not navigate).
+                                        $notBuyable = ! $categoryEnabled || $outOfStock;
                                         // Min-to-max range across ALL denominations (fixed + variable), in the product's currency.
                                         $priceLabel = $product->priceRangeLabel();
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                     @endphp
                                     <li>
                                         <a
-                                            href="{{ $shopRoute('brand', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}"
-                                            wire:navigate
-                                            class="card-3d-scene group block focus:outline-none"
+                                            @if (! $notBuyable) href="{{ $shopRoute('brand', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}" wire:navigate @endif
+                                            @class([
+                                                'card-3d-scene group block focus:outline-none',
+                                                'pointer-events-none opacity-60 grayscale' => $notBuyable,
+                                            ])
                                             aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
+                                            @if ($notBuyable) aria-disabled="true" @endif
                                         >
                                             {{-- Logo tile. bg uses a literal hex so the dark-mode
                                                  remap keeps it white — brand logos are drawn for a
@@ -302,9 +324,13 @@
                                                     </span>
                                                 @endif
 
-                                                @if ($isOut)
+                                                @if ($outOfStock)
                                                     <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-zinc-900/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
                                                         Out of stock
+                                                    </span>
+                                                @elseif (! $categoryEnabled)
+                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-amber-500/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+                                                        Unavailable
                                                     </span>
                                                 @elseif ($product->is_popular)
                                                     {{-- Round pill with a soft fuchsia glow halo. --}}

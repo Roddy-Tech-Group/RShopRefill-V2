@@ -396,8 +396,8 @@ html.dark .admin-table tbody td {
     color: rgb(212 212 216);                         /* zinc-300 */
 }
 html.dark .admin-table tbody tr:hover {
-    background-color: rgb(37 99 235 / 0.15) !important;     /* blue-600/15 */
-    box-shadow: inset 0 0 0 1px rgb(96 165 250) !important; /* blue-400 ring */
+    background-color: #1f1f1f !important;                          /* neutral grey — matches every other dark row hover */
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08) !important; /* subtle neutral ring, not blue */
 }
 html.dark .admin-table tbody tr:not(:last-child) td {
     border-bottom-color: rgb(255 255 255 / 0.08);
@@ -890,6 +890,17 @@ html.dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: #1f1f1f; }
 html.dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: #1f1f1f; }
 html.dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: #1f1f1f; }
 html.dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: #1f1f1f; }
+/* Blue hover tints (admin action rows/buttons) -> the same deeper grey #1f1f1f,
+   so every dark-mode hover is neutral instead of a light-blue cast. Matches the
+   settings page, whose hover:bg-blue-50 already resolves to grey. */
+html.dark .dark\:hover\:bg-blue-600\/10:hover,
+html.dark .dark\:hover\:bg-blue-600\/15:hover,
+html.dark .dark\:hover\:bg-blue-600\/20:hover,
+html.dark .dark\:hover\:bg-blue-600\/25:hover,
+html.dark .dark\:hover\:bg-blue-500\/10:hover,
+html.dark .dark\:hover\:bg-blue-500\/15:hover,
+html.dark .dark\:hover\:bg-blue-500\/20:hover,
+html.dark .dark\:hover\:bg-blue-500\/25:hover { background-color: #1f1f1f; }
 /* Navy borders / rings -> neutral grey so outlines match the black surfaces. */
 html.dark .dark\:border-\[\#24364f\] { border-color: #3a3a3a; }
 html.dark .dark\:ring-\[\#24364f\]   { --tw-ring-color: #3a3a3a; }
@@ -961,6 +972,16 @@ html.dark .dark\:bg-\[\#26416b\]\/95 { background-color: rgb(42 42 42 / 0.95); }
 .dark .border-zinc-300,
 .dark .border-zinc-400,
 .dark .border-zinc-500 { border-color: #3a3a3a; }
+
+/* White card/panel borders + hairline rings -> dimmer in dark mode, so outlines
+   read as a faint 1px line instead of a bright white edge. Opacity is lowered
+   (rather than swapped for a solid grey) so the border still adapts to whichever
+   dark surface sits behind it. Global — storefront AND admin. The brighter white
+   rings (/20 and up: hero glow, avatars, selected states) are left as accents. */
+html.dark .dark\:border-white\/10 { border-color: rgb(255 255 255 / 0.06); }
+html.dark .dark\:border-white\/15 { border-color: rgb(255 255 255 / 0.08); }
+html.dark .dark\:ring-white\/10 { --tw-ring-color: rgb(255 255 255 / 0.06); }
+html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
 .dark .hover\:border-zinc-500:hover { border-color: #444444; }
 
 /* Nav search box — a white resting border in dark mode so the field stands

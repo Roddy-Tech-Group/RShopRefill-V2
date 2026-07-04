@@ -381,15 +381,23 @@
                             All Categories
                         </a>
                         @foreach ([
-                            ['Gift Cards',     route('dashboard.shop.gift-cards'), true],
-                            ['eSIMs',          route('dashboard.shop.esims'),      true],
-                            ['Flights',        route('dashboard.shop.flights'),    true],
-                            ['Stays',          route('dashboard.shop.stays'),      true],
-                            ['Topups & Bills', route('dashboard.shop.topups'),     true],
-                        ] as [$label, $href, $live])
-                            <a href="{{ $href }}" @if ($live) wire:navigate.hover @endif class="{{ $subItem(false) }}">
-                                {{ $label }}
-                            </a>
+                            ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards'],
+                            ['eSIMs',          route('dashboard.shop.esims'),      'esims'],
+                            ['Flights',        route('dashboard.shop.flights'),    null],
+                            ['Stays',          route('dashboard.shop.stays'),      null],
+                            ['Topups & Bills', route('dashboard.shop.topups'),     'topups'],
+                        ] as [$label, $href, $flag])
+                            @php $catEnabled = $flag === null || \App\Support\FeatureFlag::on($flag); @endphp
+                            @if ($catEnabled)
+                                <a href="{{ $href }}" wire:navigate.hover class="{{ $subItem(false) }}">
+                                    {{ $label }}
+                                </a>
+                            @else
+                                {{-- Feature off: visible but greyed and non-clickable. --}}
+                                <span class="{{ $subItem(false) }} cursor-not-allowed opacity-50" aria-disabled="true" title="Temporarily unavailable">
+                                    {{ $label }}
+                                </span>
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -819,10 +827,11 @@
                     @click="locked = !locked; $store.cart.open = locked"
                     :aria-expanded="$store.cart.open.toString()"
                     aria-haspopup="menu"
-                    class="relative flex h-11 w-11 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-zinc-50"
+                    class="relative flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white"
                     aria-label="Shopping cart"
                 >
-                    <img src="{{ asset('assets/' . rawurlencode('new cart.svg')) }}" alt="" class="h-7 w-7" loading="lazy">
+                    {{-- Masked so the cart glyph inherits the chip's text colour (dark on grey, white on blue hover) - matches the admin header chips. --}}
+                    <span class="h-6 w-6 shrink-0 bg-current" style="-webkit-mask: url('{{ asset('assets/'.rawurlencode('new cart.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/'.rawurlencode('new cart.svg')) }}') center / contain no-repeat;"></span>
                     <span
                         x-show="$store.cart.count > 0"
                         x-text="$store.cart.count"
@@ -904,9 +913,10 @@
                  The user's own account country is set in profile settings. --}}
 
             {{-- Notification bell (desktop) — hidden lg:block so it never doubles
-                 up with the mobile hero bell on small screens. --}}
+                 up with the mobile hero bell on small screens. 'chip' tone matches
+                 the admin header (square grey chip, fills blue on hover). --}}
             <div class="hidden lg:block">
-                <livewire:notifications-menu tone="dark" />
+                <livewire:notifications-menu tone="chip" />
             </div>
 
             {{-- Profile dropdown.
@@ -936,7 +946,7 @@
                      bell icon to the left of this button already surfaces the
                      unread count, and doubling the indicator made the chrome
                      read noisier than the data warranted. --}}
-                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 ring-1 ring-blue-200 transition-all hover:ring-2 hover:ring-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-200 ring-1 ring-zinc-200 transition-all hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:ring-zinc-700/60">
                     <img src="{{ $user?->avatar_url ?: $defaultAvatar }}" alt="{{ $user?->name ?? 'Account' }}" class="h-full w-full object-cover">
                 </button>
 

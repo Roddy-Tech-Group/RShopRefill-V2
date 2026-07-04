@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -200,6 +201,7 @@ class Product extends Model
         'is_featured',
         'is_popular',
         'is_active',
+        'is_out_of_stock',
         'metadata',
     ];
 
@@ -209,8 +211,43 @@ class Product extends Model
             'is_featured' => 'boolean',
             'is_popular' => 'boolean',
             'is_active' => 'boolean',
+            'is_out_of_stock' => 'boolean',
             'metadata' => 'array',
         ];
+    }
+
+    /**
+     * Feature-flag key for this product's category (or null when the category has
+     * no gate). Resolves through the one canonical map on FeatureFlag.
+     */
+    public function categoryFeatureKey(): ?string
+    {
+        return FeatureFlag::forCategory($this->category?->slug);
+    }
+
+    /**
+     * Is this product's category feature turned on? Drives the "grey out when the
+     * category is off" behaviour. Ungated categories are always on.
+     */
+    public function isCategoryEnabled(): bool
+    {
+        return FeatureFlag::categoryEnabled($this->category?->slug);
+    }
+
+    /**
+     * The single shared "can a customer buy this right now?" predicate. Both the
+     * greyed-out UI and the server-side purchase guard read this so they always
+     * agree: buyable only if the category feature is on, the product is active and
+     * in stock, and at least one variant is available. Requires `variants` (and
+     * ideally `category`) to be loaded to avoid lazy queries in a loop.
+     */
+    public function isBuyable(): bool
+    {
+        if (! $this->is_active || $this->is_out_of_stock || ! $this->isCategoryEnabled()) {
+            return false;
+        }
+
+        return $this->variants->contains(fn (ProductVariant $v) => $v->is_available);
     }
 
     public function category()

@@ -93,28 +93,42 @@
 
         <ul class="mt-3 px-3">
             @foreach ($categories as $cat)
-                @php $isActive = $cat['slug'] === $active; @endphp
+                @php
+                    $isActive = $cat['slug'] === $active;
+                    $catEnabled = \App\Support\FeatureFlag::categoryEnabled($cat['slug']);
+                @endphp
                 <li>
-                    <a
-                        href="{{ $cat['url'] }}"
-                        wire:navigate
-                        @class([
-                            'flex items-center gap-3 rounded-[15px] px-3 py-3 text-sm transition-colors',
-                            'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $isActive,
-                            'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! $isActive,
-                        ])
-                        @if ($isActive) aria-current="page" @endif
-                    >
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 dark:bg-white/10">
-                            <img src="{{ asset('assets/' . rawurlencode($cat['icon'])) }}" alt="" class="h-5 w-5 object-contain dark:brightness-0 dark:invert" loading="lazy">
+                    @if ($catEnabled)
+                        <a
+                            href="{{ $cat['url'] }}"
+                            wire:navigate
+                            @class([
+                                'flex items-center gap-3 rounded-[15px] px-3 py-3 text-sm transition-colors',
+                                'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $isActive,
+                                'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! $isActive,
+                            ])
+                            @if ($isActive) aria-current="page" @endif
+                        >
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 dark:bg-white/10">
+                                <img src="{{ asset('assets/' . rawurlencode($cat['icon'])) }}" alt="" class="h-5 w-5 object-contain dark:brightness-0 dark:invert" loading="lazy">
+                            </span>
+                            <span class="flex-1">{{ $cat['label'] }}</span>
+                            @if ($isActive)
+                                <svg class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                </svg>
+                            @endif
+                        </a>
+                    @else
+                        {{-- Feature off: visible but greyed and non-clickable. --}}
+                        <span class="flex cursor-not-allowed items-center gap-3 rounded-[15px] px-3 py-3 text-sm font-medium text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="Temporarily unavailable">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 grayscale dark:bg-white/10">
+                                <img src="{{ asset('assets/' . rawurlencode($cat['icon'])) }}" alt="" class="h-5 w-5 object-contain opacity-50 dark:brightness-0 dark:invert" loading="lazy">
+                            </span>
+                            <span class="flex-1">{{ $cat['label'] }}</span>
+                            <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Off</span>
                         </span>
-                        <span class="flex-1">{{ $cat['label'] }}</span>
-                        @if ($isActive)
-                            <svg class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                            </svg>
-                        @endif
-                    </a>
+                    @endif
                 </li>
             @endforeach
         </ul>

@@ -62,8 +62,9 @@
             <div class="rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-blue-50">
-                            <img src="{{ asset('assets/customer.svg') }}" alt="" class="h-6 w-6" style="{{ $icon }}">
+                        {{-- The user's real profile photo (or their initials avatar), matching the settings page - not a generic icon. --}}
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-50">
+                            <img src="{{ $user?->avatar_url ?: ($user?->initialsAvatar() ?? '') }}" alt="{{ $user?->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
                         </span>
                         <div>
                             <p class="text-sm text-zinc-600">Your verification level</p>
@@ -72,12 +73,8 @@
                     </div>
 
                     @if ($kycVerified)
-                        <span class="inline-flex items-center gap-1.5 rounded-[5px] bg-blue-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                            <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M12 1.5l2.6 1.9 3.2-.2 1 3.1 2.7 1.7-1 3.1 1 3.1-2.7 1.7-1 3.1-3.2-.2L12 22.5l-2.6-1.9-3.2.2-1-3.1L2.5 16l1-3.1-1-3.1 2.7-1.7 1-3.1 3.2.2L12 1.5zm-1 13.6l5-5-1.4-1.4-3.6 3.6-1.6-1.6L7 12.1l3 3z" clip-rule="evenodd"/>
-                            </svg>
-                            Verified
-                        </span>
+                        {{-- Same scalloped verification seal the settings page uses. --}}
+                        <x-ui.verified-badge class="h-8 w-8" title="Identity verified" />
                     @elseif ($emailVerified)
                         <span class="inline-flex items-center rounded-[5px] bg-emerald-500 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Email Verified</span>
                     @else

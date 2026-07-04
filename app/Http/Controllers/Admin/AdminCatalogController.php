@@ -63,6 +63,20 @@ class AdminCatalogController extends Controller
     }
 
     /**
+     * Mark a whole product out of stock (or back in stock). Unlike is_active - which
+     * HIDES the product - out-of-stock keeps the product VISIBLE to customers but
+     * greyed with an "Out of stock" label and non-purchasable. Product-level (all
+     * variants) to match the drawer's "mark this product out of stock" control.
+     */
+    public function setOutOfStock(Request $request, Product $product)
+    {
+        $validated = $request->validate(['is_out_of_stock' => ['required', 'boolean']]);
+        $product->update(['is_out_of_stock' => (bool) $validated['is_out_of_stock']]);
+
+        return response()->json(['is_out_of_stock' => (bool) $product->is_out_of_stock]);
+    }
+
+    /**
      * Storefront curation slots: at most this many products may carry each
      * of the Featured / Popular badges at once. Keeps the homepage rows a
      * deliberate shortlist instead of an ever-growing pile.

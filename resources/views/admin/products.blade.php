@@ -909,6 +909,7 @@
                         'dataSpeed' => data_get($meta, 'dataSpeed'),
                         'isAvailable' => (bool) $variant->is_available,
                         'isActive' => (bool) ($product?->is_active ?? false),
+                        'isOutOfStock' => (bool) ($product?->is_out_of_stock ?? false),
                         'isFeatured' => (bool) ($product?->is_featured ?? false),
                         'isPopular' => (bool) ($product?->is_popular ?? false),
                         'valueLabel' => $valueLabel,
@@ -1068,6 +1069,18 @@
                                 <button type="button" @click="setActive(false)" :disabled="savingActive" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="! data.isActive ? 'bg-zinc-700 text-white' : 'text-zinc-600 dark:text-zinc-300'">Off</button>
                             </div>
                             <p class="mt-1 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">Off removes the whole product from the website.</p>
+                        </div>
+
+                        {{-- Out of stock: flips products.is_out_of_stock. Unlike "Live on
+                             website", the product stays VISIBLE on the storefront but is
+                             greyed with an "Out of stock" label and cannot be bought. --}}
+                        <div>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Out of stock</p>
+                            <div class="mt-1 inline-flex items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
+                                <button type="button" @click="setOutOfStock(true)" :disabled="savingOutOfStock" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="data.isOutOfStock ? 'bg-red-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">Out of stock</button>
+                                <button type="button" @click="setOutOfStock(false)" :disabled="savingOutOfStock" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="! data.isOutOfStock ? 'bg-emerald-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">In stock</button>
+                            </div>
+                            <p class="mt-1 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">Stays visible but greyed and non-buyable.</p>
                         </div>
 
                         {{-- Availability: flips THIS variant's is_available, so only this
@@ -1541,6 +1554,9 @@
                     // Product on/off (is_active) toggle
                     savingActive: false,
 
+                    // Product out-of-stock (is_out_of_stock) toggle
+                    savingOutOfStock: false,
+
                     // Per-product markup rule form
                     markupType: 'percentage',
                     markupValue: '',
@@ -1734,6 +1750,24 @@
                             alert(e.message);
                         } finally {
                             this.savingActive = false;
+                        }
+                    },
+
+                    async setOutOfStock(value) {
+                        if (!this.data.productId || this.savingOutOfStock || this.data.isOutOfStock === value) { return; }
+                        const previous = this.data.isOutOfStock;
+                        this.data.isOutOfStock = value;
+                        this.savingOutOfStock = true;
+                        try {
+                            const json = await this._send('PATCH',
+                                `/admin/api/catalog/products/${this.data.productId}/out-of-stock`,
+                                { is_out_of_stock: value });
+                            this.data.isOutOfStock = json.is_out_of_stock;
+                        } catch (e) {
+                            this.data.isOutOfStock = previous;
+                            alert(e.message);
+                        } finally {
+                            this.savingOutOfStock = false;
                         }
                     },
 

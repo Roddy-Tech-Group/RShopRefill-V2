@@ -1,4 +1,4 @@
-@props(['item'])
+@props(['item', 'disabled' => false])
 
 @php
     // Card is reused by storefront + dashboard shop chrome; pick the matching
@@ -8,15 +8,19 @@
 @endphp
 
 {{-- One eSIM location card for the browse grid. Filtered client-side via the parent
-     Alpine scope's locTab/locSearch. Shared by the landing and the country store. --}}
+     Alpine scope's locTab/locSearch. Shared by the landing and the country store.
+     When $disabled (eSIMs feature off), the card stays visible but greyed and inert. --}}
 <a
-    href="{{ route($detailRoute, $item['slug']) }}"
-    wire:navigate
+    @if (! $disabled) href="{{ route($detailRoute, $item['slug']) }}" wire:navigate @endif
     data-name="{{ \Illuminate\Support\Str::lower($item['name']) }}"
     data-scope="{{ $item['scope'] }}"
     data-pop="{{ $item['popular'] ? '1' : '0' }}"
     x-show="(locTab === 'all' || (locTab === 'popular' ? $el.dataset.pop === '1' : $el.dataset.scope === locTab)) && (locSearch === '' || $el.dataset.name.includes(locSearch.toLowerCase()))"
-    class="esim-tile group flex items-center justify-between gap-3 rounded-[12px] bg-[#eff6ff] px-4 py-3.5 ring-1 ring-zinc-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-zinc-300 dark:ring-zinc-700/60 dark:hover:ring-zinc-600"
+    @class([
+        'esim-tile group flex items-center justify-between gap-3 rounded-[12px] bg-[#eff6ff] px-4 py-3.5 ring-1 ring-zinc-200 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-zinc-300 dark:ring-zinc-700/60 dark:hover:ring-zinc-600',
+        'pointer-events-none opacity-60 grayscale' => $disabled,
+    ])
+    @if ($disabled) aria-disabled="true" @endif
 >
     <span class="flex min-w-0 items-center gap-3">
         @if ($item['flag'])

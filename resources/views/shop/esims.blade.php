@@ -1,5 +1,7 @@
 @php
-    abort_if(! \App\Support\FeatureFlag::on('esims'), 404);
+    // Feature A: keep the eSIM catalog visible but greyed + non-purchasable when off
+    // (was a 404). The purchase itself is blocked server-side.
+    $categoryEnabled = \App\Support\FeatureFlag::on('esims');
 
     /** @var \Illuminate\Support\Collection<int, array<string, mixed>> $catalog */
     $catalog = $catalog ?? collect();
@@ -151,10 +153,22 @@
                 <h2 class="text-[30px] font-bold tracking-tight text-zinc-900" x-text="titles[locTab]">Popular locations</h2>
                 <p class="mt-1 text-[18px] text-zinc-600" x-text="subtitles[locTab]"></p>
 
+                @unless ($categoryEnabled)
+                    <div class="mt-5 flex items-start gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">eSIMs are temporarily unavailable</p>
+                            <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">You can browse coverage, but purchases are paused right now. Please check back soon.</p>
+                        </div>
+                    </div>
+                @endunless
+
                 @if ($catalog->isNotEmpty())
                     <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach ($catalog as $item)
-                            <x-esim.location-card :item="$item" />
+                            <x-esim.location-card :item="$item" :disabled="! $categoryEnabled" />
                         @endforeach
                     </div>
                 @else

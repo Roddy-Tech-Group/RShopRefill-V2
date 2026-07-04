@@ -27,6 +27,15 @@ class ProductFactory extends Factory
             'slug' => $this->faker->slug,
             'description' => 'Test Description',
             'is_active' => true,
+            'is_out_of_stock' => false,
         ];
+    }
+
+    /**
+     * Mark the product out of stock (visible but non-purchasable).
+     */
+    public function outOfStock(): static
+    {
+        return $this->state(fn (array $attributes) => ['is_out_of_stock' => true]);
     }
 }

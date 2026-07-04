@@ -82,6 +82,10 @@
     $brandCardColor = Product::brandColor($brandKey, $product->brand_color);
     $brandColor = $brandCardColor ?: '#2563eb';
     $hasStock   = $variants->isNotEmpty();
+    // Feature A/B: can a customer buy this product right now? Category feature ON and
+    // not admin-flagged out of stock. ($hasStock separately covers "no available variant".)
+    $categoryEnabled = $product->isCategoryEnabled();
+    $productBuyable  = $categoryEnabled && ! $product->is_out_of_stock;
     $redemptionVideo = data_get($product->metadata, 'redemption_video');
 
     // Country-locked denomination range for the placeholder text ("$15 - 500").
@@ -462,6 +466,7 @@
                 'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 1.0),
                 'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
             ]),
+            purchasable: @js($productBuyable),
         })"
         x-init="init()"
         style="--brand: {{ $brandColor }};"
@@ -1003,6 +1008,21 @@
                         <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; flash()" class="inline-block text-zinc-900" x-text="pointsEarned()">0</span>
                     </p>
 
+                    {{-- Feature A/B notice: the product stays fully visible but the buy
+                         controls below are disabled (and the purchase is blocked server-side)
+                         when out of stock or when its category feature is switched off. --}}
+                    @unless ($productBuyable)
+                        <div class="mb-3 flex items-start gap-3 rounded-[12px] border px-4 py-3 {{ $product->is_out_of_stock ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-white/5' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
+                            <svg class="mt-0.5 h-5 w-5 shrink-0 {{ $product->is_out_of_stock ? 'text-zinc-400' : 'text-amber-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                            </svg>
+                            <div>
+                                <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? 'Out of stock' : 'Temporarily unavailable' }}</p>
+                                <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">{{ $product->is_out_of_stock ? 'This product is out of stock right now. Please check back later.' : 'Purchases are paused right now. Please check back soon.' }}</p>
+                            </div>
+                        </div>
+                    @endunless
+
                     {{-- Add to cart + Buy now — brand blue (outline + filled).
                          addToCart() pushes the selected variant into the global cart store,
                          which drops the nav cart popup open. Buy now also routes to checkout. --}}
@@ -1249,7 +1269,7 @@
     </div>
 
     <script>
-        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig }) {
+        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig, purchasable }) {
             // `cryptos` is an array of {code, name, type, perUsd, decimals, icon} from the
             // admin currency_rates table. Reshape into a code-keyed object.
             const cryptoMap = {};
@@ -1257,6 +1277,7 @@
 
             return {
                 rcoinConfig,
+                purchasable,          // server truth: category feature on AND product in stock
                 variants,
                 rangeText,
                 markup,               // { type, value, min_margin_percent } from CartPricingService
@@ -1318,6 +1339,11 @@
                 },
 
                 canAddToCart() {
+                    // Category feature off or product out of stock: never buyable. Mirrors
+                    // the server-side block so the buttons visibly reflect what is enforced.
+                    if (! this.purchasable) {
+                        return false;
+                    }
                     if (! this.selectedVariantId) {
                         return false;
                     }

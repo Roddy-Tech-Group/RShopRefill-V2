@@ -76,17 +76,24 @@ new class extends Component {
             'relative flex h-10 w-10 shrink-0 items-center justify-center transition-colors active:scale-95',
             'rounded-full bg-blue-100 ring-2 ring-blue-200 text-blue-700 hover:bg-blue-200 dark:bg-white/15 dark:ring-white/30 dark:text-white dark:hover:bg-white/25' => $tone === 'light',
             'rounded-full text-zinc-700 hover:bg-zinc-100' => $tone === 'dark',
+            // 'chip' matches the admin header: square grey chip that fills blue on hover.
+            'rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 hover:bg-blue-600 hover:text-white' => $tone === 'chip',
         ])
     >
-        <img
-            src="{{ asset('assets/'.rawurlencode('notification 2.svg')) }}"
-            alt=""
-            @class([
-                'h-5 w-5 shrink-0',
-                'brightness-0 dark:invert' => $tone === 'light',
-                'brightness-0' => $tone === 'dark',
-            ])
-        >
+        @if ($tone === 'chip')
+            {{-- Masked so the bell inherits the chip's text colour (dark on grey, white on blue hover) - an <img> can't be recoloured. --}}
+            <span class="h-5 w-5 shrink-0 bg-current" style="-webkit-mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat;"></span>
+        @else
+            <img
+                src="{{ asset('assets/'.rawurlencode('notification 2.svg')) }}"
+                alt=""
+                @class([
+                    'h-5 w-5 shrink-0',
+                    'brightness-0 dark:invert' => $tone === 'light',
+                    'brightness-0' => $tone === 'dark',
+                ])
+            >
+        @endif
         @if ($this->unreadCount > 0)
             <span class="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-[12px] bg-red-500 px-1 text-[10px] font-bold text-white ring-2 {{ $tone === 'light' ? 'ring-[#eff6ff] dark:ring-[#0c1a36]' : 'ring-white' }}">
                 {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}

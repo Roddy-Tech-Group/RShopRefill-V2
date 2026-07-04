@@ -4,7 +4,8 @@
     use App\Models\Subcategory;
     use Illuminate\Support\Facades\DB;
 
-    abort_if(! \App\Support\FeatureFlag::on('topups'), 404);
+    // Feature A: keep the catalog visible but greyed + non-purchasable when off (was a 404).
+    $categoryEnabled = \App\Support\FeatureFlag::on('topups');
 
     // Mobile top-up listing — mirrors the gift-card listing exactly. One card per
     // operator BRAND (Products in the `mobile-airtime` category, grouped by
@@ -238,6 +239,18 @@
                         </div>
                     </div>
 
+                    @unless ($categoryEnabled)
+                        <div class="mb-5 flex items-start gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                            <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                            </svg>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Mobile top-ups are temporarily unavailable</p>
+                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">You can browse the catalog, but purchases are paused right now. Please check back soon.</p>
+                            </div>
+                        </div>
+                    @endunless
+
                     {{-- Operator grid. Same card treatment as the gift-card listing. --}}
                     <div>
                         @if ($products->isNotEmpty())
@@ -247,6 +260,8 @@
                                         $variants   = $product->variants;
                                         $available  = $variants->where('is_available', true);
                                         $isOut      = $variants->isNotEmpty() && $available->isEmpty();
+                                        $outOfStock = $isOut || $product->is_out_of_stock;
+                                        $notBuyable = ! $categoryEnabled || $outOfStock;
                                         $priceLabel = $product->priceRangeLabel();
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                         $opName     = Product::brandDisplayName($product->brand_key);
@@ -255,10 +270,13 @@
                                     @endphp
                                     <li>
                                         <a
-                                            href="{{ $shopRoute('topup', array_filter(['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code, 'plan' => $sub === 'bundles' ? 'bundles' : ($sub === 'credit' ? 'credit' : null)], fn ($v) => $v !== null)) }}"
-                                            wire:navigate
-                                            class="card-3d-scene group block focus:outline-none"
+                                            @if (! $notBuyable) href="{{ $shopRoute('topup', array_filter(['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code, 'plan' => $sub === 'bundles' ? 'bundles' : ($sub === 'credit' ? 'credit' : null)], fn ($v) => $v !== null)) }}" wire:navigate @endif
+                                            @class([
+                                                'card-3d-scene group block focus:outline-none',
+                                                'pointer-events-none opacity-60 grayscale' => $notBuyable,
+                                            ])
                                             aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
+                                            @if ($notBuyable) aria-disabled="true" @endif
                                         >
                                             {{-- White tile, logo fills the card edge-to-edge. Caption sits OUTSIDE on the page background. --}}
                                             <div
@@ -274,9 +292,13 @@
                                                     <span class="px-3 text-center text-lg font-extrabold leading-tight text-white">{{ $opName }}</span>
                                                 @endif
 
-                                                @if ($isOut)
+                                                @if ($outOfStock)
                                                     <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-zinc-900/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
                                                         Out of stock
+                                                    </span>
+                                                @elseif (! $categoryEnabled)
+                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-amber-500/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+                                                        Unavailable
                                                     </span>
                                                 @elseif ($product->is_popular)
                                                     <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-fuchsia-500 bg-fuchsia-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-600 backdrop-blur-sm">Popular</span>

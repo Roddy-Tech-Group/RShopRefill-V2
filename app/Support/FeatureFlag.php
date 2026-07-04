@@ -18,6 +18,42 @@ class FeatureFlag
     private const TRUTHY = ['on', 'true', '1'];
 
     /**
+     * The ONE canonical map from a category's DB slug to its feature-flag key.
+     * The slugs and flag keys diverge (mobile-airtime -> topups, bill-payments ->
+     * bills), so every surface - nav, listings, detail pages, and the server-side
+     * purchase guard - must resolve the flag through here so "greyed out" in the UI
+     * and "blocked" on the server can never disagree.
+     *
+     * @var array<string, string>
+     */
+    public const CATEGORY_FLAGS = [
+        'gift-cards' => 'gift_cards',
+        'esims' => 'esims',
+        'mobile-airtime' => 'topups',
+        'bill-payments' => 'bills',
+    ];
+
+    /**
+     * Feature-flag key for a category slug, or null when the category has no gate
+     * (e.g. Flights/Stays, or a future category without a flag - treated as on).
+     */
+    public static function forCategory(?string $slug): ?string
+    {
+        return $slug ? (self::CATEGORY_FLAGS[$slug] ?? null) : null;
+    }
+
+    /**
+     * Is the category (identified by its DB slug) currently enabled? Ungated
+     * categories are always considered on, matching on()'s default-true behaviour.
+     */
+    public static function categoryEnabled(?string $slug): bool
+    {
+        $key = self::forCategory($slug);
+
+        return $key === null ? true : self::on($key);
+    }
+
+    /**
      * Is the named feature flag turned on? Pass the suffix only:
      *   FeatureFlag::on('checkout')              // reads features.checkout_enabled
      *   FeatureFlag::on('feedback_widget')       // reads features.feedback_widget_enabled

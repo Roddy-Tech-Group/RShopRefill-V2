@@ -653,41 +653,66 @@
                         ? 'text-zinc-900 dark:text-white font-semibold after:bg-zinc-900 dark:after:bg-white'
                         : 'text-zinc-800 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white after:bg-transparent';
                     $catIconState = fn (string $c) => $currentCat === $c ? 'opacity-100' : 'opacity-50';
+
+                    // When a category feature is OFF we keep the tab VISIBLE but greyed
+                    // and non-clickable (it used to vanish). The greyed state signals
+                    // "temporarily unavailable"; the purchase itself is blocked server-side.
+                    $catOff = 'cursor-not-allowed text-zinc-400 dark:text-zinc-600 after:bg-transparent';
                 @endphp
 
                 @php $catImgClass = 'w-[22px] h-[22px] shrink-0 dark:[filter:brightness(0)_invert(1)]'; @endphp
 
                 {{-- Gift Cards --}}
-                @feature('gift_cards')
+                @if (\App\Support\FeatureFlag::on('gift_cards'))
                 <a href="{{ route('shop.gift-cards') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Gift Cards') }}">
                     <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Gift Cards') }}" loading="lazy">
                     Gift Cards
                 </a>
-                @endfeature
+                @else
+                <span class="{{ $catLinkClass }} {{ $catOff }}" aria-disabled="true" title="Temporarily unavailable">
+                    <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
+                    Gift Cards
+                </span>
+                @endif
 
                 {{-- eSIMs --}}
-                @feature('esims')
+                @if (\App\Support\FeatureFlag::on('esims'))
                 <a href="{{ route('shop.esims') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('eSIMs') }}">
                     <img src="{{ asset('assets/' . rawurlencode('esim.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('eSIMs') }}" loading="lazy">
                     eSIMs
                 </a>
-                @endfeature
+                @else
+                <span class="{{ $catLinkClass }} {{ $catOff }}" aria-disabled="true" title="Temporarily unavailable">
+                    <img src="{{ asset('assets/' . rawurlencode('esim.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
+                    eSIMs
+                </span>
+                @endif
 
                 {{-- Mobile top up --}}
-                @feature('topups')
+                @if (\App\Support\FeatureFlag::on('topups'))
                 <a href="{{ route('shop.topups') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Mobile top up') }}">
                     <img src="{{ asset('assets/' . rawurlencode('topup1.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Mobile top up') }}" loading="lazy">
                     Mobile top up
                 </a>
-                @endfeature
+                @else
+                <span class="{{ $catLinkClass }} {{ $catOff }}" aria-disabled="true" title="Temporarily unavailable">
+                    <img src="{{ asset('assets/' . rawurlencode('topup1.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
+                    Mobile top up
+                </span>
+                @endif
 
                 {{-- Bill payments --}}
-                @feature('bills')
+                @if (\App\Support\FeatureFlag::on('bills'))
                 <a href="{{ route('shop.bills') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Bill payments') }}">
                     <img src="{{ $currentCat === 'Bill payments' ? asset('assets/' . rawurlencode('bill payment.svg')) : asset('assets/' . rawurlencode('Bills 2.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Bill payments') }}" loading="lazy">
                     Bill payments
                 </a>
-                @endfeature
+                @else
+                <span class="{{ $catLinkClass }} {{ $catOff }}" aria-disabled="true" title="Temporarily unavailable">
+                    <img src="{{ asset('assets/' . rawurlencode('Bills 2.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
+                    Bill payments
+                </span>
+                @endif
 
                 {{-- Flights --}}
                 <a href="{{ route('shop.flights') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Flights') }}">
