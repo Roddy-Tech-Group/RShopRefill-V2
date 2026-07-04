@@ -201,7 +201,7 @@ class extends Component {
         
         @if($rates->hasPages())
             <div class="border-t border-zinc-200 px-4 py-3 dark:border-white/10">
-                {{ $rates->links() }}
+                {{ $rates->links('vendor.pagination.circles-livewire') }}
             </div>
         @endif
     </div>

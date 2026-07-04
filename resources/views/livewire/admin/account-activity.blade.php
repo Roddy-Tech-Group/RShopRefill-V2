@@ -326,7 +326,7 @@ class extends Component {
 
             @if ($logs->hasPages())
                 <div class="border-t border-zinc-100 px-4 py-3 dark:border-zinc-700/60">
-                    {{ $logs->links() }}
+                    {{ $logs->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

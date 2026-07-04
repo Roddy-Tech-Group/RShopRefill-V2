@@ -105,7 +105,7 @@ class extends Component {
             </div>
             @if($trades->hasPages())
                 <div class="w-full overflow-x-auto border-t border-zinc-200 p-4 dark:border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {{ $trades->links() }}
+                    {{ $trades->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         @endif

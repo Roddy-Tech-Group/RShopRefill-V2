@@ -1098,9 +1098,9 @@
                         @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                         x-on:click="$dispatch('open-locale-modal')"
                         aria-label="Region, language and currency"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors dark:border-zinc-700"
+                        class="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors dark:border-zinc-700"
                     >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-6 w-6 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/25" loading="lazy">
+                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
                     </button>
 
                     {{-- Cart — links to the cart page with a live count from the
@@ -1260,9 +1260,9 @@
                         @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                         x-on:click="$dispatch('open-locale-modal')"
                         aria-label="Region, language and currency"
-                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
+                        class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
                     >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-6 w-6 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/25" loading="lazy">
+                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
                     </button>
 
                     {{-- Cart — live count from the global $store.cart, taps through to the cart page. --}}
@@ -1355,9 +1355,9 @@
                         @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                         x-on:click="$dispatch('open-locale-modal')"
                         aria-label="Region, language and currency"
-                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
+                        class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
                     >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-6 w-6 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/25" loading="lazy">
+                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
                     </button>
 
                     <a

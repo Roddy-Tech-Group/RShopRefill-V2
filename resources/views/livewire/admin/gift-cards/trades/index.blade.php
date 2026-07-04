@@ -150,7 +150,7 @@ class extends Component {
 
             @if($trades->hasPages())
                 <div class="border-t border-zinc-100 px-4 py-3 dark:border-white/10">
-                    {{ $trades->links() }}
+                    {{ $trades->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

@@ -400,7 +400,7 @@ class extends Component {
     @endif
 
     @if ($transactions->hasPages())
-        <div>{{ $transactions->links() }}</div>
+        <div>{{ $transactions->links('vendor.pagination.circles-livewire') }}</div>
     @endif
     </div>
 </div>

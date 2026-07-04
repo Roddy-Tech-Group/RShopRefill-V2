@@ -206,7 +206,7 @@ class extends Component {
 
             @if($campaigns->hasPages())
                 <div class="border-t border-zinc-200 px-4 py-3 dark:border-white/10">
-                    {{ $campaigns->links() }}
+                    {{ $campaigns->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

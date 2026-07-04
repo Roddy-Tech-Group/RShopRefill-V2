@@ -245,7 +245,7 @@ class extends Component {
 
             @if ($messages->hasPages())
                 <div class="border-t border-zinc-100 px-5 py-3 dark:border-zinc-700/60">
-                    {{ $messages->links() }}
+                    {{ $messages->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

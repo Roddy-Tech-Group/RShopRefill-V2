@@ -284,7 +284,7 @@ class extends Component {
 
             @if ($notifications->hasPages())
                 <div class="border-t border-zinc-100 px-5 py-3">
-                    {{ $notifications->links() }}
+                    {{ $notifications->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

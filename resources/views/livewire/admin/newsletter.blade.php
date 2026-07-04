@@ -367,7 +367,7 @@ class extends Component {
 
             @if ($subscribers->hasPages())
                 <div class="border-t border-zinc-100 px-5 py-3 dark:border-zinc-700/60">
-                    {{ $subscribers->links() }}
+                    {{ $subscribers->links('vendor.pagination.circles-livewire') }}
                 </div>
             @endif
         </div>

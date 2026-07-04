@@ -128,7 +128,7 @@ class extends Component {
         </div>
 
         @if ($notifications->hasPages())
-            <div>{{ $notifications->links() }}</div>
+            <div>{{ $notifications->links('vendor.pagination.circles-livewire') }}</div>
         @endif
     @else
         {{-- Empty state --}}
