@@ -1277,9 +1277,9 @@
             </div>
             @else
             {{-- Back button (task/inner pages) - a STICKY top-left affordance (these
-                 pages dropped the top chrome). A frosted page-colour strip that stays
-                 pinned as the page scrolls; goes back, falling back to the overview. --}}
-            <div class="sticky top-0 z-30 px-3 py-2.5 lg:hidden bg-[#eff6ff]/90 backdrop-blur-md dark:bg-[#0c1a36]/90">
+                 pages dropped the top chrome). No strip background - just the button
+                 chip, pinned as the page scrolls; goes back, falling back to the overview. --}}
+            <div class="sticky top-0 z-30 w-fit px-3 py-2.5 lg:hidden">
                 <button
                     type="button"
                     x-data
