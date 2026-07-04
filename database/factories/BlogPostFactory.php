@@ -23,6 +23,8 @@ class BlogPostFactory extends Factory
             'image' => 'hero gift.webp',
             'body' => [fake()->paragraph(3), fake()->paragraph(3)],
             'author' => 'RshopRefills Team',
+            'author_avatar' => null,
+            'video_urls' => [],
             'read_time' => fake()->numberBetween(2, 6).' min read',
             'published_at' => fake()->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
             'is_published' => true,

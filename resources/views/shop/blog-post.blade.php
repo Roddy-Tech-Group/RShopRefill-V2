@@ -19,9 +19,14 @@
 
         <p class="mt-6 text-xs font-bold uppercase tracking-wider text-blue-600">{{ $post->category }}</p>
         <h1 class="mt-2 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{{ $post->title }}</h1>
-        <p class="mt-3 text-sm text-zinc-500">
-            {{ $post->author }} &middot; {{ $post->published_at->format('M j, Y') }}@if ($post->read_time) &middot; {{ $post->read_time }}@endif
-        </p>
+        <div class="mt-3 flex items-center gap-3">
+            @if ($post->author_avatar)
+                <img src="{{ $img($post->author_avatar) }}" alt="{{ $post->author }}" class="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200" loading="lazy">
+            @endif
+            <p class="text-sm text-zinc-500">
+                <span class="font-semibold text-zinc-700">{{ $post->author }}</span> &middot; {{ $post->published_at->format('M j, Y') }}@if ($post->read_time) &middot; {{ $post->read_time }}@endif
+            </p>
+        </div>
 
         <div class="mt-8 overflow-hidden rounded-[12px] ring-1 ring-zinc-100">
             <img src="{{ $img($post->image) }}" alt="" class="h-auto w-full object-contain" loading="lazy">
@@ -32,6 +37,35 @@
                 <p>{{ $paragraph }}</p>
             @endforeach
         </div>
+
+        {{-- Videos the author pasted. Recognised YouTube/Vimeo links embed as
+             players; anything else falls back to a "Watch video" link. --}}
+        @php $videos = $post->videoEmbeds(); @endphp
+        @if (! empty($videos))
+            <div class="mt-8 space-y-6">
+                @foreach ($videos as $video)
+                    @if ($video['embed'])
+                        <div class="aspect-video w-full overflow-hidden rounded-[12px] ring-1 ring-zinc-100">
+                            <iframe
+                                src="{{ $video['embed'] }}"
+                                class="h-full w-full"
+                                title="{{ $post->title }} video"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen
+                                loading="lazy"
+                            ></iframe>
+                        </div>
+                    @else
+                        <a href="{{ $video['url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100">
+                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                            Watch video
+                        </a>
+                    @endif
+                @endforeach
+            </div>
+        @endif
 
         {{-- Optional downloadable attachment. Renders only when the editor
              uploaded a file in the admin. `download` attribute hints the

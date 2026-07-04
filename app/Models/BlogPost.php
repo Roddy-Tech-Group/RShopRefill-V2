@@ -21,6 +21,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $attachment_label
  * @property array<int, string> $body
  * @property string $author
+ * @property string|null $author_avatar
+ * @property array<int, string>|null $video_urls
  * @property string|null $read_time
  * @property Carbon $published_at
  * @property bool $is_published
@@ -43,6 +45,8 @@ class BlogPost extends Model
         'attachment_label',
         'body',
         'author',
+        'author_avatar',
+        'video_urls',
         'read_time',
         'published_at',
         'is_published',
@@ -53,9 +57,47 @@ class BlogPost extends Model
     {
         return [
             'body' => 'array',
+            'video_urls' => 'array',
             'published_at' => 'date',
             'is_published' => 'boolean',
         ];
+    }
+
+    /**
+     * Each pasted video URL normalised into an embeddable iframe src where we
+     * recognise the provider (YouTube / Vimeo). Unrecognised links get embed=null
+     * so the view renders them as a plain "Watch video" link instead.
+     *
+     * @return array<int, array{url: string, embed: string|null}>
+     */
+    public function videoEmbeds(): array
+    {
+        return collect($this->video_urls ?? [])
+            ->filter()
+            ->map(fn (string $url) => ['url' => $url, 'embed' => self::videoEmbedUrl($url)])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * A YouTube/Vimeo watch URL turned into an embeddable player src, or null when
+     * the link isn't a provider we can embed (the caller renders a link instead).
+     */
+    public static function videoEmbedUrl(string $url): ?string
+    {
+        $url = trim($url);
+
+        // youtu.be/ID, youtube.com/watch?v=ID, /embed/ID, /shorts/ID
+        if (preg_match('~(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/))([A-Za-z0-9_-]{11})~', $url, $m)) {
+            return 'https://www.youtube.com/embed/'.$m[1];
+        }
+
+        // vimeo.com/ID or vimeo.com/video/ID
+        if (preg_match('~vimeo\.com/(?:video/)?(\d+)~', $url, $m)) {
+            return 'https://player.vimeo.com/video/'.$m[1];
+        }
+
+        return null;
     }
 
     public function scopePublished(Builder $query): Builder

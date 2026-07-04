@@ -65,6 +65,19 @@ class extends Component {
     #[Validate('required|string|max:80')]
     public string $author = '';
 
+    /** Existing author-photo filename (relative to public/assets/), kept when editing. */
+    #[Validate('nullable|string|max:500')]
+    public string $authorAvatar = '';
+
+    /** Newly uploaded author photo. Same flow as the hero image. 5MB cap. */
+    #[Validate('nullable|image|max:5120')]
+    public $authorAvatarUpload = null;
+
+    /** Pasted video links, one URL per line. YouTube/Vimeo embed as players on the
+     *  post; anything else renders as a "Watch video" link. */
+    #[Validate('nullable|string|max:5000')]
+    public string $videoLinks = '';
+
     #[Validate('nullable|string|max:40')]
     public string $readTime = '';
 
@@ -123,6 +136,8 @@ class extends Component {
         $this->attachment = (string) $post->attachment_path;
         $this->attachmentLabel = (string) $post->attachment_label;
         $this->author = $post->author;
+        $this->authorAvatar = (string) ($post->author_avatar ?? '');
+        $this->videoLinks = implode("\n", $post->video_urls ?? []);
         $this->readTime = (string) ($post->read_time ?? '');
         $this->publishedAt = $post->published_at->toDateString();
         $this->bodyText = is_array($post->body) ? implode("\n\n", $post->body) : (string) $post->body;
@@ -180,6 +195,26 @@ class extends Component {
             $attachmentPath = 'blog/'.$filename;
         }
 
+        // Same flow for the author's photo.
+        $authorAvatarPath = $this->authorAvatar ?: null;
+        if ($this->authorAvatarUpload) {
+            $extension = $this->authorAvatarUpload->getClientOriginalExtension() ?: 'jpg';
+            $filename = Str::slug($this->author ?: 'author').'-avatar-'.Str::random(8).'.'.$extension;
+            $destination = public_path('assets/blog');
+            if (! File::isDirectory($destination)) {
+                File::makeDirectory($destination, 0755, true);
+            }
+            File::copy($this->authorAvatarUpload->getRealPath(), $destination.DIRECTORY_SEPARATOR.$filename);
+            $authorAvatarPath = 'blog/'.$filename;
+        }
+
+        // Pasted video links: one URL per line, keep only well-formed URLs.
+        $videoUrls = collect(preg_split("/\r\n|\r|\n/", trim($this->videoLinks)))
+            ->map(fn ($u) => trim($u))
+            ->filter(fn ($u) => $u !== '' && filter_var($u, FILTER_VALIDATE_URL))
+            ->values()
+            ->all();
+
         // Split body on blank lines back into the array shape the model expects.
         $bodyParagraphs = collect(preg_split("/\n\s*\n/", trim($this->bodyText)))
             ->map(fn ($p) => trim($p))
@@ -197,6 +232,8 @@ class extends Component {
             'attachment_label' => $attachmentPath ? ($this->attachmentLabel ?: 'Download file') : null,
             'body' => $bodyParagraphs,
             'author' => $this->author,
+            'author_avatar' => $authorAvatarPath,
+            'video_urls' => $videoUrls,
             'read_time' => $this->readTime ?: null,
             'published_at' => $this->publishedAt,
             'is_published' => $this->isPublished,
@@ -243,6 +280,9 @@ class extends Component {
         $this->attachmentUpload = null;
         $this->attachmentLabel = '';
         $this->author = '';
+        $this->authorAvatar = '';
+        $this->authorAvatarUpload = null;
+        $this->videoLinks = '';
         $this->readTime = '';
         $this->publishedAt = now()->toDateString();
         $this->bodyText = '';
@@ -403,6 +443,28 @@ class extends Component {
                         </div>
                     </div>
 
+                    {{-- Author photo upload --}}
+                    <div>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Author photo <span class="text-zinc-500 dark:text-zinc-400">(optional)</span></label>
+                        <div class="mt-1.5 flex items-center gap-3">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/60">
+                                @if ($authorAvatarUpload)
+                                    <img src="{{ $authorAvatarUpload->temporaryUrl() }}" alt="" class="h-full w-full object-cover">
+                                @elseif ($authorAvatar)
+                                    <img src="{{ asset('assets/' . $authorAvatar) }}" alt="" class="h-full w-full object-cover" onerror="this.style.display='none'">
+                                @else
+                                    <svg class="h-6 w-6 text-zinc-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/></svg>
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <input wire:model="authorAvatarUpload" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[12px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300">
+                                <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Shows next to the author's name on the post. PNG / JPG / WebP, up to 5MB.</p>
+                                <div wire:loading wire:target="authorAvatarUpload" class="mt-1 text-[11px] font-medium text-blue-600">Uploading…</div>
+                            </div>
+                        </div>
+                        @error('authorAvatarUpload') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
                     {{-- Hero image upload --}}
                     <div>
                         <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Hero image</label>
@@ -459,6 +521,14 @@ class extends Component {
                                 <p class="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">Defaults to "Download file" when left blank.</p>
                             </div>
                         @endif
+                    </div>
+
+                    {{-- Video links --}}
+                    <div>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Video links <span class="text-zinc-500 dark:text-zinc-400">(optional)</span></label>
+                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Paste one URL per line. YouTube and Vimeo links embed as players on the post; other links show as a "Watch video" button.</p>
+                        <textarea wire:model="videoLinks" rows="3" placeholder="https://www.youtube.com/watch?v=...&#10;https://vimeo.com/..." class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"></textarea>
+                        @error('videoLinks') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
