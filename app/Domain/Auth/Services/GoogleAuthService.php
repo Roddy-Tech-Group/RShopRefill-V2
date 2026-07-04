@@ -65,19 +65,31 @@ class GoogleAuthService
     }
 
     /**
-     * Update the user's Google profile data (avatar, name if empty).
+     * Refresh the user's Google profile data on sign-in. Only adopts the Google
+     * photo when the user hasn't uploaded their own - otherwise a custom avatar
+     * would silently revert to the Google picture on every login.
      */
     private function updateGoogleProfile(User $user, SocialiteUser $googleUser): void
     {
         $updates = [];
 
-        if ($googleUser->getAvatar()) {
+        if ($googleUser->getAvatar() && ! $this->hasCustomAvatar($user)) {
             $updates['avatar_url'] = $googleUser->getAvatar();
         }
 
         if (! empty($updates)) {
             $user->update($updates);
         }
+    }
+
+    /**
+     * A user-uploaded avatar lives under /storage/ (see the profile settings
+     * upload, which writes Storage::url()); Google avatars are remote https URLs.
+     * We never overwrite an uploaded photo with the Google one.
+     */
+    private function hasCustomAvatar(User $user): bool
+    {
+        return is_string($user->avatar_url) && str_starts_with($user->avatar_url, '/storage/');
     }
 
     /**
@@ -90,7 +102,10 @@ class GoogleAuthService
     {
         $user->update([
             'google_id' => $googleUser->getId(),
-            'avatar_url' => $googleUser->getAvatar() ?? $user->avatar_url,
+            // Keep an already-uploaded photo; otherwise adopt the Google one.
+            'avatar_url' => $this->hasCustomAvatar($user)
+                ? $user->avatar_url
+                : ($googleUser->getAvatar() ?? $user->avatar_url),
             // Google has already verified this email, so a credentials user who
             // links Google should not be asked to verify again.
             'email_verified_at' => $user->email_verified_at ?? now(),
