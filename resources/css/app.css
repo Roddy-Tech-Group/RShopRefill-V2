@@ -999,8 +999,11 @@ html.dark .dark\:bg-\[\#26416b\]\/95 { background-color: rgb(42 42 42 / 0.95); }
 .dark .hover\:bg-zinc-100:hover  { background-color: #1f1f1f; }
 .dark .hover\:bg-zinc-200:hover  { background-color: #1f3048; }
 .dark .hover\:bg-zinc-300:hover  { background-color: #243752; }
-.dark .hover\:bg-blue-50:hover   { background-color: #1f3354; }
-.dark .hover\:bg-blue-100:hover  { background-color: #274069; }
+/* Blue-tinted hovers (nav / menu items) go GREY in every dark mode, not navy -
+   Soft Dark previously kept a light-blue cast here; match the neutral #1f1f1f
+   hover the rest of the dark UI uses. */
+.dark .hover\:bg-blue-50:hover   { background-color: #1f1f1f; }
+.dark .hover\:bg-blue-100:hover  { background-color: #1f1f1f; }
 .dark .hover\:bg-white\/70:hover { background-color: rgb(31 31 31 / 0.9); }
 .dark .focus\:bg-white:focus,
 .dark .focus\:bg-zinc-50:focus,
