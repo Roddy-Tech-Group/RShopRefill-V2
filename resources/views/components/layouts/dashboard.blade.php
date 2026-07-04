@@ -1275,6 +1275,23 @@
                     </div>
                 </div>
             </div>
+            @else
+            {{-- Back button (task/inner pages) - top-left, mobile only. These pages
+                 dropped the top chrome, so this is their only top affordance; it goes
+                 back, falling back to the overview on a direct landing. --}}
+            <div class="relative z-10 px-3 py-2.5 lg:hidden">
+                <button
+                    type="button"
+                    x-data
+                    @click="window.history.length > 1 ? window.history.back() : (window.location.href = '{{ route('dashboard') }}')"
+                    aria-label="Go back"
+                    class="flex h-11 w-11 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 text-zinc-900 transition-transform active:scale-95 dark:border-white/10 dark:text-zinc-200"
+                >
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                </button>
+            </div>
             @endif
         @endif
 
@@ -1405,6 +1422,11 @@
                 ['idx' => 3, 'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'label' => 'History',      'nav' => true],
                 ['idx' => 4, 'href' => route('dashboard.profile'),      'icon' => 'system setting.svg', 'label' => 'Settings',     'nav' => true],
             ];
+
+            // Successful (completed) order count - drives the Orders tab badge.
+            $successfulOrderCount = auth()->user()
+                ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
+                : 0;
         @endphp
         {{-- Floating rounded nav bar (neobank style): detached from the edges with
              a pill highlight behind the active tab. The wrapper's bottom padding
@@ -1450,12 +1472,19 @@
                             aria-label="{{ $t['label'] }}"
                             class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
                         >
-                            <span
-                                aria-hidden="true"
-                                class="h-6 w-6 transition-colors duration-200"
-                                :class="active === {{ $t['idx'] }} ? 'bg-blue-600' : 'bg-zinc-900 dark:bg-zinc-300'"
-                                style="-webkit-mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat; mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat;"
-                            ></span>
+                            <span class="relative inline-flex">
+                                <span
+                                    aria-hidden="true"
+                                    class="h-6 w-6 transition-colors duration-200"
+                                    :class="active === {{ $t['idx'] }} ? 'bg-blue-600' : 'bg-zinc-900 dark:bg-zinc-300'"
+                                    style="-webkit-mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat; mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat;"
+                                ></span>
+                                {{-- Successful-order count on the Orders tab. Light: small
+                                     pill, dark number. Dark: bigger frosted-glass pill, light text. --}}
+                                @if ($t['idx'] === 1 && $successfulOrderCount > 0)
+                                    <span class="pointer-events-none absolute -top-2 -right-3 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold leading-none text-zinc-900 ring-1 ring-zinc-200 shadow-sm dark:h-5 dark:min-w-[20px] dark:bg-white/15 dark:px-1.5 dark:text-[11px] dark:text-white dark:shadow-none dark:ring-white/25 dark:backdrop-blur-md">{{ $successfulOrderCount > 99 ? '99+' : $successfulOrderCount }}</span>
+                                @endif
+                            </span>
                             <span class="text-[10px] leading-none transition-colors duration-200" :class="active === {{ $t['idx'] }} ? 'text-blue-600 font-semibold' : 'font-medium text-zinc-700 dark:text-zinc-300'">{{ $t['label'] }}</span>
                         </a>
                     @endforeach

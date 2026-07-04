@@ -2,6 +2,10 @@
 
 namespace Tests\Feature\Dashboard;
 
+use App\Domain\Fulfillment\Enums\FulfillmentStatus;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Payment\Enums\PaymentStatus;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -62,5 +66,75 @@ class MobileNavChromeVisibilityTest extends TestCase
         $response->assertSee(self::NAV_BAR_MARKER, false);
         // ...but the top cart / country switcher / notification + hamburger are gone.
         $response->assertDontSee(self::TOP_CHROME_MARKER, false);
+    }
+
+    /** Back button - present only on task/inner pages (which dropped the top chrome). */
+    private const BACK_BUTTON_MARKER = 'aria-label="Go back"';
+
+    /** Orders-tab count badge's distinctive glass classes. */
+    private const BADGE_MARKER = 'dark:min-w-[20px] dark:bg-white/15';
+
+    public function test_inner_pages_show_a_back_button(): void
+    {
+        $this->withoutVite();
+
+        $this->actingAs(User::factory()->create())
+            ->get('/dashboard/orders')
+            ->assertOk()
+            ->assertSee(self::BACK_BUTTON_MARKER, false);
+    }
+
+    public function test_overview_and_shop_pages_have_no_back_button(): void
+    {
+        $this->withoutVite();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/dashboard')->assertOk()->assertDontSee(self::BACK_BUTTON_MARKER, false);
+        $this->actingAs($user)->get('/dashboard/shop/cart')->assertOk()->assertDontSee(self::BACK_BUTTON_MARKER, false);
+    }
+
+    public function test_orders_tab_shows_the_completed_order_count_badge(): void
+    {
+        $this->withoutVite();
+        $user = User::factory()->create();
+
+        $this->completedOrder($user);
+        $this->completedOrder($user);
+        $this->completedOrder($user, OrderStatus::Failed); // not counted
+
+        $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString(self::BADGE_MARKER, $html);
+        // Only the two Completed orders are counted, not the Failed one.
+        $this->assertStringContainsString('dark:backdrop-blur-md">2<', $html);
+    }
+
+    public function test_orders_tab_has_no_badge_without_completed_orders(): void
+    {
+        $this->withoutVite();
+        $user = User::factory()->create();
+        $this->completedOrder($user, OrderStatus::Failed); // a non-successful order
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertDontSee(self::BADGE_MARKER, false);
+    }
+
+    private function completedOrder(User $user, OrderStatus $status = OrderStatus::Completed): void
+    {
+        Order::create([
+            'user_id' => $user->id,
+            'order_number' => 'RSR-'.uniqid(),
+            'settlement_currency' => 'USD',
+            'display_currency' => 'USD',
+            'subtotal_amount' => 0,
+            'markup_amount' => 0,
+            'total_amount' => 0,
+            'payment_method' => 'wallet',
+            'payment_status' => PaymentStatus::Paid,
+            'fulfillment_status' => FulfillmentStatus::Fulfilled,
+            'order_status' => $status,
+        ]);
     }
 }
