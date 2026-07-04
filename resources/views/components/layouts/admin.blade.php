@@ -825,7 +825,7 @@
 
             {{-- Theme toggle — admin's own light/dark/system control, saved per
                  admin account and kept separate from the customer side. --}}
-            <x-theme-toggle class="h-11 w-11 rounded-[12px] text-zinc-600 hover:bg-blue-100" />
+            <x-theme-toggle class="h-10 w-10 rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white" />
 
             {{-- Extra Dark now lives inside the theme toggle's popup (the
                  component renders an "Extra dark" row), so no separate admin
@@ -853,7 +853,7 @@
                     @click="locked = !locked; open = locked"
                     :aria-expanded="open.toString()"
                     aria-label="{{ $admin?->name ?? 'Admin' }}"
-                    class="ml-1 relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 ring-1 ring-blue-200 transition-all hover:ring-2 hover:ring-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    class="ml-1 relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-200 ring-1 ring-zinc-200 transition-all duration-150 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:ring-zinc-700/60"
                 >
                     <img src="{{ $admin?->avatar_url ?: $adminDefaultAvatar }}" alt="{{ $admin?->name ?? 'Admin' }}" class="h-full w-full object-cover" loading="lazy">
                 </button>

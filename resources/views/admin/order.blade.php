@@ -221,7 +221,6 @@
                                     <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
                                         {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
                                     </span>
-                                </div>
                                 {{-- Item subtotal — primary USD figure (truth), customer's
                                      display amount underneath as context. --}}
                                 @php

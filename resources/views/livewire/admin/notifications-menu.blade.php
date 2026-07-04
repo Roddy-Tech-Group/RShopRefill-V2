@@ -58,9 +58,11 @@ new class extends Component {
         @click="open = ! open"
         :aria-expanded="open.toString()"
         aria-label="Notifications"
-        class="relative flex h-11 w-11 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-blue-100"
+        class="relative flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white"
     >
-        <img src="{{ asset('assets/'.rawurlencode('notification 2.svg')) }}" alt="" class="h-6 w-6" loading="lazy">
+        {{-- Masked so the bell inherits the chip's text colour (light on the grey
+             chip, white on the blue hover) - an <img> can't be recoloured. --}}
+        <span class="h-6 w-6 bg-current" style="-webkit-mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat;"></span>
         @if ($this->unreadCount > 0)
             <span class="pointer-events-none absolute -top-0.5 -right-0.5 inline-flex">
                 <span class="absolute inset-0 inline-flex animate-ping rounded-[12px] bg-red-400 opacity-75"></span>
