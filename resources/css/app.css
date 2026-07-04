@@ -634,9 +634,9 @@ html.dark .wallet-glass {
     box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.18);
 }
 html.dark .liquid-pill {
-    /* Dark active tab = the card grey we use everywhere (Soft Dark #303030,
+    /* Dark active tab = the card grey we use everywhere (Soft Dark #363636,
        Extra Dark #2a2a2a below), a filled bead like the light theme. */
-    background: #303030;
+    background: #363636;
     box-shadow: inset 0 0 0 1px #3a3a3a;
 }
 
@@ -851,7 +851,7 @@ html.dark .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #0d0d0d !importa
    SOFT DARK (.dark WITHOUT .pure-dark): the lighter, comfortable dark
    palette. Every surface steps one notch UP from the pure / Extra-Dark
    ramp so toggling "Soft dark" on visibly lightens the whole UI - cards
-   #303030 (vs pure #2a2a2a), page #1a1a1a (vs pure #000/#0d0d0d).
+   #363636 (vs pure #2a2a2a), page #262626 (vs pure #000/#0d0d0d).
    :not(.pure-dark) means pure dark is left completely untouched. */
 .dark:not(.pure-dark) .bg-white,
 .dark:not(.pure-dark) .bg-zinc-50,
@@ -861,8 +861,8 @@ html.dark .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #0d0d0d !importa
 .dark:not(.pure-dark) .dark\:bg-\[\#162a4a\],
 .dark:not(.pure-dark) .dark\:bg-\[\#13294d\],
 .dark:not(.pure-dark) .dark\:bg-\[\#1d3252\],
-.dark:not(.pure-dark) .dash-shimmer { background-color: #303030; }
-.dark:not(.pure-dark) .bg-zinc-100 { background-color: #1a1a1a; }
+.dark:not(.pure-dark) .dash-shimmer { background-color: #363636; }
+.dark:not(.pure-dark) .bg-zinc-100 { background-color: #262626; }
 html.dark:not(.pure-dark) body.dark\:bg-\[\#0c1a36\],
 html.dark:not(.pure-dark) main.dark\:bg-\[\#0c1a36\],
 html.dark:not(.pure-dark) section.dark\:bg-\[\#0c1a36\],
@@ -870,8 +870,8 @@ html.dark:not(.pure-dark) [data-page-content].dark\:bg-\[\#0c1a36\],
 html.dark:not(.pure-dark) [data-flux-main].dark\:bg-\[\#0c1a36\],
 html.dark:not(.pure-dark) footer.dark\:bg-\[\#0c1a36\],
 html.dark:not(.pure-dark) .min-h-screen.dark\:bg-\[\#0c1a36\],
-html.dark:not(.pure-dark) .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #1a1a1a !important; }
-html.dark:not(.pure-dark) [data-flux-header] { background-color: #1a1a1a !important; }
+html.dark:not(.pure-dark) .min-h-full.dark\:bg-\[\#0c1a36\] { background-color: #262626 !important; }
+html.dark:not(.pure-dark) [data-flux-header] { background-color: #262626 !important; }
 
 /* The Flux top bar (<header data-flux-header>) is a full-width, border-less chrome
    bar, so it takes the PAGE tone and blends seamlessly with the page behind it

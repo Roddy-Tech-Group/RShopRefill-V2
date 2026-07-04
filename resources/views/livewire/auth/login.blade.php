@@ -196,7 +196,7 @@ new #[Layout('components.layouts.auth')] class extends Component
                     <button
                         type="button"
                         @click="show = !show"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[12px] text-zinc-600 hover:text-zinc-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-[12px] text-blue-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                         :aria-label="show ? 'Hide password' : 'Show password'"
                     >
                         <svg x-show="!show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">

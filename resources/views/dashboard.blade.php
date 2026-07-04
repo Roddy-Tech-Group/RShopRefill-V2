@@ -141,7 +141,7 @@
                         <button
                             type="button"
                             @click="goTo({{ $i }})"
-                            :class="$store.wallet.active === {{ $i }} ? 'w-5 bg-white' : 'w-1.5 bg-white/40'"
+                            :class="$store.wallet.active === {{ $i }} ? 'w-5 bg-blue-600 dark:bg-white' : 'w-1.5 bg-blue-600/40 dark:bg-white/40'"
                             class="theme-static h-1.5 rounded-full transition-all duration-200"
                             aria-label="Wallet {{ $i + 1 }}"
                         ></button>
