@@ -23,8 +23,10 @@
             <div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($posts as $post)
                     <a href="{{ route('shop.blog.show', $post->slug) }}" wire:navigate class="group block">
-                        <div class="flex items-center justify-center overflow-hidden rounded-[12px] bg-blue-50 p-6 ring-1 ring-zinc-100" style="height: 12rem;">
-                            <img src="{{ $img($post->image) }}" alt="" class="max-h-full w-auto object-contain" loading="lazy">
+                        {{-- Same image treatment as the single-post view: clean, full-width,
+                             natural aspect (no blue box, padding, or fixed height). --}}
+                        <div class="overflow-hidden rounded-[12px] ring-1 ring-zinc-100">
+                            <img src="{{ $img($post->image) }}" alt="" class="h-auto w-full object-contain" loading="lazy">
                         </div>
                         <p class="mt-4 text-xs font-bold uppercase tracking-wider text-blue-600">{{ $post->category }}</p>
                         <h2 class="mt-1 text-lg font-bold leading-snug text-zinc-900 transition-colors group-hover:text-blue-600">{{ $post->title }}</h2>
