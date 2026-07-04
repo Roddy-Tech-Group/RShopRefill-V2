@@ -2,7 +2,9 @@
     // HTML sitemap — a human-friendly index of every section. Dark-mode safe.
     $columns = [
         'Shop' => [
-            ['Gift Cards', route('shop.gift-cards')],
+            ['Buy Gift Cards', route('shop.gift-cards')],
+            ['Sell Gift Cards', route('shop.sell-gift-cards')],
+            ['GoMarket', route('shop.gomarket')],
             ['eSIMs', route('shop.esims')],
             ['Mobile top up', route('shop.topups')],
             ['Bill payments', route('shop.bills')],

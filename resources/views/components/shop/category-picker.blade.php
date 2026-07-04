@@ -16,12 +16,14 @@
     // Single source of truth for the mobile category strip. Mirrors the desktop
     // sidebar's list so swapping between the two surfaces is consistent.
     $categories = [
-        ['slug' => 'gift-cards',     'label' => 'Gift Cards',     'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
-        ['slug' => 'esims',          'label' => 'eSIMs',          'icon' => 'esim.svg',       'url' => $r('esims')],
-        ['slug' => 'mobile-airtime', 'label' => 'Mobile top-ups', 'icon' => 'topup1.svg',     'url' => $r('topups')],
-        ['slug' => 'bill-payments',  'label' => 'Bill payments',  'icon' => 'Bills 2.svg',    'url' => $r('bills')],
-        ['slug' => 'flights',        'label' => 'Flights',        'icon' => 'flight 2.svg',   'url' => $r('flights')],
-        ['slug' => 'stays',          'label' => 'Stays',          'icon' => 'stay 2.svg',     'url' => $r('stays')],
+        ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',  'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
+        ['slug' => 'sell-gift-cards', 'label' => 'Sell Gift Cards', 'icon' => 'gift cards.svg', 'url' => $r('sell-gift-cards')],
+        ['slug' => 'gomarket',        'label' => 'GoMarket',        'icon' => 'Shop.svg',       'url' => $r('gomarket')],
+        ['slug' => 'esims',           'label' => 'eSIMs',           'icon' => 'esim.svg',       'url' => $r('esims')],
+        ['slug' => 'mobile-airtime',  'label' => 'Mobile top-ups',  'icon' => 'topup1.svg',     'url' => $r('topups')],
+        ['slug' => 'bill-payments',   'label' => 'Bill payments',   'icon' => 'Bills 2.svg',    'url' => $r('bills')],
+        ['slug' => 'flights',         'label' => 'Flights',         'icon' => 'flight 2.svg',   'url' => $r('flights')],
+        ['slug' => 'stays',           'label' => 'Stays',           'icon' => 'stay 2.svg',     'url' => $r('stays')],
     ];
 
     $current = collect($categories)->firstWhere('slug', $active) ?? $categories[0];

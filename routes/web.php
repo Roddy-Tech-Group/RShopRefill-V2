@@ -126,7 +126,9 @@ Route::get('api/search/brands', function (Request $request) {
 
     // Key pages, matched by title - so a global search also surfaces sections.
     $pages = collect([
-        ['name' => 'Gift cards', 'url' => route('shop.gift-cards')],
+        ['name' => 'Buy gift cards', 'url' => route('shop.gift-cards')],
+        ['name' => 'Sell gift cards', 'url' => route('shop.sell-gift-cards')],
+        ['name' => 'GoMarket', 'url' => route('shop.gomarket')],
         ['name' => 'eSIMs', 'url' => route('shop.esims')],
         ['name' => 'Mobile top-ups', 'url' => route('shop.topups')],
         ['name' => 'Bill payments', 'url' => route('shop.bills')],
@@ -343,6 +345,11 @@ Route::redirect('en', '/', 301);
 Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('shop.flights');
 Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])->name('shop.stays');
 
+// Sell Gift Cards & GoMarket - branded "coming soon" pages until each flow ships.
+// Same shared view + service flag as Flights/Stays; ungated like them.
+Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])->name('shop.sell-gift-cards');
+Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('shop.gomarket');
+
 // Help Center - static FAQ, topic filters and support contact details.
 Route::view('help', 'shop.help')->name('shop.help');
 
@@ -468,6 +475,7 @@ Route::get('sitemap.xml', function () {
 
         $staticNames = [
             'shop.gift-cards' => '0.9', 'shop.esims' => '0.9', 'shop.topups' => '0.9', 'shop.bills' => '0.9',
+            'shop.sell-gift-cards' => '0.6', 'shop.gomarket' => '0.6',
             'shop.flights' => '0.6', 'shop.stays' => '0.6', 'shop.reviews' => '0.6', 'shop.blog' => '0.6',
             'shop.how-it-works' => '0.5', 'shop.help' => '0.5', 'shop.faq' => '0.5', 'shop.contact' => '0.5',
             'shop.about' => '0.5', 'shop.mobile-app' => '0.5', 'shop.earn-points' => '0.5',
@@ -815,6 +823,9 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
 
         Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('flights');
         Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])->name('stays');
+
+        Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])->name('sell-gift-cards');
+        Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('gomarket');
 
         // Transactional flow mirrored under the dashboard so the cart -> checkout
         // -> order journey keeps the customer inside the dashboard/PWA chrome

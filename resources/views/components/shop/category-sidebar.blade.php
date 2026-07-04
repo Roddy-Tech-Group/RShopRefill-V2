@@ -17,12 +17,14 @@
     // The single source of truth for the storefront category list. Categories
     // without a live page render as disabled "Soon" entries until one ships.
     $categories = [
-        ['slug' => 'gift-cards',     'label' => 'Gift Cards',           'url' => $r('gift-cards')],
-        ['slug' => 'mobile-airtime', 'label' => 'Mobile top up & data', 'url' => $r('topups')],
-        ['slug' => 'esims',          'label' => 'eSIMs',                'url' => $r('esims')],
-        ['slug' => 'bill-payments',  'label' => 'Bill payments',        'url' => $r('bills')],
-        ['slug' => 'flights',        'label' => 'Flights',              'url' => $r('flights')],
-        ['slug' => 'stays',          'label' => 'Stays',                'url' => $r('stays')],
+        ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',       'url' => $r('gift-cards')],
+        ['slug' => 'sell-gift-cards', 'label' => 'Sell Gift Cards',      'url' => $r('sell-gift-cards')],
+        ['slug' => 'gomarket',        'label' => 'GoMarket',             'url' => $r('gomarket')],
+        ['slug' => 'mobile-airtime',  'label' => 'Mobile top up & data', 'url' => $r('topups')],
+        ['slug' => 'esims',           'label' => 'eSIMs',                'url' => $r('esims')],
+        ['slug' => 'bill-payments',   'label' => 'Bill payments',        'url' => $r('bills')],
+        ['slug' => 'flights',         'label' => 'Flights',              'url' => $r('flights')],
+        ['slug' => 'stays',           'label' => 'Stays',                'url' => $r('stays')],
     ];
 @endphp
 

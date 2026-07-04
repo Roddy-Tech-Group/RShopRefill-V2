@@ -381,11 +381,13 @@
                             All Categories
                         </a>
                         @foreach ([
-                            ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards'],
-                            ['eSIMs',          route('dashboard.shop.esims'),      'esims'],
-                            ['Flights',        route('dashboard.shop.flights'),    null],
-                            ['Stays',          route('dashboard.shop.stays'),      null],
-                            ['Topups & Bills', route('dashboard.shop.topups'),     'topups'],
+                            ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
+                            ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null],
+                            ['GoMarket',        route('dashboard.shop.gomarket'),        null],
+                            ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
+                            ['Flights',         route('dashboard.shop.flights'),         null],
+                            ['Stays',           route('dashboard.shop.stays'),           null],
+                            ['Topups & Bills',  route('dashboard.shop.topups'),          'topups'],
                         ] as [$label, $href, $flag])
                             @php $catEnabled = $flag === null || \App\Support\FeatureFlag::on($flag); @endphp
                             @if ($catEnabled)

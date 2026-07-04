@@ -4,6 +4,32 @@
     $service = $service ?? 'flights';
 
     $m = match ($service) {
+        'sell-gift-cards' => [
+            'name'     => 'Sell Gift Cards',
+            'tagline'  => 'Turn your gift cards into instant cash.',
+            'blurb'    => "Soon you'll trade your gift cards on ".$siteName." and get paid straight to your wallet. Snap the card, see a live rate, and cash out in minutes. We're putting the finishing touches on it now.",
+            'image'    => 'hero gift.webp',
+            'icon'     => 'gift cards.svg',
+            'accent'   => 'bg-emerald-500',
+            'features' => [
+                ['Instant quotes', 'See a live payout rate before you sell.'],
+                ['Paid to your wallet', 'Cash out to your balance, card or crypto.'],
+                ['Safe and tracked', 'Every trade is checked and logged in your dashboard.'],
+            ],
+        ],
+        'gomarket' => [
+            'name'     => 'GoMarket',
+            'tagline'  => 'One marketplace for everything you need.',
+            'blurb'    => "GoMarket is coming to ".$siteName.". A single place to buy, sell and trade with people you can trust, all settled with your wallet, card or crypto. We're building it now.",
+            'illo'     => 'search',
+            'icon'     => 'Shop.svg',
+            'accent'   => 'bg-blue-600',
+            'features' => [
+                ['Buy and sell', 'List what you have and find what you need.'],
+                ['Trusted trades', 'Verified members and protected payments.'],
+                ['Your way to pay', 'Wallet balance, card or crypto at checkout.'],
+            ],
+        ],
         'stays' => [
             'name'     => 'Stays',
             'tagline'  => 'Book stays anywhere. Pay your way.',
@@ -100,12 +126,19 @@
             {{-- ── Visual ───────────────────────────────────────────── --}}
             <div class="relative mx-auto w-full max-w-md lg:max-w-none">
                 <div class="overflow-hidden rounded-[24px] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200">
-                    <img
-                        src="{{ asset('assets/' . rawurlencode($m['image'])) }}"
-                        alt="{{ $m['name'] }} on {{ $siteName }}"
-                        class="aspect-[4/3] h-full w-full object-cover"
-                        loading="lazy"
-                    >
+                    @if (! empty($m['illo']))
+                        {{-- Inline animated illustration (no image request), same as the hero chips. --}}
+                        <div class="flex aspect-[4/3] items-center justify-center bg-blue-50 p-8">
+                            <x-illo :name="$m['illo']" class="w-full max-w-xs" />
+                        </div>
+                    @else
+                        <img
+                            src="{{ asset('assets/' . rawurlencode($m['image'])) }}"
+                            alt="{{ $m['name'] }} on {{ $siteName }}"
+                            class="aspect-[4/3] h-full w-full object-cover"
+                            loading="lazy"
+                        >
+                    @endif
                 </div>
 
                 {{-- Floating launch chip --}}

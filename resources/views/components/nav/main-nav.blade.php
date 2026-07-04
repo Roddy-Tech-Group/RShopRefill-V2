@@ -644,6 +644,8 @@
                     // so the highlight is never statically stuck on Gift Cards.
                     $currentCat = match (true) {
                         request()->routeIs('shop.gift-cards', 'shop.brand') => 'Gift Cards',
+                        request()->routeIs('shop.sell-gift-cards')          => 'Sell Gift Cards',
+                        request()->routeIs('shop.gomarket')                 => 'GoMarket',
                         request()->routeIs('shop.esims', 'shop.esim')       => 'eSIMs',
                         request()->routeIs('shop.topups', 'shop.topup')     => 'Mobile top up',
                         request()->routeIs('shop.bills', 'shop.bill')       => 'Bill payments',
@@ -662,18 +664,30 @@
 
                 @php $catImgClass = 'w-[22px] h-[22px] shrink-0 dark:[filter:brightness(0)_invert(1)]'; @endphp
 
-                {{-- Gift Cards --}}
+                {{-- Buy Gift Cards --}}
                 @if (\App\Support\FeatureFlag::on('gift_cards'))
                 <a href="{{ route('shop.gift-cards') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Gift Cards') }}">
                     <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Gift Cards') }}" loading="lazy">
-                    Gift Cards
+                    Buy Gift Cards
                 </a>
                 @else
                 <span class="{{ $catLinkClass }} {{ $catOff }}" aria-disabled="true" title="Temporarily unavailable">
                     <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
-                    Gift Cards
+                    Buy Gift Cards
                 </span>
                 @endif
+
+                {{-- Sell Gift Cards (coming soon) --}}
+                <a href="{{ route('shop.sell-gift-cards') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Sell Gift Cards') }}">
+                    <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Sell Gift Cards') }}" loading="lazy">
+                    Sell Gift Cards
+                </a>
+
+                {{-- GoMarket (coming soon) --}}
+                <a href="{{ route('shop.gomarket') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('GoMarket') }}">
+                    <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('GoMarket') }}" loading="lazy">
+                    GoMarket
+                </a>
 
                 {{-- eSIMs --}}
                 @if (\App\Support\FeatureFlag::on('esims'))
