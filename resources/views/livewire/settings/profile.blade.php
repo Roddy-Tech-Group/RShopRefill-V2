@@ -255,6 +255,9 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                          Cropper.js loads from CDN at the bottom of this file.
                          File picker opens a square-crop modal that handles
                          upload + save in one shot. --}}
+                    {{-- Avatar column: photo on top, a small grey "Edit profile"
+                         button beneath it (TikTok-style). --}}
+                    <div class="flex flex-col items-center gap-2.5">
                     <div class="relative"
                         x-data="avatarCropper()"
                         @keydown.escape.window="cropperOpen && closeCropper()"
@@ -311,6 +314,16 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         </template>
                     </div>
 
+                        {{-- Edit profile - small grey button under the photo (TikTok-style). --}}
+                        <button
+                            type="button"
+                            @click="editingProfile = !editingProfile"
+                            class="rounded-[10px] bg-zinc-100 px-4 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 active:scale-95 dark:bg-white/10 dark:text-zinc-200 dark:hover:bg-white/15"
+                            :class="editingProfile && 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'"
+                            x-text="editingProfile ? 'Done' : 'Edit profile'"
+                        >Edit profile</button>
+                    </div>
+
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-1.5">
                             <p class="min-w-0 truncate text-lg font-bold text-black">{{ $authUser?->name ?? 'Account holder' }}</p>
@@ -337,18 +350,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         @endif
                     </div>
 
-                    {{-- Edit profile button --}}
-                    <button
-                        type="button"
-                        @click="editingProfile = !editingProfile"
-                        class="hidden shrink-0 items-center gap-1.5 self-start rounded-[12px] border border-zinc-200 px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:border-blue-600 hover:text-blue-700 active:scale-95 sm:inline-flex"
-                        :class="editingProfile && 'border-blue-600 text-blue-700'"
-                    >
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M12 18.75h7.5"/>
-                        </svg>
-                        <span x-text="editingProfile ? 'Done' : 'Edit profile'">Edit profile</span>
-                    </button>
+                    {{-- (Edit profile button now lives under the avatar photo, above.) --}}
                 </div>
                 @error('avatar') <p class="mt-3 text-xs text-red-600">{{ $message }}</p> @enderror
             </div>
@@ -541,7 +543,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                         class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-[#0c1a36] dark:text-white"
                                     >
                                 </div>
-                                <ul class="max-h-52 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <ul class="max-h-52 overflow-y-auto overscroll-contain p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                     <template x-for="opt in filtered" :key="opt.value">
                                         <li>
                                             <button
