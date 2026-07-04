@@ -243,7 +243,11 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             <h2 class="text-base font-bold text-zinc-900">Personal Information</h2>
         </div>
 
-        <div class="overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        {{-- No overflow-hidden here: it would clip the country dropdown (an absolute
+             panel) inside the card. The card stays rounded via rounded-[12px] (which
+             clips the background), the hero content is padded, and the avatar clips
+             itself - so nothing else needs the card-level clip. --}}
+        <div class="rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
             {{-- Hero strip: avatar + name/email + edit toggle --}}
             <div class="relative px-5 pt-6 pb-5 sm:px-6">
                 <div class="flex items-center gap-4 sm:gap-5">
