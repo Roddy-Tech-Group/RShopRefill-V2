@@ -1276,10 +1276,10 @@
                 </div>
             </div>
             @else
-            {{-- Back button (task/inner pages) - top-left, mobile only. These pages
-                 dropped the top chrome, so this is their only top affordance; it goes
-                 back, falling back to the overview on a direct landing. --}}
-            <div class="relative z-10 px-3 py-2.5 lg:hidden">
+            {{-- Back button (task/inner pages) - a STICKY top-left affordance (these
+                 pages dropped the top chrome). A frosted page-colour strip that stays
+                 pinned as the page scrolls; goes back, falling back to the overview. --}}
+            <div class="sticky top-0 z-30 px-3 py-2.5 lg:hidden bg-[#eff6ff]/90 backdrop-blur-md dark:bg-[#0c1a36]/90">
                 <button
                     type="button"
                     x-data

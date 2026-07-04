@@ -15,9 +15,11 @@
         ->values();
 @endphp
 
-<x-layouts.app.header :title="'Top up your eSIM | '.$siteName">
+<x-shop.layout :title="'Top up your eSIM | '.$siteName">
 
-    <div class="mx-auto w-full max-w-[820px] px-4 pb-32 pt-6 sm:px-6 lg:pt-10">
+    {{-- Renders inside the dashboard chrome (bottom nav + sticky back button on
+         mobile) via x-shop.layout; the dashboard content area supplies the padding. --}}
+    <div class="mx-auto w-full max-w-[820px]">
 
         <nav class="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400" aria-label="Breadcrumb">
             <a href="{{ route('dashboard.orders') }}" wire:navigate class="font-medium transition-colors hover:text-zinc-900 dark:hover:text-white">My orders</a>
@@ -144,4 +146,4 @@
 
     </div>
 
-</x-layouts.app.header>
+</x-shop.layout>
