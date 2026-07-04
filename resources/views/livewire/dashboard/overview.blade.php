@@ -763,9 +763,10 @@ new #[Lazy] class extends Component
                             </div>
 
                             <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-600/10 dark:bg-white/15">
-                                {{-- Show active wallet's specific icon when available, otherwise the generic wallet glyph --}}
+                                {{-- Show active wallet's specific icon when available, otherwise the generic wallet glyph.
+                                     The flag fills the pill (object-cover, clipped by the parent's overflow-hidden). --}}
                                 <template x-if="current.icon">
-                                    <img :src="current.icon" alt="" class="h-7 w-7 object-contain" loading="lazy">
+                                    <img :src="current.icon" alt="" class="h-full w-full object-cover" loading="lazy">
                                 </template>
                                 <template x-if="!current.icon">
                                     <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-6 w-6 brightness-0 dark:invert" loading="lazy">

@@ -75,8 +75,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 @click="softDark = ! softDark"
                 :aria-checked="softDark.toString()"
                 aria-label="Soft dark"
-                :class="softDark ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-[#26416b]'"
-                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                :class="softDark ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'"
+                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 ring-black/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:ring-white/10"
             >
                 <span :class="softDark ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
             </button>
