@@ -306,7 +306,8 @@
                                     x-transition:enter="transition ease-out duration-150"
                                     x-transition:enter-start="opacity-0 -translate-y-1"
                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
+                                    {{-- No `overflow-hidden`: on iOS Safari an overflow-hidden + rounded parent traps touch-scrolling of the list inside. The ring/shadow/bg still carry the radius, and the children are transparent + inset, so the corners stay clean. --}}
+                                    class="absolute left-0 z-30 mt-1 w-full rounded-[12px] bg-[#eff6ff] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
                                 >
                                     <div class="border-b border-zinc-100 p-2">
                                         <input
@@ -317,7 +318,7 @@
                                             class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                                         >
                                     </div>
-                                    <ul class="max-h-52 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    <ul class="max-h-52 overflow-y-auto overscroll-contain p-1 [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                         <template x-for="opt in filtered" :key="opt.value">
                                             <li>
                                                 <button
