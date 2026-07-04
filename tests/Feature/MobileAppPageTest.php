@@ -9,14 +9,16 @@ class MobileAppPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_the_mobile_app_page_renders(): void
+    public function test_the_web_app_page_renders(): void
     {
         $this->withoutVite();
 
         $this->get(route('shop.mobile-app'))
             ->assertOk()
-            ->assertSee('Our mobile app is on the way')
-            ->assertSee('App Store')
-            ->assertSee('Google Play');
+            ->assertSee('Web App')
+            ->assertSee('How to install')
+            // The "coming soon" app-store framing is gone.
+            ->assertDontSee('Our mobile app is on the way')
+            ->assertDontSee('Coming soon');
     }
 }

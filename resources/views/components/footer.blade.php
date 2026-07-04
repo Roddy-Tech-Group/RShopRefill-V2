@@ -3,6 +3,23 @@
      own grey panel - the theme flips the token to the card grey (#303030 Soft
      Dark, #2a2a2a Extra Dark) - instead of the page tone (dark:bg-[#0c1a36]),
      which went black in Extra Dark and blended into the background. --}}
+@php
+    // Popular gift cards for the "Shop" column - the curated config/popular_brands.php
+    // list, gift cards only, top few, in config order (mirrors the home Popular row).
+    $footerPopularKeys = config('popular_brands.keys', []);
+    $footerGiftCat = \App\Models\Category::where('slug', 'gift-cards')->first();
+    $footerGiftCards = $footerGiftCat
+        ? \App\Models\Product::query()
+            ->where('category_id', $footerGiftCat->id)
+            ->whereIn('brand_key', $footerPopularKeys)
+            ->get(['brand_key'])
+            ->unique('brand_key')
+            ->sortBy(fn ($p) => array_search($p->brand_key, $footerPopularKeys))
+            ->take(6)
+            ->values()
+        : collect();
+@endphp
+
 <footer class="bg-white dark:bg-[#1d3252] text-zinc-900">
     <div class="mx-auto max-w-[1550px] px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
 
@@ -50,39 +67,34 @@
                     </a>
                 </div>
 
-                {{-- Get the app --}}
-                <p class="mt-8 text-xs font-semibold uppercase tracking-wider text-zinc-500">Get the app</p>
-                <div class="mt-3 flex flex-wrap items-center gap-3">
-                    <a href="{{ route('shop.mobile-app') }}" wire:navigate aria-label="Download on the App Store (in development)" class="inline-flex items-center gap-2 rounded-[8px] px-4 py-2 text-white transition-opacity hover:opacity-90" style="background-color: #18181b;">
-                        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                        <span class="text-left leading-none">
-                            <span class="block text-[10px]">Get it on</span>
-                            <span class="block text-sm font-semibold">App Store</span>
-                        </span>
-                    </a>
-                    <a href="{{ route('shop.mobile-app') }}" wire:navigate aria-label="Get it on Google Play (in development)" class="inline-flex items-center gap-2 rounded-[8px] px-4 py-2 text-white transition-opacity hover:opacity-90" style="background-color: #18181b;">
-                        <img src="{{ asset('assets/'.rawurlencode('Playstore 2.webp')) }}" alt="" width="24" height="24" class="block h-6 w-6 shrink-0 object-contain" loading="lazy">
-                        <span class="text-left leading-tight">
-                            <span class="block text-[10px]">Download on</span>
-                            <span class="block text-sm font-semibold">Google Play</span>
-                        </span>
-                    </a>
+                {{-- Newsletter signup --}}
+                <div class="mt-8">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Newsletter</p>
+                    <p class="mt-2 max-w-sm text-sm text-zinc-600">Deals, drops and new product launches - straight to your inbox.</p>
+                    <livewire:footer-newsletter />
                 </div>
             </div>
 
-            {{-- Popular --}}
-            <nav class="lg:col-span-2" aria-label="Popular">
-                <h3 class="text-base font-semibold text-zinc-900">Popular</h3>
+            {{-- Shop --}}
+            <nav class="lg:col-span-2" aria-label="Shop">
+                <h3 class="text-base font-semibold text-zinc-900">Shop</h3>
                 <ul class="mt-4 space-y-2.5 text-base">
-                    <li><a href="{{ route('shop.brand', 'amazon') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Amazon</a></li>
-                    <li><a href="{{ route('shop.brand', 'apple') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Apple</a></li>
-                    <li><a href="{{ route('shop.brand', 'steam') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Steam</a></li>
-                    <li><a href="{{ route('shop.brand', 'playstation') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">PlayStation</a></li>
-                    <li><a href="{{ route('shop.brand', 'xbox') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Xbox</a></li>
-                    <li><a href="{{ route('shop.brand', 'netflix') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Netflix</a></li>
+                    @foreach ($footerGiftCards as $footerBrand)
+                        <li><a href="{{ route('shop.brand', \App\Models\Product::brandSlug($footerBrand->brand_key)) }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">{{ \App\Models\Product::brandDisplayName($footerBrand->brand_key) }}</a></li>
+                    @endforeach
                     <li><a href="{{ route('shop.gift-cards') }}" wire:navigate class="font-medium text-blue-600 transition-colors hover:text-blue-700">View all gift cards</a></li>
-                    <li><a href="{{ route('shop.esim.country', 'US') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">United States eSIM</a></li>
-                    <li><a href="{{ route('shop.esim.country', 'GB') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">United Kingdom eSIM</a></li>
+                    <li>
+                        <a href="{{ route('shop.esim.country', 'WW') }}" wire:navigate class="flex items-center gap-2 text-zinc-600 transition-colors hover:text-zinc-900">
+                            <img src="{{ \App\Models\Product::flagUrl('US') }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
+                            Discover Global USA
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('shop.esim.country', 'GB') }}" wire:navigate class="flex items-center gap-2 text-zinc-600 transition-colors hover:text-zinc-900">
+                            <img src="{{ \App\Models\Product::flagUrl('GB') }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
+                            UK eSIM
+                        </a>
+                    </li>
                     <li><a href="{{ route('shop.esims') }}" wire:navigate class="font-medium text-blue-600 transition-colors hover:text-blue-700">View all eSIMs</a></li>
                 </ul>
             </nav>
@@ -109,7 +121,7 @@
                     <li><a href="{{ route('shop.reviews') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Reviews</a></li>
                     <li><a href="{{ route('shop.press') }}" wire:navigate class="text-zinc-600 transition-colors hover:text-zinc-900">Press &amp; Media</a></li>
                     <li>
-                        <a href="{{ route('dashboard') }}" wire:navigate class="inline-flex items-center gap-2 text-zinc-600 transition-colors hover:text-zinc-900">
+                        <a href="{{ route('shop.mobile-app') }}" wire:navigate class="inline-flex items-center gap-2 text-zinc-600 transition-colors hover:text-zinc-900">
                             <span>WebApp Active</span>
                             <span class="shrink-0 rounded-[12px]" style="display: inline-block; width: 0.5rem; height: 0.5rem; background-color: #22c55e;"></span>
                         </a>
