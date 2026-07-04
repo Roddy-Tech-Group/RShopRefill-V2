@@ -762,9 +762,9 @@ new #[Lazy] class extends Component
                                 <p class="mt-0.5 text-xs text-blue-700 dark:text-blue-100"><span x-text="current.code">{{ $walletCurrencyCode }}</span> · <span x-text="current.label">{{ $walletCurrencyCase?->label() ?? 'Wallet' }}</span></p>
                             </div>
 
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-600/10 dark:bg-white/15">
+                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600/10 dark:bg-white/15">
                                 {{-- Show active wallet's specific icon when available, otherwise the generic wallet glyph.
-                                     The flag fills the pill (object-cover, clipped by the parent's overflow-hidden). --}}
+                                     The flag fills the circle (object-cover, clipped by the parent's overflow-hidden). --}}
                                 <template x-if="current.icon">
                                     <img :src="current.icon" alt="" class="h-full w-full object-cover" loading="lazy">
                                 </template>

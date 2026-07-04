@@ -434,20 +434,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 </div>
             </div>
 
-            {{-- Mobile edit button (full width at bottom of card on small screens) --}}
-            <div class="border-t border-zinc-100 p-4 sm:hidden">
-                <button
-                    type="button"
-                    @click="editingProfile = !editingProfile"
-                    class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-all hover:bg-blue-700 active:scale-[0.98]"
-                    :class="editingProfile && '!bg-blue-700'"
-                >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M12 18.75h7.5"/>
-                    </svg>
-                    <span x-text="editingProfile ? 'Close editor' : 'Edit profile'">Edit profile</span>
-                </button>
-            </div>
+            {{-- (Mobile blue edit button removed - the grey "Edit profile" pill under
+                 the avatar now works on all screen sizes.) --}}
 
             {{-- Inline edit form (slides down) --}}
             <div
