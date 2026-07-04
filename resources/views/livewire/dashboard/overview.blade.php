@@ -86,51 +86,16 @@ new #[Lazy] class extends Component
         // desktop card slices ->take(3) to keep its right-rail compact.
         $recentOrders = $user->orders()->with('items')->latest()->limit(5)->get();
 
-        // Popular gift cards - same rule as the storefront's "Popular Gift Cards"
-        // row: products the admin flagged is_popular lead (region-locked via
-        // ResolveRegion, one product per brand). The hand-curated
-        // config/popular_brands.php list is only a fallback for regions where
-        // nothing has been flagged yet.
+        // Popular gift cards - the exact same curated, region-resolved row the
+        // storefront shows: config/popular_brands.php order, the visitor's own-country
+        // brands floated to the top, USA rows shown to everyone. Sourced from
+        // Product::popularForRegion so the dashboard and storefront never diverge.
         $region = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-        $popularIds = Product::query()
-            ->where('is_active', true)
-            ->where('country_code', $region)
-            ->where('is_popular', true)
-            ->whereNotNull('brand_key')
-            ->groupBy('brand_key')
-            ->selectRaw('MIN(id) as id')
-            ->pluck('id');
+        $popularProducts = Product::popularForRegion($region);
 
-        $popularProducts = Product::query()
-            ->whereIn('id', $popularIds)
-            ->with('variants')
-            ->orderBy('name')
-            ->take(5)
-            ->get();
-
-        if ($popularProducts->isEmpty()) {
-            $popularKeys = config('popular_brands.keys', []);
-
-            $curatedIds = Product::query()
-                ->where('is_active', true)
-                ->where('country_code', $region)
-                ->whereIn('brand_key', $popularKeys)
-                ->groupBy('brand_key')
-                ->selectRaw('MIN(id) as id')
-                ->pluck('id');
-
-            $popularProducts = Product::query()
-                ->whereIn('id', $curatedIds)
-                ->with('variants')
-                ->get()
-                ->sortBy(fn ($p) => array_search($p->brand_key, $popularKeys))
-                ->take(5)
-                ->values();
-        }
-
-        // Fallback so the row never renders empty in a small region - any active
-        // gift-card brands available there.
+        // Last-resort fallback so the row never renders empty in a region where none
+        // of the curated brands are stocked - any active gift-card brands there.
         if ($popularProducts->isEmpty()) {
             $fallbackIds = Product::query()
                 ->where('is_active', true)
