@@ -67,29 +67,11 @@
             ->get();
     };
 
-    // "Popular Gift Cards" is admin-driven: products flagged is_popular on the
-    // admin products page lead the row. The hand-curated list in
-    // config/popular_brands.php is only a fallback for regions where nothing
-    // has been flagged yet, so the row never renders empty.
-    $popularBrands = $brandPicks('is_popular', 10);
-
-    if ($popularBrands->isEmpty()) {
-        $popularKeys = config('popular_brands.keys', []);
-        $popularIdByKey = Product::query()
-            ->where('is_active', true)
-            ->where('country_code', $region)
-            ->whereIn('brand_key', $popularKeys)
-            ->select('brand_key', DB::raw('MIN(id) as id'))
-            ->groupBy('brand_key')
-            ->pluck('id');
-        $popularBrands = Product::query()
-            ->whereIn('id', $popularIdByKey)
-            ->with('variants:id,product_id,retail_price,is_variable,is_available')
-            ->get()
-            ->sortBy(fn ($p) => array_search($p->brand_key, $popularKeys))
-            ->take(count($popularKeys))
-            ->values();
-    }
+    // "Popular" is the curated, ordered list in config/popular_brands.php, resolved
+    // per region: every brand shows its USA row to everyone, and a brand that also has
+    // a row in the visitor's own country (e.g. the Cameroon top-ups in CM) uses that
+    // local row and floats to the top. See Product::popularForRegion.
+    $popularBrands = Product::popularForRegion($region);
 
     // Featured row renders at the very top of the storefront, and ONLY from
     // real admin flags - no fallback filler, so an empty flag set simply

@@ -6,6 +6,7 @@ use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Product extends Model
@@ -248,6 +249,49 @@ class Product extends Model
         }
 
         return $this->variants->contains(fn (ProductVariant $v) => $v->is_available);
+    }
+
+    /**
+     * The curated Popular row for a region. Reads config/popular_brands.php (ordered
+     * brand keys) and returns one representative Product per brand: the visitor's own
+     * region row if the brand has one, else the USA row, else any country. Products
+     * native to $region are floated to the top (config order kept within each group),
+     * so a Cameroon visitor sees their local top-ups first, then all the USA gift cards.
+     *
+     * @return Collection<int, Product>
+     */
+    public static function popularForRegion(string $region): Collection
+    {
+        $region = strtoupper($region);
+        $keys = (array) config('popular_brands.keys', []);
+
+        if (empty($keys)) {
+            return collect();
+        }
+
+        $byBrand = static::query()
+            ->where('is_active', true)
+            ->whereIn('brand_key', $keys)
+            ->with('variants:id,product_id,retail_price,is_variable,is_available')
+            ->get()
+            ->groupBy('brand_key');
+
+        return collect($keys)
+            ->map(function (string $key) use ($byBrand, $region) {
+                $rows = $byBrand->get($key);
+                if (! $rows) {
+                    return null;
+                }
+
+                // Prefer the visitor's own region, then USA, then any country.
+                return $rows->firstWhere('country_code', $region)
+                    ?? $rows->firstWhere('country_code', 'US')
+                    ?? $rows->first();
+            })
+            ->filter()
+            // Own-region brands first; config order preserved within each group.
+            ->sortBy(fn (Product $p) => $p->country_code === $region ? 0 : 1)
+            ->values();
     }
 
     public function category()

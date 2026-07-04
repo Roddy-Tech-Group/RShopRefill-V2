@@ -1,23 +1,35 @@
 <?php
 
 /*
- * Curated "popular" brand list.
+ * Curated "popular" brand list for the home-page Popular row.
  *
- * Drives the home page "Popular Gift Cards" row AND floats these brands to the
- * top of the /gift-cards listing under the default (Popularity) sort.
+ * Values must match `products.brand_key` exactly. Order is the base display order.
  *
- * Values must match `products.brand_key` exactly. Order matters — it's the
- * display order on the home row.
+ * How it renders (see App\Models\Product::popularForRegion): every brand shows its
+ * USA row to everyone, so all these are visible in every region. When a visitor is
+ * in a country that has its own row for a brand (e.g. the Cameroon MTN/Orange/Camtel
+ * top-ups in CM), that local row is used AND floated to the top - so a Cameroon
+ * visitor sees their local brands first, then all the USA gift cards.
  */
 
 return [
     'keys' => [
+        // USA gift cards (shown to everyone).
         'Apple',
-        'Xbox',
-        'Steam',
-        'GooglePlay',
         'Amazon',
-        'Playstation',
-        'Netflix',
+        'AmazonPrime',
+        'RazerGold',
+        'Visa',
+        'DiscordNitro',
+        'EAPlay',
+        'GooglePlay',
+        'eBay',
+        'PUBG',
+        'Sephora',
+
+        // Local mobile top-ups (float to the top for that country's visitors).
+        'MTN',
+        'Orange',
+        'Camtel',
     ],
 ];
