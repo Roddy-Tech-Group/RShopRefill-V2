@@ -1428,6 +1428,16 @@
                 ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
                 : 0;
         @endphp
+        {{-- Frosted scrim behind the floating nav: as the page scrolls, content
+             blurs + fades into the bottom-bar area instead of showing sharply behind
+             it. Fixed strip below the nav (z-40), masked so the blur eases in from
+             nothing at the top to full at the bottom; never blocks taps. --}}
+        <div
+            aria-hidden="true"
+            class="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 backdrop-blur-md lg:hidden"
+            style="-webkit-mask-image: linear-gradient(to top, #000 38%, transparent); mask-image: linear-gradient(to top, #000 38%, transparent);"
+        ></div>
+
         {{-- Floating rounded nav bar (neobank style): detached from the edges with
              a pill highlight behind the active tab. The wrapper's bottom padding
              keeps it clear of the iOS home indicator. Shown on every page. --}}
