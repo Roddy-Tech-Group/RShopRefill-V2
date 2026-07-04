@@ -438,10 +438,11 @@ class DashboardMetricsQuery
      */
     /**
      * Daily sales + cost timeseries for the Trends chart. Sales is what the
-     * customer paid (order_items.subtotal_amount); cost is the per-unit
-     * cost we paid the supplier (variant_snapshot.cost_price × quantity),
-     * cast safely out of the JSON snapshot. Items missing a cost snapshot
-     * contribute zero to cost — no synthetic fallback, only real data.
+     * customer paid (order_items.subtotal_amount, converted to USD); cost is the
+     * real USD wholesale we paid the supplier (order_items.provider_cost_usd x
+     * quantity) - the same source-of-truth cost the reports page and the KPI
+     * donut use, so the three never disagree. Items missing a cost contribute
+     * zero to cost - no synthetic fallback, only real data.
      * Returns one row per day in the window, gaps filled with zeros.
      *
      * @return array<int, array{date: string, sales: float, cost: float}>
@@ -461,10 +462,13 @@ class DashboardMetricsQuery
                 // order's exchange-rate snapshot so the chart's "sales" are
                 // real USD, comparable against the USD supplier cost below.
                 DB::raw('SUM('.$this->itemUsdSql().') as sales'),
-                // Cost extracts variant_snapshot.cost_price as a number so it
-                // multiplies cleanly. Items without a cost_price contribute NULL
-                // here, which SUM skips — yielding honest, source-of-truth cost.
-                DB::raw('SUM('.$this->jsonDecimalSql('order_items.variant_snapshot', '$.cost_price').' * order_items.quantity) as cost'),
+                // Cost is the real USD wholesale we paid the supplier
+                // (order_items.provider_cost_usd) - the SAME source getReportSeries
+                // and the KPI donut use. The old variant_snapshot.cost_price
+                // over-counted: for some products (e.g. eSIMs) cost_price holds the
+                // recommended RETAIL price, not the net cost, which pushed the
+                // plotted cost line above sales. Items with no cost contribute 0.
+                DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost'),
             )
             ->groupBy('date')
             ->orderBy('date')

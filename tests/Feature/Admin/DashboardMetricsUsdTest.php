@@ -126,4 +126,33 @@ class DashboardMetricsUsdTest extends TestCase
         $this->assertNotNull($today);
         $this->assertEqualsWithDelta(7.00, $today['sales'], 0.01);
     }
+
+    /**
+     * The Trends chart must report cost from order_items.provider_cost_usd (the real
+     * wholesale we paid), NOT variant_snapshot.cost_price. For some products (eSIMs)
+     * the snapshot cost_price is the recommended RETAIL price, so summing it pushed
+     * the plotted cost line above sales even though the true margin is positive.
+     * Reproduces the observed production numbers: sales 117.45, real cost 96.44,
+     * inflated snapshot 154.84.
+     */
+    public function test_sales_cost_timeseries_uses_provider_cost_not_inflated_snapshot(): void
+    {
+        $user = User::factory()->create();
+        $order = $this->makeCompletedOrder($user, 'USD', 117.45, 1.0, 117.45);
+        $item = $this->attachItem($order, 117.45);
+        $item->update([
+            'provider_cost_usd' => 96.44,
+            'variant_snapshot' => ['cost_price' => 154.84, 'currency' => 'USD'],
+        ]);
+
+        $series = app(DashboardMetricsQuery::class)->getSalesCostTimeseries(7);
+        $today = collect($series)->firstWhere('date', now()->format('Y-m-d'));
+
+        $this->assertNotNull($today);
+        $this->assertEqualsWithDelta(117.45, $today['sales'], 0.01);
+        // Real wholesale cost, not the inflated snapshot retail price.
+        $this->assertEqualsWithDelta(96.44, $today['cost'], 0.01);
+        // Cost therefore sits below sales, as the true margin is positive.
+        $this->assertLessThan($today['sales'], $today['cost']);
+    }
 }
