@@ -3,6 +3,7 @@
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Models\Referral;
+use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -15,8 +16,11 @@ new
 #[Title('Rcoin Analytics')]
 class extends Component {
     /**
-     * Headline supply metrics - sum every Rcoin transaction in the ledger by
-     * category and derive circulating supply (minted − redeemed − reversed).
+     * Headline supply metrics. minted/redeemed/reversed are lifetime ledger flows.
+     * "Circulating" (Rcoin in customer wallets right now) is the SUM of actual Rcoin
+     * wallet balances - the source of truth. Deriving it from the ledger (minted −
+     * redeemed − reversed) drifted from real holdings, because reward_withdrawal and
+     * adjustment change a balance without being part of that formula.
      * Same source as the storefront API at /admin/api/rewards/analytics/metrics.
      */
     #[Computed]
@@ -43,7 +47,7 @@ class extends Component {
             'minted' => $minted,
             'redeemed' => $redeemed,
             'reversed' => $reversed,
-            'circulating' => max(0, $minted - $redeemed - $reversed),
+            'circulating' => (float) Wallet::where('currency', $rcoin)->sum('balance'),
         ];
     }
 
