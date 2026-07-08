@@ -36,7 +36,7 @@ class EmailChannel implements NotificationChannelInterface
 
             // Deliver email via provider
             $response = $this->mailProvider->send(
-                to: $payload->user->email,
+                to: $payload->emailRecipient(),
                 subject: $payload->title,
                 htmlBody: $htmlBody,
                 attachments: $attachments,
@@ -55,7 +55,7 @@ class EmailChannel implements NotificationChannelInterface
                 'notification_id' => $dbNotification?->id,
                 'provider' => 'resend',
                 'channel' => NotificationChannel::Email,
-                'recipient' => $payload->user->email,
+                'recipient' => $payload->emailRecipient(),
                 'status' => DeliveryStatus::Sent,
                 'response_payload' => $response,
                 'attempted_at' => now(),
@@ -63,7 +63,7 @@ class EmailChannel implements NotificationChannelInterface
 
         } catch (\Throwable $e) {
             Log::error('EmailChannel delivery failed', [
-                'recipient' => $payload->user->email,
+                'recipient' => $payload->emailRecipient(),
                 'error' => $e->getMessage(),
             ]);
 
@@ -80,7 +80,7 @@ class EmailChannel implements NotificationChannelInterface
                 'notification_id' => $dbNotification?->id,
                 'provider' => 'resend',
                 'channel' => NotificationChannel::Email,
-                'recipient' => $payload->user->email,
+                'recipient' => $payload->emailRecipient(),
                 'status' => DeliveryStatus::Failed,
                 'error_message' => $e->getMessage(),
                 'attempted_at' => now(),
@@ -107,7 +107,7 @@ class EmailChannel implements NotificationChannelInterface
             $mailer = Mail::mailer('array');
             // sendNow: some mailables are queueable, and a queued "render"
             // would dispatch a job instead of producing a message here.
-            $mailer->to($payload->user->email)->sendNow($payload->mailable);
+            $mailer->to($payload->emailRecipient())->sendNow($payload->mailable);
 
             $transport = $mailer->getSymfonyTransport();
             $sent = collect($transport->messages())->last();

@@ -33,7 +33,9 @@
                 </a>
             </li>
 
-            {{-- Sell Gift Cards (coming soon) --}}
+            {{-- Sell Gift Cards (coming soon) - hidden until its feature flag
+                 is switched on, unlike the greyed-out gated categories --}}
+            @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
             <li data-reveal-item class="shrink-0">
                 <a
                     href="{{ route('shop.sell-gift-cards') }}" wire:navigate
@@ -45,8 +47,10 @@
                     <span :class="active === 1 ? 'text-white' : 'text-zinc-800 dark:text-white'" class="text-base font-semibold transition-colors duration-300 ease-out">Sell Gift Cards</span>
                 </a>
             </li>
+            @endif
 
-            {{-- GoMarket (coming soon) --}}
+            {{-- GoMarket (coming soon) - hidden until its feature flag is switched on --}}
+            @if (\App\Support\FeatureFlag::on('gomarket', false))
             <li data-reveal-item class="shrink-0">
                 <a
                     href="{{ route('shop.gomarket') }}" wire:navigate
@@ -58,6 +62,7 @@
                     <span :class="active === 2 ? 'text-white' : 'text-zinc-800 dark:text-white'" class="text-base font-semibold transition-colors duration-300 ease-out">GoMarket</span>
                 </a>
             </li>
+            @endif
 
             {{-- eSIMs --}}
             <li data-reveal-item class="shrink-0">

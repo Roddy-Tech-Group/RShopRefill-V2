@@ -113,7 +113,7 @@ class extends Component {
     <div class="flex flex-col gap-6">
 
         @forelse ($this->settings as $group => $groupSettings)
-            <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
                 {{-- Group header pill --}}
                 <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                     <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $group }}</h2>
@@ -210,7 +210,7 @@ class extends Component {
                 </ul>
             </div>
         @empty
-            <div class="rounded-[12px] border-[1.5px] border-white bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
                 <p class="text-sm font-semibold text-zinc-900 dark:text-white">No settings configured</p>
                 <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     Use <code class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">SiteSetting::put('key', $value, 'group')</code> to seed settings, or run the site settings seeder.

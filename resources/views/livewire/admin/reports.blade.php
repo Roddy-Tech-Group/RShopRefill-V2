@@ -140,7 +140,7 @@ class extends Component {
     @endphp
 
     {{-- ── Filter card ─────────────────────────────────────────── --}}
-    <section class="rounded-[12px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
         <header class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Sales Overview by Date</h2>
             <a href="{{ $this->exportUrl() }}" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-50 px-3 py-1.5 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-600/25">
@@ -315,7 +315,7 @@ class extends Component {
     </section>
 
     {{-- ── Data table ──────────────────────────────────────────── --}}
-    <section class="mt-4 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <section class="mt-4 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-[12px]">
                 <thead>

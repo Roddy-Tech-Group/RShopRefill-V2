@@ -480,7 +480,7 @@ new class extends Component {
                 </form>
 
                 @feature('signup')
-                <p class="mt-5 border-t border-white pt-5 text-center text-sm text-white/65">
+                <p class="mt-5 pt-5 text-center text-sm text-white/65">
                     Don't have an account?
                     <button type="button" @click="switchTo('register')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">Create one</button>
                 </p>
@@ -658,7 +658,7 @@ new class extends Component {
                     </div>
                 </form>
 
-                <p class="mt-5 border-t border-white pt-5 text-center text-sm text-white/65">
+                <p class="mt-5 pt-5 text-center text-sm text-white/65">
                     Already have an account?
                     <button type="button" @click="switchTo('login')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">Log in</button>
                 </p>

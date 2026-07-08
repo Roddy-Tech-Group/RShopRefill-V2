@@ -26,6 +26,14 @@
         ['slug' => 'stays',           'label' => 'Stays',           'icon' => 'stay 2.svg',     'url' => $r('stays')],
     ];
 
+    // Coming-soon categories stay hidden until their feature flag is switched
+    // on (admin > Settings > features). Their pages remain reachable by URL.
+    $hiddenWhenOff = ['sell-gift-cards' => 'sell_gift_cards', 'gomarket' => 'gomarket'];
+    $categories = array_values(array_filter(
+        $categories,
+        fn ($c) => ! isset($hiddenWhenOff[$c['slug']]) || \App\Support\FeatureFlag::on($hiddenWhenOff[$c['slug']], false),
+    ));
+
     $current = collect($categories)->firstWhere('slug', $active) ?? $categories[0];
 @endphp
 

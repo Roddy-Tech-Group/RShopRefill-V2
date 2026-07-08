@@ -17,8 +17,10 @@ class MobileAppPageTest extends TestCase
             ->assertOk()
             ->assertSee('Web App')
             ->assertSee('How to install')
-            // The "coming soon" app-store framing is gone.
+            // The "coming soon" app-store framing is gone from the page BODY
+            // (the global footer legitimately carries "Coming soon on" store
+            // badges now, so the broad Coming soon assertion had to go).
             ->assertDontSee('Our mobile app is on the way')
-            ->assertDontSee('Coming soon');
+            ->assertDontSee('Our mobile app is coming soon');
     }
 }

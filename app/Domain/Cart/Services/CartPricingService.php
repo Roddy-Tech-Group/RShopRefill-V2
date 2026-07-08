@@ -71,7 +71,7 @@ class CartPricingService
         }
 
         $rewardEngine = app(RewardEngine::class);
-        $cashbackPercentage = (float) Setting::get('cashback_percentage', 1.0);
+        $cashbackPercentage = (float) Setting::get('cashback_percentage', 0.5);
         $estimatedRcoinReward = $rewardEngine->usdToRcoin($subtotal * ($cashbackPercentage / 100));
 
         return [

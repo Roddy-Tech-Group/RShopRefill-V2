@@ -250,6 +250,45 @@ class extends Component {
                             Need help with your order? Contact us!
                         </a>
 
+                        {{-- Download the card art to the phone. fetch->blob forces a
+                             real download even for cross-origin CDN logos; if the CDN
+                             blocks CORS it falls back to opening the image (long-press
+                             to save). Only shown when the order's brand has a logo. --}}
+                        @php
+                            $dlSnap = $order->items->first()?->product_snapshot ?? [];
+                            $dlBrandKey = $dlSnap['brand_key'] ?? null;
+                            $dlLogo = Product::brandLogoUrl($dlBrandKey, $dlSnap['logo_url'] ?? null);
+                            $dlName = str($dlBrandKey ? Product::brandDisplayName($dlBrandKey) : ($dlSnap['name'] ?? 'gift-card'))->slug();
+                        @endphp
+                        @if ($dlLogo)
+                            <button
+                                type="button"
+                                x-data
+                                @click="(async () => {
+                                    try {
+                                        const res = await fetch(@js($dlLogo));
+                                        const blob = await res.blob();
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = @js($dlName.'-card');
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        a.remove();
+                                        URL.revokeObjectURL(url);
+                                    } catch (e) {
+                                        window.open(@js($dlLogo), '_blank');
+                                    }
+                                })()"
+                                class="ml-4 mt-4 inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                            >
+                                <svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                                </svg>
+                                Download card
+                            </button>
+                        @endif
+
                         {{-- Gift cards — each delivered item shows the card with its copyable code --}}
                         <div class="mt-5 space-y-4">
                             @foreach ($order->items as $item)
@@ -341,26 +380,39 @@ class extends Component {
                                     if (! $esim && $cardCode && in_array(strtolower((string) $brandKey), ['apple', 'itunes', 'app-store', 'apple-itunes'], true)) {
                                         $appleRedeemUrl = 'https://apps.apple.com/redeem?ctx=gifts&code='.rawurlencode($cardCode);
                                     }
+
+                                    // The card wears the brand's own colour (config override,
+                                    // else the Zendit-synced brand_color); text flips to white
+                                    // on dark brands. No colour = the neutral grey card.
+                                    $brandBg = Product::brandColor($brandKey, $snap['brand_color'] ?? null);
+                                    $brandDark = Product::colorIsDark($brandBg);
+                                    $cardInk = $brandDark ? 'text-white' : 'text-zinc-900';
+                                    $cardSub = $brandDark ? 'text-white/75' : 'text-zinc-600';
                                 @endphp
                                 {{-- Gift card — brand logo + denomination, full width inside the order card.
                                      `theme-static`: resellers screenshot this to deliver to their own
                                      customers, so it must look identical in light and dark mode. --}}
-                                <div class="theme-static max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
+                                {{-- Light brand colours (e.g. Apple's near-white) keep the zinc border so
+     the card edge still reads against the white panel; dark brands merge
+     border into the fill. --}}
+<div class="theme-static max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5" @if ($brandBg) style="background: {{ $brandBg }};{{ $brandDark ? ' border-color: '.$brandBg.';' : '' }}" @endif>
                                     <div class="flex items-start justify-between gap-3 px-2 pt-2">
                                         <div class="flex min-w-0 flex-col items-start gap-2.5">
                                             @if ($logo)
-                                                <img src="{{ $logo }}" alt="{{ $name }}" class="h-16 w-auto max-w-[130px] object-contain mix-blend-multiply" loading="lazy">
+                                                <img src="{{ $logo }}" alt="{{ $name }}" class="h-16 w-auto max-w-[130px] rounded-[5px] object-contain {{ $brandDark ? '' : 'mix-blend-multiply' }}" loading="lazy">
                                             @else
-                                                <span class="text-3xl font-black uppercase text-zinc-400">{{ str($name)->substr(0, 2)->upper() }}</span>
+                                                <span class="text-3xl font-black uppercase {{ $brandDark ? 'text-white/70' : 'text-zinc-400' }}">{{ str($name)->substr(0, 2)->upper() }}</span>
                                             @endif
-                                            <p class="truncate text-sm font-bold text-zinc-900">For {{ $name }}</p>
+                                            @unless ($logo && Product::logoCarriesName($brandKey))
+                                                <p class="truncate text-sm font-bold {{ $cardInk }}">For {{ $name }}</p>
+                                            @endunless
                                         </div>
                                         <div class="shrink-0 text-right">
                                             @if ($faceTxt)
-                                                <p class="text-2xl font-extrabold leading-none text-zinc-900">{{ $faceTxt }}</p>
+                                                <p class="text-xl font-extrabold leading-none {{ $cardInk }}">{{ $faceTxt }}</p>
                                             @endif
                                             @if ($country)
-                                                <p class="mt-1 flex items-center justify-end gap-1.5 text-sm text-zinc-600">
+                                                <p class="mt-1 flex items-center justify-end gap-1.5 text-sm {{ $cardSub }}">
                                                     @if (Product::flagUrl($snap['country_code'] ?? null))
                                                         <img src="{{ Product::flagUrl($snap['country_code'] ?? null) }}" alt="" class="h-3 w-[18px] rounded-[1px] object-cover ring-1 ring-zinc-200">
                                                     @endif
@@ -370,8 +422,8 @@ class extends Component {
                                         </div>
                                     </div>
 
-                                    {{-- Card body space --}}
-                                    <div class="h-14"></div>
+                                    {{-- Card body space (short, keeps the code pill close to the header) --}}
+                                    <div class="h-8"></div>
 
                                     @if ($esim)
                                         {{-- eSIM: QR for scan + SM-DP+ address and activation code for manual entry. --}}
@@ -467,9 +519,9 @@ class extends Component {
                                         {{-- Gift card — code + PIN, each independently copyable. --}}
                                         <div class="space-y-2">
                                             @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
-                                                <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
-                                                    <span class="w-9 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
-                                                    <span class="min-w-0 flex-1 truncate text-base font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
+                                                <div class="flex items-center gap-2 rounded-full border border-zinc-100 bg-white px-3.5 py-2" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
+                                                    <span class="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
+                                                    <span class="min-w-0 flex-1 truncate text-xs font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                                     <button
                                                         type="button"
                                                         x-data="{ copied: false }"

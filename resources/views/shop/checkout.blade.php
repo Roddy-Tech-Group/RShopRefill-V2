@@ -49,7 +49,7 @@
         // Master kill-switch. When off the buyer sees no Rcoin earn lines and
         // no redemption toggle - the programme is invisible storefront-side.
         'enabled' => (bool) \App\Models\Setting::get('rcoin_enabled', true),
-        'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 1.0),
+        'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 0.5),
         'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
         // Redemption rules - checkout toggle reads these to decide whether to
         // show the "Use Rcoin" switch and how many Rcoin can be applied.
@@ -720,8 +720,13 @@
                     </div>
 
 
-                    {{-- Continue --}}
-                    @auth
+                    {{-- Continue. Guests may pay too while the admin's
+                         features.guest_checkout_enabled toggle is on: the
+                         order runs under a shadow account keyed by the
+                         delivery email, claimed later via the emailed link.
+                         Wallet/Rcoin stay signed-in-only (server-enforced). --}}
+                    @php $guestCheckoutOn = \App\Support\FeatureFlag::on('guest_checkout'); @endphp
+                    @if (auth()->check() || $guestCheckoutOn)
                         <button type="submit" :disabled="!canContinue() || submitting"
                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
                             <template x-if="!submitting">
@@ -739,12 +744,15 @@
                                 </span>
                             </template>
                         </button>
+                        @guest
+                            <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">Checking out as a guest. We will email your order and a link to set up your account.</p>
+                        @endguest
                     @else
                         <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login' })" class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700">
                             Sign in to pay
                         </button>
                         <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">You need an account to complete a purchase.</p>
-                    @endauth
+                    @endif
 
                     <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
                         <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

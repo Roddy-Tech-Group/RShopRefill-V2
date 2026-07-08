@@ -380,15 +380,20 @@
                         <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate.hover class="{{ $subItem(false) }}">
                             All Categories
                         </a>
-                        @foreach ([
-                            ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
-                            ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null],
-                            ['GoMarket',        route('dashboard.shop.gomarket'),        null],
-                            ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
-                            ['Flights',         route('dashboard.shop.flights'),         null],
-                            ['Stays',           route('dashboard.shop.stays'),           null],
-                            ['Topups & Bills',  route('dashboard.shop.topups'),          'topups'],
-                        ] as [$label, $href, $flag])
+                        @php
+                            // Sell Gift Cards + GoMarket are hidden entirely (not
+                            // greyed) until their feature flag is switched on.
+                            $shopSubItems = array_values(array_filter([
+                                ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
+                                \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null] : null,
+                                \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
+                                ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
+                                ['Flights',         route('dashboard.shop.flights'),         null],
+                                ['Stays',           route('dashboard.shop.stays'),           null],
+                                ['Topups & Bills',  route('dashboard.shop.topups'),          'topups'],
+                            ]));
+                        @endphp
+                        @foreach ($shopSubItems as [$label, $href, $flag])
                             @php $catEnabled = $flag === null || \App\Support\FeatureFlag::on($flag); @endphp
                             @if ($catEnabled)
                                 <a href="{{ $href }}" wire:navigate.hover class="{{ $subItem(false) }}">
@@ -1090,41 +1095,11 @@
                         <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
                     </a>
                 </div>
-                <div class="flex items-center gap-2" x-data>
-                    {{-- Language + currency — opens the locale modal so mobile
-                         users can switch country/currency/language without the
-                         desktop top bar. Matches the cart / notification pills. --}}
-                    <button
-                        type="button"
-                        x-data="{ code: (localStorage.getItem('locale.countryCode') || 'US').toLowerCase() }"
-                        @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
-                        x-on:click="$dispatch('open-locale-modal')"
-                        aria-label="Region, language and currency"
-                        class="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors dark:border-zinc-700"
-                    >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
-                    </button>
-
-                    {{-- Cart — links to the cart page with a live count from the
-                         global $store.cart (kept in sync with the shop pages). --}}
-                    <a
-                        href="{{ route('dashboard.shop.cart') }}"
-                        wire:navigate.hover
-                        aria-label="Cart"
-                        class="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors dark:border-zinc-700"
-                    >
-                        <img src="{{ asset('assets/' . rawurlencode('new cart.svg')) }}" alt="" class="h-5 w-5 brightness-0 dark:invert" loading="lazy">
-                        <span
-                            x-show="$store.cart && $store.cart.count > 0"
-                            x-text="$store.cart ? $store.cart.count : ''"
-                            x-cloak
-                            class="absolute -top-1 -right-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold leading-none text-blue-700"
-                        ></span>
-                    </a>
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 dark:border-zinc-700">
-                        <livewire:notifications-menu tone="dark" wire:key="overview-header-notif" />
-                    </div>
-                </div>
+                {{-- The locale / cart / notification chips moved to the ALWAYS
+                     pinned floating row (see the mobile top chrome below), so
+                     the hero no longer renders its own copy. This spacer keeps
+                     the identity strip clear of the fixed pills above it. --}}
+                <span class="h-10 w-[8.5rem] shrink-0" aria-hidden="true"></span>
             </div>
 
             {{-- Wallet card slot - sits directly under the compact identity strip
@@ -1288,22 +1263,36 @@
                 </div>
             </div>
             @else
-            {{-- Back button (task/inner pages) - a STICKY top-left affordance (these
-                 pages dropped the top chrome). No strip background - just the button
-                 chip, pinned as the page scrolls; goes back, falling back to the overview. --}}
-            <div class="sticky top-0 z-30 w-fit px-3 py-2.5 lg:hidden">
+            {{-- Back button (task/inner pages) - a FIXED top-left affordance (these
+                 pages dropped the top chrome). Fixed instead of sticky: sticky sat
+                 inside ancestors the pull-to-refresh transform moves, which made
+                 it bounce with overscroll; fixed pins to the viewport and never
+                 shakes. Goes back when the history can, else lands on the overview
+                 (Navigation API where supported, history.length elsewhere). --}}
+            <div class="fixed z-[55] px-3 py-2.5 lg:hidden" style="top: max(0.25rem, env(safe-area-inset-top));">
                 <button
                     type="button"
                     x-data
-                    @click="window.history.length > 1 ? window.history.back() : (window.location.href = '{{ route('dashboard') }}')"
+                    @click="
+                        const fallback = '{{ route('dashboard') }}';
+                        const nav = window.navigation;
+                        if (nav && 'canGoBack' in nav) {
+                            nav.canGoBack ? window.history.back() : window.location.assign(fallback);
+                        } else {
+                            window.history.length > 1 ? window.history.back() : window.location.assign(fallback);
+                        }
+                    "
                     aria-label="Go back"
-                    class="flex h-11 w-11 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 text-zinc-900 transition-transform active:scale-95 dark:border-white/10 dark:text-zinc-200"
+                    style="touch-action: manipulation;"
+                    class="flex h-11 w-11 select-none items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 text-zinc-900 shadow-sm transition-transform active:scale-95 dark:border-white/10 dark:text-zinc-200"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                     </svg>
                 </button>
             </div>
+            {{-- Spacer holding the room the button used to occupy in flow. --}}
+            <div class="h-16 lg:hidden" aria-hidden="true"></div>
             @endif
         @endif
 
@@ -1313,27 +1302,29 @@
             {{-- header. Overview + shop pages only; hidden elsewhere.     --}}
             {{-- ─────────────────────────────────────────────────────── --}}
             @if ($showMobileTopChrome)
+            {{-- ALWAYS pinned - no scroll-triggered show/hide, so the pills can
+                 never flicker or shake. The hero strip no longer carries its own
+                 copy of these chips (this row IS the chips). Only the hamburger
+                 waits for scroll, since at the top it would sit over the avatar. --}}
             <div
                 x-data="{
                     scrolled: false,
                     country: 'United States',
                     countryCode: 'US',
                     language: 'English',
-                    onScroll() { this.scrolled = window.scrollY > 80; },
+                    // Hysteresis for the hamburger only: appears past 96px, leaves
+                    // under 40px, so boundary jitter can't toggle it repeatedly.
+                    onScroll() {
+                        const y = window.scrollY;
+                        if (! this.scrolled && y > 96) { this.scrolled = true; }
+                        else if (this.scrolled && y < 40) { this.scrolled = false; }
+                    },
                     init() {
                         this.onScroll();
                         window.addEventListener('scroll', () => this.onScroll(), { passive: true });
                     },
                 }"
                 @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode; language = $event.detail.language"
-                x-show="scrolled"
-                x-cloak
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 -translate-y-2"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 -translate-y-2"
                 class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-between gap-2 px-3 lg:hidden"
                 style="top: max(0.5rem, env(safe-area-inset-top));"
             >
@@ -1341,12 +1332,22 @@
                      through (works on light + dark surfaces). --}}
                 <button
                     type="button"
+                    x-show="scrolled"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
                     @click="$dispatch('open-connect-panel')"
                     aria-label="Connect with us"
                     class="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
                 >
                     <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
                 </button>
+                {{-- Keeps justify-between spacing when the hamburger is hidden. --}}
+                <span class="h-11 w-11 shrink-0" x-show="! scrolled" aria-hidden="true"></span>
 
                 {{-- Locale + cart + notification chips (right) - same glass treatment, pinned. --}}
                 <div class="pointer-events-auto flex items-center gap-2" x-data>

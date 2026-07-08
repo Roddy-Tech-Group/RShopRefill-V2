@@ -16,9 +16,13 @@ use App\Http\Resources\PaymentSessionResource;
 use App\Models\Order;
 use App\Models\PaymentSession;
 use App\Models\Setting;
+use App\Models\User;
 use App\Support\FeatureFlag;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -59,12 +63,39 @@ class CheckoutController extends Controller
         ]);
 
         $user = $request->user();
-        abort_unless($user, 403);
+        $isGuestCheckout = false;
+
+        // Guest checkout (features.guest_checkout_enabled, default ON): the
+        // order runs through the exact same pipeline under a shadow account
+        // keyed by the delivery email. The guest claims the account later via
+        // the emailed link (password + transaction PIN).
+        if (! $user) {
+            abort_unless(FeatureFlag::on('guest_checkout'), 403, 'Please sign in to complete checkout.');
+
+            $this->ensureGuestCheckoutRateLimits($request, $data['delivery_email']);
+
+            // Wallet and Rcoin belong to signed-in accounts: a guest keying in
+            // a registered customer's email must never spend that account's
+            // balance or points.
+            if ($data['payment_method'] === 'wallet' || $request->boolean('apply_rcoin') || $request->input('apply_rcoin') === 'full') {
+                $msg = 'Sign in to pay with your wallet or Rcoin.';
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json(['message' => $msg], 422);
+                }
+
+                return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
+            }
+
+            $user = $this->resolveGuestUser($data['delivery_email']);
+            $isGuestCheckout = true;
+        }
 
         // Optional hard-gate: when the compliance toggle is ON, the buyer must
         // have a verified email address before they can pay. Soft by default
         // so the storefront stays browseable without verification friction.
-        if (Setting::get('require_email_verified_for_checkout', false) && ! $user->hasVerifiedEmail()) {
+        // Guest shadow accounts are exempt: their inbox is proven later by the
+        // claim link, and the fulfilled email goes to that same inbox anyway.
+        if (! $isGuestCheckout && Setting::get('require_email_verified_for_checkout', false) && ! $user->hasVerifiedEmail()) {
             $msg = 'Please verify your email address before completing checkout. Check your inbox for the verification link.';
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['message' => $msg, 'redirect' => route('verification.notice')], 403);
@@ -73,10 +104,15 @@ class CheckoutController extends Controller
             return redirect()->route('verification.notice')->with('checkout_status', $msg);
         }
 
-        $cart = $this->cartManager->resolveCart($user->id);
-        $cart->load('items.product', 'items.variant');
+        // Guests keep their cart under the guest_token cookie; the shadow user
+        // was only just created, so resolving by user id would mint an empty cart.
+        $guestToken = $request->cookie('guest_token') ?? $request->header('X-Guest-Token');
+        $cart = $isGuestCheckout && $guestToken
+            ? $this->cartManager->resolveCart(null, $guestToken)
+            : ($isGuestCheckout ? null : $this->cartManager->resolveCart($user->id));
+        $cart?->load('items.product', 'items.variant');
 
-        if ($cart->items->isEmpty()) {
+        if (! $cart || $cart->items->isEmpty()) {
             return redirect($this->shopRoute($request, 'checkout'))
                 ->with('checkout_status', 'Your cart is empty.');
         }
@@ -152,9 +188,15 @@ class CheckoutController extends Controller
 
             $fraudService->recordCheckout($user, $request->ip());
 
-            // Order placed — the cart is converted, so drop the ephemeral
+            // Order placed - the cart is converted, so drop the ephemeral
             // "Buy now" tag too (its item ids are now stale).
             $request->session()->forget('cart.buy_now_items');
+
+            // The confirmation page is user-scoped; grant this browser session
+            // access to its own guest orders (the guest has no login yet).
+            if ($isGuestCheckout) {
+                $request->session()->push('guest_order_numbers', $order->order_number);
+            }
         } catch (InvalidCouponException $e) {
             // Coupon error - surface the customer-safe message verbatim so the
             // buyer sees "That coupon code is not valid" instead of a generic
@@ -202,14 +244,77 @@ class CheckoutController extends Controller
     }
 
     /**
+     * Scope an order lookup to its rightful viewer: the owning user when
+     * signed in, or - for guest checkout - an order number this browser
+     * session placed. Order numbers can never be enumerated by others.
+     */
+    private function orderScopedToViewer(Request $request, string $orderNumber)
+    {
+        $query = Order::query()->where('order_number', $orderNumber);
+
+        if ($request->user()) {
+            return $query->where('user_id', $request->user()->id);
+        }
+
+        abort_unless(
+            in_array($orderNumber, $request->session()->get('guest_order_numbers', []), true),
+            404,
+        );
+
+        return $query;
+    }
+
+    /**
+     * Find or create the shadow account a guest order is placed under. An
+     * email that already belongs to a registered customer attaches the order
+     * to that account (the fulfilled email goes to the same inbox either
+     * way); a fresh email gets an unclaimed guest account with a random
+     * password, converted to a real account via the emailed claim link.
+     */
+    private function resolveGuestUser(string $email): User
+    {
+        $existing = User::where('email', $email)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        return User::create([
+            'name' => Str::ucfirst(Str::before($email, '@')) ?: 'Guest',
+            'email' => $email,
+            'password' => Hash::make(Str::random(40)),
+            'is_guest' => true,
+        ]);
+    }
+
+    /**
+     * Guest checkout abuse guard: per-IP and per-email attempt caps (the
+     * route's throttle:10,1 still applies on top). Signed-in checkout is
+     * untouched - it already has fraud detection keyed to the account.
+     */
+    private function ensureGuestCheckoutRateLimits(Request $request, string $email): void
+    {
+        $limits = [
+            'guest-checkout:ip:'.$request->ip() => 8,
+            'guest-checkout:email:'.strtolower($email) => 4,
+        ];
+
+        foreach ($limits as $key => $maxAttempts) {
+            abort_if(
+                RateLimiter::tooManyAttempts($key, $maxAttempts),
+                429,
+                'Too many checkout attempts. Please try again in a few minutes.',
+            );
+            RateLimiter::hit($key, 600); // 10-minute window
+        }
+    }
+
+    /**
      * Order confirmation page. Scoped to the owning user so order numbers
      * can't be enumerated by other customers.
      */
     public function order(Request $request, string $orderNumber)
     {
-        $order = Order::query()
-            ->where('order_number', $orderNumber)
-            ->where('user_id', $request->user()?->id)
+        $order = $this->orderScopedToViewer($request, $orderNumber)
             ->with(['items', 'paymentAttempts.paymentSession'])
             ->firstOrFail();
 
@@ -223,10 +328,7 @@ class CheckoutController extends Controller
      */
     public function orderStatus(Request $request, string $orderNumber)
     {
-        $order = Order::query()
-            ->where('order_number', $orderNumber)
-            ->where('user_id', $request->user()?->id)
-            ->firstOrFail();
+        $order = $this->orderScopedToViewer($request, $orderNumber)->firstOrFail();
 
         return response()->json([
             'order_status' => $order->order_status?->value,

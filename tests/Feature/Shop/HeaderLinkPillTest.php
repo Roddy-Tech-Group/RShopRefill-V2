@@ -17,7 +17,9 @@ class HeaderLinkPillTest extends TestCase
         $html = Blade::render('<x-home.brand-row title="Cards" view-all-href="/all"><li>card</li></x-home.brand-row>');
 
         $this->assertStringContainsString('See all', $html);
-        $this->assertStringContainsString('rounded-[8px] bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-600', $html);
+        // Restyled to the storefront reviews-header control: white rounded-[12px]
+        // pill with a zinc ring (the old small blue chip is retired).
+        $this->assertStringContainsString('rounded-[12px] bg-white px-4 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200', $html);
     }
 
     public function test_dashboard_view_all_links_are_smaller_pills(): void

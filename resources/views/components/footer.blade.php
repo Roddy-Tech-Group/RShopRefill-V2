@@ -67,6 +67,34 @@
                     </a>
                 </div>
 
+                {{-- App badges - the store listings are coming soon, so both
+                     pills route to the Web App page (the installable PWA) in
+                     the meantime. Point each href at the real store URL once
+                     the listings go live. --}}
+                <div class="mt-8">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Get the app</p>
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                        <a href="{{ route('shop.mobile-app') }}" wire:navigate title="Coming soon - use our Web App today" class="inline-flex h-12 select-none items-center gap-2.5 rounded-[10px] bg-zinc-900 px-4 text-white ring-1 ring-transparent transition-colors hover:bg-zinc-800 dark:ring-white/15">
+                            <svg class="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                            </svg>
+                            <span class="flex flex-col text-left leading-none">
+                                <span class="text-[10px] font-medium uppercase tracking-wide text-white/70">Coming soon on</span>
+                                <span class="mt-0.5 text-sm font-bold">App Store</span>
+                            </span>
+                        </a>
+                        <a href="{{ route('shop.mobile-app') }}" wire:navigate title="Coming soon - use our Web App today" class="inline-flex h-12 select-none items-center gap-2.5 rounded-[10px] bg-zinc-900 px-4 text-white ring-1 ring-transparent transition-colors hover:bg-zinc-800 dark:ring-white/15">
+                            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M3.61 1.81c-.37.23-.61.65-.61 1.16v18.06c0 .51.24.93.61 1.16l10.02-10.19L3.61 1.81zm11.5 8.7L6.05 1.35l11.32 6.52-2.26 2.64zm-2.26 5.62 2.26 2.64L3.79 25.24l9.06-9.11zm5.62-4.6-2.42-1.4-2.48 2.87 2.48 2.87 2.42-1.4c1.04-.6 1.04-2.34 0-2.94z"/>
+                            </svg>
+                            <span class="flex flex-col text-left leading-none">
+                                <span class="text-[10px] font-medium uppercase tracking-wide text-white/70">Coming soon on</span>
+                                <span class="mt-0.5 text-sm font-bold">Google Play</span>
+                            </span>
+                        </a>
+                    </div>
+                </div>
+
                 {{-- Newsletter signup --}}
                 <div class="mt-8">
                     <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Newsletter</p>

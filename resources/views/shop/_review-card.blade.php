@@ -26,7 +26,11 @@
     $empty    = 5 - $full - ($hasHalf ? 1 : 0);
 @endphp
 
-<article class="flex w-72! shrink-0 flex-col rounded-[14px] dash-shimmer border border-zinc-200 bg-transparent p-5 transition-colors hover:border-green-200 sm:w-80! dark:border-white dark:hover:border-white">
+<article
+    x-data="{ expanded: false, clamped: false }"
+    x-init="$nextTick(() => { clamped = $refs.reviewBody.scrollHeight > $refs.reviewBody.clientHeight + 1; })"
+    class="flex w-72! shrink-0 flex-col rounded-[14px] dash-shimmer border border-zinc-200 bg-transparent p-5 transition-colors hover:border-green-200 sm:w-80! dark:border-white dark:hover:border-white"
+>
 
     <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-3">
@@ -130,5 +134,24 @@
         </div>
     </div>
 
-    <p class="mt-4 line-clamp-5 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{{ $review->body }}</p>
+    {{-- Body clamps at 5 lines; "See more" unclamps it inline. The clamp is
+         released via inline style (not a class swap) so the server-rendered
+         line-clamp-5 never flashes unclamped while Alpine boots. --}}
+    <p
+        x-ref="reviewBody"
+        :style="expanded ? '-webkit-line-clamp: unset;' : ''"
+        class="mt-4 line-clamp-5 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
+    >{{ $review->body }}</p>
+
+    {{-- Only shown when the text is actually cut off. --}}
+    <button
+        x-cloak
+        x-show="clamped || expanded"
+        type="button"
+        @click="expanded = ! expanded"
+        :aria-expanded="expanded.toString()"
+        class="mt-2 self-start text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+    >
+        <span x-text="expanded ? 'See less' : 'See more'">See more</span>
+    </button>
 </article>

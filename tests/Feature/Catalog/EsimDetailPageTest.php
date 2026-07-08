@@ -293,15 +293,15 @@ class EsimDetailPageTest extends TestCase
         $this->esimRegion();
 
         // The plan-selection buy bar now slides in from the top of the viewport
-        // (fixed inset-x-0 top-3), so it sits clear of the dashboard's bottom
-        // mobile tab bar entirely. The storefront uses the same top toast.
+        // (fixed, offset just below the live nav height), so it sits clear of
+        // the nav and the dashboard's bottom tab bar. Storefront shares it.
         $this->actingAs(User::factory()->create())
             ->get(route('dashboard.shop.esim', 'united-states-data-esim'))
             ->assertOk()
-            ->assertSee('fixed inset-x-0 top-3', false);
+            ->assertSee('fixed inset-x-0 z-[100]', false);
 
         $this->get(route('shop.esim', 'united-states-data-esim'))
             ->assertOk()
-            ->assertSee('fixed inset-x-0 top-3', false);
+            ->assertSee('fixed inset-x-0 z-[100]', false);
     }
 }

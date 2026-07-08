@@ -252,6 +252,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Content (CMS) - stub Volt pages that list what's in the DB today.
         // CRUD UI lands in a follow-up; for now editors confirm data is wired.
         Route::prefix('content')->name('content.')->group(function () {
+            Volt::route('hero-sections', 'admin.content.hero-sections')->name('hero-sections');
+            Volt::route('hero-cards', 'admin.content.hero-cards')->name('hero-cards');
             Volt::route('blog', 'admin.content.blog')->name('blog');
             Volt::route('press', 'admin.content.press')->name('press');
             Volt::route('reviews', 'admin.content.reviews')->name('reviews');

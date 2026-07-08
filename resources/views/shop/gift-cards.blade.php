@@ -81,10 +81,24 @@
     } elseif ($sort === 'name-desc') {
         $productsQuery->orderByDesc('name');
     } else {
-        // Default (Popularity): the admin's is_popular / is_featured flags
-        // lead the page - those are set per product on the admin dashboard
-        // and outrank the hand-curated config list, which only breaks ties
-        // among unflagged brands. Alphabetical last.
+        // Default (Popularity): Gaming & Entertainment brands lead the whole
+        // page, then the admin's is_popular / is_featured flags - those are
+        // set per product on the admin dashboard and outrank the hand-curated
+        // config list, which only breaks ties among unflagged brands.
+        // Alphabetical last. Explicit A-Z sorts above skip the gaming boost.
+        $gamingSubId = $giftCardsCategory
+            ? Subcategory::where('category_id', $giftCardsCategory->id)->where('slug', 'gaming-entertainment')->value('id')
+            : null;
+        if ($gamingSubId) {
+            $productsQuery->orderByRaw('CASE WHEN subcategory_id = ? THEN 0 ELSE 1 END', [$gamingSubId]);
+        }
+        // Curated gaming leaders open the page in their exact config order
+        // (Free Fire, PUBG, EA Play, Mobile Legends, Discord Nitro, ...).
+        $gamingLeaders = config('popular_brands.gaming_leaders', []);
+        if (! empty($gamingLeaders)) {
+            $leaderCases = implode(' ', array_map(fn ($i) => "WHEN ? THEN {$i}", array_keys($gamingLeaders)));
+            $productsQuery->orderByRaw("CASE brand_key {$leaderCases} ELSE 99 END", $gamingLeaders);
+        }
         $productsQuery->orderByDesc('is_popular')->orderByDesc('is_featured');
         $popularKeys = config('popular_brands.keys', []);
         if (! empty($popularKeys)) {

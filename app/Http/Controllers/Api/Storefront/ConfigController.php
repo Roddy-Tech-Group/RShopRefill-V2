@@ -12,7 +12,7 @@ class ConfigController extends Controller
         return response()->json([
             'rcoin' => [
                 'enabled' => (bool) Setting::get('rcoin_enabled', true),
-                'cashback_percentage' => (float) Setting::get('cashback_percentage', 1.0),
+                'cashback_percentage' => (float) Setting::get('cashback_percentage', 0.5),
                 'usd_rate' => (float) Setting::rcoinUsdRate(),
                 'redemption' => [
                     'enabled' => (bool) Setting::get('redemption_enabled', true),

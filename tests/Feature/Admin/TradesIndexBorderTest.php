@@ -15,8 +15,11 @@ class TradesIndexBorderTest extends TestCase
     {
         $blade = file_get_contents(resource_path('views/livewire/admin/gift-cards/trades/index.blade.php'));
 
-        // Standard admin-table card + the inner padding the blue header pill needs.
-        $this->assertStringContainsString('rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]', $blade);
+        // Standard admin-table card + the inner padding the blue header pill
+        // needs. The card border is the hero-card ring style (zinc ring in
+        // light, soft white hairline in dark) - the old solid white border
+        // was retired across the admin.
+        $this->assertStringContainsString('rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10', $blade);
         $this->assertStringContainsString('<div class="overflow-x-auto p-3">', $blade);
 
         // The old bare wrapper that let the header pill sit flush is gone.

@@ -46,7 +46,8 @@ class SendAsynchronousNotificationJob implements ShouldQueue
         private readonly NotificationPriority $priority = NotificationPriority::Normal,
         private readonly array $metadata = [],
         private readonly array $channels = [NotificationChannel::Database, NotificationChannel::Email],
-        private readonly ?string $idempotencyKey = null
+        private readonly ?string $idempotencyKey = null,
+        private readonly ?string $overrideEmail = null
     ) {
         // Set queue based on priority
         $this->queue = match ($priority) {
@@ -84,7 +85,8 @@ class SendAsynchronousNotificationJob implements ShouldQueue
             priority: $this->priority,
             metadata: array_merge($this->metadata, [
                 'idempotency_key' => $this->idempotencyKey,
-            ])
+            ]),
+            overrideEmail: $this->overrideEmail
         );
 
         // 2. Dispatch to designated channels

@@ -5,6 +5,7 @@ use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Notification\Services\AdminNotificationService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Auth\GuestClaimController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CartWebController;
 use App\Http\Controllers\CheckoutController;
@@ -687,11 +688,26 @@ Route::post('coupon/preview', function (Request $request, CartManager $cartManag
 })->middleware(['not-suspended', 'maintenance-guard', 'throttle:20,1'])->name('coupon.preview');
 
 // Checkout submission - creates the Order + OrderItems + a pending Payment from the
-// cart. Gateway hand-off (Flutterwave / NowPayments / wallet debit) is the TODO inside
-// the controller. Requires auth: an Order needs a user_id.
+// cart. Auth is enforced inside the controller instead of here: guests are
+// allowed through when features.guest_checkout_enabled is on (they order under
+// a shadow account keyed by their delivery email, with per-IP/per-email rate
+// limits on top of this route throttle), and get a 403 asking them to sign in
+// when it is off. The dashboard mirror route keeps its auth middleware.
 Route::post('checkout', [CheckoutController::class, 'process'])
-    ->middleware(['auth', 'not-suspended', 'maintenance-guard', 'throttle:10,1'])
+    ->middleware(['not-suspended', 'maintenance-guard', 'throttle:10,1'])
     ->name('checkout.process');
+
+// Guest account claim. The signed link (7 days) arrives by email after a
+// guest order is fulfilled; the guest sets a password + transaction PIN and
+// the shadow account becomes theirs, guest orders included. `signed`
+// validates the URL signature; the POST uses its own short-lived signature
+// minted by the show() page.
+Route::get('claim-account/{user}', [GuestClaimController::class, 'show'])
+    ->middleware(['guest', 'signed', 'throttle:12,1'])
+    ->name('account.claim');
+Route::post('claim-account/{user}', [GuestClaimController::class, 'store'])
+    ->middleware(['guest', 'signed', 'throttle:8,1'])
+    ->name('account.claim.store');
 
 // Flutterwave hosted-checkout return URL. Customers land here after USSD,
 // Pay With Bank, Bank QR, or Mobile Wallet payments complete (or cancel).
@@ -701,14 +717,16 @@ Route::get('checkout/return/{session}', [CheckoutController::class, 'hostedRetur
     ->middleware('auth')
     ->name('shop.checkout.return');
 
-// Order confirmation page.
+// Order confirmation page. No auth middleware: the controller scopes the
+// lookup to the owning user, or - for guest checkout - to order numbers this
+// browser session placed (anything else 404s, so orders stay un-enumerable).
 Route::get('order/{orderNumber}', [CheckoutController::class, 'order'])
-    ->middleware('auth')
     ->name('shop.order');
 
 // Status probe polled by the order page while fulfillment is in flight.
+// Same viewer scoping as the confirmation page above.
 Route::get('order/{orderNumber}/status.json', [CheckoutController::class, 'orderStatus'])
-    ->middleware('auth')
+    ->middleware('throttle:60,1')
     ->name('shop.order.status');
 
 // Downloadable receipts for the order success view.

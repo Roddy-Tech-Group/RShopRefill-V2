@@ -168,8 +168,22 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-6"
+            {{-- Drops in BELOW the sticky nav, never over/behind it: the offset
+                 tracks the live header height (varies per breakpoint/collapse). --}}
+            x-data="{ navH: 0 }"
+            x-init="
+                const nav = document.querySelector('header.sticky');
+                if (nav) {
+                    const sync = () => navH = Math.round(nav.getBoundingClientRect().height);
+                    sync();
+                    new ResizeObserver(sync).observe(nav);
+                }
+            "
+            {{-- Object syntax: a string :style would REPLACE the whole style
+                 attribute and wipe the display x-show manages. --}}
+            :style="{ top: (navH + 12) + 'px' }"
             style="display:none;"
-            class="fixed inset-x-0 top-3 z-[60] px-3 sm:px-5"
+            class="fixed inset-x-0 z-[100] px-3 sm:px-5"
         >
             <div class="relative mx-auto flex w-full max-w-[640px] flex-wrap items-center gap-3 rounded-[20px] border border-white/40 bg-white/70 px-4 py-3 shadow-[0_14px_44px_-12px_rgba(15,23,42,0.4)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1d3252]/80">
                 <button type="button" @click="selectedId = null" aria-label="Deselect plan" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 dark:bg-[#0c1a36] dark:text-white dark:ring-[#24364f] dark:hover:bg-[#34507a]">

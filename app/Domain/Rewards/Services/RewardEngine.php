@@ -64,7 +64,7 @@ class RewardEngine
             return 0;
         }
 
-        $percentage = (float) Setting::get('cashback_percentage', 1.0);
+        $percentage = (float) Setting::get('cashback_percentage', 0.5);
         if ($percentage <= 0) {
             return 0;
         }
@@ -118,7 +118,7 @@ class RewardEngine
             metadata: [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'cashback_percentage' => (float) Setting::get('cashback_percentage', 1.0),
+                'cashback_percentage' => (float) Setting::get('cashback_percentage', 0.5),
             ]
         );
     }

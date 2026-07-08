@@ -128,7 +128,7 @@
             ['label' => 'Failed',    'value' => (int) $kpis->failed,    'dot' => 'bg-red-500'],
             ['label' => 'Refunded',  'value' => (int) $refundCount,     'dot' => 'bg-blue-500'],
         ] as $stat)
-            <div class="rounded-[12px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+            <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
                 <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                     <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                     {{ $stat['label'] }}
@@ -191,7 +191,7 @@
         .txn-body:hover { border-radius: 10px; }
     </style>
 
-    <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
         <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill --}}

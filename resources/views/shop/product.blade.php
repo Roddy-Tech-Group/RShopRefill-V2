@@ -359,6 +359,9 @@
         }
     }
 
+    // The on-page review carousel is the shared x-shop.brand-reviews
+    // component (it fetches its own reviews and self-guards when empty).
+
     $productJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'Product',
@@ -463,7 +466,7 @@
             requiresAccountId: @js($isBill),
             rcoinConfig: @js([
                 'enabled' => (bool) \App\Models\Setting::get('rcoin_enabled', true),
-                'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 1.0),
+                'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 0.5),
                 'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
             ]),
             purchasable: @js($productBuyable),
@@ -512,7 +515,7 @@
                         <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ number_format($brandReviewAgg['rating'], 1) }} out of 5 from {{ $brandReviewAgg['count'] }} {{ str('review')->plural($brandReviewAgg['count']) }}">
                             <span class="flex items-center gap-0.5">
                                 @for ($i = 1; $i <= 5; $i++)
-                                    <svg class="h-4 w-4 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-amber-400' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <svg class="h-4 w-4 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                                     </svg>
                                 @endfor
@@ -553,7 +556,10 @@
                         ['label' => 'Fair refund policy', 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ];
                 @endphp
-                <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto text-sm font-medium text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible dark:text-zinc-200">
+                {{-- py-1 stops the overflow-x container clipping the badge
+                     circles' ring at the top and bottom on mobile (sm+ is
+                     overflow-visible so it needs none). --}}
+                <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto py-1 text-sm font-medium text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:py-0 dark:text-zinc-200">
                     @foreach ($badges as $badge)
                         <span class="flex shrink-0 items-center gap-2">
                             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
@@ -1235,6 +1241,15 @@
                     @endforeach
                 </div>
             </section>
+        @endif
+
+        {{-- Customer reviews for THIS gift card - shared per-brand carousel
+             (also shown on the order confirmation page). Self-guarding:
+             renders nothing when the brand has no approved reviews. --}}
+        @if ($isGiftCard)
+            <div class="mt-12">
+                <x-shop.brand-reviews :brand-key="$brandKey" :brand-name="$brandName" />
+            </div>
         @endif
 
         {{-- Long-form, data-driven brand copy. Everything here is derived from

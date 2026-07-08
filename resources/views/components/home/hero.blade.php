@@ -1,7 +1,14 @@
 {{--
     Storefront hero. Light theme. Centered headline + CTAs + announcement
     banner, sitting over a static blue dotted backdrop.
+
+    When the admin uploads media to the built-in hero (admin > Content >
+    Hero Sections), $mediaPath/$mediaType replace the dotted backdrop with a
+    full-bleed image or video under a light scrim; everything else stays the
+    designed original.
 --}}
+@props(['mediaPath' => null, 'mediaType' => null])
+
 <section class="relative w-full overflow-hidden">
 
     {{-- Static dotted backdrop. Pure CSS, no JS: a single element paints the
@@ -36,7 +43,17 @@
            the hero now shows the dotted backdrop with no gradient over it. */
     </style>
 
-    <div class="roddy-dots-bg" aria-hidden="true"></div>
+    @if ($mediaPath)
+        @if ($mediaType === 'video')
+            <video src="{{ asset('assets/'.$mediaPath) }}" class="absolute inset-0 h-full w-full object-cover" autoplay muted loop playsinline aria-hidden="true"></video>
+        @else
+            <img src="{{ asset('assets/'.$mediaPath) }}" alt="" class="absolute inset-0 h-full w-full object-cover">
+        @endif
+        {{-- Light scrim so the dark headline stays readable over any footage --}}
+        <div class="absolute inset-0 bg-white/60" aria-hidden="true"></div>
+    @else
+        <div class="roddy-dots-bg" aria-hidden="true"></div>
+    @endif
 
     {{-- Content over the dots (constrained to 1200px, dots stay full-width) --}}
     <div class="relative z-10 mx-auto max-w-[1200px] px-3 pt-10 pb-14 text-center sm:px-10 sm:pt-20 sm:pb-24 lg:px-14 lg:pt-24 lg:pb-32">

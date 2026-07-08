@@ -41,16 +41,36 @@
              review card needs to align to in setup(). --}}
         <div x-ref="header" class="mb-4 flex items-center justify-between gap-4">
             <h2 class="text-lg font-bold text-zinc-900 sm:text-xl">What our customers say</h2>
-            <button
-                type="button"
-                @click="next()"
-                aria-label="Show more reviews"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-            >
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M9 6l6 6-6 6"/>
-                </svg>
-            </button>
+            <div class="flex shrink-0 items-center gap-2">
+                {{-- See more: takes the visitor to the full reviews page. --}}
+                <a
+                    href="{{ route('shop.reviews') }}"
+                    wire:navigate
+                    class="flex h-10 items-center rounded-[12px] bg-white px-4 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                >
+                    See more
+                </a>
+                <button
+                    type="button"
+                    @click="prev()"
+                    aria-label="Show previous reviews"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                >
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M15 6l-6 6 6 6"/>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    @click="next()"
+                    aria-label="Show more reviews"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                >
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 6l6 6-6 6"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 

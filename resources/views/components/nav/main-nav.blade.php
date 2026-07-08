@@ -677,17 +677,22 @@
                 </span>
                 @endif
 
-                {{-- Sell Gift Cards (coming soon) --}}
+                {{-- Sell Gift Cards (coming soon) - hidden until its feature
+                     flag is switched on, unlike the greyed-out categories above --}}
+                @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
                 <a href="{{ route('shop.sell-gift-cards') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Sell Gift Cards') }}">
                     <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Sell Gift Cards') }}" loading="lazy">
                     Sell Gift Cards
                 </a>
+                @endif
 
-                {{-- GoMarket (coming soon) --}}
+                {{-- GoMarket (coming soon) - hidden until its feature flag is switched on --}}
+                @if (\App\Support\FeatureFlag::on('gomarket', false))
                 <a href="{{ route('shop.gomarket') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('GoMarket') }}">
                     <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('GoMarket') }}" loading="lazy">
                     GoMarket
                 </a>
+                @endif
 
                 {{-- eSIMs --}}
                 @if (\App\Support\FeatureFlag::on('esims'))

@@ -111,37 +111,60 @@
 @endphp
 <x-emails.layout :mail-message="$message ?? null" :title="$emailTitle" :preheader="$emailPreheader">
 
-    <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">{{ $emailTitle }}, {{ $name }}.</h1>
+    {{-- Gift deliveries land in the recipient's inbox, so the greeting names
+         the buyer as the sender instead of addressing the reader by the
+         buyer's name. --}}
+    @if ($isGift ?? false)
+        <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">{{ $emailTitle }}.</h1>
+
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;"><strong>{{ $name }}</strong> sent you this as a gift. Everything you need to use it is below, keep this email somewhere safe.</p>
+    @else
+        <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">{{ $emailTitle }}, {{ $name }}.</h1>
+    @endif
 
     @if ($esim)
-        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Your eSIM for order <strong>#{{ $orderNumber }}</strong> has been delivered. Scan the QR code or use the manual details below to install it, and keep this email somewhere safe.</p>
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">{{ ($isGift ?? false) ? 'The' : 'Your' }} eSIM for order <strong>#{{ $orderNumber }}</strong> has been delivered. Scan the QR code or use the manual details below to install it, and keep this email somewhere safe.</p>
     @elseif ($isTopup)
-        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Your {{ strtolower($topupType) }} for order <strong>#{{ $orderNumber }}</strong> has been sent{{ $topupPhone ? ' to '.$topupPhone : ' to the recipient line' }}. It is credited directly to the phone - there is no code to redeem.</p>
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">{{ ($isGift ?? false) ? 'The' : 'Your' }} {{ strtolower($topupType) }} for order <strong>#{{ $orderNumber }}</strong> has been sent{{ $topupPhone ? ' to '.$topupPhone : ' to the recipient line' }}. It is credited directly to the phone - there is no code to redeem.</p>
     @else
-        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Your purchase for order <strong>#{{ $orderNumber }}</strong> has been delivered. Your card and redemption details are below, keep this email somewhere safe.</p>
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">{{ ($isGift ?? false) ? 'The' : 'Your' }} purchase for order <strong>#{{ $orderNumber }}</strong> has been delivered. {{ ($isGift ?? false) ? 'The' : 'Your' }} card and redemption details are below, keep this email somewhere safe.</p>
     @endif
 
     {{-- Product visual - mirrors the dashboard order card so it looks identical
          to what the customer sees in their account (resellers screenshot this). --}}
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" align="center" style="width:100%; max-width:320px; margin:8px auto 0; background:#f4f4f5; border:1px solid #e4e4e7; border-radius:12px;">
+    @php
+        // The card wears the brand's own colour (mirrors the dashboard card);
+        // text flips to white on dark brands. No colour = the neutral grey.
+        $brandBg = \App\Models\Product::brandColor($brandKey, $snap['brand_color'] ?? null);
+        $brandDark = \App\Models\Product::colorIsDark($brandBg);
+        $cardBg = $brandBg ?: '#f4f4f5';
+        // Light brand colours keep the grey border so the card edge still
+        // reads on the white email body; dark brands merge border into fill.
+        $cardBorder = $brandDark ? $brandBg : '#e4e4e7';
+        $cardInk = $brandDark ? '#ffffff' : '#18181b';
+        $cardSub = $brandDark ? 'rgba(255,255,255,0.78)' : '#52525b';
+    @endphp
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" align="center" style="width:100%; max-width:320px; margin:8px auto 0; background:{{ $cardBg }}; border:1px solid {{ $cardBorder }}; border-radius:12px;">
         <tr>
             <td style="padding:14px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                         <td valign="top" style="font-family:'Inter',-apple-system,Helvetica,Arial,sans-serif;">
                             @if ($logo)
-                                <img src="{{ $logo }}" alt="{{ $brandName }}" height="36" style="height:36px; width:auto; max-width:110px; display:block;">
+                                <img src="{{ $logo }}" alt="{{ $brandName }}" height="36" style="height:36px; width:auto; max-width:110px; display:block; border-radius:5px;">
                             @else
-                                <span style="font-size:18px; font-weight:800; text-transform:uppercase; color:#a1a1aa;">{{ strtoupper(substr($brandName, 0, 2)) }}</span>
+                                <span style="font-size:18px; font-weight:800; text-transform:uppercase; color:{{ $brandDark ? 'rgba(255,255,255,0.7)' : '#a1a1aa' }};">{{ strtoupper(substr($brandName, 0, 2)) }}</span>
                             @endif
-                            <p style="margin:8px 0 0; font-size:12px; font-weight:700; color:#18181b;">For {{ $brandName }}</p>
+                            @unless ($logo && \App\Models\Product::logoCarriesName($brandKey))
+                                <p style="margin:8px 0 0; font-size:12px; font-weight:700; color:{{ $cardInk }};">For {{ $brandName }}</p>
+                            @endunless
                         </td>
                         <td valign="top" align="right" style="font-family:'Inter',-apple-system,Helvetica,Arial,sans-serif;">
                             @if ($faceTxt)
-                                <p style="margin:0; font-size:18px; font-weight:800; line-height:1; color:#18181b;">{{ $faceTxt }}</p>
+                                <p style="margin:0; font-size:16px; font-weight:800; line-height:1; color:{{ $cardInk }};">{{ $faceTxt }}</p>
                             @endif
                             @if ($country)
-                                <p style="margin:5px 0 0; font-size:11px; color:#52525b;">
+                                <p style="margin:5px 0 0; font-size:11px; color:{{ $cardSub }};">
                                     @if ($flag)<img src="{{ $flag }}" alt="" width="16" height="11" style="width:16px; height:11px; vertical-align:middle; border-radius:1px;">&nbsp;@endif{{ $country }}
                                 </p>
                             @endif

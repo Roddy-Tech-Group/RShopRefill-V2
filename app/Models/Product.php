@@ -77,6 +77,37 @@ class Product extends Model
     }
 
     /**
+     * Whether this brand's logo art already carries the brand name (so the
+     * delivered-card caption under it would just repeat it).
+     */
+    public static function logoCarriesName(?string $brandKey): bool
+    {
+        return $brandKey !== null
+            && in_array($brandKey, config('brand_colors.logo_includes_name', []), true);
+    }
+
+    /**
+     * Whether a hex colour is dark enough to need white foreground text.
+     * Accepts #rgb and #rrggbb; anything unparsable counts as light so the
+     * caller falls back to its default dark-on-light styling.
+     */
+    public static function colorIsDark(?string $hex): bool
+    {
+        $hex = ltrim((string) $hex, '#');
+        if (strlen($hex) === 3) {
+            $hex = preg_replace('/(.)/', '$1$1', $hex);
+        }
+        if (strlen($hex) !== 6 || ! ctype_xdigit($hex)) {
+            return false;
+        }
+
+        [$r, $g, $b] = [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+
+        // Perceived luminance (ITU-R BT.601); < 150 reads as a dark surface.
+        return (0.299 * $r + 0.587 * $g + 0.114 * $b) < 150;
+    }
+
+    /**
      * Deterministic solid tile colour for a brand/operator that has no logo,
      * derived from its key so the same brand always renders the same colour.
      * Used as a branded fallback — mobile-airtime operators carry no logo, so

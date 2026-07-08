@@ -145,7 +145,7 @@ class extends Component {
     {{-- Master kill-switch is rendered standalone at the top because it's
          the most impactful setting on the page. --}}
     @php $masterRow = ['key' => 'rcoin_enabled', 'label' => 'Rcoin engine', 'help' => 'When OFF no rewards are awarded, no redemptions accepted, no referrals counted. Storefront copy (the "earn X Rcoin" lines, the redeem toggle and the marketing page) auto-hides too. Existing balances stay spendable from the Rewards dashboard.']; @endphp
-    <section class="mb-6 flex items-start justify-between gap-4 rounded-[12px] border-[1.5px] border-white bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-2 ring-blue-500 dark:border-white dark:bg-[#1d3252] dark:ring-blue-400">
+    <section class="mb-6 flex items-start justify-between gap-4 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-2 ring-blue-500 dark:bg-[#1d3252] dark:ring-blue-400">
         <div>
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">{{ $masterRow['label'] }}</h2>
             <p class="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{{ $masterRow['help'] }}</p>
@@ -158,7 +158,7 @@ class extends Component {
 
     @foreach ($this->groups() as $groupName => $rows)
         @if ($groupName === 'General') @continue @endif {{-- General's only field (rcoin_enabled) is the master switch above. --}}
-        <section class="mb-5 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <section class="mb-5 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
             {{-- Header pill --}}
             <header class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $groupName }}</h2>

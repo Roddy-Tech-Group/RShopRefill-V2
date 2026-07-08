@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Shop;
 
+use App\Models\SiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -9,6 +10,10 @@ use Tests\TestCase;
  * The gift-cards category tab was renamed "Buy Gift Cards" and two new coming-soon
  * destinations, "Sell Gift Cards" and "GoMarket", were added after it across the
  * storefront category nav. Both new pages reuse the shared shop.coming-soon view.
+ *
+ * Both categories are hidden storefront-wide while their feature flags
+ * (features.sell_gift_cards_enabled / features.gomarket_enabled) are off,
+ * which is how they are seeded. The coming-soon pages stay reachable by URL.
  */
 class CategoryNavBuySellGoMarketTest extends TestCase
 {
@@ -41,9 +46,25 @@ class CategoryNavBuySellGoMarketTest extends TestCase
             ->assertDontSee('Book flights');
     }
 
-    public function test_home_category_nav_shows_buy_sell_and_gomarket_in_order(): void
+    public function test_sell_and_gomarket_are_hidden_from_the_storefront_by_default(): void
     {
         $this->withoutVite();
+
+        // Their feature flags are seeded OFF, so neither appears in the nav,
+        // homepage tiles, or anywhere else on the page.
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Buy Gift Cards')
+            ->assertDontSee('Sell Gift Cards')
+            ->assertDontSee('GoMarket');
+    }
+
+    public function test_home_category_nav_shows_buy_sell_and_gomarket_in_order_when_enabled(): void
+    {
+        $this->withoutVite();
+
+        SiteSetting::put('features.sell_gift_cards_enabled', 'on', 'features');
+        SiteSetting::put('features.gomarket_enabled', 'on', 'features');
 
         $html = $this->get(route('home'))
             ->assertOk()

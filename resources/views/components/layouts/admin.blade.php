@@ -540,6 +540,8 @@
                                 ? 'block rounded-[12px] bg-zinc-200 px-3 py-2 text-xs font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
                                 : 'block rounded-[12px] px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
                         @endphp
+                        <a href="{{ route('admin.content.hero-sections') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.hero-sections')) }}">Hero Sections</a>
+                        <a href="{{ route('admin.content.hero-cards') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.hero-cards')) }}">Hero Cards</a>
                         <a href="{{ route('admin.content.blog') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.blog')) }}">Blog Posts</a>
                         <a href="{{ route('admin.content.press') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.press')) }}">Press Articles</a>
                         <a href="{{ route('admin.content.reviews') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.reviews')) }}">Reviews</a>
@@ -945,20 +947,45 @@
         {{-- Mobile menu popup. Triggered by the mobile hamburger via 'open-mobile-menu' window event.
              Card grid of admin nav items instead of the Flux sidebar drawer. lg:hidden so it never shows on desktop. --}}
         @php
-            $adminMenuItems = [
-                ['label' => 'Home',         'href' => route('admin.dashboard'),     'icon' => 'Home.svg',           'tone' => 'bg-blue-500'],
-                ['label' => 'Products',     'href' => route('admin.products'),      'icon' => 'Shop.svg',           'tone' => 'bg-pink-500'],
-                ['label' => 'Orders',       'href' => route('admin.orders'),        'icon' => 'order.svg',          'tone' => 'bg-sky-500'],
-                ['label' => 'Customers',    'href' => route('admin.customers'),     'icon' => 'customer.svg',       'tone' => 'bg-emerald-500'],
-                ['label' => 'Transactions', 'href' => route('admin.transactions'),  'icon' => 'transactions.svg',   'tone' => 'bg-teal-500'],
-                ['label' => 'Wallets',      'href' => route('admin.wallets'),       'icon' => 'Wallet.svg',         'tone' => 'bg-indigo-500'],
-                ['label' => 'Reports',      'href' => route('admin.reports'),         'icon' => 'report.svg',         'tone' => 'bg-violet-500'],
-                ['label' => 'Newsletter',   'href' => route('admin.newsletter'),      'icon' => 'marketing.svg',      'tone' => 'bg-fuchsia-500'],
-                ['label' => 'Support',      'href' => route('admin.support-tickets'), 'icon' => 'support.svg',        'tone' => 'bg-amber-500'],
-                ['label' => 'Admins',       'href' => route('admin.admins'),          'icon' => 'admin access.svg',   'tone' => 'bg-rose-500'],
-                ['label' => 'Rates',        'href' => route('admin.rates'),           'icon' => 'transactions.svg',   'tone' => 'bg-orange-500'],
-                ['label' => 'Settings',     'href' => route('admin.settings'),        'icon' => 'system setting.svg', 'tone' => 'bg-cyan-500'],
-            ];
+            // Every sidebar destination, in sidebar order, filtered by the
+            // SAME $can() the sidebar uses so the mobile menu never shows a
+            // page the signed-in admin cannot open. Content sub-pages get
+            // their own tiles since the sheet has no expandable groups.
+            $adminMenuItems = collect([
+                ['label' => 'Home',          'route' => 'admin.dashboard',               'icon' => 'Home.svg',                    'tone' => 'bg-blue-500'],
+                ['label' => 'Products',      'route' => 'admin.products',                'icon' => 'Shop.svg',                    'tone' => 'bg-pink-500'],
+                ['label' => 'Trades Queue',  'route' => 'admin.gift-cards.trades.index', 'icon' => 'gift cards.svg',              'tone' => 'bg-lime-600'],
+                ['label' => 'Trade Brands',  'route' => 'admin.gift-cards.brands',       'icon' => 'wide selection.svg',          'tone' => 'bg-green-600'],
+                ['label' => 'Trade Rates',   'route' => 'admin.gift-cards.rates',        'icon' => 'best prices.svg',             'tone' => 'bg-emerald-600'],
+                ['label' => 'Orders',        'route' => 'admin.orders',                  'icon' => 'order.svg',                   'tone' => 'bg-sky-500'],
+                ['label' => 'Customers',     'route' => 'admin.customers',               'icon' => 'customer.svg',                'tone' => 'bg-emerald-500'],
+                ['label' => 'Transactions',  'route' => 'admin.transactions',            'icon' => 'transactions.svg',            'tone' => 'bg-teal-500'],
+                ['label' => 'Wallets',       'route' => 'admin.wallets',                 'icon' => 'Wallet.svg',                  'tone' => 'bg-indigo-500'],
+                ['label' => 'Reports',       'route' => 'admin.reports',                 'icon' => 'report.svg',                  'tone' => 'bg-violet-500'],
+                ['label' => 'Newsletter',    'route' => 'admin.newsletter',              'icon' => 'marketing.svg',               'tone' => 'bg-fuchsia-500'],
+                ['label' => 'Campaigns',     'route' => 'admin.campaigns',               'icon' => 'notification 2.svg',          'tone' => 'bg-purple-500'],
+                ['label' => 'Pricing Rules', 'route' => 'admin.pricing-rules',           'icon' => 'total revenue.svg',           'tone' => 'bg-orange-600'],
+                ['label' => 'Hero Sections', 'route' => 'admin.content.hero-sections',   'icon' => 'Appearance.svg',              'tone' => 'bg-sky-600'],
+                ['label' => 'Hero Cards',    'route' => 'admin.content.hero-cards',      'icon' => 'savedcard.svg',               'tone' => 'bg-pink-600'],
+                ['label' => 'Blog Posts',    'route' => 'admin.content.blog',            'icon' => 'new info.svg',                'tone' => 'bg-blue-600'],
+                ['label' => 'Press',         'route' => 'admin.content.press',           'icon' => 'About svg 1.svg',             'tone' => 'bg-slate-500'],
+                ['label' => 'Reviews',       'route' => 'admin.content.reviews',         'icon' => 'trusted by millions.svg',     'tone' => 'bg-yellow-500'],
+                ['label' => 'FAQs',          'route' => 'admin.content.faqs',            'icon' => 'other.svg',                   'tone' => 'bg-stone-500'],
+                ['label' => 'Rcoin Rewards', 'route' => 'admin.content.rewards',         'icon' => 'wallet 2.svg',                'tone' => 'bg-yellow-600'],
+                ['label' => 'Rcoin Analytics', 'route' => 'admin.content.rewards.analytics', 'icon' => 'success rates admin.svg', 'tone' => 'bg-violet-600'],
+                ['label' => 'Rcoin Payouts', 'route' => 'admin.content.rewards.withdrawals', 'icon' => 'total transactions.svg',  'tone' => 'bg-red-500'],
+                ['label' => 'Support',       'route' => 'admin.support-tickets',         'icon' => 'support.svg',                 'tone' => 'bg-amber-500'],
+                ['label' => 'Admins',        'route' => 'admin.admins',                  'icon' => 'admin access.svg',            'tone' => 'bg-rose-500'],
+                ['label' => 'Rates',         'route' => 'admin.rates',                   'icon' => 'transactions.svg',            'tone' => 'bg-orange-500'],
+                ['label' => 'Crypto Fees',   'route' => 'admin.crypto-fees',             'icon' => 'BTC.svg',                     'tone' => 'bg-amber-600'],
+                ['label' => 'API Settings',  'route' => 'admin.api-settings',            'icon' => 'Network Svg.svg',             'tone' => 'bg-slate-600'],
+                ['label' => 'Settings',      'route' => 'admin.settings',                'icon' => 'system setting.svg',          'tone' => 'bg-cyan-500'],
+                ['label' => 'Activity',      'route' => 'admin.account-activity',        'icon' => 'account avtivities 3.svg',    'tone' => 'bg-zinc-500'],
+            ])
+                ->filter(fn ($item) => $can($item['route']))
+                ->map(fn ($item) => $item + ['href' => route($item['route'])])
+                ->values()
+                ->all();
         @endphp
         {{-- Mobile menu wrapper: `contents` removes the div from Flux's grid layout so it
              doesn't push flux:sidebar/header/main into an unexpected row. The fixed-position
@@ -967,6 +994,7 @@
             x-data="{ menuOpen: false }"
             x-on:open-mobile-menu.window="$nextTick(() => menuOpen = true)"
             x-on:keydown.escape.window="menuOpen = false"
+            x-effect="menuOpen ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
             class="contents lg:hidden"
         >
             <div
@@ -992,20 +1020,22 @@
                 x-transition:leave-start="translate-y-0"
                 x-transition:leave-end="translate-y-full"
                 style="display: none;"
-                class="modal-norise fixed inset-x-0 bottom-0 z-[70] rounded-t-3xl bg-white shadow-2xl shadow-zinc-900/25"
+                class="modal-norise fixed inset-x-3 bottom-3 z-[70] max-h-[85vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="admin-mobile-menu-title"
             >
                 <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300"></span>
+                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300 dark:bg-white/25"></span>
                 </div>
 
                 <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
                     {{-- No close X here — backdrop tap and the grab handle above
                          already dismiss the sheet, so the button was redundant. --}}
-                    <h2 id="admin-mobile-menu-title" class="mb-5 text-lg font-bold text-zinc-900">Admin menu</h2>
+                    <h2 id="admin-mobile-menu-title" class="mb-5 text-lg font-bold text-zinc-900 dark:text-white">Admin menu</h2>
 
+                    {{-- The whole sheet scrolls (max-h on the panel), matching
+                         the customer dashboard menu. --}}
                     <div class="skeleton-stagger-fast grid grid-cols-4 gap-3">
                         @foreach ($adminMenuItems as $i => $item)
                             <a
@@ -1013,12 +1043,12 @@
                                 @if ($item['href'] !== '#') wire:navigate @endif
                                 @click="menuOpen = false"
                                 style="--i: {{ $i }}"
-                                class="group flex flex-col items-center justify-center gap-2 rounded-[12px] bg-zinc-100 px-2 py-3 text-center transition-transform duration-200 active:scale-95"
+                                class="group flex flex-col items-center justify-center gap-2 rounded-[6px] px-2 py-3 text-center transition-transform duration-200 active:scale-95"
                             >
                                 <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
                                     <img src="{{ asset('assets/' . rawurlencode($item['icon'])) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
                                 </span>
-                                <span class="text-[11px] font-semibold leading-tight text-zinc-900">{{ $item['label'] }}</span>
+                                <span class="text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">{{ $item['label'] }}</span>
                             </a>
                         @endforeach
                     </div>
@@ -1037,27 +1067,11 @@
             </div>
         </div>
 
-        {{-- Floating action toasts (session flashes) - auto-dismiss top-right. --}}
+        {{-- Floating action toasts (session flashes) - auto-dismiss top-right.
+             The same pill the customer dashboard uses, so both surfaces share
+             one notification style. (The old SweetAlert modal bridge was dead
+             code - nothing dispatches 'swal' - and is gone with its CDN.) --}}
         <x-flash-toast />
-
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>
-            document.addEventListener('livewire:init', () => {
-                Livewire.on('swal', (event) => {
-                    const data = event[0];
-                    Swal.fire({
-                        title: data.title,
-                        text: data.text,
-                        icon: data.icon,
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: '#3b82f6', // Tailwind blue-500
-                        customClass: {
-                            popup: 'rounded-2xl',
-                        }
-                    });
-                });
-            });
-        </script>
 
         @fluxScripts
     </body>

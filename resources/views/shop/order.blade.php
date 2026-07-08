@@ -164,24 +164,37 @@
                             }
                             $qrUrl = is_scalar($payload['qrcode_url'] ?? null) ? (string) $payload['qrcode_url'] : null;
                             $phone = is_scalar($payload['phone_number'] ?? null) ? (string) $payload['phone_number'] : null;
+
+                            // The card wears the brand's own colour (config override,
+                            // else the Zendit-synced brand_color); text flips to white
+                            // on dark brands. No colour = the neutral grey card.
+                            $brandBg = \App\Models\Product::brandColor($brandKey, $snap['brand_color'] ?? null);
+                            $brandDark = \App\Models\Product::colorIsDark($brandBg);
+                            $cardInk = $brandDark ? 'text-white' : 'text-zinc-900';
+                            $cardSub = $brandDark ? 'text-white/75' : 'text-zinc-600';
                         @endphp
 
                         {{-- Gift card - mirrors the dashboard orders page card so the
                              customer sees the same gift-card visual on both surfaces. --}}
-                        <div class="theme-static mx-auto max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5">
+                        {{-- Light brand colours (e.g. Apple's near-white) keep the zinc border so
+     the card edge still reads against the white panel; dark brands merge
+     border into the fill. --}}
+<div class="theme-static mx-auto max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5" @if ($brandBg) style="background: {{ $brandBg }};{{ $brandDark ? ' border-color: '.$brandBg.';' : '' }}" @endif>
                             <div class="flex items-start justify-between gap-3 px-2 pt-2">
                                 <div class="flex min-w-0 flex-col items-start gap-2.5">
                                     @if ($logo)
-                                        <img src="{{ $logo }}" alt="{{ $name }}" class="h-16 w-auto max-w-[130px] object-contain mix-blend-multiply" loading="lazy">
+                                        <img src="{{ $logo }}" alt="{{ $name }}" class="h-16 w-auto max-w-[130px] rounded-[5px] object-contain {{ $brandDark ? '' : 'mix-blend-multiply' }}" loading="lazy">
                                     @else
-                                        <span class="text-3xl font-black uppercase text-zinc-400">{{ str($name)->substr(0, 2)->upper() }}</span>
+                                        <span class="text-3xl font-black uppercase {{ $brandDark ? 'text-white/70' : 'text-zinc-400' }}">{{ str($name)->substr(0, 2)->upper() }}</span>
                                     @endif
-                                    <p class="truncate text-sm font-bold text-zinc-900">For {{ $name }}</p>
+                                    @unless ($logo && \App\Models\Product::logoCarriesName($brandKey))
+                                        <p class="truncate text-sm font-bold {{ $cardInk }}">For {{ $name }}</p>
+                                    @endunless
                                 </div>
                                 <div class="shrink-0 text-right">
-                                    <p class="text-2xl font-extrabold leading-none text-zinc-900">{{ $faceTxt }}</p>
+                                    <p class="text-xl font-extrabold leading-none {{ $cardInk }}">{{ $faceTxt }}</p>
                                     @if ($country)
-                                        <p class="mt-1 flex items-center justify-end gap-1.5 text-sm text-zinc-600">
+                                        <p class="mt-1 flex items-center justify-end gap-1.5 text-sm {{ $cardSub }}">
                                             @if (\App\Models\Product::flagUrl($snap['country_code'] ?? null))
                                                 <img src="{{ \App\Models\Product::flagUrl($snap['country_code'] ?? null) }}" alt="" class="h-3 w-[18px] rounded-[1px] object-cover ring-1 ring-zinc-200">
                                             @endif
@@ -191,8 +204,8 @@
                                 </div>
                             </div>
 
-                            {{-- Card body space --}}
-                            <div class="h-14"></div>
+                            {{-- Card body space (short, keeps the code pill close to the header) --}}
+                            <div class="h-8"></div>
 
                             @if ($qrUrl)
                                 <div class="flex flex-col items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white p-4">
@@ -214,9 +227,9 @@
                             @elseif ($cardCode || $cardPin)
                                 <div class="space-y-2">
                                     @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
-                                        <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
-                                            <span class="w-9 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
-                                            <span class="min-w-0 flex-1 truncate text-base font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
+                                        <div class="flex items-center gap-2 rounded-full border border-zinc-100 bg-white px-3.5 py-2" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
+                                            <span class="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
+                                            <span class="min-w-0 flex-1 truncate text-xs font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                             <button
                                                 type="button"
                                                 x-data="{ copied: false }"
@@ -312,8 +325,24 @@
 
             {{-- Back to dashboard --}}
             <div class="mt-10 text-center">
-                <a href="{{ route('dashboard.orders') }}" wire:navigate class="text-xs font-semibold text-blue-700 underline-offset-4 hover:underline dark:text-blue-300">View all my orders</a>
+                <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">View all my orders</a>
             </div>
+
+            {{-- Reviews for the brand(s) just bought - the same per-brand
+                 carousel as the product page. Self-guarding per brand, so
+                 orders whose brands have no reviews add nothing here. --}}
+            @php
+                $reviewBrandKeys = $order->items
+                    ->map(fn ($orderItem) => $orderItem->product_snapshot['brand_key'] ?? null)
+                    ->filter()
+                    ->unique()
+                    ->values();
+            @endphp
+            @foreach ($reviewBrandKeys as $reviewBrandKey)
+                <div class="mt-12">
+                    <x-shop.brand-reviews :brand-key="$reviewBrandKey" :brand-name="\App\Models\Product::brandDisplayName($reviewBrandKey)" />
+                </div>
+            @endforeach
 
             {{-- Google Customer Reviews opt-in (instant digital delivery). --}}
             @include('shop._google-customer-reviews', ['order' => $order])

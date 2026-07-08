@@ -85,10 +85,44 @@
 
 <x-layouts.app.header>
 
-{{-- Hero is full-width so the dots backdrop spans the entire page --}}
-<x-home.hero />
+{{-- Hero is full-width so the dots backdrop spans the entire page. The
+     slider is CMS-driven (admin > Content > Hero Sections); with only the
+     built-in section enabled it renders exactly the designed static hero.
+
+     The hero is pinned (sticky) while the sections below scroll up and pass
+     over it. The outer relative wrapper bounds the pin, so the hero unpins
+     and scrolls away with the page before the footer arrives. --}}
+<div class="relative">
+    {{-- The sticky offset tracks the live nav height (the primary row
+         collapses on scroll on mobile/tablet), so the hero pins flush under
+         the nav instead of sliding up behind it. Before Alpine boots the
+         offset is 0, which just means top-of-viewport pinning as a fallback. --}}
+    <div
+        data-hero-stage
+        class="sticky z-0"
+        x-data="{ navHeight: 0 }"
+        x-init="
+            const nav = document.querySelector('header.sticky');
+            if (nav) {
+                const sync = () => navHeight = Math.round(nav.getBoundingClientRect().height);
+                sync();
+                new ResizeObserver(sync).observe(nav);
+            }
+        "
+        :style="`top: ${navHeight}px`"
+    >
+        <x-home.hero-slider />
+    </div>
+
+    {{-- Everything below the hero carries the opaque page background and a
+         higher stacking level, so it covers the pinned hero as it passes. --}}
+    <div class="relative z-10 bg-[#eff6ff] dark:bg-[#0c1a36]">
 
 <div class="mx-auto w-full max-w-[1550px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+
+    {{-- Hero highlight cards - Apple-style tiles right under the hero.
+         Renders nothing until the three images exist in public/assets/. --}}
+    <x-home.hero-cards />
 
     {{-- Trust strip --}}
     <div>
@@ -173,9 +207,16 @@
 
 </div>
 
-{{-- Customer reviews — full-bleed so the scroll row spans the entire page --}}
-<div class="mt-12 mb-10">
+{{-- Customer reviews — full-bleed so the scroll row spans the entire page.
+     pb (not mb): a bottom margin here collapses through the opaque z-10
+     wrapper and exposes a strip of the pinned hero right before the footer;
+     padding keeps that breathing room inside the wrapper's background so the
+     page runs flush into the footer. --}}
+<div class="mt-12 pb-10">
     <x-home.customer-reviews />
+</div>
+
+    </div>
 </div>
 
 </x-layouts.app.header>

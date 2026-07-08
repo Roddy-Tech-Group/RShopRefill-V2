@@ -168,7 +168,7 @@ class extends Component {
     @endif
 
     @forelse ($this->faqs as $topic => $items)
-        <section class="mb-6 overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <section class="mb-6 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
             {{-- Header pill --}}
             <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $topic }}</h2>
@@ -197,7 +197,7 @@ class extends Component {
             </ul>
         </section>
     @empty
-        <div class="rounded-[12px] border-[1.5px] border-white bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
             <p class="text-sm text-zinc-600 dark:text-zinc-400">No FAQs yet. Click "New FAQ" to create one, or run <code class="rounded-[12px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan db:seed --class=FaqSeeder</code>.</p>
         </div>
     @endforelse

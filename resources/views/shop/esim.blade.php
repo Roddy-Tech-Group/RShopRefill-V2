@@ -316,7 +316,7 @@
             defaultCrypto: @js($defaultCrypto),
             rcoinConfig: @js([
                 'enabled' => (bool) \App\Models\Setting::get('rcoin_enabled', true),
-                'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 1.0),
+                'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 0.5),
                 'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
             ]),
             checkoutUrl: '{{ route('shop.checkout') }}',
@@ -569,7 +569,7 @@
                             <button
                                 type="button"
                                 @click="selectedId = p.id"
-                                :class="selectedId === p.id ? 'border-2 border-blue-600 dark:border-blue-500' : 'border border-white hover:border-green-200 dark:border-[#24364f] dark:hover:border-white'"
+                                :class="selectedId === p.id ? 'border-2 border-blue-600 dark:border-blue-500' : 'border border-zinc-200 hover:border-zinc-300 dark:border-[#24364f] dark:hover:border-white'"
                                 class="esim-tile flex h-full w-[70vw]! min-w-[70vw]! flex-col rounded-[14px] bg-transparent px-4 py-4 text-left transition-colors focus:outline-none sm:w-60! sm:min-w-60!"
                             >
                                 {{-- Type badge ("Data only" / "Voice") plus an optional tier
@@ -899,8 +899,23 @@
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 -translate-y-6"
+                {{-- Drops in BELOW the sticky nav, never over/behind it: the
+                     offset tracks the live header height (it changes across
+                     breakpoints and when the primary row collapses). --}}
+                x-data="{ navH: 0 }"
+                x-init="
+                    const nav = document.querySelector('header.sticky');
+                    if (nav) {
+                        const sync = () => navH = Math.round(nav.getBoundingClientRect().height);
+                        sync();
+                        new ResizeObserver(sync).observe(nav);
+                    }
+                "
+                {{-- Object syntax: a string :style would REPLACE the whole
+                     style attribute and wipe the display x-show manages. --}}
+                :style="{ top: (navH + 12) + 'px' }"
                 style="display:none;"
-                class="fixed inset-x-0 top-3 z-[60] px-3 sm:px-5"
+                class="fixed inset-x-0 z-[100] px-3 sm:px-5"
             >
                 <div class="relative mx-auto w-full max-w-[860px] rounded-[20px] border border-white/40 bg-white/70 shadow-[0_14px_44px_-12px_rgba(15,23,42,0.4),inset_0_1px_0_rgba(255,255,255,0.4)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1d3252]/80">
                     {{-- Close chip: half-out the bottom edge, deselects the plan. --}}

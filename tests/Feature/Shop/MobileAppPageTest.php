@@ -29,6 +29,8 @@ class MobileAppPageTest extends TestCase
             ->assertSee('On Android')
             // Coming-soon / app-store framing is gone.
             ->assertDontSee('Our mobile app is on the way')
-            ->assertDontSee('Coming soon');
+            ->assertDontSee('Our mobile app is coming soon');
+        // (The global footer legitimately carries "Coming soon on" store
+        // badges now, so the broad Coming soon assertion had to go.)
     }
 }

@@ -196,6 +196,7 @@ async function initAnimations() {
 
     // Tear down any existing scroll triggers so they don't pile up after navigation.
     ScrollTrigger.getAll().forEach((t) => t.kill());
+    window.__heroCardsCleanup?.();
 
     // ----- Hero entrance timeline (on load) -----
     // Pure slide-up; no opacity fade so the hero content is always readable
@@ -212,6 +213,82 @@ async function initAnimations() {
     // Scroll-triggered reveals intentionally removed: sections render in place
     // with no fade-up on scroll (the reveal read like the page was "refreshing"
     // each section as you scrolled). The hero load animation above is kept.
+
+    // ----- Hero highlight cards: page scroll drives the row leftward -----
+    // Two mechanisms, one feel:
+    //   - Desktop (sm+): all cards rest fully on screen, so there is no real
+    //     overflow to scroll; the row slides left via transform as the
+    //     section travels up the viewport.
+    //   - Mobile: the row IS a real overflowing scroll container, so page
+    //     scroll scrubs its native scrollLeft across the full card run
+    //     instead. Because it stays native scrolling, the user can also
+    //     swipe the cards back and forth manually at any time (the scrub
+    //     only re-syncs the position while the page itself is scrolling).
+    const heroCardsSection = document.querySelector('[data-hero-cards]');
+    if (heroCardsSection && ! window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const heroCardsTrack = heroCardsSection.querySelector('[data-hero-cards-track]');
+        const heroCardsRow = heroCardsSection.querySelector('[data-hero-cards-row]');
+        if (heroCardsTrack && heroCardsRow) {
+            if (window.innerWidth >= 640) {
+                gsap.to(heroCardsRow, {
+                    x: () => -heroCardsTrack.clientWidth * 0.5,
+                    ease: 'none',
+                    scrollTrigger: {
+                        trigger: heroCardsSection,
+                        start: 'top 55%',
+                        end: 'bottom 5%',
+                        scrub: 0.4,
+                        invalidateOnRefresh: true,
+                    },
+                });
+            } else {
+                // Mobile: a scrubbed tween writing scrollLeft every frame fights
+                // the browser's async touch scrolling (and CSS snap) - that is
+                // the jank. Instead: ScrollTrigger only records a TARGET, and a
+                // ticker lerps the real scrollLeft toward it. While a finger is
+                // on the track the ticker is fully hands-off (pure native swipe);
+                // on release it glides back into sync instead of jumping.
+                const maxScroll = () => Math.max(0, heroCardsTrack.scrollWidth - heroCardsTrack.clientWidth);
+                let target = heroCardsTrack.scrollLeft;
+                let current = heroCardsTrack.scrollLeft;
+                let touching = false;
+
+                const st = ScrollTrigger.create({
+                    trigger: heroCardsSection,
+                    start: 'top 70%',
+                    end: 'bottom 15%',
+                    invalidateOnRefresh: true,
+                    onUpdate: (self) => { target = self.progress * maxScroll(); },
+                });
+
+                const tick = () => {
+                    if (touching) { current = heroCardsTrack.scrollLeft; return; }
+                    const delta = target - current;
+                    if (Math.abs(delta) < 0.5) { return; }
+                    current += delta * 0.14;
+                    heroCardsTrack.scrollLeft = current;
+                };
+                gsap.ticker.add(tick);
+
+                const onTouchStart = () => { touching = true; };
+                const onTouchEnd = () => { touching = false; current = heroCardsTrack.scrollLeft; };
+                heroCardsTrack.addEventListener('touchstart', onTouchStart, { passive: true });
+                heroCardsTrack.addEventListener('touchend', onTouchEnd, { passive: true });
+                heroCardsTrack.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+                // SPA navigations re-run initAnimations; tear this driver down
+                // so tickers and listeners never stack up.
+                window.__heroCardsCleanup = () => {
+                    gsap.ticker.remove(tick);
+                    st.kill();
+                    heroCardsTrack.removeEventListener('touchstart', onTouchStart);
+                    heroCardsTrack.removeEventListener('touchend', onTouchEnd);
+                    heroCardsTrack.removeEventListener('touchcancel', onTouchEnd);
+                    window.__heroCardsCleanup = null;
+                };
+            }
+        }
+    }
 
     // Animated inline-SVG illustrations (hero chips, 404, empty cart).
     initIllos(gsap);
@@ -1034,6 +1111,21 @@ window.customerReviewsCarousel = function () {
 
             const cardsPerStep = window.innerWidth >= 640 ? 2 : 1;
             viewport.scrollBy({ left: cardsPerStep * (this.cardW + this.gap), behavior: 'smooth' });
+        },
+
+        // Back arrow: same step in reverse; from the very start it wraps
+        // around to the end of the row.
+        prev() {
+            const viewport = this.$refs.track;
+            if (! viewport) return;
+
+            if (viewport.scrollLeft <= 4) {
+                viewport.scrollTo({ left: viewport.scrollWidth, behavior: 'smooth' });
+                return;
+            }
+
+            const cardsPerStep = window.innerWidth >= 640 ? 2 : 1;
+            viewport.scrollBy({ left: -cardsPerStep * (this.cardW + this.gap), behavior: 'smooth' });
         },
 
         // Auto-advance on a timer (slideshow). Paused while the user hovers or

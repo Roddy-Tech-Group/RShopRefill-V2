@@ -15,9 +15,15 @@ class OrderFulfilledMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    /**
+     * $isGift: the email is going to a gift recipient's inbox rather than the
+     * buyer's, so the template greets them as a recipient and names the buyer
+     * as the sender instead of addressing them by the buyer's name.
+     */
     public function __construct(
         public readonly User $user,
-        public readonly OrderItem $item
+        public readonly OrderItem $item,
+        public readonly bool $isGift = false
     ) {}
 
     public function envelope(): Envelope
@@ -37,6 +43,7 @@ class OrderFulfilledMail extends Mailable
                 'name' => $this->user->name,
                 'orderNumber' => $this->item->order->order_number,
                 'item' => $this->item,
+                'isGift' => $this->isGift,
             ]
         );
     }

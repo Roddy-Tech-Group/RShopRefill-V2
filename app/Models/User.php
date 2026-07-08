@@ -77,6 +77,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'suspension_reason',
         'suspension_review_requested_at',
         'email_verified_at',
+        'is_guest',
+        'guest_claim_last_sent_at',
     ];
 
     /**
@@ -107,6 +109,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'transaction_pin_set_at' => 'datetime',
             'transaction_pin_locked_until' => 'datetime',
             'last_transaction_pin_used_at' => 'datetime',
+            'is_guest' => 'boolean',
+            'guest_claim_last_sent_at' => 'datetime',
         ];
     }
 

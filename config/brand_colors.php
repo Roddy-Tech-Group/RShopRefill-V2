@@ -15,10 +15,21 @@
  */
 
 return [
+    /*
+     * Brands whose logo ART already carries the brand name (e.g. Apple's
+     * "For everything Apple" card art). The delivered-card templates skip
+     * their "For {brand}" caption so the name never shows twice.
+     */
+    'logo_includes_name' => [
+        'Apple',
+    ],
+
     'colors' => [
         'Airbnb' => '#FF5A5F',
         'AmazonPrime' => '#00A8E1',
-        'Apple' => '#F5F5F7',
+        // Matches the grey backdrop baked into the Apple card art, so the
+        // delivered-card background and the logo tile read as one surface.
+        'Apple' => '#ececee',
         'DoorDash' => '#FF3008',
         'HuluPlus' => '#1CE783',
         'Netflix' => '#E50914',

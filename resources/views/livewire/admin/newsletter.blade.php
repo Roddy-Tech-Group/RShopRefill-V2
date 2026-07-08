@@ -265,7 +265,7 @@ class extends Component {
                 ['label' => 'Active',        'value' => $this->counts['active'],       'dot' => 'bg-emerald-500'],
                 ['label' => 'Unsubscribed', 'value' => $this->counts['unsubscribed'], 'dot' => 'bg-zinc-400'],
             ] as $stat)
-                <div class="rounded-[12px] border-[1.5px] border-white bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+                <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -305,7 +305,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:border-white dark:bg-[#1d3252]">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm" style="border-spacing: 0 6px;">
                     <thead>

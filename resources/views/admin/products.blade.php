@@ -560,7 +560,7 @@
             x-data="{ navigating: false }"
             x-on:livewire:navigate.window="navigating = true"
             x-on:livewire:navigated.window="navigating = false"
-            class="relative overflow-hidden rounded-[12px] border-[1.5px] border-white bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252] dark:border-white"
+            class="relative overflow-hidden rounded-[12px] ring-1 ring-zinc-200 bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252] dark:ring-white/10"
         >
           <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
