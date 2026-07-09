@@ -3,6 +3,7 @@
 namespace Tests\Feature\Catalog;
 
 use App\Domain\Catalog\Services\AiraloEsimNormalizer;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -88,5 +89,31 @@ class AiraloEsimNormalizerTest extends TestCase
 
         $this->assertEqualsWithDelta(36.0, (float) $variant->cost_price, 0.001);
         $this->assertEqualsWithDelta(50.0, (float) $variant->face_value, 0.001);
+    }
+
+    public function test_non_country_product_is_named_by_region_not_generic_global(): void
+    {
+        // Airalo sends no country code for regional/worldwide products, so they
+        // are stored under the 'WW' marker. They must still carry their real
+        // region name (not a blanket "Global eSIM") so the admin can tell them
+        // apart.
+        $rawItem = [
+            'country_code' => '',
+            'title' => 'Middle East and North Africa',
+            'operators' => [[
+                'title' => 'Menalink',
+                'plan_type' => 'data',
+                'packages' => [
+                    ['id' => 'mena-30days-unlimited', 'data' => 'Unlimited', 'day' => 30, 'price' => 51.9, 'net_price' => 51.9, 'is_unlimited' => true],
+                ],
+            ]],
+        ];
+
+        (new AiraloEsimNormalizer)->normalizeAndSave($rawItem, 'airalo');
+
+        $product = Product::where('slug', 'esim-ww-middle-east-and-north-africa')->firstOrFail();
+
+        $this->assertSame('WW', $product->country_code);
+        $this->assertSame('Middle East and North Africa eSIM', $product->name);
     }
 }

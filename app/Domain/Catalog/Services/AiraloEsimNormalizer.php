@@ -31,7 +31,12 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
 
         // Grouping logic: identical to Zendit so Airalo plans fall under the same Region Product
         $productSlug = Str::slug("esim-{$countryCode}-{$regionName}");
-        $productName = $countryCode === 'WW' ? 'Global eSIM' : "{$regionName} eSIM";
+        // Name every product by its real region ("Middle East and North Africa eSIM",
+        // "Discover Global eSIM", "Europe eSIM"). Non-country products used to be a
+        // blanket "Global eSIM", which made the admin product list / command bar a wall
+        // of identical rows. The storefront already derives the display name from the
+        // slug; this stores the same region name so admin surfaces match.
+        $productName = "{$regionName} eSIM";
 
         // Preserve admin-arranged categories on existing rows so the hourly
         // re-sync doesn't wipe manual organisation.
