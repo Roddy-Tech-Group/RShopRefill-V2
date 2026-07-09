@@ -163,7 +163,23 @@
                                 if (! empty($payload[$credKey]) && is_scalar($payload[$credKey])) { $cardCode = (string) $payload[$credKey]; break; }
                             }
                             $qrUrl = is_scalar($payload['qrcode_url'] ?? null) ? (string) $payload['qrcode_url'] : null;
-                            $phone = is_scalar($payload['phone_number'] ?? null) ? (string) $payload['phone_number'] : null;
+
+                            // Top-up recipient number, resolved like the dashboard
+                            // orders card: provider payload first, then the number
+                            // the buyer typed at purchase (item metadata) - so the
+                            // tile shows the phone even before fulfillment instead
+                            // of the "code appears here" placeholder.
+                            $topupPayload = (array) ($payload['topup'] ?? []);
+                            $phone = is_scalar($payload['topup_recipient_phone'] ?? null)
+                                ? (string) $payload['topup_recipient_phone']
+                                : (is_scalar($topupPayload['recipient_phone'] ?? null) ? (string) $topupPayload['recipient_phone'] : null);
+                            if (! $phone && is_scalar($payload['phone_number'] ?? null)) {
+                                $phone = (string) $payload['phone_number'];
+                            }
+                            if (! $phone && is_scalar(((array) ($item->metadata ?? []))['recipient_phone'] ?? null)) {
+                                $phone = (string) $item->metadata['recipient_phone'];
+                            }
+                            $phoneCredited = $item->fulfillment_status?->value === 'fulfilled';
 
                             // The card wears the brand's own colour (config override,
                             // else the Zendit-synced brand_color); text flips to white
@@ -220,7 +236,7 @@
                                         </svg>
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Credited to</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $phoneCredited ? 'Credited to' : 'Will be credited to' }}</p>
                                         <p class="truncate text-base font-bold tabular-nums text-zinc-900">{{ $phone }}</p>
                                     </div>
                                 </div>
