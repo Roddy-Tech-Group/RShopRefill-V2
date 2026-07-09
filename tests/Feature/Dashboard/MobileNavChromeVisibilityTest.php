@@ -68,6 +68,38 @@ class MobileNavChromeVisibilityTest extends TestCase
         $response->assertDontSee(self::TOP_CHROME_MARKER, false);
     }
 
+    /**
+     * The country / language / currency chip, unique to the mobile top chrome.
+     * It must render exactly ONCE: it used to be emitted by both an in-flow bar
+     * and the fixed pinned chrome, which made the top pills (country switcher,
+     * cart, notification) visibly duplicate as the page scrolled.
+     */
+    private const LOCALE_CHIP_MARKER = 'aria-label="Region, language and currency"';
+
+    public function test_shop_pages_render_the_top_chrome_pills_only_once(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs(User::factory()->create())
+            ->get('/dashboard/shop/cart')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, self::LOCALE_CHIP_MARKER));
+    }
+
+    public function test_overview_renders_the_top_chrome_pills_only_once(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs(User::factory()->create())
+            ->get('/dashboard')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, self::LOCALE_CHIP_MARKER));
+    }
+
     /** Back button - present only on task/inner pages (which dropped the top chrome). */
     private const BACK_BUTTON_MARKER = 'aria-label="Go back"';
 

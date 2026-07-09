@@ -1213,9 +1213,13 @@
                     default                                       => 'Settings',
                 };
             @endphp
-            {{-- Inner-page top bar (top cart / country switcher / notification).
-                 Shown on the shop pages only; hidden on task/inner pages so they
-                 stay clean. The bottom nav bar stays on every page for navigation. --}}
+            {{-- Inner-page top strip. Holds ONLY the at-top hamburger + reserves the
+                 top gap; the locale / cart / notification chips live in the FIXED
+                 chrome below (see "FLOATING TOP CHROME"), which is the single pinned
+                 copy of those pills. The chips used to be duplicated here too, which
+                 made them appear twice on scroll (this in-flow copy slid up while the
+                 fixed copy stayed pinned) on every shop page. The hamburger stays
+                 here because the fixed chrome hides its own at the top (avatar). --}}
             @if ($showMobileTopChrome)
             <div class="relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 lg:hidden">
                 {{-- Hamburger opens the Connect panel (social + contact channels).
@@ -1229,38 +1233,6 @@
                 >
                     <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
                 </button>
-                <div class="flex items-center gap-1" x-data>
-                    {{-- Language + currency toggle (opens the locale modal). --}}
-                    <button
-                        type="button"
-                        x-data="{ code: (localStorage.getItem('locale.countryCode') || 'US').toLowerCase() }"
-                        @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
-                        x-on:click="$dispatch('open-locale-modal')"
-                        aria-label="Region, language and currency"
-                        class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                    >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
-                    </button>
-
-                    {{-- Cart — live count from the global $store.cart, taps through to the cart page. --}}
-                    <a
-                        href="{{ route('dashboard.shop.cart') }}"
-                        wire:navigate.hover
-                        aria-label="Cart"
-                        class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                    >
-                        <img src="{{ asset('assets/' . rawurlencode('new cart.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                        <span
-                            x-show="$store.cart && $store.cart.count > 0"
-                            x-text="$store.cart ? $store.cart.count : ''"
-                            x-cloak
-                            class="absolute -top-0.5 -right-0.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-none text-white"
-                        ></span>
-                    </a>
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200">
-                        <livewire:notifications-menu tone="dark" wire:key="inner-bar-notif" />
-                    </div>
-                </div>
             </div>
             @else
             {{-- Back button (task/inner pages) - a FIXED top-left affordance (these
