@@ -415,6 +415,22 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                 default => FulfillmentStatus::Failed,
             };
 
+            // A purchase that was ACCEPTED but resolved FAILED on this poll
+            // used to vanish without a trace: the accept row said SUCCESS and
+            // nothing recorded Zendit's decline reason (e.g. OFFER_UNAVAILABLE),
+            // so diagnosing meant calling Zendit's API by hand. Persist the
+            // final verdict WITH their error so the admin panel tells the story.
+            if ($statusEnum === FulfillmentStatus::Failed) {
+                FulfillmentLog::create([
+                    'order_item_id' => $item->id,
+                    'provider_name' => 'zendit',
+                    'request_payload' => ['transactionId' => $zenditTxId, 'endpoint' => $endpoint],
+                    'response_payload' => $responseBody,
+                    'status' => 'FAILED',
+                    'error_message' => json_encode($responseBody['error'] ?? ['status' => $txStatus]),
+                ]);
+            }
+
             return [
                 'status' => $statusEnum,
                 'payload' => $responseBody,

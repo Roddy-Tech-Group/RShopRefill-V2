@@ -32,12 +32,15 @@ class NotificationDispatcher
     ): void {
         $channels = [NotificationChannel::Database]; // In-app is always enabled by default
 
-        // Email check based on user preferences. An override address (e.g. a
-        // gift recipient) always emails: the inbox belongs to someone else, so
-        // the account holder's preferences must not suppress their delivery.
-        if ($overrideEmail !== null || $this->preferenceService->isAllowed($user, $category, 'email')) {
+        // Email check based on user preferences. Only when a mailable exists -
+        // enlisting the channel without one just made EmailChannel log a
+        // "called without a Mailable" warning on every in-app-only dispatch.
+        // An override address (e.g. a gift recipient) always emails: the inbox
+        // belongs to someone else, so the account holder's preferences must
+        // not suppress their delivery.
+        if ($mailable !== null && ($overrideEmail !== null || $this->preferenceService->isAllowed($user, $category, 'email'))) {
             $channels[] = NotificationChannel::Email;
-        } else {
+        } elseif ($mailable !== null) {
             Log::info('Email notification skipped due to user preference settings.', [
                 'user_id' => $user->id,
                 'category' => $category,
