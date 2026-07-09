@@ -246,10 +246,14 @@ async function initAnimations() {
                 // the browser's async touch scrolling (and CSS snap) - that is
                 // the jank. Instead: ScrollTrigger only records a TARGET, and a
                 // ticker lerps the real scrollLeft toward it. While a finger is
-                // on the track the ticker is fully hands-off (pure native swipe);
-                // on release it glides back into sync instead of jumping.
+                // on the track the ticker is fully hands-off (pure native swipe),
+                // and on release the user's position is adopted as a lasting
+                // OFFSET on top of the page mapping - so a manual swipe sticks
+                // instead of being pulled back, and page scrolling keeps moving
+                // the row relative to wherever the user parked it.
                 const maxScroll = () => Math.max(0, heroCardsTrack.scrollWidth - heroCardsTrack.clientWidth);
                 let target = heroCardsTrack.scrollLeft;
+                let userOffset = 0;
                 let current = heroCardsTrack.scrollLeft;
                 let touching = false;
 
@@ -263,7 +267,8 @@ async function initAnimations() {
 
                 const tick = () => {
                     if (touching) { current = heroCardsTrack.scrollLeft; return; }
-                    const delta = target - current;
+                    const desired = Math.min(maxScroll(), Math.max(0, target + userOffset));
+                    const delta = desired - current;
                     if (Math.abs(delta) < 0.5) { return; }
                     current += delta * 0.14;
                     heroCardsTrack.scrollLeft = current;
@@ -271,7 +276,11 @@ async function initAnimations() {
                 gsap.ticker.add(tick);
 
                 const onTouchStart = () => { touching = true; };
-                const onTouchEnd = () => { touching = false; current = heroCardsTrack.scrollLeft; };
+                const onTouchEnd = () => {
+                    touching = false;
+                    current = heroCardsTrack.scrollLeft;
+                    userOffset = current - target;
+                };
                 heroCardsTrack.addEventListener('touchstart', onTouchStart, { passive: true });
                 heroCardsTrack.addEventListener('touchend', onTouchEnd, { passive: true });
                 heroCardsTrack.addEventListener('touchcancel', onTouchEnd, { passive: true });
