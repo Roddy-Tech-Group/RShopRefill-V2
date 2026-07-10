@@ -476,6 +476,14 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             if (! empty($receipt['epin'])) {
                 $flat['epin'] = $receipt['epin'];
             }
+            // Some brands (Apple US eGift is the known one) deliver the redemption
+            // code in `accountId` while epin / voucherId / redemptionUrl all stay
+            // empty. It is the code the customer types at the brand's redeem page,
+            // so surface it as the copyable code. Guarded by empty() so a brand
+            // that returns a real code elsewhere isn't overwritten.
+            if (! empty($receipt['accountId']) && empty($flat['code'])) {
+                $flat['code'] = $receipt['accountId'];
+            }
             if (! empty($receipt['instructions'])) {
                 $flat['instructions'] = $receipt['instructions'];
             }

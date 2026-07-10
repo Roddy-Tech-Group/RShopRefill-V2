@@ -61,6 +61,38 @@ class ZenditEsimPayloadTest extends TestCase
         $this->assertSame('GC-CODE-123', $payload['code']);
     }
 
+    /**
+     * Apple US eGift (and similar brands) deliver the redemption code in
+     * receipt.accountId while epin / voucherId / redemptionUrl stay empty.
+     * Without reading accountId the payload comes out codeless and the order
+     * shows the "code appears here" placeholder despite being fulfilled.
+     */
+    public function test_voucher_account_id_is_surfaced_as_the_code(): void
+    {
+        $payload = (new ZenditFulfillmentProvider)->normalizeResponse([
+            'status' => 'DONE',
+            'receipt' => [
+                'deliveryType' => 'voucher',
+                'epin' => '',
+                'voucherId' => '',
+                'redemptionUrl' => '',
+                'accountId' => 'XQKMWHK6DR9TL7ZM',
+            ],
+        ]);
+
+        $this->assertSame('XQKMWHK6DR9TL7ZM', $payload['code']);
+    }
+
+    public function test_real_item_code_takes_precedence_over_account_id(): void
+    {
+        $payload = (new ZenditFulfillmentProvider)->normalizeResponse([
+            'items' => [['code' => 'REAL-VOUCHER-CODE']],
+            'receipt' => ['accountId' => 'ACCT-FALLBACK'],
+        ]);
+
+        $this->assertSame('REAL-VOUCHER-CODE', $payload['code']);
+    }
+
     public function test_missing_activation_code_skips_qr_but_keeps_identifiers(): void
     {
         $payload = (new ZenditFulfillmentProvider)->normalizeResponse([
