@@ -52,7 +52,6 @@ class CartMergeService
                         'quantity' => $newQuantity,
                         'subtotal_snapshot' => $existingItem->unit_price_snapshot * $newQuantity,
                         'display_amount' => ($existingItem->display_amount / $existingItem->quantity) * $newQuantity,
-                        'markup_amount' => ($existingItem->markup_amount / $existingItem->quantity) * $newQuantity,
                     ]);
                 } else {
                     // Move guest item to user cart

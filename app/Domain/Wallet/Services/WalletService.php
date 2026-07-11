@@ -263,6 +263,10 @@ class WalletService
      */
     public function lockFunds(Wallet $wallet, float $amount): void
     {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Lock amount must be greater than zero.');
+        }
+
         DB::transaction(function () use ($wallet, $amount) {
             $lockedWallet = Wallet::where('id', $wallet->id)->lockForUpdate()->firstOrFail();
 
@@ -301,6 +305,10 @@ class WalletService
      */
     public function unlockFunds(Wallet $wallet, float $amount): void
     {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Unlock amount must be greater than zero.');
+        }
+
         DB::transaction(function () use ($wallet, $amount) {
             $lockedWallet = Wallet::where('id', $wallet->id)->lockForUpdate()->firstOrFail();
 

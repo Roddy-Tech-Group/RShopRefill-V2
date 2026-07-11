@@ -158,6 +158,8 @@ class PollPendingFulfillmentJob implements ShouldQueue
                 $refundAmount = $item->subtotal_amount;
                 if ($walletPayment->payment_status === PaymentStatus::Paid) {
                     $walletProvider->refundPayment($walletPayment, $refundAmount);
+                } elseif ($walletPayment->payment_status === PaymentStatus::Reserved) {
+                    $walletProvider->releasePartialFunds($walletPayment, $refundAmount);
                 }
             }
 

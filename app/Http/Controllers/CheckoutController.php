@@ -355,8 +355,14 @@ class CheckoutController extends Controller
 
         // payment_sessions has no user_id of its own - ownership lives on the
         // underlying PaymentAttempt. Guard there so a logged-in customer can't
-        // hand-craft a URL pointing at someone else's session.
-        abort_unless($attempt->user_id === $request->user()?->id, 403);
+        // hand-craft a URL pointing at someone else's session. Guests must
+        // have the order number in their session.
+        if ($request->user()) {
+            abort_unless($attempt->user_id === $request->user()->id, 403);
+        } else {
+            $guestOrders = $request->session()->get('guest_order_numbers', []);
+            abort_unless($attempt->order && in_array($attempt->order->order_number, $guestOrders, true), 403);
+        }
 
         $reportedStatus = strtolower((string) $request->query('status'));
 
@@ -440,9 +446,7 @@ class CheckoutController extends Controller
 
     private function loadOrderForDownload(Request $request, string $orderNumber): Order
     {
-        return Order::query()
-            ->where('order_number', $orderNumber)
-            ->where('user_id', $request->user()?->id)
+        return $this->orderScopedToViewer($request, $orderNumber)
             ->with('items')
             ->firstOrFail();
     }
