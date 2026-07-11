@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 
 class ZenditEsimNormalizer implements CatalogNormalizerInterface
 {
+    use ConvertsCostToUsd;
+
     public function normalizeAndSave(array $rawItem, string $providerName): void
     {
         // 1. Ensure eSIMs Category exists
@@ -71,7 +73,11 @@ class ZenditEsimNormalizer implements CatalogNormalizerInterface
         $price = is_array($rawItem['price'] ?? null) ? $rawItem['price'] : [];
         $costDivisor = (($cost['currencyDivisor'] ?? 100) ?: 100);
         $priceDivisor = (($price['currencyDivisor'] ?? 100) ?: 100);
-        $costPrice = isset($cost['fixed']) ? (float) $cost['fixed'] / $costDivisor : 0.0;
+        // Zendit's cost `fixed` is in the plan's own currency (mislabeled "USD"),
+        // so convert to USD - the markup base. Zendit eSIMs are USD today, making
+        // this a no-op, but a non-USD plan would otherwise be overpriced by its FX.
+        $costLocal = isset($cost['fixed']) ? (float) $cost['fixed'] / $costDivisor : 0.0;
+        $costPrice = $this->costToUsd($costLocal, $currencyCode);
         $faceValue = isset($price['fixed']) ? (float) $price['fixed'] / $priceDivisor : $costPrice;
 
         // Extract eSIM specific metadata
