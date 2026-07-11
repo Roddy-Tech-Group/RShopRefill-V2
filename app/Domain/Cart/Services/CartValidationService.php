@@ -92,16 +92,19 @@ class CartValidationService
 
         // 3. Check pricing snapshot integrity — recalculate what the unit price
         // *should* be right now and compare against the snapshot.
-        //
-        // Money is compared with a 1-cent tolerance: a strict !== on floats
-        // falsely flags economically-identical prices that differ only in their
-        // binary representation (e.g. 11.01 is not exactly representable), which
-        // would block every checkout. A genuine markup/catalog change shifts the
-        // price by far more than a cent and is still caught.
-        $currentPricing = $this->pricingService->calculatePricing($variant, $item->quantity);
+        if ($variant->is_variable) {
+            $singleRequestedValue = $item->provider_cost_usd > 0 ? (float) $item->provider_cost_usd : ((float) $item->display_amount / max(1, $item->quantity));
+            $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $singleRequestedValue);
+            
+            if (abs((float) $item->unit_price_snapshot - $unitPriceUsd) > 0.01) {
+                $issues[] = 'price_updated';
+            }
+        } else {
+            $currentPricing = $this->pricingService->calculatePricing($variant, $item->quantity);
 
-        if (abs((float) $item->unit_price_snapshot - (float) $currentPricing['unit_price_snapshot']) > 0.01) {
-            $issues[] = 'price_updated';
+            if (abs((float) $item->unit_price_snapshot - (float) $currentPricing['unit_price_snapshot']) > 0.01) {
+                $issues[] = 'price_updated';
+            }
         }
 
         return $issues;
