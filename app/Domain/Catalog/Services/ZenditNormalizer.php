@@ -11,8 +11,6 @@ use Illuminate\Support\Str;
 
 class ZenditNormalizer implements CatalogNormalizerInterface
 {
-    use ConvertsCostToUsd;
-
     public function normalizeAndSave(array $rawItem, string $providerName): void
     {
         // 1. Normalize Subtype. Zendit returns subTypes as an array; pick the first.
@@ -98,13 +96,11 @@ class ZenditNormalizer implements CatalogNormalizerInterface
         $costDiv = (float) ($costBlock['currencyDivisor'] ?? 100);
 
         // Face value = the SEND block (what the recipient actually receives, in the
-        // card's own currency). The COST block's `fixed` is ALSO in the card's
-        // currency (Zendit mislabels it "USD"), so convert it to USD - the pricing
-        // engine's settlement base - or a non-USD card is overpriced by its FX rate.
+        // card's own currency). cost_price below is the COST block — always USD, our
+        // settlement base for the markup engine.
         $faceValue = isset($sendBlock['fixed']) ? ((float) $sendBlock['fixed']) / $sendDiv
                      : (isset($priceBlock['fixed']) ? ((float) $priceBlock['fixed']) / $priceDiv : null);
-        $costLocal = isset($costBlock['fixed']) ? ((float) $costBlock['fixed']) / $costDiv : ($faceValue ?? 0.0);
-        $costPrice = $this->costToUsd($costLocal, $currencyCode);
+        $costPrice = isset($costBlock['fixed']) ? ((float) $costBlock['fixed']) / $costDiv : ($faceValue ?? 0.0);
         $retailPrice = $faceValue ?? $costPrice;
 
         // VARIABLE-priced cards expose min/max on the send block.

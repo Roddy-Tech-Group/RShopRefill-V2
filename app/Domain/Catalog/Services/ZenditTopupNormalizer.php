@@ -11,8 +11,6 @@ use Illuminate\Support\Str;
 
 class ZenditTopupNormalizer implements CatalogNormalizerInterface
 {
-    use ConvertsCostToUsd;
-
     public function normalizeAndSave(array $rawItem, string $providerName): void
     {
         // 1. Ensure the Mobile Airtime category exists.
@@ -94,13 +92,10 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
         $costDiv = (float) ($costBlock['currencyDivisor'] ?? 100);
 
         // Face value = the SEND block (what the phone is credited, in its own
-        // currency). The COST block's `fixed` is ALSO in that currency (Zendit
-        // mislabels it "USD"), so convert it to USD - the markup base - or a
-        // non-USD operator's airtime is overpriced by its FX rate.
+        // currency). cost_price is the COST block — always USD, our markup base.
         $faceValue = isset($sendBlock['fixed']) ? ((float) $sendBlock['fixed']) / $sendDiv
                      : (isset($priceBlock['fixed']) ? ((float) $priceBlock['fixed']) / $priceDiv : null);
-        $costLocal = isset($costBlock['fixed']) ? ((float) $costBlock['fixed']) / $costDiv : ($faceValue ?? 0.0);
-        $costPrice = $this->costToUsd($costLocal, $currencyCode);
+        $costPrice = isset($costBlock['fixed']) ? ((float) $costBlock['fixed']) / $costDiv : ($faceValue ?? 0.0);
         $retailPrice = $faceValue ?? $costPrice;
 
         // Variable top-ups expose min/max on the send block. Zendit labels variable
