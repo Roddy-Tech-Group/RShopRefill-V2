@@ -120,7 +120,7 @@ return Application::configure(basePath: dirname(__DIR__))
             StartSession::class,
         ]);
 
-        $middleware->redirectGuestsTo(fn () => request()->is('admin*') ? route('admin.login') : route('login'));
+        $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => request()->is('admin*') ? route('admin.dashboard') : route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -17,7 +17,7 @@ class AdminAuth
     public function handle(Request $request, Closure $next): Response
     {
         if (! Auth::guard('admin')->check()) {
-            return redirect()->route('admin.login');
+            abort(404);
         }
 
         // Additional check: ensure the admin account is still active
