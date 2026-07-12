@@ -87,7 +87,12 @@ class PollPendingFulfillmentJob implements ShouldQueue
                 }
             });
 
-            // Bug #5 fix: call release() AFTER the transaction has committed, not inside it
+            // Bug #6 fix: gracefully handle max attempts instead of throwing MaxAttemptsExceededException
+            if ($this->attempts() >= $this->tries - 1) {
+                $this->failed(new \Exception("Polling exhausted after {$this->tries} attempts."));
+                return;
+            }
+
             if ($needsRelease) {
                 $this->release(10); // Release back to queue in 10 seconds
             }
