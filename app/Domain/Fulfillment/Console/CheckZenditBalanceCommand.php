@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Notification;
 
 class CheckZenditBalanceCommand extends Command
 {
-    protected $signature = 'zendit:check-balance {--threshold=500}';
+    protected $signature = 'zendit:check-balance {--threshold=250}';
 
     protected $description = 'Check Zendit API balance and alert if it falls below threshold';
 
@@ -41,7 +41,9 @@ class CheckZenditBalanceCommand extends Command
             }
 
             $data = $response->json();
-            $balance = (float) ($data['availableBalance'] ?? 0);
+            $divisor = (float) ($data['currencyDivisor'] ?? 100);
+            if ($divisor <= 0) $divisor = 100;
+            $balance = ((float) ($data['availableBalance'] ?? 0)) / $divisor;
             $currency = $data['currency'] ?? 'USD';
 
             $this->info("Current Zendit Balance: {$balance} {$currency}");
@@ -51,8 +53,7 @@ class CheckZenditBalanceCommand extends Command
                 Log::critical($msg);
 
                 // Alert Admin via CriticalSystemAlert
-                // Retrieve the admin email from config, fallback to a default if not set
-                $adminEmail = config('mail.admin_address', 'dev@roddytechgroup.com');
+                $adminEmail = 'dev@roddytechgroup.com';
 
                 Notification::route('mail', $adminEmail)
                     ->notify(new CriticalSystemAlert(

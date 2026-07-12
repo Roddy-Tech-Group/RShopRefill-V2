@@ -86,7 +86,7 @@ class CustomerDetailTest extends TestCase
         $customer = User::factory()->create();
 
         $this->get(route('admin.customer', $customer))
-            ->assertRedirect(route('admin.login'));
+            ->assertNotFound();
     }
 
     public function test_unknown_customer_returns_not_found(): void

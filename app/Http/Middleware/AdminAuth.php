@@ -39,11 +39,10 @@ class AdminAuth
         $routeName = $request->route()?->getName() ?? '';
         if ($routeName !== '' && ! $admin->canAccessAdminRoute($routeName)) {
             if ($request->expectsJson() || $request->is('admin/api/*')) {
-                abort(403, 'Your role does not have access to this area.');
+                abort(404, 'Your role does not have access to this area.');
             }
 
-            return redirect()->route('admin.dashboard')
-                ->with('error', 'You do not have access to that section.');
+            abort(404);
         }
 
         return $next($request);

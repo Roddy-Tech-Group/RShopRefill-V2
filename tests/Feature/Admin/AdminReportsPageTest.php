@@ -45,7 +45,7 @@ class AdminReportsPageTest extends TestCase
 
     public function test_reports_page_requires_admin_auth(): void
     {
-        $this->get(route('admin.reports'))->assertRedirect(route('admin.login'));
+        $this->get(route('admin.reports'))->assertNotFound();
     }
 
     public function test_csv_export_returns_a_csv_with_header_row(): void

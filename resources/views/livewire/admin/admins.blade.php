@@ -28,7 +28,7 @@ class extends Component {
     public function mount(): void
     {
         // Managing admins is the highest-risk surface - Super Admin only.
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403, 'Only a Super Admin can manage admins.');
+        abort_unless(auth('admin')->user()?->isSuperAdmin(), 404, 'Only a Super Admin can manage admins.');
 
         $this->permissions = AdminRole::from($this->role)->defaultPermissions();
     }

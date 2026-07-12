@@ -96,9 +96,9 @@ class AdminContentSectionTest extends TestCase
 
     public function test_admin_content_pages_require_admin_auth(): void
     {
-        $this->get(route('admin.content.blog'))->assertRedirect(route('admin.login'));
-        $this->get(route('admin.content.press'))->assertRedirect(route('admin.login'));
-        $this->get(route('admin.content.reviews'))->assertRedirect(route('admin.login'));
-        $this->get(route('admin.content.faqs'))->assertRedirect(route('admin.login'));
+        $this->get(route('admin.content.blog'))->assertNotFound();
+        $this->get(route('admin.content.press'))->assertNotFound();
+        $this->get(route('admin.content.reviews'))->assertNotFound();
+        $this->get(route('admin.content.faqs'))->assertNotFound();
     }
 }
