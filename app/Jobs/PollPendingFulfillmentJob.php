@@ -20,12 +20,14 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\CriticalSystemAlert;
 
 class PollPendingFulfillmentJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 120; // Allow polling up to 120 times (20 minutes total)
+    public int $tries = 1000; // Allow polling up to 1000 times to support 12-hour backoff
 
     public function __construct(protected OrderItem $item)
     {
@@ -53,8 +55,9 @@ class PollPendingFulfillmentJob implements ShouldQueue
             // a DB::transaction closure is a Laravel antipattern — the queue-level operation
             // can silently fail or race against an uncommitted transaction.
             $needsRelease = false;
+            $attempt = $this->attempts();
 
-            DB::transaction(function () use ($item, $status, $result, $provider, $orderService, $walletProvider, &$needsRelease) {
+            DB::transaction(function () use ($item, $status, $result, $provider, $orderService, $walletProvider, &$needsRelease, $attempt) {
                 // Re-fetch with lock inside the transaction for fresh state
                 $item = OrderItem::where('id', $item->id)->lockForUpdate()->first();
                 if (! $item) {
@@ -84,17 +87,50 @@ class PollPendingFulfillmentJob implements ShouldQueue
                 } else {
                     // Still pending/processing — signal that we need to re-queue after the transaction
                     $needsRelease = true;
+
+                    if ($attempt === 60 && $item->fulfillment_status !== FulfillmentStatus::Delayed) {
+                        $item->fulfillment_status = FulfillmentStatus::Delayed;
+                        $item->save();
+
+                        Notification::route('mail', config('mail.admin_address') ?? 'dev@roddytechgroup.com')
+                            ->notify(new CriticalSystemAlert(
+                                'Order Delayed by Provider',
+                                "Fulfillment for Order Item {$item->id} has been stuck in IN_PROGRESS for over 10 minutes. The system will continue monitoring it automatically.",
+                                ['Order Item ID' => $item->id, 'Provider' => $item->provider_name]
+                            ));
+                    }
                 }
             });
 
             // Bug #6 fix: gracefully handle max attempts instead of throwing MaxAttemptsExceededException
-            if ($this->attempts() >= $this->tries - 1) {
-                $this->failed(new \Exception("Polling exhausted after {$this->tries} attempts."));
+            if ($attempt >= 108) { // 60 attempts at 10s + 48 attempts at 15m = ~12 hours
+                Log::critical("PollPendingFulfillmentJob stopping after 12 hours for item {$item->id}");
+
+                DB::transaction(function () use ($item) {
+                    $lockedItem = OrderItem::where('id', $item->id)->lockForUpdate()->first();
+                    if (! $lockedItem || in_array($lockedItem->fulfillment_status, [FulfillmentStatus::Fulfilled, FulfillmentStatus::Failed])) {
+                        return;
+                    }
+
+                    $lockedItem->fulfillment_status = FulfillmentStatus::Delayed;
+                    $lockedItem->save();
+
+                    Notification::route('mail', config('mail.admin_address') ?? 'dev@roddytechgroup.com')
+                        ->notify(new CriticalSystemAlert(
+                            'Action Required: Order Permanently Stuck',
+                            "Order Item {$lockedItem->id} has been polling for 12 hours with no resolution. It has been frozen in the 'Delayed' state. Manual review required.",
+                            ['Order Item ID' => $lockedItem->id]
+                        ));
+                });
                 return;
             }
 
             if ($needsRelease) {
-                $this->release(10); // Release back to queue in 10 seconds
+                if ($attempt <= 60) {
+                    $this->release(10); // First 10 mins: poll every 10 seconds
+                } else {
+                    $this->release(900); // Next 12 hours: poll every 15 minutes
+                }
             }
 
         } catch (\Exception $e) {
@@ -104,29 +140,28 @@ class PollPendingFulfillmentJob implements ShouldQueue
     }
 
     /**
-     * Bug #6 fix: Handle permanent job failure after all 120 polling attempts are exhausted.
-     * Without this, items stay stuck in 'processing' with no refund and no alert.
+     * Handle permanent job failure (e.g., job crashed via exception).
+     * We freeze the item as Delayed and alert the admin instead of auto-refunding.
      */
     public function failed(\Throwable $e): void
     {
         Log::critical("PollPendingFulfillmentJob permanently failed for item {$this->item->id} after all retries. Manual intervention required.");
 
-        $walletProvider = app(WalletPaymentProvider::class);
-
-        DB::transaction(function () use ($e, $walletProvider) {
+        DB::transaction(function () use ($e) {
             $item = OrderItem::where('id', $this->item->id)->lockForUpdate()->first();
-            if (! $item || $item->fulfillment_status === FulfillmentStatus::Fulfilled) {
+            if (! $item || in_array($item->fulfillment_status, [FulfillmentStatus::Fulfilled, FulfillmentStatus::Failed])) {
                 return;
             }
 
-            $item->fulfillment_status = FulfillmentStatus::Failed;
-            $item->failed_at = now();
+            $item->fulfillment_status = FulfillmentStatus::Delayed;
             $item->save();
 
-            FulfillmentFailed::dispatch($item, 'Polling exhausted after 120 attempts: '.$e->getMessage());
-
-            $this->handleFailureReversal($item, $walletProvider);
-            $this->checkOrderCompletion($item->order_id, app(OrderService::class));
+            Notification::route('mail', config('mail.admin_address') ?? 'dev@roddytechgroup.com')
+                ->notify(new CriticalSystemAlert(
+                    'Action Required: Polling Job Failed Permanently',
+                    "Order Item {$item->id} polling job failed permanently. It has been frozen in the 'Delayed' state. Exception: " . $e->getMessage(),
+                    ['Order Item ID' => $item->id]
+                ));
         });
     }
 

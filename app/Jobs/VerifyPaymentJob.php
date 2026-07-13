@@ -103,6 +103,17 @@ class VerifyPaymentJob implements ShouldQueue
                         FulfillOrderItemJob::dispatch($item);
                     }
                 }
+
+                // 5. Update any pending webhooks related to this attempt
+                if ($attempt->idempotency_key) {
+                    \App\Models\PaymentWebhook::where('reference', $attempt->idempotency_key)
+                        ->where('processing_status', 'pending')
+                        ->update([
+                            'processed' => true,
+                            'processing_status' => 'processed',
+                            'processed_at' => now(),
+                        ]);
+                }
             } else {
                 Log::warning("VerifyPaymentJob: payment verification returned unpaid/pending for attempt {$attempt->id}");
             }
