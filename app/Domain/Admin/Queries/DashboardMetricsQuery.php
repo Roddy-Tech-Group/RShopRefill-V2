@@ -14,6 +14,7 @@ use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -240,28 +241,39 @@ class DashboardMetricsQuery
 
         $total = 0.0;
         foreach ($balancesByCurrency as $code => $balance) {
-            $code = strtoupper((string) $code);
-            $balance = (float) $balance;
-
-            if ($code === 'USD') {
-                $total += $balance;
-
-                continue;
-            }
-
-            if ($code === Currency::RCOIN->value) {
-                $total += $balance * $rcoinUsdRate;
-
-                continue;
-            }
-
-            $rate = (float) ($ratesPerUsd[$code] ?? 0.0);
-            if ($rate > 0) {
-                $total += $balance / $rate;
-            }
+            $total += $this->balanceToUsd((string) $code, (float) $balance, $ratesPerUsd, $rcoinUsdRate);
         }
 
         return round($total, 2);
+    }
+
+    /**
+     * Convert a single balance in `$code` to USD using the platform's canonical
+     * rule (the same one that powers the wallet-balance total and the money
+     * split, so the CLI money report can never disagree with the dashboard):
+     *
+     *   - USD counts at face value.
+     *   - Rcoin converts at the rcoin_usd_rate setting.
+     *   - Every other currency divides by its active per-USD rate.
+     *   - A currency with no usable rate contributes 0 (no rate, no claim).
+     *
+     * @param  Collection<string, mixed>  $ratesPerUsd  currency code => rate_per_usd
+     */
+    public function balanceToUsd(string $code, float $amount, Collection $ratesPerUsd, float $rcoinUsdRate): float
+    {
+        $code = strtoupper($code);
+
+        if ($code === 'USD') {
+            return $amount;
+        }
+
+        if ($code === Currency::RCOIN->value) {
+            return $amount * $rcoinUsdRate;
+        }
+
+        $rate = (float) ($ratesPerUsd[$code] ?? 0.0);
+
+        return $rate > 0 ? $amount / $rate : 0.0;
     }
 
     /**
