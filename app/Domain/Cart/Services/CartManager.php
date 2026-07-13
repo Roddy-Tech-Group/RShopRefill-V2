@@ -51,8 +51,23 @@ class CartManager
             // 1. Validate addition
             $this->validationService->validateAddition($variant, $requestedValue);
 
-            // 2. Check for existing identical variant in cart
-            $existingItem = $cart->items()->where('product_variant_id', $variant->id)->first();
+            // 2. Check for existing identical variant in cart (and matching requested value if variable)
+            $existingItems = $cart->items()->where('product_variant_id', $variant->id)->get();
+            $existingItem = null;
+            foreach ($existingItems as $item) {
+                if ($variant->is_variable && $requestedValue !== null) {
+                    // For variable products, treat the stored provider_cost_usd as the requested face value
+                    // (Or infer it from display_amount/quantity for legacy items if provider_cost_usd is missing/0)
+                    $itemRequestedValue = $item->provider_cost_usd > 0 ? $item->provider_cost_usd : ($item->display_amount / $item->quantity);
+                    if (abs($itemRequestedValue - $requestedValue) < 0.001) {
+                        $existingItem = $item;
+                        break;
+                    }
+                } else {
+                    $existingItem = $item;
+                    break;
+                }
+            }
 
             // 3. Calculate pricing
             $pricing = $this->pricingService->calculatePricing($variant, $quantity);
@@ -62,12 +77,14 @@ class CartManager
             // Assuming for now that CartPricingService handles the variant's base configuration.
             // If requestedValue is passed, we overwrite display_amount and subtotal.
             if ($variant->is_variable && $requestedValue !== null) {
-                // Simplified variable pricing: assume provider cost scales linearly
-                // or we take a fixed percentage of face value.
-                // This will need expansion based on provider specifics, but we'll
-                // override display_amount for now.
-                $pricing['display_amount'] = $requestedValue * $quantity;
-                $pricing['subtotal_snapshot'] = $requestedValue * $quantity; // Assuming 1:1 for simplicity if not scaled
+                $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $requestedValue);
+                $subtotalUsd = $unitPriceUsd * $quantity;
+
+                $pricing['provider_cost_usd'] = $requestedValue;
+                $pricing['markup_amount'] = $unitPriceUsd - $requestedValue;
+                $pricing['unit_price_snapshot'] = $unitPriceUsd;
+                $pricing['subtotal_snapshot'] = $subtotalUsd;
+                $pricing['display_amount'] = $subtotalUsd;
             }
 
             // Merge any incoming metadata over the snapshot we may already
@@ -85,8 +102,14 @@ class CartManager
                 $newPricing = $this->pricingService->calculatePricing($variant, $newQuantity);
 
                 if ($variant->is_variable && $requestedValue !== null) {
-                    $newPricing['display_amount'] = $requestedValue * $newQuantity;
-                    $newPricing['subtotal_snapshot'] = $requestedValue * $newQuantity;
+                    $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $requestedValue);
+                    $subtotalUsd = $unitPriceUsd * $newQuantity;
+
+                    $newPricing['provider_cost_usd'] = $requestedValue;
+                    $newPricing['markup_amount'] = $unitPriceUsd - $requestedValue;
+                    $newPricing['unit_price_snapshot'] = $unitPriceUsd;
+                    $newPricing['subtotal_snapshot'] = $subtotalUsd;
+                    $newPricing['display_amount'] = $subtotalUsd;
                 }
 
                 $existingItem->update(array_merge([
@@ -130,9 +153,15 @@ class CartManager
 
         // Handle variable products correctly if updating quantity
         if ($item->variant->is_variable) {
-            $singleRequestedValue = $item->display_amount / $item->quantity;
-            $pricing['display_amount'] = $singleRequestedValue * $quantity;
-            $pricing['subtotal_snapshot'] = $singleRequestedValue * $quantity;
+            $singleRequestedValue = $item->provider_cost_usd > 0 ? $item->provider_cost_usd : ($item->display_amount / $item->quantity);
+            $unitPriceUsd = $this->pricingService->resolveRetailPrice($item->variant->product, $singleRequestedValue);
+            $subtotalUsd = $unitPriceUsd * $quantity;
+
+            $pricing['provider_cost_usd'] = $singleRequestedValue;
+            $pricing['markup_amount'] = $unitPriceUsd - $singleRequestedValue;
+            $pricing['unit_price_snapshot'] = $unitPriceUsd;
+            $pricing['subtotal_snapshot'] = $subtotalUsd;
+            $pricing['display_amount'] = $subtotalUsd;
         }
 
         $item->update(array_merge(['quantity' => $quantity], $pricing));

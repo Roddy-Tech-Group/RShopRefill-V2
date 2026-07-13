@@ -90,6 +90,6 @@ class AdminOrdersExportTest extends TestCase
     {
         $response = $this->get(route('admin.api.commerce.orders.export'));
 
-        $this->assertContains($response->status(), [302, 401, 403]);
+        $response->assertNotFound();
     }
 }

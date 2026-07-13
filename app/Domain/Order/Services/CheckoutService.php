@@ -109,6 +109,10 @@ class CheckoutService
                     $validatedTotals['total'] = max(0, $validatedTotals['total'] - $couponDiscountUsd);
                     $couponId = $couponModel->id;
                     $couponCodeApplied = $couponModel->code;
+                    
+                    // Apply discount to the in-memory item so OrderItem captures the discounted price
+                    $matchingItem->subtotal_snapshot = max(0, $matchingItem->subtotal_snapshot - $couponDiscountUsd);
+                    $matchingItem->display_amount = max(0, $matchingItem->display_amount - $couponDiscountUsd);
                 }
             }
 

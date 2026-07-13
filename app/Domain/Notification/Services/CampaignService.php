@@ -30,7 +30,7 @@ class CampaignService
 
         // Active 30 days filter example
         if (! empty($campaign->audience_filters['active_last_30_days'])) {
-            $query->where('last_seen_at', '>=', now()->subDays(30));
+            $query->where('updated_at', '>=', now()->subDays(30));
         }
 
         $sentCount = 0;

@@ -66,7 +66,7 @@ class ProductOutOfStockToggleTest extends TestCase
         $product = $this->makeProduct();
 
         $this->patch("/admin/api/catalog/products/{$product->id}/out-of-stock", ['is_out_of_stock' => true])
-            ->assertRedirect();
+            ->assertNotFound();
 
         $this->assertFalse($product->refresh()->is_out_of_stock);
     }

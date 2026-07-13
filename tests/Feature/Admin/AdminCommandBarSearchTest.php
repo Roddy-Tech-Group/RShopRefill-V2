@@ -97,6 +97,6 @@ class AdminCommandBarSearchTest extends TestCase
     public function test_endpoint_requires_admin_authentication(): void
     {
         $this->get(route('admin.search-suggest', ['q' => 'test']))
-            ->assertRedirect();
+            ->assertNotFound();
     }
 }

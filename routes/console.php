@@ -166,7 +166,7 @@ Schedule::command('reconcile:wallet-balances')->dailyAt('02:00')->sentryMonitor(
 Schedule::command('reconcile:orphaned-sessions')->hourly()->sentryMonitor('reconcile-orphaned-sessions');
 
 // Enterprise Provider Monitoring
-Schedule::command('zendit:check-balance --threshold=500')->hourly()->sentryMonitor('zendit-check-balance');
+Schedule::command('zendit:check-balance --threshold=250')->hourly()->sentryMonitor('zendit-check-balance');
 
 // Check for stuck bank payouts and fallback to manual processing
 Schedule::command('payouts:check-stuck')

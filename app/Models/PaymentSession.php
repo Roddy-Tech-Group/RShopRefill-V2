@@ -136,7 +136,7 @@ class PaymentSession extends Model
             'processing' => ['confirmed', 'failed'],
             'confirmed' => [],
             'failed' => [],
-            'expired' => [],
+            'expired' => ['confirmed', 'failed'],
             'cancelled' => [],
         ];
 

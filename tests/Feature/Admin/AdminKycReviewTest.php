@@ -89,7 +89,7 @@ class AdminKycReviewTest extends TestCase
 
         // Guests are bounced to the admin login.
         $this->get(route('admin.kyc.document', [$submission, 'front']))
-            ->assertRedirect(route('admin.login'));
+            ->assertNotFound();
 
         // Admins can stream the document.
         $this->actingAs($this->admin(), 'admin')

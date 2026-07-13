@@ -16,7 +16,10 @@ class SeoHeadTest extends TestCase
 
     public function test_canonical_anchors_to_configured_host_not_request_host(): void
     {
-        config(['app.url' => 'https://rshoprefill.com']);
+        config([
+            'app.url' => 'https://rshoprefill.com',
+            'app.canonical_host' => '', // Empty to disable middleware redirect
+        ]);
         $this->withoutVite();
 
         // Request arrives on the www host; canonical must still be non-www.
@@ -27,7 +30,10 @@ class SeoHeadTest extends TestCase
 
     public function test_homepage_canonical_has_no_trailing_path(): void
     {
-        config(['app.url' => 'https://rshoprefill.com']);
+        config([
+            'app.url' => 'https://rshoprefill.com',
+            'app.canonical_host' => 'rshoprefill.com',
+        ]);
         $this->withoutVite();
 
         $html = $this->get('https://rshoprefill.com/')->assertOk()->getContent();

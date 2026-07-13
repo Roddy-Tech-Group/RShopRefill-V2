@@ -108,9 +108,6 @@ class WalletPaymentProvider implements PaymentProviderInterface
         });
     }
 
-    /**
-     * Release previously locked/reserved funds due to fulfillment failure.
-     */
     public function releaseFunds(PaymentAttempt $attempt): void
     {
         if ($attempt->payment_status !== PaymentStatus::Reserved) {
@@ -126,6 +123,27 @@ class WalletPaymentProvider implements PaymentProviderInterface
 
             $attempt->payment_status = PaymentStatus::Failed;
             $attempt->failed_at = now();
+            $attempt->save();
+        });
+    }
+
+    /**
+     * Release a specific amount of previously locked/reserved funds (partial failure).
+     */
+    public function releasePartialFunds(PaymentAttempt $attempt, float $amount): void
+    {
+        if ($attempt->payment_status !== PaymentStatus::Reserved) {
+            return;
+        }
+
+        $user = $attempt->user;
+        $currencyEnum = Currency::from(strtoupper($attempt->currency));
+        $wallet = $this->walletService->getOrCreateWallet($user, $currencyEnum);
+
+        DB::transaction(function () use ($wallet, $attempt, $amount) {
+            $this->walletService->unlockFunds($wallet, $amount);
+
+            $attempt->amount -= $amount;
             $attempt->save();
         });
     }

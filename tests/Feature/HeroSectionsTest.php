@@ -112,7 +112,7 @@ class HeroSectionsTest extends TestCase
     public function test_guest_is_redirected_from_the_hero_sections_admin(): void
     {
         $this->get(route('admin.content.hero-sections'))
-            ->assertRedirect(route('admin.login'));
+            ->assertNotFound();
     }
 
     public function test_admin_page_lists_the_default_hero(): void

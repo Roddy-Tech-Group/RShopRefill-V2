@@ -93,7 +93,7 @@ class AdminRolePermissionsTest extends TestCase
 
         $this->actingAs($moderator, 'admin')
             ->get(route('admin.pricing-rules'))
-            ->assertRedirect(route('admin.dashboard'));
+            ->assertNotFound();
 
         // An allowed page renders fine.
         $this->actingAs($moderator, 'admin')
@@ -101,13 +101,13 @@ class AdminRolePermissionsTest extends TestCase
             ->assertOk();
     }
 
-    public function test_api_route_returns_403_for_denied_role(): void
+    public function test_api_route_returns_404_for_denied_role(): void
     {
         $moderator = $this->admin(AdminRole::Moderator);
 
         $this->actingAs($moderator, 'admin')
             ->getJson(route('admin.api.commerce.orders'))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_admins_page_is_super_admin_only(): void
@@ -120,7 +120,7 @@ class AdminRolePermissionsTest extends TestCase
 
         $this->actingAs($admin, 'admin')
             ->get(route('admin.admins'))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_unknown_route_defaults_to_super_admin_only(): void

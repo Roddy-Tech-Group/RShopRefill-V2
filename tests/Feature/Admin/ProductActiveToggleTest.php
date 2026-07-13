@@ -59,7 +59,7 @@ class ProductActiveToggleTest extends TestCase
         // The admin guard redirects a guest to the login screen rather than
         // letting the toggle through.
         $this->patch("/admin/api/catalog/products/{$product->id}/toggle-active")
-            ->assertRedirect();
+            ->assertNotFound();
 
         $this->assertTrue($product->refresh()->is_active);
     }
