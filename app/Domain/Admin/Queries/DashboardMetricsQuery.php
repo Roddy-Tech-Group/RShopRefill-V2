@@ -144,6 +144,48 @@ class DashboardMetricsQuery
     }
 
     /**
+     * The company's money vs money it merely holds for customers - a plain
+     * separation of the two pools so they are never confused:
+     *
+     *   - customer_float_usd  Every wallet balance summed in USD. A LIABILITY:
+     *                         money customers funded that the business must keep
+     *                         available to honour their spends and withdrawals.
+     *                         NOT the company's to spend.
+     *   - company_profit_usd  Markup actually earned = completed-order sales
+     *                         minus the supplier cost paid. This IS the
+     *                         business's money.
+     *
+     * Deliberately all-time and range-independent: float is a live snapshot (you
+     * cannot date-filter a current balance) and profit is cumulative earnings.
+     *
+     * @return array{customer_float_usd: float, company_profit_usd: float, gross_sales_usd: float, supplier_cost_usd: float}
+     */
+    public function getMoneySplit(): array
+    {
+        $customerFloat = $this->walletBalanceTotalUsd();
+
+        // All-time completed-order sales, converted per-order to USD (same rule
+        // as the Total Revenue KPI, just unfiltered by date).
+        $grossSales = (float) Order::query()
+            ->where('order_status', OrderStatus::Completed->value)
+            ->get(['id', 'total_amount', 'display_currency', 'metadata'])
+            ->sum(fn (Order $order) => $order->usdTotal());
+
+        // Source-of-truth supplier cost from the item cost snapshots.
+        $supplierCost = (float) DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->sum(DB::raw('order_items.provider_cost_usd * order_items.quantity'));
+
+        return [
+            'customer_float_usd' => round($customerFloat, 2),
+            'company_profit_usd' => round(max(0.0, $grossSales - $supplierCost), 2),
+            'gross_sales_usd' => round($grossSales, 2),
+            'supplier_cost_usd' => round($supplierCost, 2),
+        ];
+    }
+
+    /**
      * Resolve a preset string + optional custom bounds into [start, end] Carbon
      * instances or [null, null] for all-time.
      *

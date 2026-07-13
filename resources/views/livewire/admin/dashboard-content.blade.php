@@ -22,6 +22,16 @@
     $walletBalanceTotal = (float) $metrics['wallet_balance_total'];
     $donuts            = (array) ($metrics['donuts'] ?? []);
 
+    // Money separation - what the business holds for customers (a liability)
+    // vs what it has actually earned. All-time + live snapshot, so it stays
+    // independent of the date-range picker (a balance is current; profit is
+    // cumulative).
+    $moneySplit    = $dashboardQuery->getMoneySplit();
+    $customerFloat = (float) $moneySplit['customer_float_usd'];
+    $companyProfit = (float) $moneySplit['company_profit_usd'];
+    $grossSales    = (float) $moneySplit['gross_sales_usd'];
+    $supplierCost  = (float) $moneySplit['supplier_cost_usd'];
+
     // ── Tables ─────────────────────────────────────────────────────────
     $latestUsers        = $dashboardQuery->getLatestUsers(5)->items();
     $latestTransactions = $dashboardQuery->getLatestTransactions(5)->items();
@@ -223,6 +233,51 @@
 
         </div>
         </div> {{-- /skeleton-wrap KPIs --}}
+
+        {{-- Money separation: customer float (a liability) vs company earnings.
+             Live + all-time, so it ignores the date-range picker above - a wallet
+             balance is a current figure and profit is cumulative. --}}
+        <div class="rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+            <div>
+                <h2 class="text-base font-bold tracking-tight text-zinc-900 sm:text-lg dark:text-white">Money separation</h2>
+                <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">What you hold for customers vs what the business has earned - live, all-time.</p>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                {{-- Held for customers: a liability, NOT the company's money --}}
+                <div class="rounded-[12px] border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+                    <div class="flex items-center gap-2">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 3h16.5A1.5 1.5 0 0121.75 4.5v15a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-15A1.5 1.5 0 013.75 3z"/></svg>
+                        </span>
+                        <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Held for customers</p>
+                    </div>
+                    <p class="mt-2 text-2xl font-extrabold tabular-nums text-zinc-900 sm:text-3xl dark:text-white">${{ number_format($customerFloat, 2) }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Sitting in customer wallets. You <span class="font-semibold text-zinc-700 dark:text-zinc-200">owe</span> this - keep it reserved; it is not the company's to spend.</p>
+                </div>
+
+                {{-- Company earnings: the business's actual money --}}
+                <div class="rounded-[12px] border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                    <div class="flex items-center gap-2">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-emerald-600/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </span>
+                        <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Company earnings</p>
+                    </div>
+                    <p class="mt-2 text-2xl font-extrabold tabular-nums text-zinc-900 sm:text-3xl dark:text-white">${{ number_format($companyProfit, 2) }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">Markup earned on completed orders. This is the business's money - yours to keep or reinvest.</p>
+                </div>
+            </div>
+
+            {{-- Reconciliation: gross sales minus supplier cost equals your profit --}}
+            <div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-700/60 dark:text-zinc-400">
+                <span>Gross sales <span class="font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">${{ number_format($grossSales, 2) }}</span></span>
+                <span aria-hidden="true" class="text-zinc-400">-</span>
+                <span>Supplier cost <span class="font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">${{ number_format($supplierCost, 2) }}</span></span>
+                <span aria-hidden="true" class="text-zinc-400">=</span>
+                <span>Your profit <span class="font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">${{ number_format($companyProfit, 2) }}</span></span>
+            </div>
+        </div>
 
         {{-- ─── Charts row (placeholder UI — no aggregation endpoints yet) ─ --}}
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
