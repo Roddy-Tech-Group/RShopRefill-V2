@@ -304,6 +304,15 @@
 <link rel="dns-prefetch" href="https://flagcdn.com">
 <link rel="preconnect" href="https://flagcdn.com" crossorigin>
 
+{{-- Brand-logo CDN: ~1,300 gift-card / top-up / bill brands serve their logo
+     from this single host. Pre-opening the TCP+TLS connection means the first
+     row of product logos starts downloading the instant the grid paints instead
+     of stalling on a cold handshake. No `crossorigin` - the logos load through
+     plain <img> (no-cors), so a credentialed preconnect would open a second
+     connection the image requests never reuse. --}}
+<link rel="dns-prefetch" href="https://bmk.idtdigitalpayments.com">
+<link rel="preconnect" href="https://bmk.idtdigitalpayments.com">
+
 {{-- Async third-party origins (chat, analytics, captcha). These load async/defer
      and sit OFF the critical render path, so dns-prefetch (resolve DNS early) is
      the right hint - not preconnect, which would spend a full TCP+TLS connection

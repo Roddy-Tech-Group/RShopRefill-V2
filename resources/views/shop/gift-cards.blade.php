@@ -331,7 +331,20 @@
                                                 class="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] bg-[#ffffff] shadow-sm ring-1 ring-zinc-200"
                                             >
                                                 @if ($logoSrc)
-                                                    <img src="{{ $logoSrc }}" alt="{{ Product::brandDisplayName($product->brand_key) }}" class="h-full w-full object-cover" loading="lazy">
+                                                    {{-- The first ~10 tiles (the two rows above the fold on a 5-col
+                                                         desktop grid) load eagerly with a high fetch priority so the
+                                                         page paints its logos immediately; everything below defers with
+                                                         lazy loading. decoding=async keeps logo decode off the main
+                                                         thread, and the intrinsic 16:10 size prevents any reflow. --}}
+                                                    <img
+                                                        src="{{ $logoSrc }}"
+                                                        alt="{{ Product::brandDisplayName($product->brand_key) }}"
+                                                        width="320" height="200"
+                                                        class="h-full w-full object-cover"
+                                                        loading="{{ $loop->index < 10 ? 'eager' : 'lazy' }}"
+                                                        @if ($loop->index < 5) fetchpriority="high" @endif
+                                                        decoding="async"
+                                                    >
                                                 @else
                                                     <span class="text-2xl font-black tracking-tight text-[#3f3f46]">
                                                         {{ str(Product::brandDisplayName($product->brand_key))->substr(0, 2)->upper() }}
