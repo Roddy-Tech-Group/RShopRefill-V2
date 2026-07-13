@@ -94,7 +94,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
                     'status' => $response->status(),
                     'body' => $response->json(),
                 ]);
-                throw new \Exception('Failed to initialize NowPayments billing.');
+                throw new \Exception('Failed to initiate Crypto billing.');
             }
 
             $body = $response->json();
@@ -152,6 +152,8 @@ class NowPaymentsProvider implements PaymentProviderInterface
         $payCurrency = strtolower($payCurrency);
         if ($payCurrency === 'usdt') {
             $payCurrency = 'usdttrc20';
+        } elseif ($payCurrency === 'bnb') {
+            $payCurrency = 'bnbbsc';
         }
         $txRef = $attempt->idempotency_key;
 
@@ -226,7 +228,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
 
                 return [
                     'status' => 'failed',
-                    'message' => 'Failed to initialize NowPayments billing: '.($response->json('message') ?? 'Unknown error'),
+                    'message' => 'Failed to initiate Crypto billing: '.($response->json('message') ?? 'Unknown error'),
                 ];
             }
 

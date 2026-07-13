@@ -371,7 +371,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             if (empty($innerData) || empty($innerData['transfer_account'])) {
                 return [
                     'status' => 'failed',
-                    'message' => 'Failed to generate bank transfer virtual account. Please make sure "Pay with Bank Transfer" is enabled in your Flutterwave dashboard under Settings > Payment Methods.',
+                    'message' => 'Failed to generate bank transfer virtual account. Please try again or contact support.',
                 ];
             }
 
