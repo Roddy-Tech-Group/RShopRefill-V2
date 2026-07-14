@@ -64,6 +64,14 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
             'rate_per_usd' => 1400.0,
             'is_active' => true,
         ]);
+
+        CurrencyRate::create([
+            'code' => 'XAF',
+            'name' => 'CFA Franc BEAC',
+            'type' => 'fiat',
+            'rate_per_usd' => 600.0,
+            'is_active' => true,
+        ]);
     }
 
     /**

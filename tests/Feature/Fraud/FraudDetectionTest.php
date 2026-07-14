@@ -26,21 +26,21 @@ class FraudDetectionTest extends TestCase
         $this->assertFalse($this->service()->isSuspiciousCheckout($user, 50.0, '1.2.3.4'));
     }
 
-    public function test_a_high_value_checkout_on_a_new_account_is_flagged_and_alerts_admin(): void
+    public function test_a_high_value_checkout_on_an_unverified_account_is_flagged_and_alerts_admin(): void
     {
         Notification::fake();
-        $user = User::factory()->create(['created_at' => now()->subDays(2)]);
+        $user = User::factory()->create(['kyc_status' => 'pending']);
 
-        $this->assertTrue($this->service()->isSuspiciousCheckout($user, 600.0, '1.2.3.4'));
+        $this->assertTrue($this->service()->isSuspiciousCheckout($user, 1500.0, '1.2.3.4'));
 
         Notification::assertSentOnDemand(CriticalSystemAlert::class);
     }
 
-    public function test_a_high_value_checkout_on_an_established_account_is_allowed(): void
+    public function test_a_high_value_checkout_on_a_verified_account_is_allowed(): void
     {
-        $user = User::factory()->create(['created_at' => now()->subDays(30)]);
+        $user = User::factory()->create(['kyc_status' => 'verified']);
 
-        $this->assertFalse($this->service()->isSuspiciousCheckout($user, 600.0, '1.2.3.4'));
+        $this->assertFalse($this->service()->isSuspiciousCheckout($user, 1500.0, '1.2.3.4'));
     }
 
     public function test_purchase_velocity_over_the_limit_is_flagged(): void
