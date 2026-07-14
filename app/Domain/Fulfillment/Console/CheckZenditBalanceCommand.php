@@ -6,6 +6,7 @@ use App\Notifications\CriticalSystemAlert;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
 class CheckZenditBalanceCommand extends Command
@@ -16,7 +17,6 @@ class CheckZenditBalanceCommand extends Command
 
     public function handle()
     {
-        $threshold = (float) $this->option('threshold');
         $apiKey = config('services.zendit.api_key');
         $baseUrl = config('services.zendit.base_url', 'https://api.zendit.io/v1');
 
@@ -48,8 +48,49 @@ class CheckZenditBalanceCommand extends Command
 
             $this->info("Current Zendit Balance: {$balance} {$currency}");
 
-            if ($balance < $threshold) {
-                $msg = "Zendit account balance has dropped below the threshold ({$threshold} {$currency}). Current Balance: {$balance} {$currency}. Fulfillments may begin to fail if funds run out.";
+            if ($balance > 250) {
+                // If balance is healthy, reset all alert states
+                Cache::forget('zendit_last_alert_level');
+                Cache::forget('zendit_low_balance_alerted_at');
+                return;
+            }
+
+            $shouldAlert = false;
+            $msg = "";
+
+            if ($balance <= 100) {
+                // Below $100: Alert every 2 hours
+                $lastAlerted = Cache::get('zendit_low_balance_alerted_at');
+                
+                if (! $lastAlerted || now()->diffInHours($lastAlerted) >= 2) {
+                    $shouldAlert = true;
+                    $msg = "CRITICAL: Zendit balance is severely low ({$balance} {$currency}). Fulfillments may fail very soon.";
+                    
+                    Cache::put('zendit_low_balance_alerted_at', now());
+                    Cache::put('zendit_last_alert_level', 100);
+                }
+            } else {
+                // Between $100 and $250: Tiered alerts
+                $triggerLevel = null;
+                if ($balance <= 150) {
+                    $triggerLevel = 150;
+                } elseif ($balance <= 200) {
+                    $triggerLevel = 200;
+                } elseif ($balance <= 250) {
+                    $triggerLevel = 250;
+                }
+
+                $lastAlertedLevel = Cache::get('zendit_last_alert_level');
+
+                if (is_null($lastAlertedLevel) || $triggerLevel < $lastAlertedLevel) {
+                    $shouldAlert = true;
+                    $msg = "Zendit account balance has dropped below {$triggerLevel} {$currency}. Current Balance: {$balance} {$currency}.";
+                    
+                    Cache::put('zendit_last_alert_level', $triggerLevel);
+                }
+            }
+
+            if ($shouldAlert) {
                 Log::critical($msg);
 
                 // Alert Admin via CriticalSystemAlert
@@ -60,7 +101,6 @@ class CheckZenditBalanceCommand extends Command
                         title: 'Zendit Balance Low',
                         description: $msg,
                         context: [
-                            'Threshold' => $threshold,
                             'Current Balance' => $balance,
                             'Currency' => $currency,
                         ]

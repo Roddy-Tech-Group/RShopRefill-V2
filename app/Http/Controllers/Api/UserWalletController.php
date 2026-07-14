@@ -51,6 +51,17 @@ class UserWalletController extends Controller
         $displayCurrency = $validated['display_currency'] ?? null;
 
         try {
+            $fraudService = app(\App\Domain\Fraud\Services\FraudDetectionService::class);
+            $usdRate = app(\App\Domain\Wallet\Services\CurrencyRateService::class)->resolveRate($currency->value, 'USD');
+            $usdAmount = (float) $validated['amount'] * $usdRate;
+
+            if ($fraudService->isSuspiciousCheckout($request->user(), $usdAmount, $request->ip())) {
+                $msg = $request->user()->isKycVerified()
+                    ? 'Your funding attempt was flagged by our security systems. Please contact support.'
+                    : 'Your funding attempt was flagged by our security systems. Please complete KYC verification to proceed.';
+                return response()->json(['message' => $msg], 403);
+            }
+
             $result = $this->fundingService->initializeFunding(
                 user: $request->user(),
                 wallet: $wallet,

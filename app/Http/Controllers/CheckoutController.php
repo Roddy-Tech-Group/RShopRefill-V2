@@ -163,7 +163,10 @@ class CheckoutController extends Controller
         };
 
         if ($fraudService->isSuspiciousCheckout($user, $amount, $request->ip())) {
-            $msg = 'Your checkout attempt was flagged by our security systems. Please contact support.';
+            $msg = $user->isKycVerified()
+                ? 'Your checkout attempt was flagged by our security systems. Please contact support.'
+                : 'Your checkout attempt was flagged by our security systems. Please complete KYC verification to proceed.';
+            
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['message' => $msg], 403);
             }

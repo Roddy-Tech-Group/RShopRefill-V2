@@ -28,10 +28,10 @@ class FraudDetectionService
             $reason = 'User exceeded 10 purchases in an hour.';
         }
 
-        // 2. High Value Transaction for new accounts
-        if (! $flagged && $amount > 500 && $user->created_at->diffInDays(now()) < 7) {
+        // 2. High Value Transaction for unverified accounts
+        if (! $flagged && $amount > 1000 && ! $user->isKycVerified()) {
             $flagged = true;
-            $reason = 'High value transaction (>500) for a new account (<7 days).';
+            $reason = 'High value transaction (>1000) for an unverified account.';
         }
 
         // 3. IP address velocity (prevent carding attacks)
