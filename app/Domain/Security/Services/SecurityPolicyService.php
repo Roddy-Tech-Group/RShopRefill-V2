@@ -12,6 +12,10 @@ class SecurityPolicyService
      */
     public function isDeviceMature(TrustedDevice $device): bool
     {
+        if (\App\Support\FeatureFlag::off('device_restriction')) {
+            return true;
+        }
+
         if (!$device->isTrusted()) {
             return false;
         }
