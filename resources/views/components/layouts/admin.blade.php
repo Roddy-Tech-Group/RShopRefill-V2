@@ -622,7 +622,9 @@
                     <img src="{{ asset('assets/' . rawurlencode('system setting.svg')) }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
                     API & Integrations
                 </a>
+                @endif
 
+                @if ($can('admin.crypto-fees'))
                 @php $active = $isCurrent('admin.crypto-fees*'); @endphp
                 <a href="{{ route('admin.crypto-fees') }}" wire:navigate data-tip="Crypto Fees" class="{{ $navItemClass($active) }}">
                     <svg class="{{ $iconClass($active) }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
