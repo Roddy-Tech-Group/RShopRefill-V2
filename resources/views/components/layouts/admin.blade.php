@@ -264,7 +264,7 @@
             {{-- Brand. Two stacked marks: the full wordmark when expanded,
                  the square favicon when collapsed (swap is CSS-driven via the
                  admin-sidebar-collapsed class on <html>). --}}
-            <a href="{{ route('admin.dashboard') }}" wire:navigate class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+            <a href="{{ auth('admin')->user()?->canAccessAdminRoute('dashboard') ? route('admin.dashboard') : route('admin.account') }}" wire:navigate class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                 <span class="brand-full flex h-10 items-center">
                     <img
                         src="{{ asset('assets/Rshoprefillslogo.webp') }}"
@@ -314,13 +314,15 @@
 
             <nav class="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-[12px] [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10" aria-label="Admin">
                 {{-- Overview --}}
-                @php $active = $isCurrent('admin.dashboard'); @endphp
-                <a href="{{ route('admin.dashboard') }}" wire:navigate data-tip="Overview" class="{{ $navItemClass($active) }}">
-                    <svg class="{{ $iconClass($active) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25zM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25z"/>
-                    </svg>
-                    Overview
-                </a>
+                @if ($can('admin.dashboard'))
+                    @php $active = $isCurrent('admin.dashboard'); @endphp
+                    <a href="{{ route('admin.dashboard') }}" wire:navigate data-tip="Overview" class="{{ $navItemClass($active) }}">
+                        <svg class="{{ $iconClass($active) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25zM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25z"/>
+                        </svg>
+                        Overview
+                    </a>
+                @endif
 
                 {{-- Products (expandable group — SoC for product/service categories) --}}
                 @if ($can('admin.products'))

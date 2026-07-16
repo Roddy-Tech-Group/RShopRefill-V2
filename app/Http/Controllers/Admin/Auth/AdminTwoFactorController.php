@@ -107,7 +107,11 @@ class AdminTwoFactorController extends Controller
             'email' => $admin->email,
         ]);
 
-        return redirect()->intended(route('admin.dashboard', absolute: false));
+        $defaultRoute = $admin->canAccessAdminRoute('dashboard')
+            ? route('admin.dashboard', absolute: false)
+            : route('admin.account', absolute: false);
+
+        return redirect()->intended($defaultRoute);
     }
 
     public function resend(Request $request): RedirectResponse

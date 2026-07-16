@@ -51,12 +51,26 @@ class SiteSetting extends Model
 
     public static function put(string $key, mixed $value, string $group = 'general', ?string $description = null): self
     {
+        $oldValue = self::get($key);
+
         $setting = self::updateOrCreate(
             ['key' => $key],
             ['value' => $value, 'group' => $group, 'description' => $description],
         );
 
         Cache::forget(self::cacheKey($key));
+
+        if ($key === 'features.gift_cards_enabled') {
+            $isTruthy = fn($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
+            $wasOn = $isTruthy($oldValue ?? 'on');
+            $isOn = $isTruthy($value);
+
+            if ($wasOn && !$isOn) {
+                \Illuminate\Support\Facades\Artisan::call('app:broadcast-gift-card-outage');
+            } elseif (!$wasOn && $isOn) {
+                \Illuminate\Support\Facades\Artisan::call('notify:giftcards-restored');
+            }
+        }
 
         return $setting;
     }

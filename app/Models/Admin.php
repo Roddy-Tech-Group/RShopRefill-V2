@@ -71,6 +71,7 @@ class Admin extends Authenticatable
      * @var array<string, string>
      */
     public const SECTIONS = [
+        'dashboard' => 'Dashboard',
         'products' => 'Products',
         'orders' => 'Orders',
         'customers' => 'Customers',
@@ -169,7 +170,7 @@ class Admin extends Authenticatable
     {
         $name = str_starts_with($routeName, 'admin.') ? substr($routeName, 6) : $routeName;
 
-        $alwaysAllowed = ['dashboard', 'logout', 'theme', 'account', 'account-activity'];
+        $alwaysAllowed = ['logout', 'theme', 'account', 'account-activity'];
         if (in_array($name, $alwaysAllowed, true)) {
             return true;
         }
@@ -192,12 +193,13 @@ class Admin extends Authenticatable
     public static function routeSection(string $name): ?string
     {
         return match (true) {
+            str_starts_with($name, 'dashboard') || str_starts_with($name, 'api.dashboard.') => 'dashboard',
             str_starts_with($name, 'products') || str_starts_with($name, 'api.catalog.') => 'products',
             str_starts_with($name, 'orders') || $name === 'order' || str_starts_with($name, 'api.commerce.') => 'orders',
             str_starts_with($name, 'customers') || $name === 'customer' || str_starts_with($name, 'customer.') || str_starts_with($name, 'kyc.') => 'customers',
             str_starts_with($name, 'transactions') => 'transactions',
             str_starts_with($name, 'wallets') || str_starts_with($name, 'api.monitoring.') => 'wallets',
-            str_starts_with($name, 'reports') || str_starts_with($name, 'api.dashboard.') || str_starts_with($name, 'api.sre.') => 'reports',
+            str_starts_with($name, 'reports') || str_starts_with($name, 'api.sre.') => 'reports',
             str_starts_with($name, 'newsletter') => 'newsletter',
             str_starts_with($name, 'pricing-rules') => 'pricing-rules',
             str_starts_with($name, 'content.') || str_starts_with($name, 'api.rewards.') => 'content',

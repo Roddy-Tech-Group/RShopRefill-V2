@@ -49,6 +49,10 @@
                  Sits above the sticky header so it announces itself first. --}}
             @include('partials.maintenance-banner')
 
+            @if(\App\Support\FeatureFlag::off('gift_cards'))
+                @include('partials.giftcard-outage-banner')
+            @endif
+
             {{-- Announcement / coupon bar - blue strip rotating admin-set promos. --}}
             @include('partials.announcement-bar')
 

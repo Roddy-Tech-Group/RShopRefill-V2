@@ -78,6 +78,20 @@ class ProcessFundingWebhookJob implements ShouldQueue
                     'processed_at' => now(),
                 ]);
             }
+        } catch (\App\Domain\Transaction\Exceptions\DuplicateTransactionException $e) {
+            Log::info('ProcessFundingWebhookJob encountered duplicate transaction, ignoring.', [
+                'webhook_id' => $webhook->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            $webhook->update([
+                'processed' => true,
+                'processing_status' => 'completed',
+                'processed_at' => now(),
+                'exception_traces' => 'Ignored: ' . $e->getMessage(),
+            ]);
+
+            return;
         } catch (\Throwable $e) {
             Log::error('ProcessFundingWebhookJob failed: '.$e->getMessage(), [
                 'webhook_id' => $webhook->id,

@@ -36,7 +36,8 @@ new class extends Component {
             $notification->update(['read_at' => now()]);
         }
 
-        return redirect($notification->url ?: route('admin.dashboard'));
+        $defaultRoute = auth('admin')->user()->canAccessAdminRoute('dashboard') ? route('admin.dashboard') : route('admin.account');
+        return redirect($notification->url ?: $defaultRoute);
     }
 
     public function markAllRead(): void

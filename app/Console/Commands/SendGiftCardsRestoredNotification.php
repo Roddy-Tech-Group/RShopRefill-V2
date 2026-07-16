@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Domain\Notification\Enums\NotificationChannel;
+use App\Domain\Notification\Enums\NotificationPriority;
+use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
+use App\Mail\GiftCardsRestored;
+use App\Models\User;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+
+class SendGiftCardsRestoredNotification extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'notify:giftcards-restored {--dry-run : Only print what would be done without sending}';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Send the gift cards restored notification to all users via Email, Web Push, and Database';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $isDryRun = $this->option('dry-run');
+        
+        $this->info('Starting to dispatch notifications for all users...');
+
+        if ($isDryRun) {
+            $this->warn('DRY RUN MODE ENABLED. No jobs will actually be dispatched.');
+        }
+
+        $count = 0;
+
+        User::chunkById(100, function ($users) use (&$count, $isDryRun) {
+            foreach ($users as $user) {
+                if (!$isDryRun) {
+                    SendAsynchronousNotificationJob::dispatch(
+                        $user,
+                        'Great News! Gift Cards Are Back!',
+                        'Our Gift Card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online. We appreciate your continued trust in RShopRefills. Happy shopping!',
+                        new GiftCardsRestored($user),
+                        NotificationPriority::High,
+                        [
+                            'url' => config('app.url') . '/dashboard/gift-cards',
+                            'campaign_id' => 'giftcards_restored_2026_07',
+                        ],
+                        [
+                            NotificationChannel::Database,
+                            NotificationChannel::Email,
+                            NotificationChannel::Push,
+                        ],
+                        'giftcards_restored_2026_07_' . $user->id
+                    );
+                }
+                
+                $count++;
+            }
+            
+            $this->info("Processed {$count} users...");
+        });
+
+        $this->info("Done! Processed {$count} users total.");
+        
+        return Command::SUCCESS;
+    }
+}

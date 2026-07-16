@@ -225,7 +225,7 @@ return [
         ],
         'supervisor-default' => [
             'connection' => 'redis',
-            'queue' => ['payments', 'notifications', 'default', 'rewards'],
+            'queue' => ['payments', 'notifications', 'default', 'rewards', 'emails', 'critical-alerts'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
