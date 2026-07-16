@@ -43,7 +43,7 @@ Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handl
 // Airalo low-data + expiry notifications. Auth is HMAC inside the controller
 // (X-Airalo-Signature), not Laravel middleware â€” the partner can't carry our
 // CSRF token. Returns 200 even on no-match so Airalo doesn't keep retrying.
-Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');});
+Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
 
 // Storefront Catalog APIs (Public)
 Route::prefix('storefront')->name('api.storefront.')->group(function () {
