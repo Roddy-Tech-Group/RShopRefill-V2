@@ -51,6 +51,7 @@ class KycSubmission extends Model
         return [
             'date_of_birth' => 'date',
             'reviewed_at' => 'datetime',
+            'document_number' => 'encrypted',
         ];
     }
 

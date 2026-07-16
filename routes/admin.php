@@ -35,12 +35,30 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('2fa', [AdminTwoFactorController::class, 'create'])->name('2fa.challenge');
         Route::post('2fa', [AdminTwoFactorController::class, 'store'])->name('2fa.verify');
         Route::post('2fa/resend', [AdminTwoFactorController::class, 'resend'])->name('2fa.resend');
+
+        Route::get('security-question', [\App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController::class, 'create'])->name('security-question');
+        Route::post('security-question', [\App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController::class, 'store'])->name('security-question.verify');
     });
 
     // Authenticated admin routes
     Route::middleware('admin')->group(function () {
+        // Core Dashboard & Operations
         Route::view('dashboard', 'admin.dashboard')->name('dashboard');
+        Route::view('operations', 'admin.operations')->name('operations');
+
         Route::post('logout', [AdminLoginController::class, 'destroy'])->name('logout');
+
+        // Impersonation
+        Route::post('revert-admin-impersonation', function () {
+            if (!session()->has('impersonator_admin_id')) {
+                return redirect()->route('admin.dashboard');
+            }
+            $superAdmin = \App\Models\Admin::find(session()->pull('impersonator_admin_id'));
+            if ($superAdmin && $superAdmin->isSuperAdmin()) {
+                auth()->guard('admin')->login($superAdmin);
+            }
+            return redirect()->route('admin.admins')->with('status', 'Returned to Super Admin account.');
+        })->name('revert-impersonation');
 
         // Persists the admin's own light/dark/system preference, kept separate
         // from the customer side (different table + guard).
@@ -211,6 +229,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::patch('customers/{user}', [AdminCustomerController::class, 'update'])->name('customer.update');
         Route::post('customers/{user}/ban', [AdminCustomerController::class, 'toggleBan'])->name('customer.ban');
         Route::post('customers/{user}/suspend', [AdminCustomerController::class, 'toggleSuspend'])->name('customer.suspend');
+        Route::post('customers/{user}/restrict', [AdminCustomerController::class, 'toggleRestrict'])->name('customer.restrict');
         Route::post('customers/{user}/funds', [AdminCustomerController::class, 'toggleFunds'])->name('customer.funds');
         Route::post('customers/{user}/verify-email', [AdminCustomerController::class, 'toggleEmailVerification'])->name('customer.verify-email');
         Route::post('customers/{user}/kyc-status', [AdminCustomerController::class, 'setKycStatus'])->name('customer.kyc-status');

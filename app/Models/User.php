@@ -74,8 +74,15 @@ class User extends Authenticatable implements MustVerifyEmail
         'kyc_status',
         'banned_at',
         'suspended_at',
+        'restricted_at',
         'suspension_reason',
         'suspension_review_requested_at',
+        'transaction_pin',
+        'transaction_pin_set_at',
+        'transaction_pin_attempts',
+        'transaction_pin_locked_until',
+        'pin_status',
+        'last_transaction_pin_used_at',
         'email_verified_at',
         'is_guest',
         'guest_claim_last_sent_at',
@@ -104,6 +111,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'rcoin_multiplier' => 'decimal:2',
             'banned_at' => 'datetime',
             'suspended_at' => 'datetime',
+            'restricted_at' => 'datetime',
             'suspension_review_requested_at' => 'datetime',
             'password' => 'hashed',
             'transaction_pin_set_at' => 'datetime',
@@ -169,6 +177,15 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->suspended_at !== null;
     }
 
+    /**
+     * Whether the account is in Protected Mode (Level 2). The user can still log in,
+     * but financial operations require self-serve recovery.
+     */
+    public function isRestricted(): bool
+    {
+        return $this->restricted_at !== null;
+    }
+
     public function hasRequestedSuspensionReview(): bool
     {
         return $this->suspension_review_requested_at !== null;
@@ -225,6 +242,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function wallets(): HasMany
     {
         return $this->hasMany(Wallet::class);
+    }
+
+    /**
+     * Get the user's trusted devices.
+     */
+    public function trustedDevices(): HasMany
+    {
+        return $this->hasMany(TrustedDevice::class);
     }
 
     /**
@@ -446,6 +471,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isTransactionPinLocked(): bool
     {
+        // Check for permanent lock via pin_status
+        if ($this->pin_status === 'locked') {
+            return true;
+        }
+
+        // Check for temporary rate-limiting lockout
         return $this->transaction_pin_locked_until && $this->transaction_pin_locked_until->isFuture();
     }
 

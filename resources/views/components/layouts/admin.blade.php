@@ -324,6 +324,18 @@
                     </a>
                 @endif
 
+                {{-- Operations --}}
+                @if ($can('admin.operations'))
+                    @php $active = $isCurrent('admin.operations'); @endphp
+                    <a href="{{ route('admin.operations') }}" wire:navigate data-tip="Operations" class="{{ $navItemClass($active) }}">
+                        <svg class="{{ $iconClass($active) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
+                        </svg>
+                        Operations
+                    </a>
+                @endif
+
                 {{-- Products (expandable group — SoC for product/service categories) --}}
                 @if ($can('admin.products'))
                 @php
@@ -1073,7 +1085,45 @@
              The same pill the customer dashboard uses, so both surfaces share
              one notification style. (The old SweetAlert modal bridge was dead
              code - nothing dispatches 'swal' - and is gone with its CDN.) --}}
+        @php
+            $adminUser = auth()->guard('admin')->user();
+            $needsSecurityQuestion = $adminUser && empty($adminUser->security_question) && \App\Support\FeatureFlag::on('admin_security_question') && !session()->has('has_seen_security_prompt');
+            if ($needsSecurityQuestion) {
+                session()->put('has_seen_security_prompt', true);
+            }
+        @endphp
+        @if ($needsSecurityQuestion)
+            <div x-data="{ show: true }" x-show="show" class="fixed bottom-6 right-6 z-[100] flex max-w-sm items-start gap-4 rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-zinc-900/10 dark:bg-[#0c1a36] dark:ring-white/10" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Action Required</h3>
+                    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Please set up your security question in your account settings to secure your login.</p>
+                    <div class="mt-3 flex items-center gap-3">
+                        <a href="{{ route('admin.account') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">Set up now</a>
+                        <button @click="show = false" class="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <x-flash-toast />
+
+        @if (session()->has('impersonator_admin_id'))
+            <form method="POST" action="{{ route('admin.revert-impersonation') }}" class="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-purple-500 p-2 pr-3 text-sm shadow-xl shadow-purple-900/20 ring-4 ring-purple-500/30">
+                @csrf
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-purple-950 text-purple-400">
+                    <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </div>
+                <div>
+                    <p class="font-bold text-white">Viewing as {{ auth()->guard('admin')->user()?->name }}</p>
+                    <p class="text-[11px] font-semibold text-purple-100/80">Any actions taken are logged as this admin.</p>
+                </div>
+                <div class="ml-2 h-6 w-px bg-purple-400/50"></div>
+                <button type="submit" class="rounded-[5px] bg-purple-950 px-3 py-1 text-xs font-bold text-purple-50 transition-colors hover:bg-purple-900">Return to super admin</button>
+            </form>
+        @endif
 
         @fluxScripts
     </body>

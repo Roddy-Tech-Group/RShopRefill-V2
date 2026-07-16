@@ -13,14 +13,28 @@ new class extends Component {
     #[Computed]
     public function items()
     {
-        return AdminNotification::latest()->limit(15)->get();
+        $admin = auth('admin')->user();
+        $query = AdminNotification::latest()->limit(15);
+        
+        if (!$admin->isSuperAdmin()) {
+            $query->whereIn('type', $admin->allowedNotificationTypes());
+        }
+
+        return $query->get();
     }
 
     /** Unread badge count. */
     #[Computed]
     public function unreadCount(): int
     {
-        return AdminNotification::whereNull('read_at')->count();
+        $admin = auth('admin')->user();
+        $query = AdminNotification::whereNull('read_at');
+
+        if (!$admin->isSuperAdmin()) {
+            $query->whereIn('type', $admin->allowedNotificationTypes());
+        }
+
+        return $query->count();
     }
 
     /** Mark one read, then go to its target page. */
@@ -42,7 +56,14 @@ new class extends Component {
 
     public function markAllRead(): void
     {
-        AdminNotification::whereNull('read_at')->update(['read_at' => now()]);
+        $admin = auth('admin')->user();
+        $query = AdminNotification::whereNull('read_at');
+
+        if (!$admin->isSuperAdmin()) {
+            $query->whereIn('type', $admin->allowedNotificationTypes());
+        }
+
+        $query->update(['read_at' => now()]);
         unset($this->items, $this->unreadCount);
     }
 }; ?>

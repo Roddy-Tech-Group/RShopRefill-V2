@@ -30,13 +30,20 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Webhooks (No auth required)
-Route::post('webhooks/flutterwave', [FlutterwaveWebhookController::class, 'handle'])->name('api.webhooks.flutterwave');
-Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handle'])->name('api.webhooks.nowpayments');
+// Webhooks (No auth required, but HMAC verification enforced)
+Route::post('webhooks/flutterwave', [FlutterwaveWebhookController::class, 'handle'])
+    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':flutterwave')
+    ->name('api.webhooks.flutterwave');
+
+Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handle'])
+    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':nowpayments')
+    ->name('api.webhooks.nowpayments');
+
+
 // Airalo low-data + expiry notifications. Auth is HMAC inside the controller
-// (X-Airalo-Signature), not Laravel middleware — the partner can't carry our
+// (X-Airalo-Signature), not Laravel middleware â€” the partner can't carry our
 // CSRF token. Returns 200 even on no-match so Airalo doesn't keep retrying.
-Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
+Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');});
 
 // Storefront Catalog APIs (Public)
 Route::prefix('storefront')->name('api.storefront.')->group(function () {
@@ -70,7 +77,7 @@ Route::get('newsletter/unsubscribe', [NewsletterApiController::class, 'unsubscri
 
 // Push notification interaction tracking (Public + throttled). The service worker
 // fires this on `notificationclick`, which can happen with no active session and
-// from a context that carries no auth — so it must NOT sit behind auth or clicks
+// from a context that carries no auth â€” so it must NOT sit behind auth or clicks
 // never record. Attribution is by campaign_id / notification_id in the body.
 Route::post('push/track', [InteractionTrackingController::class, 'record'])
     ->middleware('throttle:120,1')
@@ -132,4 +139,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('transactions', [UserTransactionController::class, 'index'])->name('api.transactions.index');
+    
+    // Security Center APIs
+    Route::prefix('security')->name('api.security.')->group(function () {
+        Route::put('preferences', [\App\Http\Controllers\Api\SecurityController::class, 'updatePreferences'])->name('preferences.update');
+        Route::delete('devices/{device}', [\App\Http\Controllers\Api\SecurityController::class, 'revokeDevice'])->name('devices.revoke');
+    });
 });

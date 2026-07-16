@@ -233,6 +233,22 @@ class AdminCustomerController extends Controller
     }
 
     /**
+     * Restrict or unrestrict the customer (Protected Mode Level 2).
+     */
+    public function toggleRestrict(User $user): RedirectResponse
+    {
+        $restricted = $user->restricted_at !== null;
+
+        $user->update([
+            'restricted_at' => $restricted ? null : now(),
+        ]);
+
+        return back()->with('status', $restricted
+            ? 'Customer removed from Protected Mode.'
+            : 'Customer placed in Protected Mode.');
+    }
+
+    /**
      * Hold or release the customer's funds by freezing every wallet. Frozen
      * wallets cannot be debited (guarded in WalletService::debit).
      */

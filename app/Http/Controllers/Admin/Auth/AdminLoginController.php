@@ -37,6 +37,10 @@ class AdminLoginController extends Controller
             $request->boolean('remember')
         );
 
+        if ($request->session()->has('admin_needs_security_question')) {
+            return redirect()->route('admin.security-question');
+        }
+
         return redirect()->route('admin.2fa.challenge');
     }
 

@@ -609,7 +609,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         <div class="flex flex-col gap-3">
             {{-- Password + Google on one card --}}
             <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
-            <a href="{{ route('dashboard.password') }}" wire:navigate class="relative flex items-center gap-4 p-4 transition-colors hover:bg-zinc-50/60 dark:hover:bg-white/5 sm:p-5">
+            <a href="{{ route('dashboard.security') }}" wire:navigate class="relative flex items-center gap-4 p-4 transition-colors hover:bg-zinc-50/60 dark:hover:bg-white/5 sm:p-5">
                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>

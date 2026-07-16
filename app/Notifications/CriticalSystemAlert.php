@@ -41,7 +41,7 @@ class CriticalSystemAlert extends Notification implements ShouldQueue
     {
         $mail = (new MailMessage)
             ->error()
-            ->subject("🚨 CRITICAL ALERT: {$this->title}")
+            ->subject("CRITICAL ALERT: {$this->title}")
             ->greeting('Critical System Alert')
             ->line($this->description);
 

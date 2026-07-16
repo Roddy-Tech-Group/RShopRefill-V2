@@ -38,6 +38,20 @@ class EnsureAccountNotSuspended
 
             return back()->withErrors(['account' => $message]);
         }
+        
+        if ($user && $user->isRestricted()) {
+            $message = 'Your account is in Protected Mode. Please recover your account to perform financial operations.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $message,
+                    'protected_mode' => true,
+                    'restricted_at' => $user->restricted_at?->toIso8601String(),
+                ], 403);
+            }
+
+            return redirect()->route('security.recover');
+        }
 
         return $next($request);
     }

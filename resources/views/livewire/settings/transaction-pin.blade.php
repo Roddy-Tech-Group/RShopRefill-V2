@@ -1,12 +1,15 @@
 <?php
 
 use App\Domain\Wallet\Services\TransactionPinService;
+use App\Livewire\Traits\EnforcesDeviceTrust;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Component;
 
 new class extends Component
 {
+    use EnforcesDeviceTrust;
+
     /** Whether the customer currently has a transaction PIN configured. */
     public bool $hasPin = false;
 
@@ -37,6 +40,8 @@ new class extends Component
      */
     public function setupPin(TransactionPinService $pinService): void
     {
+        $this->enforceDeviceTrust('pin');
+
         $this->validate([
             'pin' => ['required', 'digits:4', 'confirmed'],
         ], [], ['pin' => 'PIN']);
@@ -61,6 +66,8 @@ new class extends Component
      */
     public function changePin(TransactionPinService $pinService): void
     {
+        $this->enforceDeviceTrust('old_pin');
+
         $this->validate([
             'old_pin' => ['required', 'digits:4'],
             'new_pin' => ['required', 'digits:4', 'confirmed', 'different:old_pin'],
@@ -94,6 +101,8 @@ new class extends Component
      */
     public function removePin(TransactionPinService $pinService): void
     {
+        $this->enforceDeviceTrust('remove_password');
+
         $this->validate([
             'remove_password' => ['required', 'string'],
         ]);
@@ -110,6 +119,17 @@ new class extends Component
         $this->hasPin = false;
         $this->locked = false;
         $this->dispatch('pin-updated');
+    }
+
+    /**
+     * Request a PIN reset via email.
+     */
+    public function requestReset(TransactionPinService $pinService): void
+    {
+        $this->enforceDeviceTrust('old_pin');
+
+        $pinService->requestReset(Auth::user());
+        $this->dispatch('reset-requested');
     }
 }; ?>
 
@@ -196,7 +216,19 @@ new class extends Component
         {{-- Change the existing PIN --}}
         <form wire:submit="changePin" class="space-y-5">
             <div x-data="{ show: false }">
-                <label for="pin-old" class="mb-1.5 block text-sm font-medium text-zinc-700">Current PIN</label>
+                <div class="mb-1.5 flex items-center justify-between">
+                    <label for="pin-old" class="block text-sm font-medium text-zinc-700">Current PIN</label>
+                    <div x-data="{ sent: false }" @reset-requested.window="sent = true; setTimeout(() => sent = false, 3000)">
+                        <button type="button" wire:click="requestReset" wire:loading.attr="disabled" wire:target="requestReset" x-show="!sent" class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:no-underline">
+                            <span wire:loading.remove wire:target="requestReset">Forgot PIN?</span>
+                            <span wire:loading wire:target="requestReset">Sending...</span>
+                        </button>
+                        <span x-show="sent" x-cloak x-transition class="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                            Email sent!
+                        </span>
+                    </div>
+                </div>
                 <div class="relative">
                     <input
                         wire:model="old_pin"
@@ -279,6 +311,9 @@ new class extends Component
                 </button>
                 <x-action-message on="pin-updated" class="text-sm font-medium text-emerald-600">
                     {{ __('Saved.') }}
+                </x-action-message>
+                <x-action-message on="reset-requested" class="text-sm font-medium text-emerald-600">
+                    {{ __('Reset link sent to your email.') }}
                 </x-action-message>
             </div>
         </form>
