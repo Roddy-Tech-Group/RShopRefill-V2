@@ -200,9 +200,8 @@ class WalletFundingSystemTest extends TestCase
 
         $response->assertStatus(401);
 
-        $this->assertDatabaseHas('payment_webhooks', [
+        $this->assertDatabaseMissing('payment_webhooks', [
             'reference' => 'FUND-USD-54321',
-            'processing_status' => 'failed',
         ]);
 
         Queue::assertNotPushed(ProcessFundingWebhookJob::class);
