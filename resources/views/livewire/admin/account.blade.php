@@ -37,8 +37,6 @@ class extends Component {
     public string $totpQrCode = '';
     public string $totpCode = '';
 
-    public string $security_question = '';
-    public string $security_answer = '';
     public string $current_password_for_security_question = '';
 
     public function mount(): void
