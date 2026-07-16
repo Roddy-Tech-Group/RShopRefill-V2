@@ -81,6 +81,7 @@ class Admin extends Authenticatable
         'wallets' => 'Wallets',
         'reports' => 'Reports',
         'newsletter' => 'Newsletter',
+        'campaigns' => 'Campaigns',
         'pricing-rules' => 'Pricing Rules',
         'content' => 'Content (CMS)',
         'support-tickets' => 'Support Tickets',
@@ -88,6 +89,7 @@ class Admin extends Authenticatable
         'gift-cards' => 'Gift Cards Trading',
         'admins' => 'Admins',
         'rates' => 'Rate Management',
+        'crypto-fees' => 'Crypto Fees',
         'settings' => 'System Settings',
         'api-settings' => 'API & Integrations',
     ];

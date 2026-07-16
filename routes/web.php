@@ -144,7 +144,7 @@ Route::get('api/search/brands', function (Request $request) {
 })->name('api.search.brands');
 
 // Brand-level detail page. The URL slug is a kebab-cased brand_key
-// ("apple" â†’ brand_key "Apple", "mobile-legends" â†’ "MobileLegends"). The page is
+// ("apple" → brand_key "Apple", "mobile-legends" → "MobileLegends"). The page is
 // locked to ONE country - whichever the user selected in the locale modal, passed
 // through as `?country=XX`. If the brand isn't sold in that country the page 404s
 // (the listing already only links to countries that have stock).
@@ -760,7 +760,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('dashboard/rewards/withdraw', [RcoinWithdrawalController::class, 'store'])
         ->middleware('maintenance-guard')->name('dashboard.rewards.withdraw');
 
-    // Instant Rcoin â†’ wallet (USD) conversion. No admin approval. Capped by
+    // Instant Rcoin → wallet (USD) conversion. No admin approval. Capped by
     // wallet_conversion_min_usd setting (default $2.00).
     Route::post('dashboard/rewards/convert-to-wallet', [RcoinConvertController::class, 'toWallet'])
         ->middleware('maintenance-guard')->name('dashboard.rewards.convert-to-wallet');
@@ -796,6 +796,10 @@ Route::middleware(['auth'])->group(function () {
 
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
     Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
+    
+    // Alias for main branch compatibility where views still call route('dashboard.password')
+    Volt::route('dashboard/password', 'settings.security')->name('dashboard.password');
+    
     Volt::route('dashboard/security/pin-reset', 'settings.pin-reset')->name('dashboard.security.pin-reset');
     Volt::route('dashboard/appearance', 'settings.appearance')->name('dashboard.appearance');
 
