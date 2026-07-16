@@ -495,11 +495,13 @@
                 @endif
 
                 {{-- Campaigns / Push --}}
+                @if ($can('admin.campaigns'))
                 @php $active = $isCurrent('admin.campaigns*'); @endphp
                 <a href="{{ route('admin.campaigns') }}" wire:navigate data-tip="Push Campaigns" class="{{ $navItemClass($active) }}">
                     <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
                     Push Campaigns
                 </a>
+                @endif
 
                 {{-- Pricing Rules --}}
                 @if ($can('admin.pricing-rules'))
