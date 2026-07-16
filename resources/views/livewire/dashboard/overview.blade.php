@@ -240,10 +240,10 @@ new #[Lazy] class extends Component
             </div>
             <div class="mt-4 grid grid-cols-4 gap-3">
                 @foreach ([
-                    ['Send Money', 'transactions 1.svg', 'bg-blue-500',    route('dashboard.transfers')],
-                    ['Cards',      'savedcard.svg',      'bg-indigo-500',  route('dashboard.virtual-cards')],
-                    ['Withdraw',   'transactions.svg',   'bg-purple-500',  route('dashboard.withdrawals')],
-                    ['Exchange',   'transactions.svg',   'bg-amber-500',   route('dashboard.exchange')],
+                    ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'],
+                    ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'],
+                    ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'],
+                    ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'],
                     ['Add Money',  'wallet 2.svg',       'bg-emerald-500', route('dashboard')],
                     ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    route('dashboard.shop.gift-cards')],
                     ['Bills',      'bill payment.svg',   'bg-teal-500',    route('dashboard.shop.bills')],
@@ -893,10 +893,10 @@ new #[Lazy] class extends Component
 
                         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
                             @foreach ([
-                                ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, route('dashboard.transfers')],
-                                ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, route('dashboard.virtual-cards')],
-                                ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, route('dashboard.withdrawals')],
-                                ['Exchange',   'transactions.svg',   'bg-amber-500',   null, route('dashboard.exchange')],
+                                ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'],
+                                ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'],
+                                ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'],
+                                ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'],
                                 ['Add Money',  'wallet 2.svg',       'bg-emerald-500', null, route('dashboard')],
                                 ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    null, route('dashboard.shop.gift-cards')],
                                 ['Bills',      'bill payment.svg',   'bg-teal-500',    'Bills 2.svg', route('dashboard.shop.bills')],
