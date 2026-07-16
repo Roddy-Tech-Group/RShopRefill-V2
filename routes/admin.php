@@ -41,7 +41,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 
     // Authenticated admin routes
-    Route::middleware('admin')->group(function () {
+    Route::middleware(['admin', \App\Http\Middleware\AdminInactivityTimeout::class])->group(function () {
         // Core Dashboard & Operations
         Route::view('dashboard', 'admin.dashboard')->name('dashboard');
         Route::view('operations', 'admin.operations')->name('operations');
