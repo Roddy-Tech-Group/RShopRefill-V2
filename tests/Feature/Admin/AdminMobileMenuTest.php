@@ -51,7 +51,7 @@ class AdminMobileMenuTest extends TestCase
         // Moderator preset: content + support tickets + newsletter only.
         $this->actingAs($this->admin(AdminRole::Moderator), 'admin');
 
-        $html = $this->withoutVite()->get(route('admin.dashboard'))->assertOk()->getContent();
+        $html = $this->withoutVite()->get(route('admin.support-tickets'))->assertOk()->getContent();
 
         $this->assertStringContainsString('Blog Posts', $html);
         $this->assertStringContainsString('Support', $html);

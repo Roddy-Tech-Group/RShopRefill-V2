@@ -55,11 +55,11 @@ class AdminRolePermissionsTest extends TestCase
         $this->assertFalse($admin->canAccessAdminRoute('admin.api-settings'));
     }
 
-    public function test_dashboard_and_account_are_always_allowed(): void
+    public function test_account_is_always_allowed_but_dashboard_is_restricted(): void
     {
         $admin = $this->admin(AdminRole::Moderator);
 
-        $this->assertTrue($admin->canAccessAdminRoute('admin.dashboard'));
+        $this->assertFalse($admin->canAccessAdminRoute('admin.dashboard'));
         $this->assertTrue($admin->canAccessAdminRoute('admin.account'));
         $this->assertTrue($admin->canAccessAdminRoute('admin.account-activity'));
     }
