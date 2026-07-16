@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "bacon/bacon-qr-code": "*",
+        "jenssegers/agent": "^2.6",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.47",
         "laravel/socialite": "^5.27",
@@ -21,7 +22,8 @@
         "minishlink/web-push": "*",
         "pragmarx/google2fa": "*",
         "resend/resend-php": "^1.3",
-        "sentry/sentry-laravel": "^4.25"
+        "sentry/sentry-laravel": "^4.25",
+        "stevebauman/location": "^7.6"
     },
     "require-dev": {
         "doctrine/dbal": "^4.4",

@@ -76,8 +76,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         // browser shouldn't accidentally attribute to the same referrer.
         Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
 
+        event(new Registered($user));
+
+        Session::regenerate();
         Auth::login($user);
-        
+
         RateLimiter::clear($this->throttleKey());
 
         $this->redirect(route('dashboard', absolute: false), navigate: true);

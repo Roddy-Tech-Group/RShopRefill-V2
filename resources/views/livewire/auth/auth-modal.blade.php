@@ -75,13 +75,16 @@ new class extends Component {
 
         $this->ensureIsNotRateLimited();
 
+        Session::regenerate();
+
         if (! Auth::attempt(['email' => $this->loginEmail, 'password' => $this->loginPassword], $this->loginRemember)) {
             RateLimiter::hit($this->throttleKey());
-            throw ValidationException::withMessages(['loginEmail' => __('auth.failed')]);
+            throw ValidationException::withMessages([
+                'loginEmail' => __('auth.failed'),
+            ]);
         }
 
         RateLimiter::clear($this->throttleKey());
-        Session::regenerate();
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
     }
 

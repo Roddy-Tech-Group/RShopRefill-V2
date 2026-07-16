@@ -108,12 +108,20 @@
             @php
                 $status = $statusFor($user);
                 $rowAvatar = $user->avatar_url ?: $user->initialsAvatar();
+                $isModerator = auth()->guard('admin')->user()->role->value === 'moderator';
             @endphp
+            
+            @if ($isModerator)
+            <div
+                class="cust-row cust-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10"
+            >
+            @else
             <a
                 href="{{ route('admin.customer', $user) }}"
                 wire:navigate
                 class="cust-row cust-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400"
             >
+            @endif
                 {{-- User — avatar + name + email stacked. --}}
                 <div class="col-user flex min-w-0 items-center gap-3">
                     <img src="{{ $rowAvatar }}" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
@@ -149,11 +157,17 @@
                 {{-- View action — kept as a visual chip on the right; the
                      entire row is the link, so this is just an affordance. --}}
                 <span class="col-action text-right">
+                    @if (!$isModerator)
                     <span class="inline-flex w-fit items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium text-zinc-600 transition-colors group-hover:border-blue-600 group-hover:bg-white group-hover:text-blue-700 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:group-hover:border-blue-400 dark:group-hover:text-blue-300">
                         View
                     </span>
+                    @endif
                 </span>
+            @if ($isModerator)
+            </div>
+            @else
             </a>
+            @endif
         @empty
             <div class="px-5 py-12 text-center text-sm text-zinc-600 dark:text-zinc-400">
                 No customers yet.

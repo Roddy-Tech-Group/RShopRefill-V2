@@ -109,7 +109,9 @@ class AdminTwoFactorController extends Controller
 
         $defaultRoute = $admin->canAccessAdminRoute('dashboard')
             ? route('admin.dashboard', absolute: false)
-            : route('admin.account', absolute: false);
+            : ($admin->canAccessAdminRoute('operations') 
+                ? route('admin.operations', absolute: false) 
+                : route('admin.account', absolute: false));
 
         return redirect()->intended($defaultRoute);
     }

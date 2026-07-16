@@ -87,6 +87,7 @@
         @php
             $isBanned = $user->banned_at !== null;
             $isSuspended = $user->isSuspended();
+            $isRestricted = $user->isRestricted();
             $fundsHeld = $user->wallets->isNotEmpty() && $user->wallets->where('is_active', true)->isEmpty();
             $emailVerified = $user->email_verified_at !== null;
             // Normalised KYC string, used by both the dropdown above AND the badge
@@ -219,6 +220,17 @@
                         @csrf
                         <button type="submit" class="{{ $btn }} {{ $fundsHeld ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100' }}">
                             {{ $fundsHeld ? 'Release funds' : 'Hold funds' }}
+                        </button>
+                    </form>
+
+                    <form method="POST" action="{{ route('admin.customer.restrict', $user) }}"
+                          data-confirm="{{ $isRestricted ? 'Remove this customer from Protected Mode? They will regain full access to financial operations.' : 'Place this customer in Protected Mode (Level 2)? Their account will require self-serve recovery for financial operations.' }}"
+                          data-confirm-title="{{ $isRestricted ? 'Remove Protected Mode' : 'Enable Protected Mode' }}"
+                          data-confirm-text="{{ $isRestricted ? 'Remove' : 'Enable' }}"
+                          data-confirm-tone="{{ $isRestricted ? 'success' : 'warning' }}">
+                        @csrf
+                        <button type="submit" class="{{ $btn }} {{ $isRestricted ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100' }}">
+                            {{ $isRestricted ? 'Remove Protected Mode' : 'Enable Protected Mode' }}
                         </button>
                     </form>
 
@@ -381,10 +393,15 @@
                 // close to the divider above instead of floating in dead space.
                 $badgeBase = 'inline-flex items-center gap-1 rounded-[12px] px-2 py-0.5 text-[11px] font-medium ring-1';
             @endphp
-            @if ($isBanned || $isSuspended || $fundsHeld || ! $emailVerified || ! $kycVerified)
+            @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || ! $emailVerified || ! $kycVerified)
                 <div class="flex flex-wrap gap-1.5 px-5 py-2">
                     @if ($isBanned)
                         <span class="{{ $badgeBase }} bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">Banned{{ $user->banned_at ? ' on '.$fmtDate($user->banned_at) : '' }}</span>
+                    @endif
+                    @if ($isRestricted)
+                        <span class="{{ $badgeBase }} bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">
+                            Protected Mode (Level 2){{ $user->restricted_at ? ' since '.$fmtDate($user->restricted_at) : '' }}
+                        </span>
                     @endif
                     @if ($isSuspended)
                         <span class="{{ $badgeBase }} bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">
@@ -805,6 +822,50 @@
                 </div>
             @else
                 <div class="px-5 py-10 text-center text-sm text-zinc-600">This customer has not submitted KYC documents.</div>
+            @endif
+        </div>
+
+        {{-- Trusted Devices --}}
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="border-b border-zinc-100 px-5 py-4">
+                <h3 class="text-sm font-bold text-zinc-900">Devices ({{ $user->trustedDevices->count() }})</h3>
+            </div>
+            @if ($user->trustedDevices->isNotEmpty())
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px]">
+                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Device</th>
+                                <th class="px-5 py-3 font-semibold">IP Address</th>
+                                <th class="px-5 py-3 font-semibold">Location</th>
+                                <th class="px-5 py-3 font-semibold">Last Seen</th>
+                                <th class="px-5 py-3 font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100">
+                            @foreach ($user->trustedDevices()->orderByDesc('last_seen_at')->get() as $device)
+                                <tr>
+                                    <td class="px-5 py-3">
+                                        <p class="font-semibold text-zinc-900">{{ $device->device_name ?: 'Unknown Device' }}</p>
+                                        <p class="text-zinc-500">{{ $device->os ?: 'Unknown OS' }} / {{ $device->browser ?: 'Unknown Browser' }}</p>
+                                    </td>
+                                    <td class="px-5 py-3 text-zinc-700">{{ $device->ip_address ?: 'Unknown' }}</td>
+                                    <td class="px-5 py-3 text-zinc-700">{{ collect([$device->city, $device->country])->filter()->join(', ') ?: 'Unknown' }}</td>
+                                    <td class="px-5 py-3 text-zinc-700">{{ $fmtDate($device->last_seen_at ?? $device->created_at) }}</td>
+                                    <td class="px-5 py-3">
+                                        @if ($device->isTrusted())
+                                            <span class="inline-flex items-center rounded-[12px] bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Trusted</span>
+                                        @else
+                                            <span class="inline-flex items-center rounded-[12px] bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Pending</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="px-5 py-10 text-center text-sm text-zinc-600">No devices tracked for this customer yet.</div>
             @endif
         </div>
 

@@ -143,6 +143,30 @@ class extends Component {
         unset($this->admins);
     }
 
+    public function loginAs(int $id): mixed
+    {
+        $currentAdminId = auth()->guard('admin')->id();
+
+        if ($id === $currentAdminId) {
+            session()->flash('error', 'You are already logged in as this admin.');
+            return null;
+        }
+
+        session()->put('impersonator_admin_id', $currentAdminId);
+
+        $admin = Admin::findOrFail($id);
+        auth()->guard('admin')->login($admin);
+
+        // Redirect them based on what the target admin can access
+        $defaultRoute = $admin->canAccessAdminRoute('dashboard')
+            ? route('admin.dashboard', absolute: false)
+            : ($admin->canAccessAdminRoute('operations') 
+                ? route('admin.operations', absolute: false) 
+                : route('admin.account', absolute: false));
+
+        return redirect()->intended($defaultRoute);
+    }
+
     public function closeForm(): void
     {
         $this->resetForm();
@@ -342,9 +366,19 @@ class extends Component {
                     </label>
                 </div>
 
-                <div class="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
-                    <button type="button" wire:click="closeForm" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
-                    <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create admin' }}</button>
+                <div class="flex shrink-0 items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#0c1a36]/50">
+                    <div>
+                        @if ($editingId && $editingId !== auth()->guard('admin')->id())
+                            <button type="button" wire:click="loginAs({{ $editingId }})" class="inline-flex items-center gap-1.5 rounded-[12px] px-3.5 py-2 text-xs font-semibold text-emerald-600 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-50 dark:ring-emerald-500/30 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                                Login as admin
+                            </button>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="closeForm" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
+                        <button type="submit" class="inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700">{{ $editingId ? 'Save changes' : 'Create admin' }}</button>
+                    </div>
                 </div>
             </form>
         </div>

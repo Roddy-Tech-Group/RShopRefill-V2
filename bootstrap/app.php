@@ -69,6 +69,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => AdminAuth::class,
+            'device.trust' => \App\Http\Middleware\EnforceDeviceTrustRestrictions::class,
             // Selectively applied to write routes (checkout, cart writes,
             // wallet funding). Suspended users stay logged in so they can
             // see the banner + request a review - only the action is refused.
@@ -107,6 +108,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ResolveRegion::class,
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
+            \App\Http\Middleware\EnforceDeviceVerification::class,
             // Order matters on the response unwind: AdvertiseDiscoveryLinks runs
             // first (while the body is still HTML) so it can set the Link header,
             // then NegotiateMarkdown converts the body for agents while keeping it.
@@ -121,7 +123,19 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
-        $middleware->redirectUsersTo(fn () => request()->is('admin*') ? route('admin.dashboard') : route('dashboard'));
+        $middleware->redirectUsersTo(function () {
+            if (request()->is('admin*')) {
+                /** @var \App\Models\Admin|null $admin */
+                $admin = auth('admin')->user();
+                if ($admin && !$admin->canAccessAdminRoute('dashboard')) {
+                    return $admin->canAccessAdminRoute('operations') 
+                        ? route('admin.operations') 
+                        : route('admin.account');
+                }
+                return route('admin.dashboard');
+            }
+            return route('dashboard');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Guard: duplicate failed_jobs UUID insert is a harmless race condition,

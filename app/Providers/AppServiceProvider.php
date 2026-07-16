@@ -54,7 +54,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Event::listen(Registered::class, CreateWalletForNewUser::class);
         Event::listen(Registered::class, CreateDefaultPreferencesListener::class);
         Event::listen(Registered::class, SendWelcomeEmailListener::class);
 
@@ -72,9 +71,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Fan key platform events out to the admin-dashboard notification feed.
         Event::subscribe(AdminEventNotifier::class);
-
-        // Transaction PIN lifecycle emails (created, changed, locked, reset).
-        Event::subscribe(TransactionPinNotificationListener::class);
 
         // Append security-relevant events to the audit log.
         Event::subscribe(AuditLogListener::class);

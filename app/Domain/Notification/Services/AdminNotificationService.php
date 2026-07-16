@@ -32,15 +32,20 @@ class AdminNotificationService
                 'data' => $data ?: null,
             ]);
 
-            $this->sendPushToAdmins($title, $message, $url);
+            $this->sendPushToAdmins($type, $title, $message, $url);
         } catch (\Throwable $e) {
             Log::warning('Admin notification failed: '.$e->getMessage());
         }
     }
 
-    private function sendPushToAdmins(string $title, ?string $message, ?string $url): void
+    private function sendPushToAdmins(string $type, string $title, ?string $message, ?string $url): void
     {
-        $admins = Admin::all();
+        $admins = Admin::all()->filter(function (Admin $admin) use ($type) {
+            if ($admin->isSuperAdmin()) {
+                return true;
+            }
+            return in_array($type, $admin->allowedNotificationTypes(), true);
+        });
         $payload = [
             'title' => $title,
             'body' => $message ?? '',

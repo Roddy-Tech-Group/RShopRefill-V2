@@ -32,6 +32,8 @@ new #[Layout('components.layouts.auth')] class extends Component
 
         $this->ensureIsNotRateLimited();
 
+        Session::regenerate();
+
         if (! Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
             RateLimiter::hit($this->throttleKey());
 
@@ -41,7 +43,6 @@ new #[Layout('components.layouts.auth')] class extends Component
         }
 
         RateLimiter::clear($this->throttleKey());
-        Session::regenerate();
 
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
     }

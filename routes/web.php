@@ -144,7 +144,7 @@ Route::get('api/search/brands', function (Request $request) {
 })->name('api.search.brands');
 
 // Brand-level detail page. The URL slug is a kebab-cased brand_key
-// ("apple" → brand_key "Apple", "mobile-legends" → "MobileLegends"). The page is
+// ("apple" â†’ brand_key "Apple", "mobile-legends" â†’ "MobileLegends"). The page is
 // locked to ONE country - whichever the user selected in the locale modal, passed
 // through as `?country=XX`. If the brand isn't sold in that country the page 404s
 // (the listing already only links to countries that have stock).
@@ -760,7 +760,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('dashboard/rewards/withdraw', [RcoinWithdrawalController::class, 'store'])
         ->middleware('maintenance-guard')->name('dashboard.rewards.withdraw');
 
-    // Instant Rcoin → wallet (USD) conversion. No admin approval. Capped by
+    // Instant Rcoin â†’ wallet (USD) conversion. No admin approval. Capped by
     // wallet_conversion_min_usd setting (default $2.00).
     Route::post('dashboard/rewards/convert-to-wallet', [RcoinConvertController::class, 'toWallet'])
         ->middleware('maintenance-guard')->name('dashboard.rewards.convert-to-wallet');
@@ -795,7 +795,8 @@ Route::middleware(['auth'])->group(function () {
     Route::view('dashboard/wallet', 'dashboard.wallet')->name('dashboard.wallet');
 
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
-    Volt::route('dashboard/password', 'settings.password')->name('dashboard.password');
+    Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
+    Volt::route('dashboard/security/pin-reset', 'settings.pin-reset')->name('dashboard.security.pin-reset');
     Volt::route('dashboard/appearance', 'settings.appearance')->name('dashboard.appearance');
 
     // Persists the customer's light/dark/system preference (theme engine posts here).
@@ -862,7 +863,8 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'dashboard/profile');
     Route::redirect('settings/profile', 'dashboard/profile');
-    Route::redirect('settings/password', 'dashboard/password');
+    Route::redirect('settings/password', 'dashboard/security');
+    Route::redirect('settings/security', 'dashboard/security');
     Route::redirect('settings/appearance', 'dashboard/appearance');
 });
 
@@ -872,6 +874,21 @@ if (app()->environment('local')) {
     Route::get('dev/emails', [EmailPreviewController::class, 'index'])->name('dev.emails.index');
     Route::get('dev/emails/{key}', [EmailPreviewController::class, 'show'])->name('dev.emails.show');
 }
+
+// Security & Verification
+Route::middleware(['auth'])->prefix('security')->name('security.')->group(function () {
+    Route::get('verify-device', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'show'])->name('verify-device');
+    Route::post('verify-device/send', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'sendOtp'])->name('verify-device.send');
+    Route::post('verify-device', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'verifyOtp'])->name('verify-device.verify');
+    
+    // Unauthenticated route for the NO IT WASN'T ME flow
+    Route::get('compromise', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'handleCompromise'])
+        ->withoutMiddleware(['auth'])
+        ->name('compromise');
+
+    // Account recovery flow for Protected Mode
+    Volt::route('recover', 'security.recover')->name('recover');
+});
 
 require __DIR__.'/admin.php';
 

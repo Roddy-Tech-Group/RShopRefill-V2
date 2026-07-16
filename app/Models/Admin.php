@@ -59,6 +59,8 @@ class Admin extends Authenticatable
         'two_factor_confirmed_at',
         'email_otp',
         'email_otp_expires_at',
+        'security_question',
+        'security_answer',
     ];
 
     /**
@@ -83,6 +85,7 @@ class Admin extends Authenticatable
         'content' => 'Content (CMS)',
         'support-tickets' => 'Support Tickets',
         'notifications' => 'Notifications',
+        'gift-cards' => 'Gift Cards Trading',
         'admins' => 'Admins',
         'rates' => 'Rate Management',
         'settings' => 'System Settings',
@@ -170,7 +173,14 @@ class Admin extends Authenticatable
     {
         $name = str_starts_with($routeName, 'admin.') ? substr($routeName, 6) : $routeName;
 
-        $alwaysAllowed = ['logout', 'theme', 'account', 'account-activity'];
+        // Special rule: Moderators can never view individual customer profiles
+        if ($this->role === \App\Domain\Admin\Enums\AdminRole::Moderator) {
+            if ($name === 'customer' || str_starts_with($name, 'customer.')) {
+                return false;
+            }
+        }
+
+        $alwaysAllowed = ['logout', 'theme', 'account', 'account-activity', 'operations', 'revert-impersonation'];
         if (in_array($name, $alwaysAllowed, true)) {
             return true;
         }
@@ -205,12 +215,45 @@ class Admin extends Authenticatable
             str_starts_with($name, 'content.') || str_starts_with($name, 'api.rewards.') => 'content',
             str_starts_with($name, 'support-tickets') => 'support-tickets',
             str_starts_with($name, 'notifications') || str_starts_with($name, 'api.notifications.') => 'notifications',
+            str_starts_with($name, 'gift-cards') => 'gift-cards',
             str_starts_with($name, 'admins') => 'admins',
             str_starts_with($name, 'rates') => 'rates',
             str_starts_with($name, 'settings') => 'settings',
             str_starts_with($name, 'api-settings') => 'api-settings',
             default => null,
         };
+    }
+
+    /**
+     * Map notification types to the sections an admin must have to see them.
+     * Returns the allowed notification types for this admin.
+     * Super admins return all types effectively (checked externally via isSuperAdmin).
+     *
+     * @return array<int, string>
+     */
+    public function allowedNotificationTypes(): array
+    {
+        $types = [];
+
+        if ($this->canAccessSection('customers')) {
+            $types[] = 'customer';
+        }
+        if ($this->canAccessSection('orders')) {
+            array_push($types, 'order', 'fulfillment');
+        }
+        if ($this->canAccessSection('transactions') || $this->canAccessSection('wallets')) {
+            array_push($types, 'payment', 'wallet', 'transaction');
+        }
+        if ($this->canAccessSection('support-tickets')) {
+            array_push($types, 'ticket', 'support-ticket');
+        }
+        
+        // Let basic operational alerts through if they have Operations access
+        if ($this->canAccessAdminRoute('operations')) {
+            $types[] = 'system';
+        }
+
+        return $types;
     }
 
     /**

@@ -7,7 +7,7 @@ We received a request to reset your wallet transaction PIN.
 
 Click the button below to set a new PIN. This link will expire in 1 hour.
 
-@component('mail::button', ['url' => config('app.frontend_url') . '/wallet/pin/reset/confirm?token=' . $token])
+@component('mail::button', ['url' => route('dashboard.security.pin-reset', ['token' => $token])])
 Reset PIN
 @endcomponent
 
