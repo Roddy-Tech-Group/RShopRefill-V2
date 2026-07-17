@@ -251,12 +251,21 @@ new #[Lazy] class extends Component
                 ] as $item)
                     @if ($item)
                         @php [$label, $icon, $bg, $href] = $item; @endphp
-                        <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                            <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
-                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                            </span>
-                            <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
-                        </a>
+                        @if ($label === 'Add Money')
+                            <button type="button" @click.prevent="$dispatch('open-fund-wallet', { code: '{{ $walletCurrencyCode }}' })" class="group flex flex-col items-center gap-2 text-center">
+                                <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
+                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                </span>
+                                <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
+                            </button>
+                        @else
+                            <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                                <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
+                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                </span>
+                                <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
+                            </a>
+                        @endif
                     @endif
                 @endforeach
             </div>
@@ -907,17 +916,31 @@ new #[Lazy] class extends Component
                             ] as $item)
                                 @if ($item)
                                     @php [$label, $icon, $bg, $hoverIcon, $href] = $item; @endphp
-                                    <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                                        <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
-                                            @if ($hoverIcon)
-                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
-                                                <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
-                                            @else
-                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                            @endif
-                                        </span>
-                                        <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
-                                    </a>
+                                    @if ($label === 'Add Money')
+                                        <button type="button" @click.prevent="$dispatch('open-fund-wallet', { code: '{{ $walletCurrencyCode }}' })" class="group flex flex-col items-center gap-2 text-center">
+                                            <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
+                                                @if ($hoverIcon)
+                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
+                                                    <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
+                                                @else
+                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                                @endif
+                                            </span>
+                                            <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
+                                        </button>
+                                    @else
+                                        <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                                            <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
+                                                @if ($hoverIcon)
+                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
+                                                    <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
+                                                @else
+                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                                @endif
+                                            </span>
+                                            <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
+                                        </a>
+                                    @endif
                                 @endif
                             @endforeach
                         </div>
