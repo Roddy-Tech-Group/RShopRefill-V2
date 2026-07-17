@@ -433,7 +433,7 @@
                     </span>
                 </a>
 
-                @if (\App\Support\FeatureFlag::on('wallet.virtual_cards'))
+                @if (\App\Support\FeatureFlag::on('wallet.virtual_cards', false))
                     @php $active = request()->routeIs('dashboard.virtual-cards'); @endphp
                     <a href="{{ route('dashboard.virtual-cards') }}" wire:navigate.hover data-tip="Virtual Cards" class="{{ $navItem($active) }}">
                         <span class="flex items-center gap-3">
@@ -447,7 +447,7 @@
                     </a>
                 @endif
 
-                @if (\App\Support\FeatureFlag::on('wallet.transfers'))
+                @if (\App\Support\FeatureFlag::on('wallet.transfers', false))
                     @php $active = request()->routeIs('dashboard.transfers'); @endphp
                     <a href="{{ route('dashboard.transfers') }}" wire:navigate.hover data-tip="P2P Transfers" class="{{ $navItem($active) }}">
                         <span class="flex items-center gap-3">
@@ -463,7 +463,7 @@
                     </a>
                 @endif
 
-                @if (\App\Support\FeatureFlag::on('wallet.withdrawals'))
+                @if (\App\Support\FeatureFlag::on('wallet_withdraw', false))
                     @php $active = request()->routeIs('dashboard.withdrawals'); @endphp
                     <a href="{{ route('dashboard.withdrawals') }}" wire:navigate.hover data-tip="Withdrawals" class="{{ $navItem($active) }}">
                         <span class="flex items-center gap-3">
