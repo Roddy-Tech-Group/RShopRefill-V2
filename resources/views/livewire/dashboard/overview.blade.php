@@ -240,21 +240,24 @@ new #[Lazy] class extends Component
             </div>
             <div class="mt-4 grid grid-cols-4 gap-3">
                 @foreach ([
-                    ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'],
-                    ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'],
-                    ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'],
-                    ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'],
-                    ['Add Money',  'wallet 2.svg',       'bg-emerald-500', route('dashboard')],
+                    \App\Support\FeatureFlag::on('wallet.transfers') ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
+                    \App\Support\FeatureFlag::on('wallet.virtual_cards') ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
+                    \App\Support\FeatureFlag::on('wallet.withdrawals') ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
+                    \App\Support\FeatureFlag::on('wallet.fx') ? ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
+                    \App\Support\FeatureFlag::on('wallet.enabled') ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', route('dashboard')] : null,
                     ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    route('dashboard.shop.gift-cards')],
                     ['Bills',      'bill payment.svg',   'bg-teal-500',    route('dashboard.shop.bills')],
                     ['More',       'More.svg',           'bg-slate-500',   route('dashboard.shop.gift-cards')],
-                ] as [$label, $icon, $bg, $href])
-                    <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                        <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
-                            <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                        </span>
-                        <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
-                    </a>
+                ] as $item)
+                    @if ($item)
+                        @php [$label, $icon, $bg, $href] = $item; @endphp
+                        <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
+                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                            </span>
+                            <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
+                        </a>
+                    @endif
                 @endforeach
             </div>
         </div>
@@ -893,26 +896,29 @@ new #[Lazy] class extends Component
 
                         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
                             @foreach ([
-                                ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'],
-                                ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'],
-                                ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'],
-                                ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'],
-                                ['Add Money',  'wallet 2.svg',       'bg-emerald-500', null, route('dashboard')],
+                                \App\Support\FeatureFlag::on('wallet.transfers') ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
+                                \App\Support\FeatureFlag::on('wallet.virtual_cards') ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
+                                \App\Support\FeatureFlag::on('wallet.withdrawals') ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
+                                \App\Support\FeatureFlag::on('wallet.fx') ? ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
+                                \App\Support\FeatureFlag::on('wallet.enabled') ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', null, route('dashboard')] : null,
                                 ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    null, route('dashboard.shop.gift-cards')],
                                 ['Bills',      'bill payment.svg',   'bg-teal-500',    'Bills 2.svg', route('dashboard.shop.bills')],
                                 ['More',       'More.svg',           'bg-slate-500',   'more two.svg', route('dashboard.shop.gift-cards')],
-                            ] as [$label, $icon, $bg, $hoverIcon, $href])
-                                <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                                    <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
-                                        @if ($hoverIcon)
-                                            <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
-                                            <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
-                                        @else
-                                            <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                        @endif
-                                    </span>
-                                    <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
-                                </a>
+                            ] as $item)
+                                @if ($item)
+                                    @php [$label, $icon, $bg, $hoverIcon, $href] = $item; @endphp
+                                    <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                                        <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
+                                            @if ($hoverIcon)
+                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
+                                                <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
+                                            @else
+                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                            @endif
+                                        </span>
+                                        <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     </div>

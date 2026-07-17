@@ -433,6 +433,51 @@
                     </span>
                 </a>
 
+                @if (\App\Support\FeatureFlag::on('wallet.virtual_cards'))
+                    @php $active = request()->routeIs('dashboard.virtual-cards'); @endphp
+                    <a href="{{ route('dashboard.virtual-cards') }}" wire:navigate.hover data-tip="Virtual Cards" class="{{ $navItem($active) }}">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                                <line x1="1" y1="10" x2="23" y2="10"/>
+                            </svg>
+                            Virtual Cards
+                        </span>
+                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
+                    </a>
+                @endif
+
+                @if (\App\Support\FeatureFlag::on('wallet.transfers'))
+                    @php $active = request()->routeIs('dashboard.transfers'); @endphp
+                    <a href="{{ route('dashboard.transfers') }}" wire:navigate.hover data-tip="P2P Transfers" class="{{ $navItem($active) }}">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M17 3l4 4-4 4"/>
+                                <path d="M3 7h18"/>
+                                <path d="M7 21l-4-4 4-4"/>
+                                <path d="M21 17H3"/>
+                            </svg>
+                            Transfers
+                        </span>
+                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
+                    </a>
+                @endif
+
+                @if (\App\Support\FeatureFlag::on('wallet.withdrawals'))
+                    @php $active = request()->routeIs('dashboard.withdrawals'); @endphp
+                    <a href="{{ route('dashboard.withdrawals') }}" wire:navigate.hover data-tip="Withdrawals" class="{{ $navItem($active) }}">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Withdrawals
+                        </span>
+                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
+                    </a>
+                @endif
+
                 @php $active = $isCurrent('dashboard.transactions*'); @endphp
                 <a href="{{ route('dashboard.transactions') }}" wire:navigate.hover data-tip="Transactions" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
@@ -464,8 +509,8 @@
                     <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">KYC</span>
                 </a>
 
-                @php $active = $isCurrent('dashboard.password'); @endphp
-                <a href="{{ route('dashboard.password') }}" wire:navigate.hover data-tip="Security" class="{{ $navItem($active) }}">
+                @php $active = $isCurrent('dashboard.security'); @endphp
+                <a href="{{ route('dashboard.security') }}" wire:navigate.hover data-tip="Security" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
                         <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
                         Security
@@ -787,7 +832,7 @@
                                 ['Orders',          'Recent purchases',       'order.svg',          route('dashboard.orders')],
                                 ['Transactions',    'Activity history',       'transactions.svg',   route('dashboard.transactions')],
                                 ['Settings',        'Account information',    'system setting.svg', route('dashboard.profile')],
-                                ['Security',        'Password & sessions',    'admin access.svg',   route('dashboard.password')],
+                                ['Security',        'Password & sessions',    'admin access.svg',   route('dashboard.security')],
                             ];
                         @endphp
 
@@ -989,7 +1034,7 @@
                             <img src="{{ asset('assets/user.svg') }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Profile
                         </a>
-                        <a href="{{ route('dashboard.password') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
+                        <a href="{{ route('dashboard.security') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
                             Security
                         </a>
@@ -1208,7 +1253,7 @@
                     request()->routeIs('dashboard.saved-cards')   => 'Saved Cards',
                     request()->routeIs('dashboard.kyc')           => 'Verify Identity',
                     request()->routeIs('dashboard.rewards')       => 'Rewards',
-                    request()->routeIs('dashboard.password')      => 'Security',
+                    request()->routeIs('dashboard.security')      => 'Security',
                     request()->routeIs('dashboard.appearance')    => 'Appearance',
                     default                                       => 'Settings',
                 };
@@ -1364,6 +1409,8 @@
                     @auth
                         @if (auth()->user()->isSuspended())
                             @include('partials.suspension-banner')
+                        @elseif (auth()->user()->isRestricted())
+                            @include('partials.protected-mode-banner')
                         @endif
                     @endauth
 
@@ -1394,7 +1441,7 @@
                 request()->routeIs('dashboard.orders*')       => 1,
                 request()->routeIs('dashboard.transactions*') => 3,
                 request()->routeIs('dashboard.profile')       => 4,
-                request()->routeIs('dashboard.password')      => 4,
+                request()->routeIs('dashboard.security')      => 4,
                 request()->routeIs('dashboard.appearance')    => 4,
                 default                                       => 0, // dashboard / overview
             };
@@ -1561,7 +1608,7 @@
                 ['label' => 'Transactions',  'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'tone' => 'bg-teal-500',  'nav' => true],
                 ['label' => 'Settings',      'href' => route('dashboard.profile'),   'icon' => 'system setting.svg', 'tone' => 'bg-indigo-500',   'nav' => true],
                 ['label' => 'Verify (KYC)',  'href' => route('dashboard.kyc'),       'icon' => 'customer.svg',       'tone' => 'bg-amber-500',    'nav' => true],
-                ['label' => 'Security',      'href' => route('dashboard.password'),  'icon' => 'admin access.svg',   'tone' => 'bg-violet-500',   'nav' => true],
+                ['label' => 'Security',      'href' => route('dashboard.security'),  'icon' => 'admin access.svg',   'tone' => 'bg-violet-500',   'nav' => true],
                 ['label' => 'Appearance',    'href' => route('dashboard.appearance'),'icon' => 'Appearance.svg',     'tone' => 'bg-fuchsia-500',  'nav' => true],
                 ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
                 // Saved Cards hidden until the card-vault backend ships (see routes/web.php).

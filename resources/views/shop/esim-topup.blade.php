@@ -55,7 +55,7 @@
             <div class="mt-6 rounded-[12px] bg-amber-50 p-6 text-center ring-1 ring-amber-200">
                 <p class="text-base font-semibold text-amber-900">Wallet PIN Required</p>
                 <p class="mt-1 text-sm text-amber-700">You must set up a Wallet Transaction PIN before you can top up using your wallet balance.</p>
-                <a href="{{ route('dashboard.password') }}" class="mt-4 inline-flex items-center gap-1.5 rounded-[12px] bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700">
+                <a href="{{ route('dashboard.security') }}" class="mt-4 inline-flex items-center gap-1.5 rounded-[12px] bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700">
                     Set up PIN in Settings
                 </a>
             </div>

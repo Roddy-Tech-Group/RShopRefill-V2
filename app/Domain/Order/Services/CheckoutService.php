@@ -281,21 +281,23 @@ class CheckoutService
             $provider = $this->paymentGatewayFactory->getProvider($paymentMethod);
             $initResult = $provider->initializePayment($attempt);
         } catch (\Throwable $e) {
-            $order->update([
-                'order_status' => OrderStatus::Failed,
-                'payment_status' => PaymentStatus::Failed,
-            ]);
-            $attempt->update([
-                'payment_status' => PaymentStatus::Failed,
-                'failed_at' => now(),
-            ]);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($order, $attempt, $user) {
+                $order->update([
+                    'order_status' => OrderStatus::Failed,
+                    'payment_status' => PaymentStatus::Failed,
+                ]);
+                $attempt->update([
+                    'payment_status' => PaymentStatus::Failed,
+                    'failed_at' => now(),
+                ]);
 
-            $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
-            if ($rcoinApplied > 0) {
-                $walletService = app(WalletService::class);
-                $wallet = $walletService->getOrCreateWallet($user, Currency::RCOIN);
-                $walletService->unlockFunds($wallet, $rcoinApplied);
-            }
+                $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
+                if ($rcoinApplied > 0) {
+                    $walletService = app(\App\Domain\Wallet\Services\WalletService::class);
+                    $wallet = $walletService->getOrCreateWallet($user, \App\Enums\Currency::RCOIN);
+                    $walletService->unlockFunds($wallet, $rcoinApplied);
+                }
+            });
 
             throw $e;
         }

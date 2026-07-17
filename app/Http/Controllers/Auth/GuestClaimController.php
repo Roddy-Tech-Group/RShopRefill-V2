@@ -62,8 +62,8 @@ class GuestClaimController extends Controller
             'email_verified_at' => $user->email_verified_at ?? now(),
         ])->save();
 
-        Auth::login($user, remember: true);
         $request->session()->regenerate();
+        Auth::login($user, remember: true);
 
         return redirect()->route('dashboard.orders')
             ->with('status', 'Welcome! Your account is ready - here are your orders.');

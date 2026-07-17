@@ -845,7 +845,7 @@
                                     </svg>
                                     <span x-text="authorizingWallet ? 'Authorizing...' : 'Authorize payment'"></span>
                                 </button>
-                                <a href="{{ route('dashboard.password') }}" class="block text-center text-[11px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">Manage your transaction PIN</a>
+                                <a href="{{ route('dashboard.security') }}" class="block text-center text-[11px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">Manage your transaction PIN</a>
                             </div>
                         </div>
 
