@@ -39,11 +39,26 @@ Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handl
     ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':nowpayments')
     ->name('api.webhooks.nowpayments');
 
+Route::post('webhooks/maplerad', [\App\Http\Controllers\Webhooks\MapleradWebhookController::class, 'handle'])
+    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':maplerad')
+    ->name('api.webhooks.maplerad');
 
 // Airalo low-data + expiry notifications. Auth is HMAC inside the controller
-// (X-Airalo-Signature), not Laravel middleware â€” the partner can't carry our
+// (X-Airalo-Signature), not Laravel middleware — the partner can't carry our
 // CSRF token. Returns 200 even on no-match so Airalo doesn't keep retrying.
 Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
+
+// Financial Features (Requires Auth + Pin)
+Route::middleware(['auth:sanctum', 'require-pin'])->group(function () {
+    // Virtual Cards
+    Route::middleware([\App\Http\Middleware\EnsureFeatureEnabled::class . ':virtual_cards'])->group(function () {
+        Route::post('cards', [\App\Http\Controllers\Api\VirtualCardController::class, 'store']);
+        Route::post('cards/{id}/fund', [\App\Http\Controllers\Api\VirtualCardController::class, 'fund']);
+        Route::post('cards/{id}/freeze', [\App\Http\Controllers\Api\VirtualCardController::class, 'freeze']);
+        Route::post('cards/{id}/unfreeze', [\App\Http\Controllers\Api\VirtualCardController::class, 'unfreeze']);
+        Route::post('cards/{id}/terminate', [\App\Http\Controllers\Api\VirtualCardController::class, 'terminate']);
+    });
+});
 
 // Storefront Catalog APIs (Public)
 Route::prefix('storefront')->name('api.storefront.')->group(function () {
@@ -77,7 +92,7 @@ Route::get('newsletter/unsubscribe', [NewsletterApiController::class, 'unsubscri
 
 // Push notification interaction tracking (Public + throttled). The service worker
 // fires this on `notificationclick`, which can happen with no active session and
-// from a context that carries no auth â€” so it must NOT sit behind auth or clicks
+// from a context that carries no auth — so it must NOT sit behind auth or clicks
 // never record. Attribution is by campaign_id / notification_id in the body.
 Route::post('push/track', [InteractionTrackingController::class, 'record'])
     ->middleware('throttle:120,1')
