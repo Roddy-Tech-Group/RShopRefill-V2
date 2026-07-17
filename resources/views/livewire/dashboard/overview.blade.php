@@ -240,10 +240,10 @@ new #[Lazy] class extends Component
             </div>
             <div class="mt-4 grid grid-cols-4 gap-3">
                 @foreach ([
-                    \App\Support\FeatureFlag::on('wallet.transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
-                    \App\Support\FeatureFlag::on('wallet.virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
-                    \App\Support\FeatureFlag::on('wallet_withdraw', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
-                    \App\Support\FeatureFlag::on('wallet.fx', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
+                    \App\Support\FeatureFlag::on('ef_transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
+                    \App\Support\FeatureFlag::on('ef_virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
+                    \App\Support\FeatureFlag::on('ef_fiat_withdrawals', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
+                    \App\Support\FeatureFlag::on('ef_exchange', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
                     \App\Support\FeatureFlag::on('wallet_funding', false) ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', route('dashboard')] : null,
                     ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    route('dashboard.shop.gift-cards')],
                     ['Bills',      'bill payment.svg',   'bg-teal-500',    route('dashboard.shop.bills')],
@@ -896,10 +896,10 @@ new #[Lazy] class extends Component
 
                         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
                             @foreach ([
-                                \App\Support\FeatureFlag::on('wallet.transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
-                                \App\Support\FeatureFlag::on('wallet.virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
-                                \App\Support\FeatureFlag::on('wallet_withdraw', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
-                                \App\Support\FeatureFlag::on('wallet.fx', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
+                                \App\Support\FeatureFlag::on('ef_transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
+                                \App\Support\FeatureFlag::on('ef_virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
+                                \App\Support\FeatureFlag::on('ef_fiat_withdrawals', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
+                                \App\Support\FeatureFlag::on('ef_exchange', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
                                 \App\Support\FeatureFlag::on('wallet_funding', false) ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', null, route('dashboard')] : null,
                                 ['Gift Cards', 'gift cards.svg',     'bg-pink-500',    null, route('dashboard.shop.gift-cards')],
                                 ['Bills',      'bill payment.svg',   'bg-teal-500',    'Bills 2.svg', route('dashboard.shop.bills')],
