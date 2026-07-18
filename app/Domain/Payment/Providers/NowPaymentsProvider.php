@@ -128,6 +128,23 @@ class NowPaymentsProvider implements PaymentProviderInterface
         }
     }
 
+    /**
+     * Normalize a coin code to the ticker NOWPayments accepts. The bare "usdt"
+     * and "bnb" tickers are rejected as invalid currencies, so every outbound
+     * call must translate them to a concrete chain (usdt -> usdttrc20,
+     * bnb -> bnbbsc). All other tickers pass through lowercased.
+     */
+    private function normalizePayCurrency(string $payCurrency): string
+    {
+        $payCurrency = strtolower($payCurrency);
+
+        return match ($payCurrency) {
+            'usdt' => 'usdttrc20',
+            'bnb' => 'bnbbsc',
+            default => $payCurrency,
+        };
+    }
+
     private function resolveNetwork(string $currency): string
     {
         return match (strtolower($currency)) {
@@ -149,12 +166,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
 
     public function chargeCrypto(PaymentAttempt $attempt, string $payCurrency): array
     {
-        $payCurrency = strtolower($payCurrency);
-        if ($payCurrency === 'usdt') {
-            $payCurrency = 'usdttrc20';
-        } elseif ($payCurrency === 'bnb') {
-            $payCurrency = 'bnbbsc';
-        }
+        $payCurrency = $this->normalizePayCurrency($payCurrency);
         $txRef = $attempt->idempotency_key;
 
         if (str_contains($this->apiKey, 'MOCK')) {
@@ -375,7 +387,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
             ])->get("{$this->baseUrl}/estimate", [
                 'amount' => $priceAmount,
                 'currency_from' => strtolower($priceCurrency),
-                'currency_to' => strtolower($payCurrency),
+                'currency_to' => $this->normalizePayCurrency($payCurrency),
             ]);
 
             if ($response->failed()) {

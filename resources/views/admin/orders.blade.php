@@ -97,7 +97,7 @@
             background-color: rgb(255 255 255 / 0.08);
         }
         .order-body:hover::after { display: none; }
-        .order-body:hover { border-radius: 10px; }
+        .order-body:hover { border-radius: 12px; }
     </style>
 
     <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
