@@ -14,6 +14,7 @@ class UserDashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $user->loadMissing('wallets');
 
         $wallets = $user->wallets ?? []; // Requires adding HasMany wallets to User model
         $recentTransactions = $user->walletTransactions()->latest()->take(5)->get();

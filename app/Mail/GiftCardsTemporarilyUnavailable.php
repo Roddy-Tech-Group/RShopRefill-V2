@@ -2,15 +2,13 @@
 
 namespace App\Mail;
 
+use App\Models\User;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-
-use App\Models\User;
 
 class GiftCardsTemporarilyUnavailable extends Mailable
 {
@@ -42,7 +40,7 @@ class GiftCardsTemporarilyUnavailable extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.giftcards-unavailable',
+            view: 'mail.giftcards-unavailable',
         );
     }
 

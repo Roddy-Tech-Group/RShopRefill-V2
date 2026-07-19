@@ -21,7 +21,10 @@ class UserWalletController extends Controller
 
     public function index(Request $request)
     {
-        $wallets = $request->user()->wallets; // Assumes relation exists
+        $user = $request->user();
+        $user->loadMissing('wallets');
+        
+        $wallets = $user->wallets; // Assumes relation exists
 
         return WalletResource::collection($wallets);
     }

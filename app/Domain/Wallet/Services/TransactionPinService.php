@@ -38,6 +38,7 @@ class TransactionPinService
 
         $user->transaction_pin = Hash::make($pin);
         $user->transaction_pin_set_at = now();
+        $user->pin_status = 'active';
         $user->save();
 
         event(new TransactionPinCreated($user));
@@ -139,6 +140,7 @@ class TransactionPinService
 
         $user->transaction_pin = Hash::make($newPin);
         $user->transaction_pin_set_at = now();
+        $user->pin_status = 'active';
         $user->resetTransactionPinAttempts(); // Reset any lockouts
         $user->save();
 
@@ -160,6 +162,7 @@ class TransactionPinService
         $user->transaction_pin_set_at = null;
         $user->transaction_pin_attempts = 0;
         $user->transaction_pin_locked_until = null;
+        $user->pin_status = 'active';
         $user->last_transaction_pin_used_at = null;
         $user->save();
 
@@ -177,6 +180,7 @@ class TransactionPinService
         $user->transaction_pin_set_at = null;
         $user->transaction_pin_attempts = 0;
         $user->transaction_pin_locked_until = null;
+        $user->pin_status = 'reset_required';
         $user->last_transaction_pin_used_at = null;
         $user->save();
 

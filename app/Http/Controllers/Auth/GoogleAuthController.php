@@ -83,8 +83,8 @@ class GoogleAuthController extends Controller
             }
 
             if (! Auth::check() || Auth::id() !== $user->id) {
-                Auth::login($user, remember: true);
                 session()->regenerate();
+                Auth::login($user, remember: true);
             }
 
             if ($isPopup) {

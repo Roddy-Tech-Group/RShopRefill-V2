@@ -217,31 +217,35 @@ class WalletFundingService
      */
     public function failFunding(WalletFunding $funding, string $reason, array $payload = []): void
     {
-        $funding->update([
-            'status' => FundingStatus::Failed,
-            'failed_reason' => $reason,
-            'provider_payload_snapshot' => $payload,
-            'processed_at' => now(),
-        ]);
-
-        // Fail polymorphic payment attempt
-        $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)
-            ->where('payable_id', $funding->id)
-            ->first();
-
-        if ($attempt) {
-            $attempt->update([
-                'payment_status' => PaymentStatus::Failed,
-                'failed_at' => now(),
+        \Illuminate\Support\Facades\DB::transaction(function () use ($funding, $reason, $payload) {
+            $funding->update([
+                'status' => FundingStatus::Failed,
+                'failed_reason' => $reason,
+                'provider_payload_snapshot' => $payload,
+                'processed_at' => now(),
             ]);
 
-            // Sync payment session status
-            $attempt->load('paymentSession');
-            if ($attempt->paymentSession) {
-                $this->paymentSessionService->failSession($attempt->paymentSession, $reason, $payload);
-            }
-        }
+            // Fail polymorphic payment attempt
+            $attempt = \App\Models\PaymentAttempt::where('payable_type', \App\Models\WalletFunding::class)
+                ->where('payable_id', $funding->id)
+                ->first();
 
-        event(new FundingFailed($funding, $reason));
+            if ($attempt) {
+                $attempt->update([
+                    'payment_status' => \App\Enums\PaymentStatus::Failed,
+                    'failed_at' => now(),
+                ]);
+
+                // Sync payment session status
+                $attempt->load('paymentSession');
+                if ($attempt->paymentSession) {
+                    $this->paymentSessionService->failSession($attempt->paymentSession, $reason, $payload);
+                }
+            }
+
+            \Illuminate\Support\Facades\DB::afterCommit(function () use ($funding, $reason) {
+                event(new \App\Domain\Wallet\Events\FundingFailed($funding, $reason));
+            });
+        });
     }
 }

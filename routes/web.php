@@ -794,6 +794,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::view('dashboard/wallet', 'dashboard.wallet')->name('dashboard.wallet');
 
+    // TESTING ROUTES - Functional UI for backend testing
+    Volt::route('dashboard/virtual-cards', 'dashboard.virtual-cards.index')->name('dashboard.virtual-cards');
+    Volt::route('dashboard/transfers', 'dashboard.transfers.index')->name('dashboard.transfers');
+    Volt::route('dashboard/withdrawals', 'dashboard.withdrawals.index')->name('dashboard.withdrawals');
+    Volt::route('dashboard/exchange', 'dashboard.exchange.index')->name('dashboard.exchange');
+
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
     Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
     
