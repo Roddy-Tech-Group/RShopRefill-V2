@@ -231,20 +231,15 @@ new #[Lazy] class extends Component
         {{-- Quick Actions - 4-col grid (2 rows of 4). --}}
         <div class="rounded-[15px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
             <div class="flex items-center justify-between">
-                <h3 class="text-base font-bold text-zinc-900">Quick Actions</h3>
+                <h3 class="text-base font-bold text-zinc-900 dark:text-white">Quick Actions</h3>
                 <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate aria-label="See more categories" class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                     </svg>
                 </a>
             </div>
-            <div class="mt-4 grid grid-cols-4 gap-3">
+            <div class="mt-4 grid grid-cols-3 gap-3">
                 @foreach ([
-                    \App\Support\FeatureFlag::on('ef_transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
-                    \App\Support\FeatureFlag::on('ef_virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
-                    \App\Support\FeatureFlag::on('ef_fiat_withdrawals', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
-                    \App\Support\FeatureFlag::on('ef_exchange', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
-                    \App\Support\FeatureFlag::on('wallet_funding', false) ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', route('dashboard')] : null,
                     ['eSIM',       'esim.svg',           'bg-orange-500',  route('dashboard.shop.esims')],
                     ['Top-ups',    'topup1.svg',         'bg-rose-500',    route('dashboard.shop.topups')],
                     ['Flights',    'flight 2.svg',       'bg-sky-500',     route('dashboard.shop.flights')],
@@ -255,21 +250,12 @@ new #[Lazy] class extends Component
                 ] as $item)
                     @if ($item)
                         @php [$label, $icon, $bg, $href] = $item; @endphp
-                        @if ($label === 'Add Money')
-                            <button type="button" @click.prevent="$dispatch('open-fund-wallet', { code: '{{ $walletCurrencyCode }}' })" class="group flex flex-col items-center gap-2 text-center">
-                                <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
-                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                </span>
-                                <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
-                            </button>
-                        @else
-                            <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                                <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
-                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                </span>
-                                <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
-                            </a>
-                        @endif
+                        <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95 shadow-sm shadow-zinc-900/10">
+                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                            </span>
+                            <span class="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">{{ $label }}</span>
+                        </a>
                     @endif
                 @endforeach
             </div>
@@ -339,7 +325,7 @@ new #[Lazy] class extends Component
         <div class="relative overflow-hidden rounded-[15px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors dark:border-zinc-700 dark:shadow-none">
             <x-ui.floating-confetti />
             <div class="relative z-10 flex items-center justify-between">
-                <h3 class="text-base font-bold text-zinc-900">Recent Orders</h3>
+                <h3 class="text-base font-bold text-zinc-900 dark:text-white">Recent Orders</h3>
                 <a href="{{ route('dashboard.orders') }}" wire:navigate aria-label="View all orders" class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
@@ -400,7 +386,7 @@ new #[Lazy] class extends Component
         <div class="relative overflow-hidden rounded-[15px] bg-[#eff6ff] dash-shimmer p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors dark:border-zinc-700 dark:shadow-none">
             <x-ui.floating-confetti />
             <div class="relative z-10 flex items-center justify-between">
-                <h3 class="text-base font-bold text-zinc-900">Recent Transactions</h3>
+                <h3 class="text-base font-bold text-zinc-900 dark:text-white">Recent Transactions</h3>
                 <a href="{{ route('dashboard.transactions') }}" wire:navigate aria-label="View all transactions" class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
@@ -833,7 +819,7 @@ new #[Lazy] class extends Component
                     <div class="relative overflow-hidden rounded-[15px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors dark:border-zinc-700 dark:shadow-none">
                         <x-ui.floating-confetti />
                         <div class="relative z-10 flex items-center justify-between">
-                            <h3 class="text-base font-semibold text-zinc-900">Recent Orders</h3>
+                            <h3 class="text-base font-semibold text-zinc-900 dark:text-white">Recent Orders</h3>
                             <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">View all</a>
                         </div>
 
@@ -903,17 +889,12 @@ new #[Lazy] class extends Component
                     {{-- Quick Actions section --}}
                     <div class="p-5 sm:p-6">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-base font-semibold text-zinc-900">Quick Actions</h3>
+                            <h3 class="text-base font-semibold text-zinc-900 dark:text-white">Quick Actions</h3>
                             <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate class="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">View all</a>
                         </div>
 
                         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
                             @foreach ([
-                                \App\Support\FeatureFlag::on('ef_transfers', false) ? ['Send Money', 'transactions 1.svg', 'bg-blue-500',    null, Route::has('dashboard.transfers') ? route('dashboard.transfers') : '#'] : null,
-                                \App\Support\FeatureFlag::on('ef_virtual_cards', false) ? ['Cards',      'savedcard.svg',      'bg-indigo-500',  null, Route::has('dashboard.virtual-cards') ? route('dashboard.virtual-cards') : '#'] : null,
-                                \App\Support\FeatureFlag::on('ef_fiat_withdrawals', false) ? ['Withdraw',   'transactions.svg',   'bg-purple-500',  null, Route::has('dashboard.withdrawals') ? route('dashboard.withdrawals') : '#'] : null,
-                                \App\Support\FeatureFlag::on('ef_exchange', false) ? ['Exchange',   'transactions.svg',   'bg-amber-500',   null, Route::has('dashboard.exchange') ? route('dashboard.exchange') : '#'] : null,
-                                \App\Support\FeatureFlag::on('wallet_funding', false) ? ['Add Money',  'wallet 2.svg',       'bg-emerald-500', null, route('dashboard')] : null,
                                 ['eSIM',       'esim.svg',           'bg-orange-500',  null, route('dashboard.shop.esims')],
                                 ['Top-ups',    'topup1.svg',         'bg-rose-500',    null, route('dashboard.shop.topups')],
                                 ['Flights',    'flight 2.svg',       'bg-sky-500',     null, route('dashboard.shop.flights')],
@@ -924,31 +905,17 @@ new #[Lazy] class extends Component
                             ] as $item)
                                 @if ($item)
                                     @php [$label, $icon, $bg, $hoverIcon, $href] = $item; @endphp
-                                    @if ($label === 'Add Money')
-                                        <button type="button" @click.prevent="$dispatch('open-fund-wallet', { code: '{{ $walletCurrencyCode }}' })" class="group flex flex-col items-center gap-2 text-center">
-                                            <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
-                                                @if ($hoverIcon)
-                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
-                                                    <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
-                                                @else
-                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                                @endif
-                                            </span>
-                                            <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
-                                        </button>
-                                    @else
-                                        <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                                            <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
-                                                @if ($hoverIcon)
-                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
-                                                    <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
-                                                @else
-                                                    <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                                @endif
-                                            </span>
-                                            <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700">{{ $label }}</span>
-                                        </a>
-                                    @endif
+                                    <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
+                                        <span class="flex h-14 w-14 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 shadow-sm shadow-zinc-900/10">
+                                            @if ($hoverIcon)
+                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert group-hover:hidden" loading="lazy">
+                                                <img src="{{ asset('assets/' . rawurlencode($hoverIcon)) }}" alt="" class="hidden h-6 w-6 brightness-0 invert group-hover:block" loading="lazy">
+                                            @else
+                                                <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                            @endif
+                                        </span>
+                                        <span class="text-xs font-medium text-zinc-700 transition-colors group-hover:text-blue-700 dark:text-zinc-300 dark:group-hover:text-blue-400">{{ $label }}</span>
+                                    </a>
                                 @endif
                             @endforeach
                         </div>
@@ -1051,7 +1018,7 @@ new #[Lazy] class extends Component
                 <div class="relative flex flex-1 flex-col overflow-hidden rounded-[15px] bg-[#eff6ff] dash-shimmer p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors dark:border-zinc-700 dark:shadow-none">
                     <x-ui.floating-confetti />
                     <div class="relative z-10 flex items-center justify-between">
-                        <h3 class="text-base font-semibold text-zinc-900">Recent Transactions</h3>
+                        <h3 class="text-base font-semibold text-zinc-900 dark:text-white">Recent Transactions</h3>
                         <a href="{{ route('dashboard.transactions') }}" wire:navigate class="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">View all</a>
                     </div>
 

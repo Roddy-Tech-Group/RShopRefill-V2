@@ -27,17 +27,18 @@ class DeviceTrustManager
         $fingerprint = $this->computeFingerprint($installationId, $userAgent, $ipAddress);
 
         $device = TrustedDevice::where('user_id', $user->id)
-            ->where('fingerprint', $fingerprint)
+            ->where('device_uuid', $installationId)
             ->first();
 
         if (!$device) {
             $device = new TrustedDevice([
                 'user_id' => $user->id,
                 'device_uuid' => $installationId,
-                'fingerprint' => $fingerprint,
                 'trust_score' => 20, // Default for new devices
             ]);
         }
+        
+        $device->fingerprint = $fingerprint;
 
         $agent = new Agent();
         $agent->setUserAgent($userAgent);

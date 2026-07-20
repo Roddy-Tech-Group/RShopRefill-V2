@@ -70,7 +70,7 @@
                     <label for="otp" class="sr-only">Verification Code</label>
                     <div class="relative">
                         <input id="otp" name="otp" type="text" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="------" autocomplete="one-time-code"
-                            class="block w-full rounded-[16px] border border-zinc-200/80 bg-zinc-50/50 px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 shadow-inner outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f]/50 dark:bg-[#0c1a36]/50 dark:text-white dark:focus:border-blue-400 dark:focus:bg-[#0c1a36] dark:focus:ring-blue-400/20">
+                            class="block w-full rounded-[16px] border border-zinc-300 bg-white px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 shadow-inner outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f]/50 dark:bg-[#0c1a36]/50 dark:text-white dark:focus:border-blue-400 dark:focus:bg-[#0c1a36] dark:focus:ring-blue-400/20">
                         
                         @error('otp') 
                             <div class="absolute -bottom-6 left-0 right-0 text-center">
@@ -81,8 +81,8 @@
                 </div>
 
                 <button type="submit" :disabled="loading"
-                    class="group relative flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.5)] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0c1a36]"
-                    :class="loading ? 'opacity-80' : 'hover:-translate-y-0.5 hover:shadow-[0_12px_25px_-8px_rgba(37,99,235,0.6)]'">
+                    class="group relative flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-[14px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.5)] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0c1a36]"
+                    :class="loading ? 'opacity-80' : 'hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-[0_12px_25px_-8px_rgba(37,99,235,0.6)]'">
                     
                     {{-- Default State --}}
                     <span class="relative z-10 flex items-center gap-2" x-show="!loading">
