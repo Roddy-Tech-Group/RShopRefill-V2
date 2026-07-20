@@ -86,6 +86,9 @@
     // The registration/redemption link the buyer must open to claim the card.
     // Captured but historically never shown - surface it as the primary CTA.
     $redemptionUrl = $scalar($payload['redemption_url'] ?? null);
+    // Supplier-issued redemption steps captured at fulfillment (plain text with
+    // newlines, e.g. the POSA portal flow for Discord Nitro).
+    $supplierSteps = $scalar($payload['instructions'] ?? null);
 
     // Rcoin cashback for this order, shown here instead of a separate
     // "you earned Rcoin" email. Prefer the credited wallet transaction
@@ -313,6 +316,12 @@
     @else
         @if ($redemptionUrl)
             <x-emails.button :url="$redemptionUrl" align="center">Redeem your card</x-emails.button>
+        @endif
+
+        @if ($supplierSteps)
+            <x-emails.panel title="Redemption steps">
+                <div style="font-size:14px; line-height:1.6; color:#3f3f46;">{!! nl2br(e($supplierSteps)) !!}</div>
+            </x-emails.panel>
         @endif
 
         @if ($redeemHtml)
