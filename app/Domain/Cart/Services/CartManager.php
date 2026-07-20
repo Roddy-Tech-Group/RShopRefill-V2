@@ -7,9 +7,16 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CartManager
 {
+    /**
+     * Hard ceiling on the quantity of any single line item. Guards against
+     * overflow of DECIMAL(12,4) monetary columns and unreasonable orders.
+     */
+    public const MAX_ITEM_QUANTITY = 100;
+
     public function __construct(
         private CartPricingService $pricingService,
         private CartValidationService $validationService
@@ -99,6 +106,13 @@ class CartManager
             if ($existingItem) {
                 // Update existing
                 $newQuantity = $existingItem->quantity + $quantity;
+
+                if ($newQuantity > self::MAX_ITEM_QUANTITY) {
+                    throw ValidationException::withMessages([
+                        'quantity' => 'You can have at most '.self::MAX_ITEM_QUANTITY.' of this item in your cart (currently '.$existingItem->quantity.').',
+                    ]);
+                }
+
                 $newPricing = $this->pricingService->calculatePricing($variant, $newQuantity);
 
                 if ($variant->is_variable && $requestedValue !== null) {

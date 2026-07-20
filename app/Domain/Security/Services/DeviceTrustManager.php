@@ -15,7 +15,7 @@ class DeviceTrustManager
      */
     public function computeFingerprint(string $installationId, string $userAgent, string $ipAddress): string
     {
-        return hash('sha256', $installationId . '|' . $userAgent . '|' . $ipAddress);
+        return hash('sha256', $installationId.'|'.$userAgent.'|'.$ipAddress);
     }
 
     /**
@@ -27,23 +27,24 @@ class DeviceTrustManager
         $fingerprint = $this->computeFingerprint($installationId, $userAgent, $ipAddress);
 
         $device = TrustedDevice::where('user_id', $user->id)
-            ->where('fingerprint', $fingerprint)
+            ->where('device_uuid', $installationId)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             $device = new TrustedDevice([
                 'user_id' => $user->id,
                 'device_uuid' => $installationId,
-                'fingerprint' => $fingerprint,
                 'trust_score' => 20, // Default for new devices
             ]);
         }
 
-        $agent = new Agent();
+        $device->fingerprint = $fingerprint;
+
+        $agent = new Agent;
         $agent->setUserAgent($userAgent);
-        
+
         $location = Location::get($ipAddress);
-        
+
         $device->fill([
             'device_name' => $deviceData['device_name'] ?? $device->device_name,
             'browser' => $deviceData['browser'] ?? ($agent->browser() ?: null) ?? $device->browser,

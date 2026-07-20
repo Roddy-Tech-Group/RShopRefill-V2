@@ -24,6 +24,13 @@ class NegotiateMarkdown
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Livewire's update requests carry a checksum-verified JSON payload that
+        // must never be modified. Short-circuit before touching the response so
+        // the markdown conversion can never corrupt a Livewire round-trip.
+        if ($request->hasHeader('X-Livewire')) {
+            return $next($request);
+        }
+
         $response = $next($request);
 
         // Shared caches must key on Accept so an agent and a browser never get

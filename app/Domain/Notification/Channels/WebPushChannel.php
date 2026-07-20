@@ -25,8 +25,6 @@ class WebPushChannel implements NotificationChannelInterface
         $subscriptions = $this->deviceManager->getSubscriptionsFor($user);
 
         if ($subscriptions->isEmpty()) {
-            $this->recordDelivery($payload, DeliveryStatus::Failed, 'No active push subscriptions for user');
-
             return;
         }
 
