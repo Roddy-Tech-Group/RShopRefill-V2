@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
-use App\Domain\Notification\Enums\DeliveryStatus;
-use App\Domain\Notification\Enums\NotificationChannel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
+ * Legacy delivery audit rows from the pre-Communication-Platform system.
+ * New deliveries are recorded in communication_logs; this table is kept
+ * read-only for historical data, so channel/status stay plain strings.
+ *
  * @property int $id
  * @property string|null $notification_id
  * @property string $provider
- * @property NotificationChannel $channel
+ * @property string $channel
  * @property string $recipient
- * @property DeliveryStatus $status
+ * @property string $status
  * @property array|null $response_payload
  * @property string|null $error_message
  * @property Carbon $attempted_at
@@ -40,8 +42,6 @@ class NotificationDelivery extends Model
     protected function casts(): array
     {
         return [
-            'channel' => NotificationChannel::class,
-            'status' => DeliveryStatus::class,
             'response_payload' => 'array',
             'attempted_at' => 'datetime',
         ];

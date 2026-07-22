@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\GiftCardTrading\Services\TradeReviewService;
-use App\Domain\Notification\Services\AdminNotificationService;
 use App\Enums\TradeStatus;
 use App\Models\Admin;
 use App\Models\Payout;

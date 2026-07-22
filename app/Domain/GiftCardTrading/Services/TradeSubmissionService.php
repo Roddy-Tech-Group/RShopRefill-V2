@@ -2,17 +2,17 @@
 
 namespace App\Domain\GiftCardTrading\Services;
 
-use App\Domain\Notification\Services\AdminNotificationService;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\AdminNotificationService;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Enums\TradeStatus;
 use App\Mail\AdminNewTradeMail;
-use App\Models\Admin;
 use App\Models\GiftCardRate;
 use App\Models\GiftCardTrade;
 use App\Models\TradeAuditLog;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 class TradeSubmissionService
 {
@@ -86,10 +86,13 @@ class TradeSubmissionService
             );
 
             // Send Email notification to all admins
-            $admins = Admin::all();
-            if ($admins->isNotEmpty()) {
-                Mail::to($admins)->send(new AdminNewTradeMail($trade));
-            }
+            app(CommunicationManager::class)->sendToAdmin(
+                category: CommunicationCategory::AdminAlert,
+                title: 'New Trade Submitted',
+                message: "A new trade ({$trade->rate->brand->name}) was submitted by {$trade->user->name}.",
+                mailable: new AdminNewTradeMail($trade),
+                correlationId: 'new_trade_'.$trade->id
+            );
 
             // Dispatch events here (e.g., TradeSubmitted)
             // event(new \App\Events\GiftCardTrading\TradeSubmitted($trade));

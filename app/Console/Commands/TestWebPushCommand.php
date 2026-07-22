@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Notification\Providers\WebPushProvider;
+use App\Domain\Communication\Providers\WebPushProvider;
 use App\Models\PushSubscription;
 use Illuminate\Console\Command;
 
@@ -38,50 +38,24 @@ class TestWebPushCommand extends Command
 
         $this->info("Found {$subscriptions->count()} subscription(s). Sending test push...");
 
-        $payload = [
-            'title' => '🎉 RshopRefills Push Test',
-            'body' => 'If you see this, Web Push is working! '.now()->format('H:i:s'),
-            'icon' => '/assets/icon-512.png',
-            'badge' => '/assets/icon-192.png',
-            'url' => '/dashboard',
-            'data' => [
-                'url' => '/dashboard',
-                'test' => true,
-            ],
-        ];
-
-        $successCount = 0;
-        $failCount = 0;
-
-        foreach ($subscriptions as $sub) {
-            $subscriptionData = [
-                'endpoint' => $sub->endpoint,
-                'keys' => [
-                    'p256dh' => $sub->p256dh,
-                    'auth' => $sub->auth,
-                ],
-            ];
-
-            $results = $provider->send($subscriptionData, $payload);
-
-            foreach ($results as $result) {
-                if ($result['success']) {
-                    $successCount++;
-                    $this->line("  ✓ Sent to {$sub->subscribable_type}#{$sub->subscribable_id}");
-                } else {
-                    $failCount++;
-                    $this->error('  ✗ Failed: '.($result['reason'] ?? 'Unknown'));
-                    if (! empty($result['expired'])) {
-                        $this->warn('    Subscription expired — cleaning up.');
-                        $sub->delete();
-                    }
-                }
-            }
-        }
+        $success = $provider->send(
+            subscriptions: $subscriptions,
+            title: '🎉 RshopRefills Push Test',
+            body: 'If you see this, Web Push is working! '.now()->format('H:i:s'),
+            url: '/dashboard',
+            icon: '/assets/icon-512.png',
+        );
 
         $this->newLine();
-        $this->info("Done! Sent: {$successCount}, Failed: {$failCount}");
 
-        return $failCount > 0 ? 1 : 0;
+        if ($success) {
+            $this->info("Done! Push dispatched to {$subscriptions->count()} subscription(s).");
+
+            return 0;
+        }
+
+        $this->error('Push dispatch failed — check laravel.log for provider errors.');
+
+        return 1;
     }
 }

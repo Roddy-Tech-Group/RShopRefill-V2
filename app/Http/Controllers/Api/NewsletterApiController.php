@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Notification\Services\NotificationService;
+use App\Domain\Communication\Services\NewsletterService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\URL;
 class NewsletterApiController extends Controller
 {
     public function __construct(
-        private readonly NotificationService $notificationService
+        private readonly NewsletterService $notificationService
     ) {}
 
     /**

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Notification\Services\NotificationPreferenceService;
+use App\Domain\Communication\Services\PreferenceManager;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\NotificationPreferenceResource;
 use App\Http\Resources\NotificationResource;
@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 class NotificationApiController extends Controller
 {
     public function __construct(
-        private readonly NotificationPreferenceService $preferenceService
+        private readonly PreferenceManager $preferenceService
     ) {}
 
     /**

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Notification;
 
-use App\Domain\Notification\Jobs\DispatchCampaignJob;
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
-use App\Domain\Notification\Services\CampaignService;
+use App\Domain\Communication\Jobs\DispatchCampaignJob;
+use App\Domain\Communication\Jobs\DispatchCommunicationJob;
+use App\Domain\Communication\Services\CampaignService;
 use App\Models\NotificationCampaign;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +16,7 @@ use Tests\TestCase;
  * "Send Immediately" hands a campaign straight to DispatchCampaignJob so it goes
  * out on the queue within seconds, instead of waiting for the per-minute
  * campaigns:dispatch cron. The job fans the campaign out to its audience (one
- * queued notification per user) and finalises the campaign as 'sent'.
+ * queued communication per user) and finalises the campaign as 'sent'.
  */
 class SendCampaignNowTest extends TestCase
 {
@@ -30,7 +30,7 @@ class SendCampaignNowTest extends TestCase
             'notification_message' => 'Up to 50% off today',
             'notification_url' => '/dashboard',
             'channels' => ['push'],
-            'category' => 'marketing',
+            'category' => 'campaign',
             'audience_type' => 'all',
             'audience_filters' => [],
             'status' => $status,
@@ -38,7 +38,7 @@ class SendCampaignNowTest extends TestCase
         ]);
     }
 
-    public function test_job_enqueues_one_notification_per_user_and_marks_campaign_sent(): void
+    public function test_job_enqueues_one_communication_per_user_and_marks_campaign_sent(): void
     {
         Queue::fake();
         User::factory()->count(3)->create();
@@ -46,7 +46,7 @@ class SendCampaignNowTest extends TestCase
 
         (new DispatchCampaignJob($campaign))->handle(app(CampaignService::class));
 
-        Queue::assertPushed(SendAsynchronousNotificationJob::class, 3);
+        Queue::assertPushed(DispatchCommunicationJob::class, 3);
         $this->assertSame('sent', $campaign->fresh()->status);
     }
 
@@ -58,7 +58,7 @@ class SendCampaignNowTest extends TestCase
 
         (new DispatchCampaignJob($campaign))->handle(app(CampaignService::class));
 
-        Queue::assertNotPushed(SendAsynchronousNotificationJob::class);
+        Queue::assertNotPushed(DispatchCommunicationJob::class);
         $this->assertSame('sent', $campaign->fresh()->status);
     }
 

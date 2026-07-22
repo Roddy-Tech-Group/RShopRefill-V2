@@ -2,12 +2,13 @@
 
 namespace Tests\Feature\Shop;
 
-use App\Domain\Notification\Providers\MailProviderInterface;
+use App\Domain\Communication\Mail\Orders\GuestAccountClaimMail;
+use App\Domain\Communication\Providers\MailProviderInterface;
 use App\Domain\Order\Events\FulfillmentSucceeded;
-use App\Mail\GuestAccountClaimMail;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
+use App\Models\CommunicationLog;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PricingRule;
@@ -16,6 +17,7 @@ use App\Models\ProductVariant;
 use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
+use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -47,9 +49,9 @@ class GuestCheckoutTest extends TestCase
         // The notification pipeline must never hit the real mail provider.
         $this->app->instance(MailProviderInterface::class, new class implements MailProviderInterface
         {
-            public function send(string $to, string $subject, string $htmlBody, array $headers = [], array $attachments = []): array
+            public function send(string $to, string $from, string $replyTo, string $subject, Mailable $mailable, array $metadata = []): array
             {
-                return ['id' => 'spy', 'status' => 'success'];
+                return ['id' => 'spy'];
             }
         });
     }
@@ -208,29 +210,33 @@ class GuestCheckoutTest extends TestCase
 
     public function test_fulfillment_sends_the_claim_email_to_guests_once(): void
     {
-        Mail::fake();
-
         $guest = User::factory()->create(['email' => 'guest@example.com', 'is_guest' => true]);
         $item = $this->makeFulfilledItem($guest);
 
         event(new FulfillmentSucceeded($item));
         event(new FulfillmentSucceeded($item)); // second item of the same order
 
-        Mail::assertQueued(GuestAccountClaimMail::class, 1);
-        Mail::assertQueued(GuestAccountClaimMail::class, fn (GuestAccountClaimMail $mail) => $mail->user->is($guest));
+        $this->assertSame(
+            1,
+            CommunicationLog::where('user_id', $guest->id)
+                ->where('template_key', GuestAccountClaimMail::class)
+                ->where('channel', 'email')
+                ->count()
+        );
         $this->assertNotNull($guest->refresh()->guest_claim_last_sent_at);
     }
 
     public function test_fulfillment_sends_no_claim_email_to_registered_users(): void
     {
-        Mail::fake();
-
         $user = User::factory()->create();
         $item = $this->makeFulfilledItem($user);
 
         event(new FulfillmentSucceeded($item));
 
-        Mail::assertNotQueued(GuestAccountClaimMail::class);
+        $this->assertSame(
+            0,
+            CommunicationLog::where('template_key', GuestAccountClaimMail::class)->count()
+        );
     }
 
     // ── Claiming the account ────────────────────────────────────

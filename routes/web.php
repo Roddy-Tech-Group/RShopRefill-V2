@@ -2,7 +2,7 @@
 
 use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
-use App\Domain\Notification\Services\AdminNotificationService;
+use App\Domain\Communication\Services\AdminNotificationService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\GuestClaimController;
@@ -19,8 +19,10 @@ use App\Http\Controllers\PressController;
 use App\Http\Controllers\RcoinConvertController;
 use App\Http\Controllers\RcoinWithdrawalController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\Security\DeviceVerificationController;
 use App\Http\Controllers\SuspensionController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\Web\RecoveryController;
 use App\Models\BlogPost;
 use App\Models\Category;
 use App\Models\Coupon;
@@ -802,10 +804,10 @@ Route::middleware(['auth'])->group(function () {
 
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
     Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
-    
+
     // Alias for main branch compatibility where views still call route('dashboard.password')
     Volt::route('dashboard/password', 'settings.security')->name('dashboard.password');
-    
+
     Volt::route('dashboard/security/pin-reset', 'settings.pin-reset')->name('dashboard.security.pin-reset');
     Volt::route('dashboard/appearance', 'settings.appearance')->name('dashboard.appearance');
 
@@ -885,14 +887,20 @@ if (app()->environment('local')) {
     Route::get('dev/emails/{key}', [EmailPreviewController::class, 'show'])->name('dev.emails.show');
 }
 
+// Transaction Recovery Routes (Public)
+Route::get('/recovery/thanks', [RecoveryController::class, 'thanks'])->name('recovery.thanks');
+Route::get('/recovery/{token}', [RecoveryController::class, 'show'])->name('recovery.show');
+Route::post('/recovery/{token}/feedback', [RecoveryController::class, 'feedback'])->name('recovery.feedback');
+Route::post('/recovery/{token}/retry', [RecoveryController::class, 'retry'])->name('recovery.retry');
+
 // Security & Verification
 Route::middleware(['auth'])->prefix('security')->name('security.')->group(function () {
-    Route::get('verify-device', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'show'])->name('verify-device');
-    Route::post('verify-device/send', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'sendOtp'])->name('verify-device.send');
-    Route::post('verify-device', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'verifyOtp'])->name('verify-device.verify');
-    
+    Route::get('verify-device', [DeviceVerificationController::class, 'show'])->name('verify-device');
+    Route::post('verify-device/send', [DeviceVerificationController::class, 'sendOtp'])->name('verify-device.send');
+    Route::post('verify-device', [DeviceVerificationController::class, 'verifyOtp'])->name('verify-device.verify');
+
     // Unauthenticated route for the NO IT WASN'T ME flow
-    Route::get('compromise', [\App\Http\Controllers\Security\DeviceVerificationController::class, 'handleCompromise'])
+    Route::get('compromise', [DeviceVerificationController::class, 'handleCompromise'])
         ->withoutMiddleware(['auth'])
         ->name('compromise');
 

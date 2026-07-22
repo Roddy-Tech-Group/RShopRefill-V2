@@ -4,13 +4,13 @@
  * Newsletter signup card — sits in the customer dashboard sidebar.
  *
  * One-tap subscribe for an authenticated user: the auth email is the address,
- * NotificationService writes to the newsletter_subscribers table. On mount we
+ * NewsletterService writes to the newsletter_subscribers table. On mount we
  * check whether the user is already an active subscriber and render the
  * "already subscribed" state instead of the CTA so they aren't shown the prompt
  * again on every dashboard hit.
  */
 
-use App\Domain\Notification\Services\NotificationService;
+use App\Domain\Communication\Services\NewsletterService;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
@@ -35,7 +35,7 @@ new class extends Component
         $this->subscribed = (bool) $existing;
     }
 
-    public function subscribe(NotificationService $service): void
+    public function subscribe(NewsletterService $service): void
     {
         $this->errorMessage = null;
         $user = Auth::user();

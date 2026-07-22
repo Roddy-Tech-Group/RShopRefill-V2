@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Notification\Services\CampaignService;
+use App\Domain\Communication\Services\CampaignService;
 use App\Models\NotificationCampaign;
 use Illuminate\Console\Command;
 

@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Mail;
 
+use App\Domain\Communication\Mail\Orders\OrderFulfilledMail;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\WalletService;
-use App\Mail\OrderFulfilledMail;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -90,7 +90,7 @@ class OrderFulfilledMailTest extends TestCase
             ],
         ]);
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('Your eSIM is ready', $html);
         $this->assertStringNotContainsString('Your gift card is ready', $html);
@@ -126,7 +126,7 @@ class OrderFulfilledMailTest extends TestCase
             'iccid' => '8944465400000000000',
         ]);
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('Your eSIM is ready', $html);
         $this->assertStringContainsString('Manage your eSIM', $html);
@@ -144,7 +144,7 @@ class OrderFulfilledMailTest extends TestCase
             'zendit',
         );
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('Your gift card is ready', $html);
         $this->assertStringNotContainsString('Your eSIM is ready', $html);
@@ -165,7 +165,7 @@ class OrderFulfilledMailTest extends TestCase
             'zendit',
         );
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('Your gift card is ready', $html);
         // The registration link must be delivered as a clickable CTA.
@@ -183,7 +183,7 @@ class OrderFulfilledMailTest extends TestCase
         Setting::set('cashback_percentage', 1.0);
         $item = $this->makeFulfilledItem(['code' => 'GC-TEST-12345']);
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('Rcoin cashback', $html);
         $this->assertStringContainsString('+7 Rcoin', $html);
@@ -205,7 +205,7 @@ class OrderFulfilledMailTest extends TestCase
             'iccid' => '8944465400000000000',
         ]);
 
-        Mail::to('customer@example.test')->send(new OrderFulfilledMail($item));
+        Mail::to('customer@example.test')->send(new OrderFulfilledMail($item->order->user, $item));
 
         $sent = app('mail.manager')->mailer('array')->getSymfonyTransport()->messages();
         $this->assertCount(1, $sent);
@@ -239,7 +239,7 @@ class OrderFulfilledMailTest extends TestCase
             idempotencyKey: "reward-cashback-{$order->id}",
         );
 
-        $html = (new OrderFulfilledMail($item))->render();
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
 
         $this->assertStringContainsString('+42 Rcoin', $html);
         $this->assertStringContainsString('already in your Rcoin wallet', $html);

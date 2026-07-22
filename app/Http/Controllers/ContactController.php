@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Notification\Services\AdminNotificationService;
+use App\Domain\Communication\Services\AdminNotificationService;
 use App\Models\ContactMessage;
 use Illuminate\Http\Request;
 

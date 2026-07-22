@@ -44,13 +44,17 @@ class AdminFlashToastTest extends TestCase
         $response->assertSee('show = false', false);
     }
 
-    public function test_no_toast_markup_without_a_flash(): void
+    public function test_toast_host_stays_dormant_without_a_flash(): void
     {
         $this->withoutVite()->actingAs($this->admin(), 'admin');
         $user = User::factory()->create();
 
+        // The toast host is always mounted (it also receives window `toast`
+        // events from Livewire actions), but with no flash it must start
+        // hidden with an empty message — nothing visible to the admin.
         $this->get(route('admin.customer', $user))
             ->assertOk()
-            ->assertDontSee('sm:right-5 sm:top-5', false);
+            ->assertSee("message: ''", false)
+            ->assertSee('style="display:none;"', false);
     }
 }

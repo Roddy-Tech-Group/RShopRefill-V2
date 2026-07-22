@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Domain\Notification\Services\NotificationDispatcher;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Http\Controllers\Controller;
 use App\Models\KycSubmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -41,7 +41,7 @@ class AdminKycController extends Controller
     /**
      * Approve a submission: mark it verified and raise the customer's status.
      */
-    public function approve(KycSubmission $submission, NotificationDispatcher $dispatcher): RedirectResponse
+    public function approve(KycSubmission $submission, CommunicationManager $communication): RedirectResponse
     {
         $submission->update([
             'status' => 'approved',
@@ -53,7 +53,7 @@ class AdminKycController extends Controller
         $submission->user->update(['kyc_status' => 'verified']);
 
         $this->notify(
-            $dispatcher,
+            $communication,
             $submission,
             'Identity verified',
             'Your identity has been verified. Your account now has raised transaction limits.',
@@ -65,7 +65,7 @@ class AdminKycController extends Controller
     /**
      * Reject a submission with a reason the customer will see.
      */
-    public function reject(Request $request, KycSubmission $submission, NotificationDispatcher $dispatcher): RedirectResponse
+    public function reject(Request $request, KycSubmission $submission, CommunicationManager $communication): RedirectResponse
     {
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
@@ -81,7 +81,7 @@ class AdminKycController extends Controller
         $submission->user->update(['kyc_status' => 'rejected']);
 
         $this->notify(
-            $dispatcher,
+            $communication,
             $submission,
             'Identity verification needs attention',
             'We could not verify your identity: '.$validated['reason'].' Please resubmit your documents.',
@@ -91,20 +91,18 @@ class AdminKycController extends Controller
     }
 
     /**
-     * Notify the customer. Wrapped so a notification hiccup never blocks the
-     * review decision (which has already been persisted).
+     * Notify the customer via the Communication Platform (compliance@).
+     * CommunicationManager::send() never throws, so a notification hiccup
+     * can never block the review decision (which has already been persisted).
      */
-    private function notify(NotificationDispatcher $dispatcher, KycSubmission $submission, string $title, string $message): void
+    private function notify(CommunicationManager $communication, KycSubmission $submission, string $title, string $message): void
     {
-        try {
-            $dispatcher->dispatch(
-                user: $submission->user,
-                title: $title,
-                message: $message,
-                category: 'security',
-            );
-        } catch (\Throwable $e) {
-            Log::warning('KYC review notification failed: '.$e->getMessage());
-        }
+        $communication->send(
+            recipient: $submission->user,
+            category: CommunicationCategory::Kyc,
+            title: $title,
+            message: $message,
+            correlationId: 'kyc_review_'.$submission->id,
+        );
     }
 }

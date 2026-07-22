@@ -3,10 +3,10 @@
 /**
  * Guest-friendly newsletter signup for the storefront footer. Anyone can enter an
  * email (unlike the dashboard newsletter-card, which one-tap subscribes the logged-in
- * user). Writes to newsletter_subscribers via NotificationService, source "footer".
+ * user). Writes to newsletter_subscribers via NewsletterService, source "footer".
  */
 
-use App\Domain\Notification\Services\NotificationService;
+use App\Domain\Communication\Services\NewsletterService;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
 
@@ -17,7 +17,7 @@ new class extends Component
 
     public bool $subscribed = false;
 
-    public function subscribe(NotificationService $service): void
+    public function subscribe(NewsletterService $service): void
     {
         $this->validate();
 

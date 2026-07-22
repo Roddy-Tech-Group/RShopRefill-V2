@@ -1,12 +1,9 @@
-@component('mail::message')
-# Transaction PIN Changed
+<x-emails.layout :mail-message="$message ?? null" title="Transaction PIN Changed" preheader="Your wallet transaction PIN has been changed.">
+    <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">Transaction PIN Changed</h1>
 
-Hi {{ $user->name }},
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hi {{ $user->name }},</p>
 
-This is a confirmation that your wallet transaction PIN has been successfully changed.
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">This is a confirmation that your wallet transaction PIN has been successfully changed.</p>
 
-If you did not make this change, please contact support immediately to secure your account.
-
-Thanks,<br>
-{{ config('app.name') }}
-@endcomponent
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">If you did not make this change, please contact support immediately to secure your account.</p>
+</x-emails.layout>

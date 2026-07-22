@@ -2,13 +2,11 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Notification\Enums\NotificationChannel;
-use App\Domain\Notification\Enums\NotificationPriority;
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
-use App\Mail\GiftCardsRestored;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Notifications\GiftCardsRestoredMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class SendGiftCardsRestoredNotification extends Command
 {
@@ -32,7 +30,7 @@ class SendGiftCardsRestoredNotification extends Command
     public function handle()
     {
         $isDryRun = $this->option('dry-run');
-        
+
         $this->info('Starting to dispatch notifications for all users...');
 
         if ($isDryRun) {
@@ -43,34 +41,29 @@ class SendGiftCardsRestoredNotification extends Command
 
         User::chunkById(100, function ($users) use (&$count, $isDryRun) {
             foreach ($users as $user) {
-                if (!$isDryRun) {
-                    SendAsynchronousNotificationJob::dispatch(
-                        $user,
-                        'Great News! Gift Cards Are Back!',
-                        'Our Gift Card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online. We appreciate your continued trust in RShopRefills. Happy shopping!',
-                        new GiftCardsRestored($user),
-                        NotificationPriority::High,
-                        [
-                            'url' => config('app.url') . '/dashboard/gift-cards',
+                if (! $isDryRun) {
+                    app(CommunicationManager::class)->send(
+                        recipient: $user,
+                        category: CommunicationCategory::GiftCardsRestored,
+                        title: 'Great News! Gift Cards Are Back!',
+                        message: 'Our Gift Card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online. We appreciate your continued trust in RShopRefills. Happy shopping!',
+                        mailable: new GiftCardsRestoredMail($user),
+                        correlationId: 'giftcards_restored_2026_07_'.$user->id,
+                        metadata: [
+                            'url' => config('app.url').'/dashboard/gift-cards',
                             'campaign_id' => 'giftcards_restored_2026_07',
-                        ],
-                        [
-                            NotificationChannel::Database,
-                            NotificationChannel::Email,
-                            NotificationChannel::Push,
-                        ],
-                        'giftcards_restored_2026_07_' . $user->id
+                        ]
                     );
                 }
-                
+
                 $count++;
             }
-            
+
             $this->info("Processed {$count} users...");
         });
 
         $this->info("Done! Processed {$count} users total.");
-        
+
         return Command::SUCCESS;
     }
 }

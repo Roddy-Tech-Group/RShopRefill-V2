@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\PasswordResetMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -484,5 +487,22 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $this->last_transaction_pin_used_at = now();
         $this->save();
+    }
+
+    /**
+     * Route password reset emails through the Communication Platform so they
+     * are sent from verify@rshoprefill.com, logged, and preference-audited
+     * instead of using Laravel's default notification mailer.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        app(CommunicationManager::class)->send(
+            recipient: $this,
+            category: CommunicationCategory::PasswordReset,
+            title: 'Reset your password',
+            message: 'We received a request to reset your password. The reset link expires shortly.',
+            mailable: new PasswordResetMail($this, $token),
+            correlationId: 'password_reset_'.$this->id,
+        );
     }
 }

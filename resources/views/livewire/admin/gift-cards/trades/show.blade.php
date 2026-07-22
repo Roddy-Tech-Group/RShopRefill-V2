@@ -75,15 +75,15 @@ class extends Component {
 
         $this->trade->refresh();
 
-        // Notify User via the project's native asynchronous NotificationDispatcher
+        // Notify User via the Communication Platform (orders@ mailbox)
         if (in_array($this->new_status, ['under_review', 'approved', 'paid', 'need_more_info', 'rejected'])) {
-            $dispatcher = app(\App\Domain\Notification\Services\NotificationDispatcher::class);
-            $dispatcher->dispatch(
-                user: $this->trade->user,
+            app(\App\Domain\Communication\Services\CommunicationManager::class)->send(
+                recipient: $this->trade->user,
+                category: \App\Domain\Communication\Enums\CommunicationCategory::TradeUpdate,
                 title: 'Trade Status Updated',
                 message: "Your trade #".substr($this->trade->uuid, 0, 8)." is now ".$this->trade->status->label()."." . ($this->status_reason ? " Admin Note: ".$this->status_reason : ""),
-                category: 'order',
-                mailable: new \App\Mail\TradeStatusMail($this->trade, $this->status_reason),
+                mailable: new \App\Domain\Communication\Mail\Orders\TradeStatusMail($this->trade, $this->status_reason),
+                correlationId: 'trade_status_'.$this->trade->id.'_'.$this->new_status,
                 metadata: ['url' => '/dashboard/gift-cards/trades/'.$this->trade->id]
             );
         }

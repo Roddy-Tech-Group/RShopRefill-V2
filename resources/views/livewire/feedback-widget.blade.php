@@ -4,7 +4,7 @@
      AdminNotificationService so the team sees it in their feed. --}}
 <?php
 
-use App\Domain\Notification\Services\AdminNotificationService;
+use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\Security\Services\TurnstileService;
 use App\Models\ContactMessage;
 use App\Support\TaggedCache;

@@ -39,7 +39,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->country = $user->country;
         $this->gender  = $user->gender;
 
-        $prefs = app(\App\Domain\Notification\Services\NotificationPreferenceService::class)->getPreferences($user);
+        $prefs = app(\App\Domain\Communication\Services\PreferenceManager::class)->getPreferences($user);
         $this->notifyEmail     = (bool) $prefs->email_enabled;
         $this->notifyPush      = (bool) $prefs->push_enabled;
         $this->notifyMarketing = (bool) $prefs->marketing_enabled;
@@ -172,7 +172,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $property = $map[$key];
         $this->{$property} = ! $this->{$property};
 
-        app(\App\Domain\Notification\Services\NotificationPreferenceService::class)
+        app(\App\Domain\Communication\Services\PreferenceManager::class)
             ->updatePreferences(Auth::user(), [
                 'email_enabled'          => $this->notifyEmail,
                 'push_enabled'           => $this->notifyPush,

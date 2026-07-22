@@ -3,27 +3,9 @@
 namespace App\Providers;
 
 use App\Domain\Audit\Listeners\AuditLogListener;
-use App\Domain\Notification\Listeners\AdminEventNotifier;
-use App\Domain\Notification\Listeners\CreateDefaultPreferencesListener;
-use App\Domain\Notification\Listeners\SendFulfillmentNotificationListener;
-use App\Domain\Notification\Listeners\SendOrderConfirmationListener;
-use App\Domain\Notification\Listeners\SendWalletCreditNotificationListener;
-use App\Domain\Notification\Listeners\SendWalletDebitNotificationListener;
-use App\Domain\Notification\Listeners\SendWalletFundingFailedNotificationListener;
-use App\Domain\Notification\Listeners\SendWelcomeEmailListener;
-use App\Domain\Notification\Providers\MailProviderInterface;
-use App\Domain\Notification\Providers\ResendProvider;
-use App\Domain\Notification\Providers\WebPushProvider;
-use App\Domain\Wallet\Events\FundingFailed;
-use App\Domain\Wallet\Events\WalletCredited;
-use App\Domain\Wallet\Events\WalletDebited;
 use App\Http\View\Composers\CartComposer;
 use App\Http\View\Composers\SiteIdentityComposer;
-use App\Listeners\CommerceNotificationListener;
-use App\Listeners\CreateWalletForNewUser;
-use App\Listeners\TransactionPinNotificationListener;
 use App\Support\FeatureFlag;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
@@ -37,40 +19,13 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
-    public function register(): void
-    {
-        $this->app->singleton(
-            MailProviderInterface::class,
-            ResendProvider::class
-        );
-
-        $this->app->singleton(
-            WebPushProvider::class
-        );
-    }
+    public function register(): void {}
 
     /**
      * Bootstrap any application services.
      */
     public function boot(): void
     {
-        Event::listen(Registered::class, CreateDefaultPreferencesListener::class);
-        Event::listen(Registered::class, SendWelcomeEmailListener::class);
-
-        Event::listen(WalletCredited::class, SendWalletCreditNotificationListener::class);
-        Event::listen(WalletDebited::class, SendWalletDebitNotificationListener::class);
-        // Customer notification when a top-up is rejected by the gateway.
-        // Pairs with the WalletCredited listener so both outcomes surface
-        // in the bell feed, not just successes.
-        Event::listen(FundingFailed::class, SendWalletFundingFailedNotificationListener::class);
-
-        Event::subscribe(SendOrderConfirmationListener::class);
-        Event::subscribe(SendFulfillmentNotificationListener::class);
-
-        Event::subscribe(CommerceNotificationListener::class);
-
-        // Fan key platform events out to the admin-dashboard notification feed.
-        Event::subscribe(AdminEventNotifier::class);
 
         // Append security-relevant events to the audit log.
         Event::subscribe(AuditLogListener::class);

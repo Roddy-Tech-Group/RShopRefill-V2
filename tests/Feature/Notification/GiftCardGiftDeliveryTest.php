@@ -2,17 +2,18 @@
 
 namespace Tests\Feature\Notification;
 
-use App\Domain\Notification\Providers\MailProviderInterface;
+use App\Domain\Communication\Providers\MailProviderInterface;
+use App\Domain\Communication\Services\PreferenceManager;
 use App\Domain\Order\Events\FulfillmentSucceeded;
 use App\Models\Category;
 use App\Models\Notification;
-use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Subcategory;
 use App\Models\User;
+use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,7 +22,7 @@ use Tests\TestCase;
  * stored delivery_email differs from the buyer's account email, the
  * fulfilled email (which carries the code) goes to the recipient's inbox,
  * while the buyer keeps the in-app notification and the order + codes on
- * their dashboard. A gift email must also bypass the BUYER's notification
+ * their dashboard. A gift email must also bypass the BUYER's communication
  * preferences - the inbox belongs to someone else.
  */
 class GiftCardGiftDeliveryTest extends TestCase
@@ -42,11 +43,16 @@ class GiftCardGiftDeliveryTest extends TestCase
         {
             public function __construct(private GiftCardGiftDeliveryTest $test) {}
 
-            public function send(string $to, string $subject, string $htmlBody, array $headers = [], array $attachments = []): array
+            public function send(string $to, string $from, string $replyTo, string $subject, Mailable $mailable, array $metadata = []): array
             {
-                $this->test->capture(compact('to', 'subject', 'htmlBody'));
+                $this->test->capture([
+                    'to' => $to,
+                    'from' => $from,
+                    'subject' => $subject,
+                    'htmlBody' => $mailable->render(),
+                ]);
 
-                return ['id' => 'spy', 'status' => 'success'];
+                return ['id' => 'spy'];
             }
         });
     }
@@ -132,20 +138,17 @@ class GiftCardGiftDeliveryTest extends TestCase
         $this->assertStringNotContainsString('sent you this as a gift', $this->sent[0]['htmlBody']);
     }
 
-    public function test_gift_email_bypasses_the_buyers_notification_preferences(): void
+    public function test_gift_email_bypasses_the_buyers_communication_preferences(): void
     {
         $buyer = User::factory()->create(['email' => 'buyer@example.com']);
-        NotificationPreference::create([
-            'user_id' => $buyer->id,
+        app(PreferenceManager::class)->updatePreferences($buyer, [
             'email_enabled' => false,
             'push_enabled' => false,
-            'marketing_enabled' => false,
-            'order_notifications' => false,
-            'wallet_notifications' => false,
-            'security_notifications' => false,
+            'marketing_email' => false,
+            'orders_email' => false,
         ]);
 
-        $item = $this->makeFulfilledItem($buyer, 'friend@example.com');
+        $item = $this->makeFulfilledItem($buyer->fresh(), 'friend@example.com');
 
         event(new FulfillmentSucceeded($item));
 

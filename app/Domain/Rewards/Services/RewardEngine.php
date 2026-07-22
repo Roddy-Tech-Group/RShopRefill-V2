@@ -2,6 +2,8 @@
 
 namespace App\Domain\Rewards\Services;
 
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Fraud\Services\FraudDetectionService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -14,7 +16,6 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 class RewardEngine
 {
@@ -215,15 +216,21 @@ class RewardEngine
         // user's name for context ("Maria just completed an order").
         try {
             $referredUser = User::find($order->user_id);
-            Mail::to($referrer->email)->queue(
-                new RcoinEarnedMail(
+
+            app(CommunicationManager::class)->send(
+                recipient: $referrer,
+                category: CommunicationCategory::RcoinReward,
+                title: 'You Earned RCoins!',
+                message: "You just earned {$rcoinAmount} RCoins because {$referredUser?->name} completed an order.",
+                mailable: new RcoinEarnedMail(
                     recipient: $referrer,
                     rcoinAmount: $rcoinAmount,
                     newBalance: (int) $wallet->refresh()->balance,
                     kind: 'referral',
                     orderNumber: $order->order_number,
                     referredName: $referredUser?->name,
-                )
+                ),
+                correlationId: 'rcoin_referral_'.$order->id
             );
         } catch (\Throwable $e) {
             report($e);

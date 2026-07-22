@@ -1,9 +1,9 @@
 <?php
 
-use App\Domain\Notification\Enums\DeliveryStatus;
-use App\Domain\Notification\Jobs\RetryFailedNotificationsJob;
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
-use App\Domain\Notification\Services\NotificationAuditService;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Enums\DeliveryStatus;
+use App\Domain\Communication\Services\CommunicationManager;
+use App\Models\CommunicationLog;
 use App\Models\Notification;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -20,11 +20,23 @@ class extends Component {
     /** Status filter: all | pending | sent | failed. */
     public string $filter = 'all';
 
-    /** System-wide delivery metrics (NotificationAuditService). */
+    /** System-wide delivery metrics from the unified communication_logs trail. */
     #[Computed]
     public function metrics(): array
     {
-        return app(NotificationAuditService::class)->getSystemMetrics();
+        $total = CommunicationLog::count();
+        $successful = CommunicationLog::whereIn('status', [
+            DeliveryStatus::Sent->value,
+            DeliveryStatus::Delivered->value,
+        ])->count();
+        $failed = CommunicationLog::where('status', DeliveryStatus::Failed->value)->count();
+
+        return [
+            'total_delivery_attempts' => $total,
+            'successful_deliveries' => $successful,
+            'failed_deliveries' => $failed,
+            'success_rate' => $total > 0 ? round(($successful / $total) * 100, 2) : 100.0,
+        ];
     }
 
     public function setFilter(string $filter): void
@@ -34,8 +46,9 @@ class extends Component {
     }
 
     /**
-     * Re-queue a failed/pending notification for delivery. Mirrors
-     * NotificationAdminApiController::retry so both entry points behave the same.
+     * Re-send a failed/pending notification through the Communication
+     * Platform. Mirrors NotificationAdminApiController::retry so both
+     * entry points behave the same.
      */
     public function retry(string $id): void
     {
@@ -45,39 +58,41 @@ class extends Component {
             return;
         }
 
-        $notification->update([
-            'status' => DeliveryStatus::Pending,
-            'failed_at' => null,
-        ]);
-
-        // Rebuild the original mailable when `type` holds a mailable class name.
-        $mailable = null;
-        if ($notification->type && class_exists($notification->type)) {
-            $mailable = new $notification->type($notification->user);
-        }
-
-        SendAsynchronousNotificationJob::dispatch(
-            user: $notification->user,
-            title: $notification->title,
-            message: $notification->message,
-            mailable: $mailable,
-            priority: $notification->priority,
-            metadata: $notification->metadata ?? [],
-            channels: [$notification->channel],
-        );
+        $this->resend($notification);
 
         $this->dispatch('notification-retried');
     }
 
     /**
-     * Re-queue every failed notification in one click. Runs the same auto-retry
-     * sweep that the scheduler fires every 15 minutes, but synchronously so the
-     * admin sees the change in real time.
+     * Re-send every failed notification in one click so the admin can flush
+     * the backlog immediately after fixing the root cause.
      */
     public function retryAllFailed(): void
     {
-        RetryFailedNotificationsJob::dispatchSync();
+        Notification::with('user')
+            ->where('status', DeliveryStatus::Failed->value)
+            ->latest()
+            ->limit(500)
+            ->get()
+            ->each(fn (Notification $notification) => $this->resend($notification));
+
         $this->dispatch('notification-retried');
+    }
+
+    private function resend(Notification $notification): void
+    {
+        if (! $notification->user) {
+            return;
+        }
+
+        app(CommunicationManager::class)->send(
+            recipient: $notification->user,
+            category: CommunicationCategory::tryFrom($notification->type) ?? CommunicationCategory::ServiceNotice,
+            title: $notification->title,
+            message: $notification->message,
+            correlationId: 'admin_retry_'.$notification->id,
+            metadata: ($notification->metadata ?? []) + ['retried_from' => $notification->id],
+        );
     }
 
     /** Permanently delete a notification record from the audit log. */
@@ -174,7 +189,7 @@ class extends Component {
                     wire:click="retryAllFailed"
                     wire:loading.attr="disabled"
                     wire:target="retryAllFailed"
-                    wire:confirm="Re-queue every failed notification? Each row is capped at {{ \App\Domain\Notification\Jobs\RetryFailedNotificationsJob::MAX_AUTO_RETRIES }} auto-retries."
+                    wire:confirm="Re-send every failed notification through the Communication Platform?"
                     class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                 >
                     <svg wire:loading.remove wire:target="retryAllFailed" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -190,7 +205,7 @@ class extends Component {
             @endif
 
             <span class="ml-auto text-[11px] text-zinc-500">
-                Auto-retry runs every 15 min, capped at {{ \App\Domain\Notification\Jobs\RetryFailedNotificationsJob::MAX_AUTO_RETRIES }} attempts per notification.
+                Failed deliveries are retried automatically by the queue (3 attempts with backoff); this button re-sends the in-app backlog immediately.
             </span>
         </div>
 
@@ -234,7 +249,7 @@ class extends Component {
                                 <td class="px-5 py-3.5 text-zinc-600">{{ $n->created_at->format('M j, Y g:i A') }}</td>
                                 <td class="px-5 py-3.5">
                                     <div class="flex items-center justify-end gap-2">
-                                        @if ($n->status !== \App\Domain\Notification\Enums\DeliveryStatus::Sent)
+                                        @if ($n->status !== \App\Domain\Communication\Enums\DeliveryStatus::Sent)
                                             <button
                                                 type="button"
                                                 @click.stop

@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Notification\Enums\NotificationChannel;
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
-use App\Mail\GiftCardsTemporarilyUnavailable;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Notifications\GiftCardsUnavailableMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -35,16 +35,16 @@ class BroadcastGiftCardOutage extends Command
         User::chunkById(500, function ($users) use (&$count) {
             foreach ($users as $user) {
                 // Ensure the user hasn't already received it if the script fails and restarts
-                $idempotencyKey = 'giftcard_outage_' . date('Y_m_d') . '_user_' . $user->id;
+                $idempotencyKey = 'giftcard_outage_'.date('Y_m_d').'_user_'.$user->id;
 
-                dispatch(new SendAsynchronousNotificationJob(
-                    user: $user,
+                app(CommunicationManager::class)->send(
+                    recipient: $user,
+                    category: CommunicationCategory::GiftCardsUnavailable,
                     title: 'Gift Cards Temporarily Unavailable',
                     message: "We're currently performing maintenance on our gift cards service to improve reliability. It will be back as soon as possible.",
-                    mailable: new GiftCardsTemporarilyUnavailable($user),
-                    channels: [NotificationChannel::Email, NotificationChannel::Push, NotificationChannel::Database],
+                    mailable: new GiftCardsUnavailableMail($user),
                     idempotencyKey: $idempotencyKey
-                ));
+                );
                 $count++;
             }
             $this->info("Queued {$count} notifications...");

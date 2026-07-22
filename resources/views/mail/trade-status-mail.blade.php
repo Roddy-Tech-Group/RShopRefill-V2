@@ -1,22 +1,19 @@
-<x-mail::message>
-# Hello {{ $trade->user->name }},
+<x-emails.layout :mail-message="$message ?? null" title="Gift Card Trade Update" preheader="The status of your gift card trade has been updated.">
+    <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">Trade Update: {{ $trade->status->label() }}</h1>
 
-The status of your gift card trade **#{{ substr($trade->uuid, 0, 8) }}** has been updated to: **{{ $trade->status->label() }}**.
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hello {{ $trade->user->name }},</p>
 
-@if($trade->status === \App\Enums\TradeStatus::Approved)
-Your gift card has been verified successfully. We are now processing your payout to your selected payment method!
-@endif
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">The status of your gift card trade <strong>#{{ substr($trade->uuid, 0, 8) }}</strong> has been updated to: <strong>{{ $trade->status->label() }}</strong>.</p>
 
-@if($reason)
-<x-mail::panel>
-**Admin Note:** {{ $reason }}
-</x-mail::panel>
-@endif
+    @if($trade->status === \App\Enums\TradeStatus::Approved)
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Your gift card has been verified successfully. We are now processing your payout to your selected payment method!</p>
+    @endif
 
-<x-mail::button :url="url('/dashboard/gift-cards/trades/'.$trade->id)">
-View Trade Details
-</x-mail::button>
+    @if($reason)
+        <x-emails.panel title="Admin Note">
+            <p style="margin:0; font-size:14px; line-height:1.55; color:#3f3f46;">{{ $reason }}</p>
+        </x-emails.panel>
+    @endif
 
-Thank you for trading with us,<br>
-{{ config('app.name') }}
-</x-mail::message>
+    <x-emails.button :url="url('/dashboard/gift-cards/trades/'.$trade->id)" align="center">View Trade Details</x-emails.button>
+</x-emails.layout>

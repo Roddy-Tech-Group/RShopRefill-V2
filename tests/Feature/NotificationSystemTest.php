@@ -2,16 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Domain\Notification\Channels\DatabaseChannel;
-use App\Domain\Notification\Channels\EmailChannel;
-use App\Domain\Notification\Channels\WebPushChannel;
-use App\Domain\Notification\Enums\NotificationPriority;
-use App\Domain\Notification\Jobs\SendAsynchronousNotificationJob;
-use App\Domain\Notification\Mail\WelcomeMail;
-use App\Domain\Notification\Services\NotificationDispatcher;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Jobs\DispatchCommunicationJob;
+use App\Domain\Communication\Mail\Marketing\NewsletterBroadcastMail;
+use App\Domain\Communication\Mail\Security\WelcomeMail;
+use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Communication\Services\PreferenceManager;
+use App\Models\CommunicationLog;
 use App\Models\Notification;
-use App\Models\NotificationDelivery;
-use App\Models\NotificationPreference;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,9 +21,10 @@ class NotificationSystemTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Test that user registration initiates default preferences and welcome mail.
+     * Registration fires the Registered event; the WelcomeListener routes the
+     * welcome email through the Communication Platform on the critical queue.
      */
-    public function test_user_registration_creates_preferences_and_welcomes_user(): void
+    public function test_user_registration_queues_welcome_communication(): void
     {
         Queue::fake();
 
@@ -36,145 +35,113 @@ class NotificationSystemTest extends TestCase
 
         event(new Registered($user));
 
-        // 1. Verify default preferences created
-        $this->assertDatabaseHas('notification_preferences', [
+        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $job) {
+            return $job->payload->category === CommunicationCategory::AccountActivation
+                && $job->queue === 'comm-critical';
+        });
+
+        // Preferences are provisioned lazily with everything defaulted on.
+        app(PreferenceManager::class)->getPreferences($user);
+
+        $this->assertDatabaseHas('communication_preferences', [
             'user_id' => $user->id,
             'email_enabled' => true,
-            'marketing_enabled' => true,
+            'marketing_email' => true,
         ]);
-
-        // 2. Verify Welcome Job was pushed to queue
-        Queue::assertPushed(SendAsynchronousNotificationJob::class, function ($job) {
-            return $job->queue === 'notifications';
-        });
     }
 
     /**
-     * Test dispatcher respects preference toggles.
+     * The manager respects per-category preference toggles: with marketing
+     * email disabled, a newsletter enlists in-app but not the email channel.
      */
-    public function test_dispatcher_respects_user_preference_toggles(): void
+    public function test_manager_respects_user_preference_toggles(): void
     {
         Queue::fake();
 
         $user = User::factory()->create();
+        app(PreferenceManager::class)->updatePreferences($user, ['marketing_email' => false]);
 
-        // Disable email notifications
-        NotificationPreference::create([
-            'user_id' => $user->id,
-            'email_enabled' => false,
-            'marketing_enabled' => true,
-            'order_notifications' => true,
-            'wallet_notifications' => true,
-            'security_notifications' => true,
-            'push_enabled' => false,
-        ]);
-
-        $dispatcher = app(NotificationDispatcher::class);
-        $dispatcher->dispatch(
-            user: $user,
-            title: 'Refill Warning',
-            message: 'Low Refill credits.',
-            category: 'order'
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::Newsletter,
+            title: 'Weekly deals',
+            message: 'Up to 50% off.',
+            mailable: new NewsletterBroadcastMail('Weekly deals', '<p>Up to 50% off.</p>', true),
         );
 
-        // Verify that only Database channel is queued, Email is skipped!
-        Queue::assertPushed(SendAsynchronousNotificationJob::class, function ($job) {
-            // Verify reflected channels
-            $reflector = new \ReflectionProperty(SendAsynchronousNotificationJob::class, 'channels');
-            $reflector->setAccessible(true);
-            $channels = $reflector->getValue($job);
+        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $job) {
+            $channelValues = array_map(fn ($channel) => $channel->value, $job->payload->channels);
 
-            return count($channels) === 1 && $channels[0]->value === 'database';
+            return $job->payload->category === CommunicationCategory::Newsletter
+                && ! in_array('email', $channelValues, true)
+                && in_array('in_app', $channelValues, true);
         });
     }
 
     /**
-     * Test notification queue job processes successfully and registers logs.
+     * The delivery job processes each channel and records the unified audit
+     * trail in communication_logs plus the in-app bell feed.
      */
-    public function test_notification_job_processes_successfully_and_logs(): void
+    public function test_communication_delivers_and_logs(): void
     {
         $user = User::factory()->create(['email' => 'jane@example.com']);
-        $mailable = new WelcomeMail($user, false);
 
-        // Execute the job directly
-        $job = new SendAsynchronousNotificationJob(
-            user: $user,
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountActivation,
             title: 'Welcome to RshopRefills!',
             message: 'Your account was successfully registered.',
-            mailable: $mailable,
-            priority: NotificationPriority::Normal,
-            idempotencyKey: 'test_welcome_job_key'
+            mailable: new WelcomeMail($user),
+            idempotencyKey: 'test_welcome_job_key',
         );
 
-        $job->handle(
-            app(EmailChannel::class),
-            app(DatabaseChannel::class),
-            app(WebPushChannel::class)
-        );
-
-        // Verify notification saved in database
+        // In-app bell feed entry
         $this->assertDatabaseHas('notifications', [
             'user_id' => $user->id,
             'title' => 'Welcome to RshopRefills!',
             'status' => 'sent',
         ]);
 
-        // Verify successful delivery logs written to audit trail
-        $this->assertDatabaseHas('notification_deliveries', [
-            'provider' => 'resend',
+        // Unified audit trail: email delivered from the verify@ mailbox
+        $this->assertDatabaseHas('communication_logs', [
+            'user_id' => $user->id,
             'channel' => 'email',
             'recipient' => 'jane@example.com',
+            'sender' => 'verify@rshoprefill.com',
             'status' => 'sent',
         ]);
-        $this->assertDatabaseHas('notification_deliveries', [
-            'provider' => 'database',
-            'channel' => 'database',
+        $this->assertDatabaseHas('communication_logs', [
+            'user_id' => $user->id,
+            'channel' => 'in_app',
             'status' => 'sent',
         ]);
     }
 
     /**
-     * Test job level idempotency key protection.
+     * The idempotency key blocks duplicate dispatches of the same
+     * logical communication.
      */
-    public function test_job_blocks_duplicate_deliveries_by_idempotency_key(): void
+    public function test_manager_blocks_duplicate_dispatch_by_idempotency_key(): void
     {
         $user = User::factory()->create();
-        $mailable = new WelcomeMail($user, false);
 
-        // 1. Process first time
-        $job1 = new SendAsynchronousNotificationJob(
-            user: $user,
-            title: 'Unique Event',
-            message: 'Testing uniqueness.',
-            mailable: $mailable,
-            priority: NotificationPriority::Normal,
-            idempotencyKey: 'event_12345_key'
-        );
-        $job1->handle(
-            app(EmailChannel::class),
-            app(DatabaseChannel::class),
-            app(WebPushChannel::class)
-        );
+        foreach ([1, 2] as $attempt) {
+            app(CommunicationManager::class)->send(
+                recipient: $user,
+                category: CommunicationCategory::AccountActivation,
+                title: 'Unique Event',
+                message: 'Testing uniqueness.',
+                mailable: new WelcomeMail($user),
+                idempotencyKey: 'event_12345_key',
+            );
+        }
 
-        $initialDeliveryCount = NotificationDelivery::count();
-
-        // 2. Process duplicate time
-        $job2 = new SendAsynchronousNotificationJob(
-            user: $user,
-            title: 'Unique Event',
-            message: 'Testing uniqueness.',
-            mailable: $mailable,
-            priority: NotificationPriority::Normal,
-            idempotencyKey: 'event_12345_key'
+        $this->assertSame(
+            1,
+            CommunicationLog::where('idempotency_key', 'event_12345_key')
+                ->where('channel', 'email')
+                ->count()
         );
-        $job2->handle(
-            app(EmailChannel::class),
-            app(DatabaseChannel::class),
-            app(WebPushChannel::class)
-        );
-
-        // Verify no extra deliveries recorded
-        $this->assertEquals($initialDeliveryCount, NotificationDelivery::count());
     }
 
     /**
@@ -231,19 +198,19 @@ class NotificationSystemTest extends TestCase
         // Seed some notifications
         $n1 = Notification::create([
             'user_id' => $user->id,
-            'type' => 'App\Domain\Notification\General',
+            'type' => 'service_notice',
             'title' => 'Title 1',
             'message' => 'Msg 1',
-            'channel' => 'database',
+            'channel' => 'in_app',
             'status' => 'sent',
         ]);
 
         $n2 = Notification::create([
             'user_id' => $user->id,
-            'type' => 'App\Domain\Notification\General',
+            'type' => 'service_notice',
             'title' => 'Title 2',
             'message' => 'Msg 2',
-            'channel' => 'database',
+            'channel' => 'in_app',
             'status' => 'sent',
         ]);
 
@@ -266,17 +233,5 @@ class NotificationSystemTest extends TestCase
         $readAllResponse = $this->actingAs($user)->patchJson(route('api.notifications.read-all'));
         $readAllResponse->assertStatus(200);
         $this->assertNotNull($n2->refresh()->read_at);
-
-        // 5. Get preferences
-        $prefResponse = $this->actingAs($user)->getJson(route('api.notification-preferences.get'));
-        $prefResponse->assertStatus(200);
-
-        // 6. Update preferences
-        $updatePrefResponse = $this->actingAs($user)->putJson(route('api.notification-preferences.update'), [
-            'email_enabled' => false,
-            'marketing_enabled' => false,
-        ]);
-        $updatePrefResponse->assertStatus(200);
-        $this->assertFalse($user->notificationPreference->email_enabled);
     }
 }

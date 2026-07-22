@@ -2,12 +2,13 @@
 
 namespace App\Domain\Admin\Services;
 
-use App\Mail\AdminTwoFactorOtpMail;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\System\AdminTwoFactorOtpMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\Admin;
 use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -69,8 +70,8 @@ class AdminAuthService
             ]);
         }
 
-        RateLimiter::clear('admin-login-ip:' . request()->ip());
-        RateLimiter::clear('admin-login-email:' . Str::transliterate(Str::lower($email)));
+        RateLimiter::clear('admin-login-ip:'.request()->ip());
+        RateLimiter::clear('admin-login-email:'.Str::transliterate(Str::lower($email)));
 
         // Put the admin ID in the session for the 2FA challenge
         session([
@@ -88,7 +89,15 @@ class AdminAuthService
         // If the admin doesn't have TOTP enabled, send an Email OTP
         if (! $admin->hasTotpEnabled()) {
             $otp = $this->twoFactorService->generateAndSaveEmailOtp($admin);
-            Mail::to($admin->email)->send(new AdminTwoFactorOtpMail($admin, $otp));
+
+            app(CommunicationManager::class)->send(
+                recipient: $admin,
+                category: CommunicationCategory::TwoFactor,
+                title: 'Your Admin 2FA Code',
+                message: "Your admin 2FA code is {$otp}.",
+                mailable: new AdminTwoFactorOtpMail($admin, $otp),
+                correlationId: 'admin_2fa_'.$admin->id.'_'.time()
+            );
         }
     }
 
@@ -120,8 +129,8 @@ class AdminAuthService
      */
     private function ensureIsNotRateLimited(string $email): void
     {
-        $ipKey = 'admin-login-ip:' . request()->ip();
-        $emailKey = 'admin-login-email:' . Str::transliterate(Str::lower($email));
+        $ipKey = 'admin-login-ip:'.request()->ip();
+        $emailKey = 'admin-login-email:'.Str::transliterate(Str::lower($email));
 
         // Progressive delays based on failure count
         $maxIpAttempts = 10;
@@ -133,21 +142,23 @@ class AdminAuthService
 
         if (RateLimiter::tooManyAttempts($emailKey, $maxEmailAttempts)) {
             // Require Cloudflare Turnstile if email is heavily targeted
-            if (!request()->has('cf-turnstile-response')) {
+            if (! request()->has('cf-turnstile-response')) {
                 throw ValidationException::withMessages([
                     'email' => __('Additional security verification required. Please solve the CAPTCHA.'),
                 ]);
             }
             // Trigger Turnstile verification...
-            
+
             $this->throwThrottleException($emailKey, 'Account locked temporarily. Please try again later.');
         }
 
         // Calculate basic Risk Score (example placeholder for Phase 7)
         $riskScore = 0;
-        if (!request()->header('User-Agent')) $riskScore += 50;
+        if (! request()->header('User-Agent')) {
+            $riskScore += 50;
+        }
         // Device fingerprinting could be injected here
-        
+
         if ($riskScore > 80) {
             Log::warning('High-risk admin login blocked', ['email' => $email, 'ip' => request()->ip()]);
             throw ValidationException::withMessages([
@@ -162,7 +173,7 @@ class AdminAuthService
         Log::warning('Admin login rate limited', ['key' => $key, 'seconds' => $seconds]);
 
         throw ValidationException::withMessages([
-            'email' => __($message . ' Try again in :seconds seconds.', ['seconds' => $seconds]),
+            'email' => __($message.' Try again in :seconds seconds.', ['seconds' => $seconds]),
         ]);
     }
 
@@ -171,8 +182,8 @@ class AdminAuthService
      */
     private function hitRateLimiters(string $email): void
     {
-        $ipKey = 'admin-login-ip:' . request()->ip();
-        $emailKey = 'admin-login-email:' . Str::transliterate(Str::lower($email));
+        $ipKey = 'admin-login-ip:'.request()->ip();
+        $emailKey = 'admin-login-email:'.Str::transliterate(Str::lower($email));
 
         RateLimiter::hit($ipKey, 300); // IP decay is 5 minutes
         RateLimiter::hit($emailKey, 300); // Email decay is 5 minutes

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Domain\Notification\Enums\InteractionType;
+use App\Domain\Communication\Enums\InteractionType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

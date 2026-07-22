@@ -2,22 +2,21 @@
 
 namespace Tests\Feature\Notification;
 
-use App\Domain\Notification\Channels\EmailChannel;
-use App\Domain\Notification\DTOs\NotificationPayload;
-use App\Domain\Notification\Mail\OrderPlacedMail;
-use App\Domain\Notification\Mail\WelcomeMail;
-use App\Domain\Notification\Providers\MailProviderInterface;
+use App\Domain\Communication\Mail\Orders\OrderPlacedMail;
+use App\Domain\Communication\Mail\Security\WelcomeMail;
+use App\Domain\Communication\Providers\ResendProvider;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Dispatcher-driven emails (welcome, order placed, refunds, wallet...) go out
- * through EmailChannel -> the HTTP mail provider. The channel must render the
- * mailable through the real Mailer pipeline so inline CID images (the brand
- * logo) exist, and forward them to the provider - a plain render() has no
- * $message and ships emails with broken logos.
+ * Platform emails go out through the Resend HTTP provider. The provider must
+ * render the mailable through the real Mailer pipeline so inline CID images
+ * (the brand logo) exist, and forward them as attachments carrying a
+ * content_id - a plain render() has no $message and ships emails with broken
+ * logos.
  */
 class EmailChannelInlineImagesTest extends TestCase
 {
@@ -30,47 +29,42 @@ class EmailChannelInlineImagesTest extends TestCase
     {
         parent::setUp();
 
+        config(['services.resend.key' => 'test-key']);
+
         $this->captured = [];
-        $test = $this;
 
-        $this->app->instance(MailProviderInterface::class, new class($test) implements MailProviderInterface
-        {
-            public function __construct(private EmailChannelInlineImagesTest $test) {}
+        Http::fake(function ($request) {
+            $this->captured = $request->data();
 
-            public function send(string $to, string $subject, string $htmlBody, array $headers = [], array $attachments = []): array
-            {
-                $this->test->capture(compact('to', 'subject', 'htmlBody', 'attachments'));
-
-                return ['id' => 'spy', 'status' => 'success'];
-            }
+            return Http::response(['id' => 'fake-resend-id'], 200);
         });
     }
 
-    /** @param array<string, mixed> $args */
-    public function capture(array $args): void
+    private function sendThroughProvider(object $mailable, string $to): void
     {
-        $this->captured = $args;
+        (new ResendProvider)->send(
+            to: $to,
+            from: 'Orders <orders@rshoprefill.com>',
+            replyTo: 'support@rshoprefill.com',
+            subject: 'Test subject',
+            mailable: $mailable,
+        );
     }
 
     public function test_welcome_email_carries_the_logo_as_an_inline_cid_attachment(): void
     {
         $user = User::factory()->create();
 
-        app(EmailChannel::class)->send(new NotificationPayload(
-            user: $user,
-            title: 'Welcome to RshopRefills!',
-            message: 'Welcome aboard.',
-            mailable: new WelcomeMail($user),
-        ));
+        $this->sendThroughProvider(new WelcomeMail($user), $user->email);
 
         $this->assertNotEmpty($this->captured, 'Provider was never called');
-        $this->assertStringContainsString('cid:', $this->captured['htmlBody']);
-        $this->assertStringNotContainsString('assets/email-logo.png', $this->captured['htmlBody']);
+        $this->assertStringContainsString('cid:', $this->captured['html']);
+        $this->assertStringNotContainsString('assets/email-logo.png', $this->captured['html']);
 
-        $logo = collect($this->captured['attachments'])->firstWhere('filename', 'email-logo.png');
+        $logo = collect($this->captured['attachments'] ?? [])->firstWhere('filename', 'email-logo.png');
         $this->assertNotNull($logo, 'Expected the logo as an attachment');
         $this->assertNotEmpty($logo['content_id'] ?? null, 'Logo attachment must carry a content_id for CID rendering');
-        $this->assertStringContainsString('cid:'.$logo['content_id'], $this->captured['htmlBody']);
+        $this->assertStringContainsString('cid:'.$logo['content_id'], $this->captured['html']);
     }
 
     public function test_order_placed_email_carries_the_logo_too(): void
@@ -93,12 +87,7 @@ class EmailChannelInlineImagesTest extends TestCase
             'metadata' => ['exchange_rate' => 1.0, 'settlement_total_usd' => 7, 'settlement_subtotal_usd' => 7],
         ]);
 
-        app(EmailChannel::class)->send(new NotificationPayload(
-            user: $user,
-            title: 'Order confirmed',
-            message: 'We received your order.',
-            mailable: new OrderPlacedMail($user, $order),
-        ));
+        $this->sendThroughProvider(new OrderPlacedMail($user, $order), $user->email);
 
         $logo = collect($this->captured['attachments'] ?? [])->firstWhere('filename', 'email-logo.png');
         $this->assertNotNull($logo, 'Expected the logo as an attachment');

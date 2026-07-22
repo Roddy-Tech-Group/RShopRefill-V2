@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Domain\Notification\Mail\WelcomeMail;
-use App\Domain\Notification\Providers\ResendProvider;
+use App\Domain\Communication\Enums\MailDomain;
+use App\Domain\Communication\Mail\Security\WelcomeMail;
 use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -46,14 +45,15 @@ class SiteNameWiringTest extends TestCase
         $mailable->assertSeeInHtml('BrandX Market, your digital marketplace');
     }
 
-    public function test_resend_sender_name_uses_email_from_name_setting(): void
+    public function test_mailbox_sender_names_follow_site_name_setting(): void
     {
-        SiteSetting::put('email.from_name', 'BrandX Mailer', 'email');
+        SiteSetting::put('site.name', 'BrandX Market', 'site');
 
-        $provider = new ResendProvider;
-        $fromName = new ReflectionMethod($provider, 'fromName');
-        $fromName->setAccessible(true);
-
-        $this->assertSame('BrandX Mailer', $fromName->invoke($provider));
+        $this->assertSame('BrandX Market Orders', MailDomain::Orders->senderName());
+        $this->assertSame('BrandX Market Security', MailDomain::Security->senderName());
+        $this->assertSame(
+            'BrandX Market Orders <orders@rshoprefill.com>',
+            MailDomain::Orders->fromHeader()
+        );
     }
 }

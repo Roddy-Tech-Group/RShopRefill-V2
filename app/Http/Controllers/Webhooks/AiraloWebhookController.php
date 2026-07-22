@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers\Webhooks;
 
-use App\Domain\Notification\Enums\DeliveryStatus;
-use App\Domain\Notification\Enums\NotificationChannel;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Http\Controllers\Controller;
 use App\Mail\EsimLowDataMail;
 use App\Models\Notification;
-use App\Models\NotificationDelivery;
 use App\Models\OrderItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
@@ -81,67 +79,39 @@ class AiraloWebhookController extends Controller
         $user = $orderItem->order->user;
 
         try {
-            // 1. Dashboard notification — always writes (mail can fail without
-            // rolling back the in-app notice the customer sees on the bell).
             $title = $this->titleFor($eventType, $payload);
             $message = $this->messageFor($eventType, $payload, $orderItem);
 
-            $dbNotification = Notification::create([
-                'user_id' => $user->id,
-                'type' => EsimLowDataMail::class,
-                'title' => $title,
-                'message' => $message,
-                'channel' => NotificationChannel::Database,
-                'status' => DeliveryStatus::Sent,
-                'priority' => 'high',
-                'metadata' => [
+            app(CommunicationManager::class)->send(
+                recipient: $user,
+                category: CommunicationCategory::EsimLowData,
+                title: $title,
+                message: $message,
+                mailable: new EsimLowDataMail(
+                    recipient: $user,
+                    orderItem: $orderItem,
+                    iccid: $iccid,
+                    eventType: $eventType,
+                    payload: $payload,
+                ),
+                correlationId: 'esim_low_data_'.$iccid.'_'.$eventType,
+                metadata: [
                     'kind' => 'esim_low_data',
                     'iccid' => $iccid,
                     'order_item_id' => $orderItem->id,
                     'event_type' => $eventType,
                     'usage_percentage' => $payload['usage_percentage'] ?? null,
                     'days_remaining' => $payload['days_remaining'] ?? null,
-                ],
-                'sent_at' => now(),
-            ]);
+                ]
+            );
 
-            NotificationDelivery::create([
-                'notification_id' => $dbNotification->id,
-                'provider' => 'database',
-                'channel' => NotificationChannel::Database,
-                'recipient' => (string) $user->id,
-                'status' => DeliveryStatus::Sent,
-                'response_payload' => ['notification_id' => $dbNotification->id],
-                'attempted_at' => now(),
-            ]);
-
-            // 2. Branded email with a deep link to the top-up page so the
-            // customer is one tap from refilling. Wrapped in try/catch so
-            // a mail-driver outage doesn't lose the webhook.
-            try {
-                Mail::to($user->email)->send(new EsimLowDataMail(
-                    recipient: $user,
-                    orderItem: $orderItem,
-                    iccid: $iccid,
-                    eventType: $eventType,
-                    payload: $payload,
-                ));
-            } catch (Throwable $mailError) {
-                Log::warning('Airalo webhook: email send failed', [
-                    'iccid' => $iccid,
-                    'user_id' => $user->id,
-                    'error' => $mailError->getMessage(),
-                ]);
-            }
         } catch (Throwable $e) {
             Log::error('Airalo webhook handler failed', [
                 'iccid' => $iccid,
                 'error' => $e->getMessage(),
             ]);
 
-            // 500 → Airalo retries. The handler is idempotent (Notification
-            // rows aren't deduped here but customer can tolerate dupes far
-            // more than a missed notice).
+            // 500 → Airalo retries.
             return response()->json(['error' => 'internal'], 500);
         }
 

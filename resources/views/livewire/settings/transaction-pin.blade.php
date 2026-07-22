@@ -57,7 +57,7 @@ new class extends Component
 
         $this->reset('pin', 'pin_confirmation');
         $this->hasPin = true;
-        $this->dispatch('pin-updated');
+        $this->dispatch('toast', message: 'PIN set successfully.');
     }
 
     /**
@@ -93,7 +93,7 @@ new class extends Component
         }
 
         $this->reset('old_pin', 'new_pin', 'new_pin_confirmation');
-        $this->dispatch('pin-updated');
+        $this->dispatch('toast', message: 'PIN changed successfully.');
     }
 
     /**
@@ -118,7 +118,7 @@ new class extends Component
         $this->reset('remove_password');
         $this->hasPin = false;
         $this->locked = false;
-        $this->dispatch('pin-updated');
+        $this->dispatch('toast', message: 'PIN removed successfully.');
     }
 
     /**
@@ -129,7 +129,7 @@ new class extends Component
         $this->enforceDeviceTrust('old_pin');
 
         $pinService->requestReset(Auth::user());
-        $this->dispatch('reset-requested');
+        $this->dispatch('toast', message: 'PIN reset requested.');
     }
 }; ?>
 
@@ -204,12 +204,13 @@ new class extends Component
             </div>
 
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
-                    Set up PIN
+                <button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-75 disabled:cursor-not-allowed">
+                    <svg wire:loading wire:target="setupPin" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Set up PIN</span>
                 </button>
-                <x-action-message on="pin-updated" class="text-sm font-medium text-emerald-600">
-                    {{ __('Saved.') }}
-                </x-action-message>
             </div>
         </form>
     @else
@@ -306,15 +307,13 @@ new class extends Component
             </div>
 
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
-                    Change PIN
+                <button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-75 disabled:cursor-not-allowed">
+                    <svg wire:loading wire:target="changePin" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Change PIN</span>
                 </button>
-                <x-action-message on="pin-updated" class="text-sm font-medium text-emerald-600">
-                    {{ __('Saved.') }}
-                </x-action-message>
-                <x-action-message on="reset-requested" class="text-sm font-medium text-emerald-600">
-                    {{ __('Reset link sent to your email.') }}
-                </x-action-message>
             </div>
         </form>
 
@@ -336,8 +335,12 @@ new class extends Component
                         />
                         @error('remove_password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">
-                        Remove PIN
+                    <button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-75 disabled:cursor-not-allowed">
+                        <svg wire:loading wire:target="removePin" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Remove PIN</span>
                     </button>
                 </form>
             </div>

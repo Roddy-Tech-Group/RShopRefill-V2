@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Notification\Enums\InteractionType;
+use App\Domain\Communication\Enums\InteractionType;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationCampaign;
 use App\Models\NotificationInteraction;

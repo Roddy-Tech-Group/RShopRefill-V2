@@ -3,7 +3,7 @@
 use Livewire\Volt\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use App\Domain\Notification\Jobs\DispatchCampaignJob;
+use App\Domain\Communication\Jobs\DispatchCampaignJob;
 use App\Models\NotificationCampaign;
 use App\Models\NotificationTemplate;
 
