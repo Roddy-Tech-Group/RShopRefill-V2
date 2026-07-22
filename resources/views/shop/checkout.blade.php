@@ -727,14 +727,17 @@
                          Wallet/Rcoin stay signed-in-only (server-enforced). --}}
                     @php $guestCheckoutOn = \App\Support\FeatureFlag::on('guest_checkout'); @endphp
                     @if (auth()->check() || $guestCheckoutOn)
-                        <button type="submit" :disabled="!canContinue() || submitting"
+                        <button type="submit" :disabled="!canContinue() || submitting || backoffRemaining > 0"
                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
-                            <template x-if="!submitting">
+                            <template x-if="backoffRemaining > 0">
+                                <span class="flex items-center gap-2" x-text="'Please wait ' + backoffRemaining + ' seconds before trying again'"></span>
+                            </template>
+                            <template x-if="!submitting && backoffRemaining === 0">
                                 <span class="flex items-center gap-2">
                                     Continue to payment
                                 </span>
                             </template>
-                            <template x-if="submitting">
+                            <template x-if="submitting && backoffRemaining === 0">
                                 <span class="flex items-center gap-2">
                                     <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
@@ -1439,6 +1442,21 @@
                     const total = Number(this.$store.cart.subtotal);
                     return balance >= total;
                 },
+                
+                backoffRemaining: 0,
+                backoffInterval: null,
+                
+                startBackoff(seconds) {
+                    this.backoffRemaining = seconds;
+                    if (this.backoffInterval) clearInterval(this.backoffInterval);
+                    this.backoffInterval = setInterval(() => {
+                        if (this.backoffRemaining > 0) {
+                            this.backoffRemaining--;
+                        } else {
+                            clearInterval(this.backoffInterval);
+                        }
+                    }, 1000);
+                },
 
                 canContinue() {
                     if (! this.$store.cart.hydrated || this.$store.cart.count === 0) {
@@ -1493,8 +1511,15 @@
                         const resData = await response.json();
                         if (!response.ok) {
                             this.submitting = false;
-                            this.errorMessage = resData.message || 'Checkout failed. Please try again.';
-                            alert(this.errorMessage);
+                            if (response.status === 429 && resData.is_rate_limited) {
+                                this.startBackoff(resData.wait_seconds);
+                                this.errorMessage = resData.error || 'Too many failed payment attempts.';
+                            } else {
+                                this.errorMessage = resData.message || 'Checkout failed. Please try again.';
+                            }
+                            // Show error modal instead of alert
+                            this.paymentState = 'error';
+                            this.open = true;
                             return;
                         }
 
@@ -1751,9 +1776,30 @@
                 },
 
                 openFlutterwaveInline(data) {
+                    const self = this;
+
+                    // Ad blockers / CDN failures leave the SDK undefined —
+                    // report it as a terminal frontend failure instead of
+                    // throwing an unexplained JS error.
+                    if (typeof FlutterwaveCheckout === 'undefined') {
+                        if (window.PaymentTelemetry && self.session?.id) {
+                            window.PaymentTelemetry.recordFailure(self.session.id, 'sdk_load_failed', { provider: 'flutterwave' });
+                        }
+                        this.paymentState = 'error';
+                        this.errorMessage = 'The payment window could not load. Please disable any ad blocker and try again.';
+                        this.open = true;
+                        this.submitting = false;
+                        return;
+                    }
+
                     this.paymentState = 'processing';
                     this.open = false; // Hide our modal to prevent z-index/click interception issues
-                    const self = this;
+
+                    // Watch for JS exceptions / offline / tab-close while the
+                    // provider popup owns the flow.
+                    const disarmTelemetry = window.PaymentTelemetry
+                        ? window.PaymentTelemetry.armSession(self.session?.id, { provider: 'flutterwave' })
+                        : function () {};
 
                     FlutterwaveCheckout({
                         public_key: data.public_key,
@@ -1764,6 +1810,7 @@
                         customizations: data.customizations,
                         callback: async function(response) {
                             // Payment completed inside the popup
+                            disarmTelemetry();
                             self.paymentState = 'processing';
                             try {
                                 let verifyRes = await fetch(
@@ -1790,6 +1837,11 @@
                                     self.open = true; // Re-open modal to show error
                                 }
                             } catch (e) {
+                                // Verification request itself failed — a client
+                                // connectivity signal, not a payment verdict.
+                                if (window.PaymentTelemetry && self.session?.id) {
+                                    window.PaymentTelemetry.recordSignal(self.session.id, 'network_timeout', { provider: 'flutterwave', step: 'verify' });
+                                }
                                 self.paymentState = 'error';
                                 self.errorMessage = 'Could not verify payment. Please check your connection.';
                                 self.open = true; // Re-open modal to show error
@@ -1797,7 +1849,11 @@
                         },
                         onclose: function() {
                             // User closed the popup without completing
+                            disarmTelemetry();
                             if (self.paymentState !== 'success') {
+                                if (window.PaymentTelemetry && self.session?.id) {
+                                    window.PaymentTelemetry.recordFailure(self.session.id, 'popup_closed', { provider: 'flutterwave' });
+                                }
                                 self.paymentState = 'idle';
                                 self.open = true; // Re-open our modal if user cancelled
                                 self.submitting = false;

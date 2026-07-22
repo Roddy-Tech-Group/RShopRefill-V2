@@ -27,6 +27,9 @@ use Illuminate\Support\Carbon;
  * @property array|null $checkout_context
  * @property string $customer_email
  * @property string|null $customer_ip
+ * @property string|null $correlation_id
+ * @property string|null $device_uuid
+ * @property int|null $trusted_device_id
  * @property array|null $device_metadata
  * @property Carbon|null $expires_at
  * @property Carbon|null $confirmed_at
@@ -55,6 +58,9 @@ class PaymentSession extends Model
         'checkout_context',
         'customer_email',
         'customer_ip',
+        'correlation_id',
+        'device_uuid',
+        'trusted_device_id',
         'device_metadata',
         'expires_at',
         'confirmed_at',
@@ -126,7 +132,10 @@ class PaymentSession extends Model
     public function transitionTo(string $newStatus): void
     {
         $allowedTransitions = [
-            'pending' => ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_customer_action', 'cancelled'],
+            // 'failed'/'expired' from pending: the orphaned-session reconciler
+            // and stale-session sweeper terminate abandoned checkouts that
+            // never progressed past creation.
+            'pending' => ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_customer_action', 'cancelled', 'failed', 'expired'],
             'awaiting_payment' => ['processing', 'expired', 'cancelled', 'confirmed', 'failed'],
             'awaiting_method' => ['awaiting_payment', 'awaiting_customer_action', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_customer_action' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],

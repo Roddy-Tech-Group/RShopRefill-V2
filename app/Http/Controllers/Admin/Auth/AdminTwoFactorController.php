@@ -3,15 +3,16 @@
 namespace App\Http\Controllers\Admin\Auth;
 
 use App\Domain\Admin\Services\AdminTwoFactorService;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\System\AdminTwoFactorOtpMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Http\Controllers\Controller;
-use App\Mail\AdminTwoFactorOtpMail;
 use App\Models\Admin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class AdminTwoFactorController extends Controller
@@ -109,8 +110,8 @@ class AdminTwoFactorController extends Controller
 
         $defaultRoute = $admin->canAccessAdminRoute('dashboard')
             ? route('admin.dashboard', absolute: false)
-            : ($admin->canAccessAdminRoute('operations') 
-                ? route('admin.operations', absolute: false) 
+            : ($admin->canAccessAdminRoute('operations')
+                ? route('admin.operations', absolute: false)
                 : route('admin.account', absolute: false));
 
         return redirect()->intended($defaultRoute);
@@ -167,7 +168,15 @@ class AdminTwoFactorController extends Controller
 
         // Generate and send new OTP
         $otp = $this->twoFactorService->generateAndSaveEmailOtp($admin);
-        Mail::to($admin->email)->send(new AdminTwoFactorOtpMail($admin, $otp));
+
+        app(CommunicationManager::class)->send(
+            recipient: $admin,
+            category: CommunicationCategory::TwoFactor,
+            title: 'Your Admin 2FA Code',
+            message: "Your admin 2FA code is {$otp}.",
+            mailable: new AdminTwoFactorOtpMail($admin, $otp),
+            correlationId: 'admin_2fa_'.$admin->id.'_'.time()
+        );
 
         return back()->with('status', 'A new code has been sent to your email.');
     }

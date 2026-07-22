@@ -8,6 +8,7 @@ window.flatpickr = flatpickr;
 // Web Push notification manager — registers window.RshopPush for
 // subscribe/unsubscribe from the Settings page and admin bell.
 import './push-manager';
+import './payment-telemetry';
 
 /**
  * Build a custom dropdown (trigger button + styled options panel) to replace one

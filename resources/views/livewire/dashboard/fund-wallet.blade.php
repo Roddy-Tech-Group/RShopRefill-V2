@@ -156,6 +156,8 @@ new class extends Component
                 session: $resource->toArray(request()),
                 reference: $result['funding']->reference,
             );
+        } catch (\App\Domain\PaymentInsights\Exceptions\PaymentBackoffException $e) {
+            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds);
         } catch (\Throwable $e) {
             $this->addError('amount', $e->getMessage());
         }
@@ -167,6 +169,8 @@ new class extends Component
         open: false,
         ccyOpen: false,
         session: null,
+        backoffRemaining: 0,
+        backoffInterval: null,
         selectedMethod: null,
         cardDetails: {
             card_number: '',
@@ -199,9 +203,24 @@ new class extends Component
                 let script = document.createElement('script');
                 script.id = 'flutterwave-v3';
                 script.src = 'https://checkout.flutterwave.com/v3.js';
+                // Blocked/failed SDK loads are reported when the customer
+                // actually tries to pay (no session exists yet at page load).
+                script.onerror = () => { window.__flwSdkLoadFailed = true; };
                 document.head.appendChild(script);
             }
             this.detectApplePay();
+        },
+
+        startBackoff(seconds) {
+            this.backoffRemaining = seconds;
+            if (this.backoffInterval) clearInterval(this.backoffInterval);
+            this.backoffInterval = setInterval(() => {
+                if (this.backoffRemaining > 0) {
+                    this.backoffRemaining--;
+                } else {
+                    clearInterval(this.backoffInterval);
+                }
+            }, 1000);
         },
 
         /**
@@ -435,9 +454,31 @@ new class extends Component
         },
 
         openFlutterwaveInline(data) {
+            const self = this;
+
+            // Ad blockers / CDN failures leave the SDK undefined — report a
+            // terminal frontend failure instead of throwing.
+            if (typeof FlutterwaveCheckout === 'undefined') {
+                if (window.PaymentTelemetry && self.session?.id) {
+                    window.PaymentTelemetry.recordFailure(self.session.id, 'sdk_load_failed', {
+                        provider: 'flutterwave',
+                        load_error: !!window.__flwSdkLoadFailed,
+                    });
+                }
+                this.paymentState = 'error';
+                this.errorMessage = 'The payment window could not load. Please disable any ad blocker and try again.';
+                this.open = true;
+                return;
+            }
+
             this.paymentState = 'processing';
             this.open = false; // Hide our modal to prevent z-index/click interception issues
-            const self = this;
+
+            // Watch for JS exceptions / offline / tab-close while the
+            // provider popup owns the flow.
+            const disarmTelemetry = window.PaymentTelemetry
+                ? window.PaymentTelemetry.armSession(self.session?.id, { provider: 'flutterwave' })
+                : function () {};
 
             FlutterwaveCheckout({
                 public_key: data.public_key,
@@ -447,6 +488,7 @@ new class extends Component
                 customer: data.customer,
                 customizations: data.customizations,
                 callback: async function(response) {
+                    disarmTelemetry();
                     self.paymentState = 'processing';
                     try {
                         let verifyRes = await fetch(
@@ -473,13 +515,22 @@ new class extends Component
                             self.open = true; // Re-open modal to show error
                         }
                     } catch (e) {
+                        // Verification request itself failed — a client
+                        // connectivity signal, not a payment verdict.
+                        if (window.PaymentTelemetry && self.session?.id) {
+                            window.PaymentTelemetry.recordSignal(self.session.id, 'network_timeout', { provider: 'flutterwave', step: 'verify' });
+                        }
                         self.paymentState = 'error';
                         self.errorMessage = 'Could not verify payment. Please check your connection.';
                         self.open = true; // Re-open modal to show error
                     }
                 },
                 onclose: function() {
+                    disarmTelemetry();
                     if (self.paymentState !== 'success') {
+                        if (window.PaymentTelemetry && self.session?.id) {
+                            window.PaymentTelemetry.recordFailure(self.session.id, 'popup_closed', { provider: 'flutterwave' });
+                        }
                         self.paymentState = 'idle';
                         self.open = true; // Re-open our modal if user cancelled
                     }
@@ -595,6 +646,7 @@ new class extends Component
     }"
     @payment-session-initialized.window="initPayment($event.detail.session)"
     @open-fund-wallet.window="if (($event.detail?.code || '').toUpperCase() === '{{ strtoupper($this->currency) }}') open = true"
+    @payment-backoff-triggered.window="if (open) { startBackoff($event.detail.seconds); errorMessage = 'Too many failed payment attempts. Please wait.' }"
     class="shrink-0"
 >
     {{-- Trigger. `full` = desktop wallet-card button; `compact` = mobile hero "Top Up". --}}
@@ -730,14 +782,22 @@ new class extends Component
                     wire:click="fund"
                     wire:target="fund"
                     wire:loading.attr="disabled"
-                    class="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                    x-bind:disabled="backoffRemaining > 0"
+                    class="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     <svg wire:loading wire:target="fund" class="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
-                    <span wire:loading.remove wire:target="fund">Continue to payment</span>
-                    <span wire:loading wire:target="fund">Starting...</span>
+                    <template x-if="backoffRemaining > 0">
+                        <span x-text="'Please wait ' + backoffRemaining + ' seconds before trying again'"></span>
+                    </template>
+                    <template x-if="backoffRemaining === 0">
+                        <span>
+                            <span wire:loading.remove wire:target="fund">Continue to payment</span>
+                            <span wire:loading wire:target="fund">Starting...</span>
+                        </span>
+                    </template>
                 </button>
             </div>
 

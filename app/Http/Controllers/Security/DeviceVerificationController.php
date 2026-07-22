@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Security;
 
+use App\Domain\Security\Events\NewDeviceDetected;
+use App\Domain\Security\Events\OtpRequested;
+use App\Domain\Security\Services\DeviceTrustManager;
+use App\Domain\Security\Services\SecurityIncidentManager;
 use App\Http\Controllers\Controller;
 use App\Models\TrustedDevice;
-use App\Domain\Security\Services\DeviceTrustManager;
-use App\Domain\Security\Notifications\EmailOtpNotification;
-use App\Domain\Security\Services\SecurityIncidentManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -20,14 +21,14 @@ class DeviceVerificationController extends Controller
 
     public function show(Request $request)
     {
-        if (!session('pending_email_otp')) {
+        if (! session('pending_email_otp')) {
             return redirect()->route('dashboard');
         }
 
         $user = Auth::user();
-        $throttleKey = 'otp_throttle_' . $user->id;
+        $throttleKey = 'otp_throttle_'.$user->id;
         $expiresAt = Cache::get($throttleKey, 0);
-        
+
         // Ensure it's a timestamp; if it was previously stored as a boolean, this handles it gracefully.
         $cooldown = is_numeric($expiresAt) ? max(0, $expiresAt - time()) : 0;
 
@@ -40,14 +41,14 @@ class DeviceVerificationController extends Controller
 
     public function sendOtp(Request $request)
     {
-        if (!session('pending_email_otp')) {
+        if (! session('pending_email_otp')) {
             return back()->withErrors(['error' => 'No pending verification']);
         }
 
         $user = Auth::user();
-        
-        $throttleKey = 'otp_throttle_' . $user->id;
-        $attemptsKey = 'otp_attempts_' . $user->id;
+
+        $throttleKey = 'otp_throttle_'.$user->id;
+        $attemptsKey = 'otp_attempts_'.$user->id;
 
         // Anti-spam with a 3-second grace period for frontend timer drift
         if (Cache::has($throttleKey)) {
@@ -55,7 +56,7 @@ class DeviceVerificationController extends Controller
             if ($val === true || $val === 1 || $val < 1000) {
                 Cache::forget($throttleKey);
             } else {
-                $remaining = max(0, (int)$val - time());
+                $remaining = max(0, (int) $val - time());
                 if ($remaining <= 3) {
                     Cache::forget($throttleKey);
                 } else {
@@ -80,13 +81,13 @@ class DeviceVerificationController extends Controller
 
         $delay = $delays[$attempts];
 
-        $otp = sprintf("%06d", mt_rand(1, 999999));
-        
-        Cache::put('device_otp_' . $user->id, $otp, now()->addMinutes(10));
+        $otp = sprintf('%06d', mt_rand(1, 999999));
+
+        Cache::put('device_otp_'.$user->id, $otp, now()->addMinutes(10));
         Cache::put($throttleKey, now()->addSeconds($delay)->timestamp, now()->addSeconds($delay));
         Cache::put($attemptsKey, $attempts, now()->addHours(24));
 
-        $user->notify(new EmailOtpNotification($otp));
+        OtpRequested::dispatch($user, $otp, 'login');
 
         return back()->with('status', 'A new verification code has been sent to your email.');
     }
@@ -95,21 +96,21 @@ class DeviceVerificationController extends Controller
     {
         $request->validate(['otp' => 'required|string|size:6']);
 
-        if (!session('pending_email_otp')) {
+        if (! session('pending_email_otp')) {
             return redirect()->route('dashboard');
         }
 
         $user = Auth::user();
-        $storedOtp = Cache::get('device_otp_' . $user->id);
+        $storedOtp = Cache::get('device_otp_'.$user->id);
 
-        if (!$storedOtp || $storedOtp !== $request->otp) {
+        if (! $storedOtp || $storedOtp !== $request->otp) {
             return back()->withErrors(['otp' => 'Invalid or expired code.']);
         }
 
         // OTP verified successfully
-        Cache::forget('device_otp_' . $user->id);
-        Cache::forget('otp_throttle_' . $user->id);
-        Cache::forget('otp_attempts_' . $user->id);
+        Cache::forget('device_otp_'.$user->id);
+        Cache::forget('otp_throttle_'.$user->id);
+        Cache::forget('otp_attempts_'.$user->id);
         session()->forget('pending_email_otp');
 
         $deviceId = session()->pull('pending_device_id');
@@ -117,9 +118,10 @@ class DeviceVerificationController extends Controller
             $device = TrustedDevice::find($deviceId);
             if ($device) {
                 $this->trustManager->markAsTrusted($device);
-                
+
                 // Now that it's verified, send the "New device logged in" email
-                $user->notify(new \App\Domain\Security\Notifications\NewDeviceDetectedNotification($device));
+                // Dispatch NewDeviceDetected event so CommunicationManager sends from security@ mailbox
+                NewDeviceDetected::dispatch($device);
             }
         }
 
@@ -132,12 +134,12 @@ class DeviceVerificationController extends Controller
         $deviceId = $request->get('device');
         $token = $request->get('token');
 
-        if (!$deviceId || !$token) {
+        if (! $deviceId || ! $token) {
             abort(400, 'Invalid compromise link.');
         }
 
         $expectedToken = hash_hmac('sha256', $deviceId, config('app.key'));
-        if (!hash_equals($expectedToken, $token)) {
+        if (! hash_equals($expectedToken, $token)) {
             abort(403, 'Invalid or expired compromise link.');
         }
 
@@ -145,8 +147,8 @@ class DeviceVerificationController extends Controller
         $user = $device->user;
 
         $incidentId = $this->incidentManager->handleCompromisedAccount(
-            $user, 
-            $request->ip(), 
+            $user,
+            $request->ip(),
             "User flagged unrecognized device: {$device->os} / {$device->browser}"
         );
 

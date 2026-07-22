@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentSessionController;
+use App\Http\Controllers\Api\PaymentTelemetryController;
+use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\Storefront\CartController;
 use App\Http\Controllers\Api\Storefront\CatalogController;
 use App\Http\Controllers\Api\Storefront\ConfigController;
@@ -13,10 +15,14 @@ use App\Http\Controllers\Api\Storefront\EsimCatalogController;
 use App\Http\Controllers\Api\UserDashboardController;
 use App\Http\Controllers\Api\UserTransactionController;
 use App\Http\Controllers\Api\UserWalletController;
+use App\Http\Controllers\Api\VirtualCardController;
 use App\Http\Controllers\Api\Wallet\TransactionPinController;
 use App\Http\Controllers\Api\Webhooks\NowPaymentsWebhookController;
 use App\Http\Controllers\Webhooks\AiraloWebhookController;
 use App\Http\Controllers\Webhooks\FlutterwaveWebhookController;
+use App\Http\Controllers\Webhooks\MapleradWebhookController;
+use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\VerifyWebhookSignature;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,15 +38,15 @@ use Illuminate\Support\Facades\Route;
 
 // Webhooks (No auth required, but HMAC verification enforced)
 Route::post('webhooks/flutterwave', [FlutterwaveWebhookController::class, 'handle'])
-    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':flutterwave')
+    ->middleware(VerifyWebhookSignature::class.':flutterwave')
     ->name('api.webhooks.flutterwave');
 
 Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handle'])
-    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':nowpayments')
+    ->middleware(VerifyWebhookSignature::class.':nowpayments')
     ->name('api.webhooks.nowpayments');
 
-Route::post('webhooks/maplerad', [\App\Http\Controllers\Webhooks\MapleradWebhookController::class, 'handle'])
-    ->middleware(\App\Http\Middleware\VerifyWebhookSignature::class . ':maplerad')
+Route::post('webhooks/maplerad', [MapleradWebhookController::class, 'handle'])
+    ->middleware(VerifyWebhookSignature::class.':maplerad')
     ->name('api.webhooks.maplerad');
 
 // Airalo low-data + expiry notifications. Auth is HMAC inside the controller
@@ -51,12 +57,12 @@ Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhoo
 // Financial Features (Requires Auth + Pin)
 Route::middleware(['auth:sanctum', 'require-pin'])->group(function () {
     // Virtual Cards
-    Route::middleware([\App\Http\Middleware\EnsureFeatureEnabled::class . ':virtual_cards'])->group(function () {
-        Route::post('cards', [\App\Http\Controllers\Api\VirtualCardController::class, 'store']);
-        Route::post('cards/{id}/fund', [\App\Http\Controllers\Api\VirtualCardController::class, 'fund']);
-        Route::post('cards/{id}/freeze', [\App\Http\Controllers\Api\VirtualCardController::class, 'freeze']);
-        Route::post('cards/{id}/unfreeze', [\App\Http\Controllers\Api\VirtualCardController::class, 'unfreeze']);
-        Route::post('cards/{id}/terminate', [\App\Http\Controllers\Api\VirtualCardController::class, 'terminate']);
+    Route::middleware([EnsureFeatureEnabled::class.':virtual_cards'])->group(function () {
+        Route::post('cards', [VirtualCardController::class, 'store']);
+        Route::post('cards/{id}/fund', [VirtualCardController::class, 'fund']);
+        Route::post('cards/{id}/freeze', [VirtualCardController::class, 'freeze']);
+        Route::post('cards/{id}/unfreeze', [VirtualCardController::class, 'unfreeze']);
+        Route::post('cards/{id}/terminate', [VirtualCardController::class, 'terminate']);
     });
 });
 
@@ -151,13 +157,18 @@ Route::middleware('auth')->group(function () {
         Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
         Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
         Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
+        Route::post('telemetry/record-failure', [PaymentTelemetryController::class, 'recordFailure'])->middleware('throttle:10,1')->name('telemetry.record-failure');
+        // Signals are chattier than terminal failures (exceptions, offline
+        // blips) — looser throttle, and the controller caps rows per session.
+        Route::post('telemetry/record-signal', [PaymentTelemetryController::class, 'recordSignal'])->middleware('throttle:30,1')->name('telemetry.record-signal');
+        Route::post('telemetry/reset-backoff', [PaymentTelemetryController::class, 'resetBackoff'])->middleware('throttle:10,1')->name('telemetry.reset-backoff');
     });
 
     Route::get('transactions', [UserTransactionController::class, 'index'])->name('api.transactions.index');
-    
+
     // Security Center APIs
     Route::prefix('security')->name('api.security.')->group(function () {
-        Route::put('preferences', [\App\Http\Controllers\Api\SecurityController::class, 'updatePreferences'])->name('preferences.update');
-        Route::delete('devices/{device}', [\App\Http\Controllers\Api\SecurityController::class, 'revokeDevice'])->name('devices.revoke');
+        Route::put('preferences', [SecurityController::class, 'updatePreferences'])->name('preferences.update');
+        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->name('devices.revoke');
     });
 });

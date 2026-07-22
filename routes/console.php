@@ -1,9 +1,9 @@
 <?php
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
-use App\Domain\Notification\Jobs\RetryFailedNotificationsJob;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
+use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
 use App\Domain\Wallet\Jobs\ReconcilePendingFundingsJob;
 use App\Domain\Wallet\Jobs\SyncExchangeRatesJob;
 use App\Jobs\FulfillOrderItemJob;
@@ -74,22 +74,18 @@ Schedule::command('topups:sync-logos')
     ->runInBackground()
     ->name('topups:sync-logos-weekly');
 
-// Auto-retry failed customer notifications. The job picks up notifications
-// that have been in the Failed state for at least 5 minutes (transient outage
-// backoff) and re-dispatches them, capped at MAX_AUTO_RETRIES per row so a
-// permanently broken recipient doesn't churn forever. Admin retains a manual
-// per-row Retry button on /admin/notifications for cases where the auto-sweep
-// has exhausted its retries.
-Schedule::job(new RetryFailedNotificationsJob)
-    ->everyFifteenMinutes()
-    ->withoutOverlapping()
-    ->name('notifications:retry-failed');
+// (Removed auto-retry for old notifications)
 
 // Sweep PaymentSessions past their 15-minute TTL and cancel the linked Order /
 // WalletFunding, so half-finished checkout attempts don't sit Pending on the
 // customer's dashboard forever. Five-minute cadence — the dead state shows for
 // at most ~5 min between cron ticks.
 Schedule::job(new ExpireStalePaymentSessionsJob)->everyFiveMinutes()->sentryMonitor('expire-stale-payment-sessions');
+
+// Sweep pending transaction recoveries whose 24h links have lapsed into the
+// terminal `abandoned` state, so recovery analytics stay truthful. Hourly is
+// plenty — the read paths already refuse expired tokens.
+Schedule::job(new ExpireStaleRecoveriesJob)->hourly()->sentryMonitor('expire-stale-recoveries');
 
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.

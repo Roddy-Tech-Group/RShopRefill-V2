@@ -6,6 +6,9 @@ use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
+use App\Domain\PaymentInsights\Enums\ProductLine;
+use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
+use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\WalletService;
@@ -13,7 +16,10 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
+use App\Models\User;
 use App\Models\WalletFunding;
+use App\Support\FeatureFlag;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -24,6 +30,8 @@ class PaymentSessionService
      */
     public function createForOrder(Order $order, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
+        $this->enforceBackoff($order->user, ProductLine::Checkout->value);
+
         return DB::transaction(function () use ($order, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -46,6 +54,9 @@ class PaymentSessionService
                 ],
                 'customer_email' => $order->user->email,
                 'customer_ip' => request()->ip(),
+                'correlation_id' => Context::get('correlation_id'),
+                'device_uuid' => request()->cookie('device_uuid') ?? request()->header('X-Installation-ID'),
+
                 'device_metadata' => [
                     'user_agent' => request()->userAgent(),
                 ],
@@ -70,6 +81,8 @@ class PaymentSessionService
      */
     public function createForWalletFunding(WalletFunding $funding, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
+        $this->enforceBackoff($funding->user, ProductLine::WalletFunding->value);
+
         return DB::transaction(function () use ($funding, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -91,6 +104,9 @@ class PaymentSessionService
                 ],
                 'customer_email' => $funding->user->email,
                 'customer_ip' => request()->ip(),
+                'correlation_id' => Context::get('correlation_id'),
+                'device_uuid' => request()->cookie('device_uuid') ?? request()->header('X-Installation-ID'),
+
                 'device_metadata' => [
                     'user_agent' => request()->userAgent(),
                 ],
@@ -267,5 +283,27 @@ class PaymentSessionService
             'flutterwave' => 'card',
             default => 'card',
         };
+    }
+
+    private function enforceBackoff(?User $user, string $productLine): void
+    {
+        // Kill switch: disabling progressive backoff removes the rate limit
+        // without touching outcome recording or recovery.
+        if (FeatureFlag::off('progressive_backoff')) {
+            return;
+        }
+
+        /** @var PaymentBackoffManager $backoffManager */
+        $backoffManager = app(PaymentBackoffManager::class);
+        $status = $backoffManager->getBackoffStatus(
+            $user,
+            $productLine,
+            request()->ip(),
+            request()->cookie('device_uuid') ?? request()->header('X-Installation-ID')
+        );
+
+        if ($status['is_rate_limited']) {
+            throw new PaymentBackoffException($status['wait_seconds']);
+        }
     }
 }

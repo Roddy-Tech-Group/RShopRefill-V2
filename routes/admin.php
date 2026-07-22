@@ -12,9 +12,12 @@ use App\Http\Controllers\Admin\AdminRewardSettingsController;
 use App\Http\Controllers\Admin\AdminSreController;
 use App\Http\Controllers\Admin\AdminTransactionExportController;
 use App\Http\Controllers\Admin\Auth\AdminLoginController;
+use App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController;
 use App\Http\Controllers\Admin\Auth\AdminTwoFactorController;
 use App\Http\Controllers\Admin\NotificationAdminApiController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Middleware\AdminInactivityTimeout;
+use App\Models\Admin;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -36,12 +39,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('2fa', [AdminTwoFactorController::class, 'store'])->name('2fa.verify');
         Route::post('2fa/resend', [AdminTwoFactorController::class, 'resend'])->name('2fa.resend');
 
-        Route::get('security-question', [\App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController::class, 'create'])->name('security-question');
-        Route::post('security-question', [\App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController::class, 'store'])->name('security-question.verify');
+        Route::get('security-question', [AdminSecurityQuestionController::class, 'create'])->name('security-question');
+        Route::post('security-question', [AdminSecurityQuestionController::class, 'store'])->name('security-question.verify');
     });
 
     // Authenticated admin routes
-    Route::middleware(['admin', \App\Http\Middleware\AdminInactivityTimeout::class])->group(function () {
+    Route::middleware(['admin', AdminInactivityTimeout::class])->group(function () {
         // Core Dashboard & Operations
         Route::view('dashboard', 'admin.dashboard')->name('dashboard');
         Route::view('operations', 'admin.operations')->name('operations');
@@ -50,13 +53,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Impersonation
         Route::post('revert-admin-impersonation', function () {
-            if (!session()->has('impersonator_admin_id')) {
+            if (! session()->has('impersonator_admin_id')) {
                 return redirect()->route('admin.dashboard');
             }
-            $superAdmin = \App\Models\Admin::find(session()->pull('impersonator_admin_id'));
+            $superAdmin = Admin::find(session()->pull('impersonator_admin_id'));
             if ($superAdmin && $superAdmin->isSuperAdmin()) {
                 auth()->guard('admin')->login($superAdmin);
             }
+
             return redirect()->route('admin.admins')->with('status', 'Returned to Super Admin account.');
         })->name('revert-impersonation');
 
@@ -247,6 +251,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::view('wallets', 'admin.wallets')->name('wallets');
         Volt::route('rates', 'admin.rates')->name('rates');
         Volt::route('account', 'admin.account')->name('account');
+        Volt::route('payment-insights', 'admin.payment-insights.dashboard')->name('payment-insights');
         Volt::route('notifications', 'admin.notifications')->name('notifications');
         Volt::route('reports', 'admin.reports')->name('reports');
         Route::get('reports/export.csv', [AdminReportExportController::class, 'csv'])->name('reports.export');

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Domain\Notification\Enums\DeliveryStatus;
-use App\Domain\Notification\Enums\NotificationChannel;
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\TransactionPinService;
@@ -11,8 +11,6 @@ use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Mail\AdminDirectMessageMail;
 use App\Models\Notification;
-use App\Models\NotificationDelivery;
-use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -278,65 +276,31 @@ class AdminCustomerController extends Controller
             'body' => ['required', 'string', 'min:5', 'max:2000'],
         ]);
 
-        $admin = $request->user('admin');
+        $admin = auth('admin')->user();
         $isWarning = $validated['type'] === 'warning';
-        $title = $isWarning ? 'Account warning' : 'Message from '.SiteSetting::get('site.name', 'RshopRefills');
+        $title = $isWarning ? 'Warning regarding your account' : 'New message from RShopRefills Support';
 
-        // 1. Dashboard notification - always lands. We write directly to the
-        //    custom `notifications` table (App\Models\Notification) to match
-        //    the project's DatabaseChannel pattern; Laravel's default Notifiable
-        //    targets a different `data` JSON column that this table doesn't have.
-        $dbNotification = Notification::create([
-            'user_id' => $user->id,
-            'type' => AdminDirectMessageMail::class,
-            'title' => $title,
-            'message' => $validated['body'],
-            'channel' => NotificationChannel::Database,
-            'status' => DeliveryStatus::Sent,
-            'priority' => $isWarning ? 'high' : 'normal',
-            'metadata' => [
-                'kind' => $validated['type'],
-                'admin_name' => $admin?->name,
-            ],
-            'sent_at' => now(),
-        ]);
-
-        NotificationDelivery::create([
-            'notification_id' => $dbNotification->id,
-            'provider' => 'database',
-            'channel' => NotificationChannel::Database,
-            'recipient' => (string) $user->id,
-            'status' => DeliveryStatus::Sent,
-            'response_payload' => ['notification_id' => $dbNotification->id],
-            'attempted_at' => now(),
-        ]);
-
-        // 2. Email - best-effort. Sending the Mailable directly keeps a transport
-        //    failure from rolling back the database row above.
-        $emailDelivered = true;
-        try {
-            Mail::to($user->email)->send(new AdminDirectMessageMail(
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::AdminDirectMessage,
+            title: $title,
+            message: $validated['body'],
+            mailable: new AdminDirectMessageMail(
                 recipient: $user,
                 type: $validated['type'],
                 body: $validated['body'],
                 adminName: $admin?->name,
-            ));
-        } catch (Throwable $e) {
-            $emailDelivered = false;
-            Log::warning('Admin direct message: email send failed', [
-                'user_id' => $user->id,
-                'type' => $validated['type'],
-                'error' => $e->getMessage(),
-            ]);
-        }
+            ),
+            correlationId: 'admin_dm_'.$user->id.'_'.time(),
+            metadata: [
+                'kind' => $validated['type'],
+                'admin_name' => $admin?->name,
+            ]
+        );
 
         $status = $validated['type'] === 'warning'
             ? 'Warning sent to the customer.'
             : 'Message sent to the customer.';
-
-        if (! $emailDelivered) {
-            $status .= ' (Dashboard delivered; email could not be sent - check mail driver.)';
-        }
 
         // Explicit redirect (not back()) so the browser's address bar ends up on
         // the customer detail page rather than the POST endpoint - a refresh

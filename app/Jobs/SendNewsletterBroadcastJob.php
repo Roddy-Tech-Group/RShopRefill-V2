@@ -2,12 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Mail\NewsletterBroadcastMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Broadcasts a single newsletter campaign to every active subscriber.
@@ -46,11 +47,24 @@ class SendNewsletterBroadcastJob implements ShouldQueue
             ->chunkById(50, function ($chunk) use (&$sent, &$failed) {
                 foreach ($chunk as $subscriber) {
                     try {
-                        Mail::to($subscriber->email)->send(new NewsletterBroadcastMail(
-                            subjectLine: $this->subjectLine,
-                            bodyContent: $this->bodyContent,
-                            isHtml: $this->isHtml,
-                        ));
+                        // For newsletters, we use a fake model because it's subscriber list, not users.
+                        // Or rather, we use the NewsletterSubscriber as the recipient model.
+                        app(CommunicationManager::class)->send(
+                            recipient: $subscriber,
+                            category: CommunicationCategory::Newsletter,
+                            title: $this->subjectLine,
+                            message: $this->subjectLine, // Push/InApp disabled via channel resolver anyway
+                            mailable: new NewsletterBroadcastMail(
+                                subjectLine: $this->subjectLine,
+                                bodyContent: $this->bodyContent,
+                                isHtml: $this->isHtml,
+                            ),
+                            metadata: [
+                                'is_marketing' => true,
+                                'subscriber_id' => $subscriber->id,
+                            ]
+                        );
+
                         $sent++;
                     } catch (\Throwable $e) {
                         $failed++;

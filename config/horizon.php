@@ -225,7 +225,20 @@ return [
         ],
         'supervisor-default' => [
             'connection' => 'redis',
-            'queue' => ['payments', 'notifications', 'default', 'rewards', 'emails', 'critical-alerts'],
+            'queue' => ['payments', 'notifications', 'default', 'rewards', 'emails', 'critical-alerts', 'intelligence'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 3600,
+            'maxJobs' => 1000,
+            'memory' => 128,
+            'tries' => 3,
+            'timeout' => 90,
+            'nice' => 0,
+        ],
+        'supervisor-comms' => [
+            'connection' => 'redis',
+            'queue' => ['comm-critical', 'comm-transactional', 'comm-marketing', 'comm-push'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
@@ -268,6 +281,11 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-comms' => [
+                'maxProcesses' => 10,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 3,
+            ],
             'supervisor-long-running' => [
                 'maxProcesses' => 2,
             ],
@@ -281,6 +299,9 @@ return [
                 'maxProcesses' => 3,
             ],
             'supervisor-default' => [
+                'maxProcesses' => 3,
+            ],
+            'supervisor-comms' => [
                 'maxProcesses' => 3,
             ],
             'supervisor-long-running' => [

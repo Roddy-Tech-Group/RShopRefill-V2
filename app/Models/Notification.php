@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\Domain\Notification\Enums\DeliveryStatus;
-use App\Domain\Notification\Enums\NotificationChannel;
-use App\Domain\Notification\Enums\NotificationPriority;
+use App\Domain\Communication\Enums\CommunicationChannel;
+use App\Domain\Communication\Enums\DeliveryStatus;
+use App\Domain\Communication\Enums\Priority;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,9 +18,9 @@ use Illuminate\Support\Carbon;
  * @property string $type
  * @property string $title
  * @property string $message
- * @property NotificationChannel $channel
+ * @property CommunicationChannel $channel
  * @property DeliveryStatus $status
- * @property NotificationPriority $priority
+ * @property Priority $priority
  * @property array|null $metadata
  * @property Carbon|null $read_at
  * @property Carbon|null $sent_at
@@ -49,9 +49,9 @@ class Notification extends Model
     protected function casts(): array
     {
         return [
-            'channel' => NotificationChannel::class,
+            'channel' => CommunicationChannel::class,
             'status' => DeliveryStatus::class,
-            'priority' => NotificationPriority::class,
+            'priority' => Priority::class,
             'metadata' => 'array',
             'read_at' => 'datetime',
             'sent_at' => 'datetime',

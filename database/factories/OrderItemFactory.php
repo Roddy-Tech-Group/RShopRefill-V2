@@ -30,7 +30,7 @@ class OrderItemFactory extends Factory
             'provider_cost_usd' => 8.00,
             'markup_amount' => 2.00,
             'subtotal_amount' => 10.00,
-            'fulfillment_status' => FulfillmentStatus::Pending,
+            'fulfillment_status' => FulfillmentStatus::NotStarted,
         ];
     }
 }

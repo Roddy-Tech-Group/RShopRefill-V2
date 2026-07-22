@@ -3,6 +3,8 @@
 use App\Http\Middleware\AdminAuth;
 use App\Http\Middleware\AdvertiseDiscoveryLinks;
 use App\Http\Middleware\CaptureReferralCookie;
+use App\Http\Middleware\EnforceDeviceTrustRestrictions;
+use App\Http\Middleware\EnforceDeviceVerification;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureAccountNotSuspended;
@@ -11,6 +13,7 @@ use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\ResolveRegion;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
+use App\Models\Admin;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
@@ -38,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
         __DIR__.'/../app/Domain/Reconciliation/Console',
         __DIR__.'/../app/Domain/Fulfillment/Console',
         __DIR__.'/../app/Domain/Payment/Console',
+        __DIR__.'/../app/Domain/Communication/Console',
+        __DIR__.'/../app/Domain/PaymentInsights/Console',
     ])
     ->withMiddleware(function (Middleware $middleware) {
         // Real client IPs: the app runs behind Cloudflare -> the VPS web server,
@@ -69,7 +74,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => AdminAuth::class,
-            'device.trust' => \App\Http\Middleware\EnforceDeviceTrustRestrictions::class,
+            'device.trust' => EnforceDeviceTrustRestrictions::class,
             // Selectively applied to write routes (checkout, cart writes,
             // wallet funding). Suspended users stay logged in so they can
             // see the banner + request a review - only the action is refused.
@@ -108,7 +113,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ResolveRegion::class,
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
-            \App\Http\Middleware\EnforceDeviceVerification::class,
+            EnforceDeviceVerification::class,
             // Order matters on the response unwind: AdvertiseDiscoveryLinks runs
             // first (while the body is still HTML) so it can set the Link header,
             // then NegotiateMarkdown converts the body for agents while keeping it.
@@ -125,15 +130,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(function () {
             if (request()->is('admin*')) {
-                /** @var \App\Models\Admin|null $admin */
+                /** @var Admin|null $admin */
                 $admin = auth('admin')->user();
-                if ($admin && !$admin->canAccessAdminRoute('dashboard')) {
-                    return $admin->canAccessAdminRoute('operations') 
-                        ? route('admin.operations') 
+                if ($admin && ! $admin->canAccessAdminRoute('dashboard')) {
+                    return $admin->canAccessAdminRoute('operations')
+                        ? route('admin.operations')
                         : route('admin.account');
                 }
+
                 return route('admin.dashboard');
             }
+
             return route('dashboard');
         });
     })
