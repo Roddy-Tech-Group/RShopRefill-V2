@@ -165,7 +165,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             </div>
         </div>
 
-        <div class="relative overflow-hidden rounded-[24px] bg-white shadow-xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60 transition-all duration-300">
+        <div class="relative overflow-hidden rounded-[12px] bg-white shadow-xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60 transition-all duration-300">
             
             {{-- STEP 1: RECIPIENT --}}
             <div x-show="$wire.step === 1" 
@@ -261,31 +261,31 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
                                 </svg>
                             </div>
-                            <input type="text" wire:model="note" class="block w-full rounded-2xl border-0 py-3.5 pl-12 pr-4 text-zinc-900 ring-1 ring-inset ring-zinc-200 placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm font-medium bg-zinc-50 dark:bg-[#0c1a36] dark:text-white dark:ring-zinc-700/60" placeholder="Add a note (optional)">
+                            <input type="text" wire:model="note" class="block w-full rounded-[12px] border-0 py-3.5 pl-12 pr-4 text-zinc-900 ring-1 ring-inset ring-zinc-200 placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm font-medium bg-zinc-50 dark:bg-[#0c1a36] dark:text-white dark:ring-zinc-700/60" placeholder="Add a note (optional)">
                         </div>
                     </div>
 
                     {{-- Keypad --}}
                     <div class="mt-8 grid grid-cols-3 gap-2">
                         @foreach([1,2,3,4,5,6,7,8,9] as $num)
-                            <button type="button" @click="appendNum({{ $num }})" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                            <button type="button" @click="appendNum({{ $num }})" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                                 {{ $num }}
                             </button>
                         @endforeach
-                        <button type="button" @click="appendNum('.')" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="appendNum('.')" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             .
                         </button>
-                        <button type="button" @click="appendNum(0)" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="appendNum(0)" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             0
                         </button>
-                        <button type="button" @click="deleteNum()" class="flex h-14 items-center justify-center rounded-2xl text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="deleteNum()" class="flex h-14 items-center justify-center rounded-[12px] text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75L14.25 12m0 0l2.25 2.25M14.25 12l2.25-2.25M14.25 12L12 14.25m-2.58 4.92l-6.375-6.375a1.125 1.125 0 010-1.59L9.42 4.83c.211-.211.498-.33.796-.33H19.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-9.284c-.298 0-.585-.119-.796-.33z"/>
                             </svg>
                         </button>
                     </div>
 
-                    <button type="submit" :disabled="!amount || amount == '0'" class="mt-8 w-full rounded-2xl bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
+                    <button type="submit" :disabled="!amount || amount == '0'" class="mt-8 w-full rounded-[12px] bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
                         Review Transfer
                     </button>
                 </form>
@@ -316,7 +316,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     <h2 class="mt-4 text-xl font-bold text-zinc-900 dark:text-white">Confirm Transfer</h2>
                     
                     @if($receiverFound)
-                        <div class="mt-6 w-full rounded-2xl bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60">
+                        <div class="mt-6 w-full rounded-[12px] bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60">
                             <div class="flex items-center justify-between py-2 border-b border-zinc-200 dark:border-zinc-700/50">
                                 <span class="text-sm font-medium text-zinc-500">To</span>
                                 <span class="text-sm font-bold text-zinc-900 dark:text-white">{{ $receiverFound['name'] }}</span>
@@ -345,7 +345,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                             @error('pin') <p class="text-xs text-red-500 text-left mt-2">{{ $message }}</p> @enderror
                         </div>
 
-                        <button type="submit" class="mt-6 w-full rounded-2xl bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
+                        <button type="submit" class="mt-6 w-full rounded-[12px] bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
                             <span wire:loading.remove wire:target="executeTransfer">Send {{ $currency }} {{ number_format((float)$amount, 2) }}</span>
                             <span wire:loading wire:target="executeTransfer">Processing...</span>
                         </button>

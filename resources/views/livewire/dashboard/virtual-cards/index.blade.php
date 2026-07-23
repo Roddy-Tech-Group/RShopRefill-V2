@@ -143,7 +143,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
     @if ($this->cards->isEmpty())
         {{-- Empty State --}}
-        <div class="flex flex-col items-center justify-center rounded-[20px] bg-white border border-zinc-200 py-16 px-6 shadow-sm dark:bg-[#1d3252] dark:border-zinc-700/60 text-center">
+        <div class="flex flex-col items-center justify-center rounded-[12px] bg-white border border-zinc-200 py-16 px-6 shadow-sm dark:bg-[#1d3252] dark:border-zinc-700/60 text-center">
             <div class="relative flex h-24 w-24 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/10 mb-6">
                 <svg class="h-10 w-10 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
@@ -177,14 +177,11 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     <div class="card-3d-wrapper relative h-[220px] w-full transform-style-3d transition-transform duration-700 ease-in-out" x-ref="cardWrapper" :class="isFlipped ? 'rotate-y-180' : ''">
                         
                         {{-- Front of Card --}}
-                        <div class="card-face card-front absolute inset-0 overflow-hidden rounded-[20px] p-6 shadow-xl backface-hidden"
-                             style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); border: 1px solid rgba(255,255,255,0.1);">
-                            
-                            {{-- Glossy Overlay --}}
-                            <div class="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent"></div>
-                            
+                        <div class="card-face card-front absolute inset-0 overflow-hidden rounded-[12px] p-6 shadow-xl backface-hidden"
+                             style="background: #122343; border: 1px solid rgba(255,255,255,0.1);">
+
                             {{-- Chip --}}
-                            <div class="mt-2 h-9 w-11 rounded-md border border-amber-600/30 bg-gradient-to-br from-amber-200 to-amber-500 opacity-80 mix-blend-screen shadow-[inset_0_0_8px_rgba(0,0,0,0.2)]"></div>
+                            <div class="mt-2 h-9 w-11 rounded-md border border-amber-600/30 bg-amber-400 opacity-80 shadow-[inset_0_0_8px_rgba(0,0,0,0.2)]"></div>
                             
                             {{-- Network Logo (Mastercard placeholder) --}}
                             <div class="absolute right-5 top-5 flex">
@@ -208,36 +205,36 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                 <p class="mt-3 text-sm font-semibold tracking-widest text-white/90 uppercase">{{ $this->activeCard->name_on_card ?? Auth::user()->name }}</p>
                             </div>
 
-                            <div class="absolute top-6 left-6 rounded-full bg-white/10 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white backdrop-blur-md">
+                            <div class="absolute top-6 left-6 rounded-full bg-white/10 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white">
                                 {{ $this->activeCard->status === 'active' ? 'Active' : ucfirst($this->activeCard->status) }}
                             </div>
                         </div>
                         
                         {{-- Back of Card (Flipped) --}}
-                        <div class="card-face card-back absolute inset-0 overflow-hidden rounded-[20px] bg-zinc-900 shadow-xl backface-hidden rotate-y-180"
+                        <div class="card-face card-back absolute inset-0 overflow-hidden rounded-[12px] bg-[#122343] shadow-xl backface-hidden rotate-y-180"
                              style="border: 1px solid rgba(255,255,255,0.1);">
                             
                             {{-- Magnetic Stripe --}}
-                            <div class="absolute left-0 right-0 top-6 h-12 bg-black/80"></div>
+                            <div class="absolute left-0 right-0 top-6 h-12 bg-[#0c1a36]"></div>
                             
                             <div class="absolute left-6 right-6 top-24 flex flex-col gap-4">
                                 {{-- Fake sensitive details --}}
                                 <div>
                                     <p class="text-[9px] font-medium uppercase tracking-widest text-zinc-400">Card Number</p>
-                                    <div class="mt-1 flex h-8 items-center rounded bg-white/10 px-3 backdrop-blur-md">
+                                    <div class="mt-1 flex h-8 items-center rounded bg-white/10 px-3">
                                         <span class="font-mono text-sm tracking-[0.2em] text-white" x-text="isRevealed ? '4532 8812 0049 1123' : '•••• •••• •••• ' + '{{ substr($this->activeCard->masked_pan ?? '0000', -4) }}'"></span>
                                     </div>
                                 </div>
                                 <div class="flex gap-4">
                                     <div class="flex-1">
                                         <p class="text-[9px] font-medium uppercase tracking-widest text-zinc-400">Valid Thru</p>
-                                        <div class="mt-1 flex h-8 items-center rounded bg-white/10 px-3 backdrop-blur-md">
+                                        <div class="mt-1 flex h-8 items-center rounded bg-white/10 px-3">
                                             <span class="font-mono text-sm text-white" x-text="isRevealed ? '12/28' : '••/••'"></span>
                                         </div>
                                     </div>
                                     <div class="flex-1">
                                         <p class="text-[9px] font-medium uppercase tracking-widest text-zinc-400">CVV</p>
-                                        <div class="mt-1 flex h-8 items-center justify-end rounded bg-white/10 px-3 backdrop-blur-md">
+                                        <div class="mt-1 flex h-8 items-center justify-end rounded bg-white/10 px-3">
                                             <span class="font-mono text-sm tracking-[0.2em] text-white" x-text="isRevealed ? '821' : '•••'"></span>
                                         </div>
                                     </div>
@@ -264,7 +261,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
                 {{-- Action Grid --}}
                 <div class="grid grid-cols-3 gap-3">
-                    <button @click="$wire.requirePinFor('reveal')" class="flex flex-col items-center justify-center gap-2 rounded-[16px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
+                    <button @click="$wire.requirePinFor('reveal')" class="flex flex-col items-center justify-center gap-2 rounded-[12px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
                         <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                             <svg class="h-5 w-5" x-show="!isRevealed" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             <svg class="h-5 w-5" x-show="isRevealed" x-cloak fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.244 7.244L19.5 19.5m-2.876-2.876L13.875 13.875M9.878 9.878a3 3 0 105.249 5.249"/></svg>
@@ -272,14 +269,14 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300" x-text="isRevealed ? 'Hide Details' : 'Show Details'"></span>
                     </button>
 
-                    <button @click="$wire.requirePinFor('freeze')" class="flex flex-col items-center justify-center gap-2 rounded-[16px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
+                    <button @click="$wire.requirePinFor('freeze')" class="flex flex-col items-center justify-center gap-2 rounded-[12px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
                         <span class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                         </span>
                         <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Freeze Card</span>
                     </button>
 
-                    <button class="flex flex-col items-center justify-center gap-2 rounded-[16px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
+                    <button class="flex flex-col items-center justify-center gap-2 rounded-[12px] bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 active:scale-95 dark:bg-[#1d3252] dark:ring-zinc-700/60 dark:hover:bg-white/5">
                         <span class="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46"/></svg>
                         </span>
@@ -290,7 +287,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
             {{-- Right Column: Transaction History --}}
             <div class="lg:col-span-7">
-                <div class="flex h-full flex-col overflow-hidden rounded-[20px] bg-white border border-zinc-200 shadow-sm dark:bg-[#1d3252] dark:border-zinc-700/60">
+                <div class="flex h-full flex-col overflow-hidden rounded-[12px] bg-white border border-zinc-200 shadow-sm dark:bg-[#1d3252] dark:border-zinc-700/60">
                     <div class="border-b border-zinc-100 p-5 dark:border-zinc-700/60 flex items-center justify-between">
                         <h3 class="text-base font-bold text-zinc-900 dark:text-white">Recent Activity</h3>
                         <div class="text-xs font-semibold text-blue-600 dark:text-blue-400">View All</div>
@@ -335,7 +332,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                      x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
                      x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
                      @click.outside="$wire.showCreateModal = false"
-                     class="relative transform overflow-hidden rounded-[24px] bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md dark:bg-[#0f172a] dark:ring-1 dark:ring-white/10">
+                     class="relative transform overflow-hidden rounded-[12px] bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md dark:bg-[#122343] dark:ring-1 dark:ring-white/10">
                     
                     <div class="px-6 pb-6 pt-8 sm:p-8">
                         <div class="flex items-center justify-center h-14 w-14 rounded-full bg-blue-50 dark:bg-blue-500/10 mx-auto mb-6">
@@ -396,7 +393,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                      x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
                      x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
                      @click.outside="$wire.showPinModal = false"
-                     class="relative transform overflow-hidden rounded-[24px] bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-sm dark:bg-[#0f172a] dark:ring-1 dark:ring-white/10">
+                     class="relative transform overflow-hidden rounded-[12px] bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-sm dark:bg-[#122343] dark:ring-1 dark:ring-white/10">
                     
                     <div class="px-6 pb-6 pt-8 sm:p-8">
                         <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/10 mb-4">

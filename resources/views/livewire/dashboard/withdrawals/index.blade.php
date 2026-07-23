@@ -142,7 +142,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             </div>
         </div>
 
-        <div class="relative overflow-hidden rounded-[24px] bg-white shadow-xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60 transition-all duration-300">
+        <div class="relative overflow-hidden rounded-[12px] bg-white shadow-xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60 transition-all duration-300">
             
             {{-- STEP 1: ACCOUNT DETAILS --}}
             <div x-show="$wire.step === 1" 
@@ -199,7 +199,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 </button>
 
                 @if($resolvedName)
-                    <div class="mt-2 flex w-full flex-col items-center rounded-2xl bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60 text-center">
+                    <div class="mt-2 flex w-full flex-col items-center rounded-[12px] bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60 text-center">
                         <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Account Verified</span>
                         <h2 class="text-base font-bold text-zinc-900 dark:text-white">{{ $resolvedName }}</h2>
                         <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ collect($banks)->firstWhere('code', $bankCode)['name'] ?? 'Bank' }} • {{ $accountNumber }}</p>
@@ -220,24 +220,24 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     {{-- Keypad --}}
                     <div class="mt-8 grid grid-cols-3 gap-2">
                         @foreach([1,2,3,4,5,6,7,8,9] as $num)
-                            <button type="button" @click="appendNum({{ $num }})" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                            <button type="button" @click="appendNum({{ $num }})" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                                 {{ $num }}
                             </button>
                         @endforeach
-                        <button type="button" @click="appendNum('.')" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="appendNum('.')" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             .
                         </button>
-                        <button type="button" @click="appendNum(0)" class="flex h-14 items-center justify-center rounded-2xl text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="appendNum(0)" class="flex h-14 items-center justify-center rounded-[12px] text-2xl font-semibold text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             0
                         </button>
-                        <button type="button" @click="deleteNum()" class="flex h-14 items-center justify-center rounded-2xl text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
+                        <button type="button" @click="deleteNum()" class="flex h-14 items-center justify-center rounded-[12px] text-zinc-900 hover:bg-zinc-100 active:scale-95 dark:text-white dark:hover:bg-white/5 transition-all">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75L14.25 12m0 0l2.25 2.25M14.25 12l2.25-2.25M14.25 12L12 14.25m-2.58 4.92l-6.375-6.375a1.125 1.125 0 010-1.59L9.42 4.83c.211-.211.498-.33.796-.33H19.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-9.284c-.298 0-.585-.119-.796-.33z"/>
                             </svg>
                         </button>
                     </div>
 
-                    <button type="submit" :disabled="!amount || amount == '0'" class="mt-8 w-full rounded-2xl bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
+                    <button type="submit" :disabled="!amount || amount == '0'" class="mt-8 w-full rounded-[12px] bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
                         Review Withdrawal
                     </button>
                 </form>
@@ -268,7 +268,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     <h2 class="mt-4 text-xl font-bold text-zinc-900 dark:text-white">Confirm Withdrawal</h2>
                     
                     @if($resolvedName)
-                        <div class="mt-6 w-full rounded-2xl bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60">
+                        <div class="mt-6 w-full rounded-[12px] bg-zinc-50 p-4 border border-zinc-100 dark:bg-[#0c1a36] dark:border-zinc-700/60">
                             <div class="flex items-center justify-between py-2 border-b border-zinc-200 dark:border-zinc-700/50">
                                 <span class="text-sm font-medium text-zinc-500">Bank</span>
                                 <span class="text-sm font-bold text-zinc-900 dark:text-white">{{ collect($banks)->firstWhere('code', $bankCode)['name'] ?? 'Bank' }}</span>
@@ -299,7 +299,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                             @error('pin') <p class="text-xs text-red-500 text-left mt-2">{{ $message }}</p> @enderror
                         </div>
 
-                        <button type="submit" class="mt-6 w-full rounded-2xl bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
+                        <button type="submit" class="mt-6 w-full rounded-[12px] bg-blue-600 px-4 py-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors">
                             <span wire:loading.remove wire:target="executeWithdrawal">Withdraw {{ $currency }} {{ number_format((float)$amount, 2) }}</span>
                             <span wire:loading wire:target="executeWithdrawal">Processing...</span>
                         </button>

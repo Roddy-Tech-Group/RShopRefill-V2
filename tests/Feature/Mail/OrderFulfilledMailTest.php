@@ -175,6 +175,30 @@ class OrderFulfilledMailTest extends TestCase
         $this->assertStringContainsString('585634', $html);
     }
 
+    public function test_gift_card_email_includes_supplier_redemption_steps_and_hides_the_account_reference(): void
+    {
+        // MintRoute POSA voucher (Discord Nitro): the redeemable value is the
+        // pin; account_reference is a receipt token that must never render as a
+        // code; the supplier's portal steps ride along in `instructions`.
+        $item = $this->makeFulfilledItem(
+            [
+                'pin' => '38eq-THbU-ppHJ-NfJS-msPA-sGHQ',
+                'account_reference' => 'c0a791be85fd55a9b85cd10a2df36b',
+                'instructions' => "1- Go to https://posa.mintroute.com.\n2- Select Discord service.",
+            ],
+            ['name' => 'Discord Nitro (US)', 'country_code' => 'US'],
+            'zendit',
+        );
+
+        $html = (new OrderFulfilledMail($item->order->user, $item))->render();
+
+        $this->assertStringContainsString('Your gift card is ready', $html);
+        $this->assertStringContainsString('38eq-THbU-ppHJ-NfJS-msPA-sGHQ', $html);
+        $this->assertStringContainsString('Redemption steps', $html);
+        $this->assertStringContainsString('posa.mintroute.com', $html);
+        $this->assertStringNotContainsString('c0a791be85fd55a9b85cd10a2df36b', $html);
+    }
+
     public function test_delivery_email_previews_rcoin_cashback_before_the_reward_lands(): void
     {
         // Pin the rate so the preview is independent of the default: $7 order

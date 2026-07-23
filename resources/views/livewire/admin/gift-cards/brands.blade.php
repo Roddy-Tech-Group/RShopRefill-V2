@@ -113,7 +113,10 @@ class extends Component {
     </div>
 
     {{-- Data Table --}}
-    <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900">
+    {{-- overflow-hidden clips hovered top/bottom rows to the card's rounded
+         corners. Plain tables use border-collapse: collapse (Tailwind preflight
+         default), so a <tr> can't take its own border-radius, so the card must clip. --}}
+    <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="border-b border-zinc-200 bg-zinc-50/50 text-zinc-500 dark:border-white/10 dark:bg-zinc-800/50">

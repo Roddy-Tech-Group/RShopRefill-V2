@@ -35,7 +35,7 @@ class TradeStatusMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.trade-status-mail',
+            view: 'mail.trade-status-mail',
         );
     }
 

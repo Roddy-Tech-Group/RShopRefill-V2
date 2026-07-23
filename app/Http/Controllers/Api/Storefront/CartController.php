@@ -37,7 +37,7 @@ class CartController extends Controller
     {
         $request->validate([
             'product_variant_id' => ['required', 'exists:product_variants,id'],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
             'requested_value' => ['nullable', 'numeric', 'min:0.01'],
             'metadata' => ['nullable', 'array'],
             // Top-up recipient: digits-only after normalisation, no longer
@@ -65,7 +65,7 @@ class CartController extends Controller
     public function updateItem(Request $request, string $itemId)
     {
         $request->validate([
-            'quantity' => ['required', 'integer', 'min:0'],
+            'quantity' => ['required', 'integer', 'min:0', 'max:100'],
         ]);
 
         $cart = $this->resolveCart($request);

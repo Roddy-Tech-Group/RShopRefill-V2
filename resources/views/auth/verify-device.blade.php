@@ -6,21 +6,14 @@
 <body class="min-h-screen bg-[#eff6ff] text-zinc-900 antialiased dark:bg-[#0c1a36] dark:text-zinc-100">
 
 <div class="relative flex min-h-screen items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    {{-- Ambient Background Glow --}}
-    <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div class="absolute -top-[10%] left-[20%] h-[500px] w-[500px] rounded-full bg-blue-400/20 blur-[100px] dark:bg-blue-600/20"></div>
-        <div class="absolute bottom-[10%] right-[20%] h-[400px] w-[400px] rounded-full bg-cyan-400/20 blur-[100px] dark:bg-cyan-600/20"></div>
-    </div>
-
     <div class="relative z-10 w-full max-w-md">
-        {{-- Glassmorphic Card --}}
-        <div class="overflow-hidden rounded-[24px] border border-white/40 bg-white/70 p-8 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#122343]/70 sm:p-10">
-            
+        {{-- Card --}}
+        <div class="overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-[#122343] sm:p-10">
+
             {{-- Icon Header --}}
             <div class="mb-8 flex justify-center">
-                <div class="relative flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-inner dark:bg-blue-900/30 dark:text-blue-400">
-                    <div class="absolute inset-0 rounded-full border border-blue-200/50 animate-[spin_4s_linear_infinite] dark:border-blue-500/20"></div>
-                    <svg class="h-10 w-10 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                     </svg>
                 </div>
@@ -70,7 +63,7 @@
                     <label for="otp" class="sr-only">Verification Code</label>
                     <div class="relative">
                         <input id="otp" name="otp" type="text" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="------" autocomplete="one-time-code"
-                            class="block w-full rounded-[16px] border border-zinc-200/80 bg-zinc-50/50 px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 shadow-inner outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f]/50 dark:bg-[#0c1a36]/50 dark:text-white dark:focus:border-blue-400 dark:focus:bg-[#0c1a36] dark:focus:ring-blue-400/20">
+                            class="block w-full rounded-[12px] border border-zinc-200 bg-zinc-50 px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f] dark:bg-[#0c1a36] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20">
                         
                         @error('otp') 
                             <div class="absolute -bottom-6 left-0 right-0 text-center">
@@ -81,27 +74,22 @@
                 </div>
 
                 <button type="submit" :disabled="loading"
-                    class="group relative flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-[14px] bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.5)] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0c1a36]"
-                    :class="loading ? 'opacity-80' : 'hover:-translate-y-0.5 hover:shadow-[0_12px_25px_-8px_rgba(37,99,235,0.6)]'">
-                    
+                    class="flex w-full cursor-pointer items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0c1a36]"
+                    :class="loading ? 'opacity-80' : ''">
+
                     {{-- Default State --}}
-                    <span class="relative z-10 flex items-center gap-2" x-show="!loading">
+                    <span class="flex items-center gap-2" x-show="!loading">
                         Verify Device
-                        <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                        </svg>
                     </span>
 
                     {{-- Loading State --}}
-                    <span class="relative z-10 flex items-center gap-2" x-show="loading" x-cloak>
+                    <span class="flex items-center gap-2" x-show="loading" x-cloak>
                         <svg class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Verifying...
                     </span>
-
-                    <div class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700" :class="loading ? '' : 'group-hover:translate-x-full'"></div>
                 </button>
             </form>
             

@@ -40,7 +40,7 @@ class GiftCardsRestoredMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.giftcards-restored',
+            view: 'mail.giftcards-restored',
         );
     }
 

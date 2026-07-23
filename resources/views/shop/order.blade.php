@@ -111,6 +111,28 @@
     @php
         $tpProfileUrl = config('services.trustpilot.profile_url');
         $groupedItemsSuccess = $order->items->groupBy('product_variant_id');
+
+        // Supplier-issued redemption steps captured at fulfillment (plain text
+        // with newlines, e.g. the POSA portal flow for Discord Nitro). Grouped
+        // by brand so a mixed order labels each block; deduped because every
+        // unit of the same variant carries identical instructions.
+        $supplierRedeemSteps = $order->items
+            ->map(function ($orderItem) {
+                $itemPayload = (array) ($orderItem->fulfillment_payload ?? []);
+                $steps = $itemPayload['instructions'] ?? null;
+                if (empty($steps) || ! is_scalar($steps)) {
+                    return null;
+                }
+                $stepBrandKey = $orderItem->product_snapshot['brand_key'] ?? null;
+
+                return [
+                    'brand' => $stepBrandKey ? Product::brandDisplayName($stepBrandKey) : ($orderItem->product_snapshot['name'] ?? 'Your card'),
+                    'steps' => (string) $steps,
+                ];
+            })
+            ->filter()
+            ->unique(fn ($row) => $row['brand'].'|'.$row['steps'])
+            ->values();
     @endphp
 
     <div class="min-h-full bg-zinc-50 dark:bg-[#0c1a36]">
@@ -294,8 +316,14 @@
 
                 {{-- Inline collapsible panels - one renders at a time below the links. --}}
                 <div x-show="open === 'redeem'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[12px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
+                    {{-- Supplier steps come first: when present they are the
+                         authoritative flow for that exact voucher. --}}
+                    @foreach ($supplierRedeemSteps as $supplierStep)
+                        <p class="{{ $loop->first ? '' : 'mt-3 ' }}font-semibold text-zinc-900 dark:text-white">{{ $supplierStep['brand'] }}</p>
+                        <p class="mt-1 whitespace-pre-line">{{ $supplierStep['steps'] }}</p>
+                    @endforeach
                     @if ($orderHasGiftCards)
-                        <p class="font-semibold text-zinc-900 dark:text-white">Gift cards</p>
+                        <p class="{{ $supplierRedeemSteps->isNotEmpty() ? 'mt-3 ' : '' }}font-semibold text-zinc-900 dark:text-white">Gift cards</p>
                         <ol class="ml-4 mt-1 list-decimal space-y-1">
                             <li>Visit the brand's redemption page (e.g. apple.com/redeem for Apple, amazon.com/gc for Amazon).</li>
                             <li>Sign in or create an account in the matching region.</li>

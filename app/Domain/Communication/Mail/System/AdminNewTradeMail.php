@@ -37,7 +37,7 @@ class AdminNewTradeMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.admin-new-trade-mail',
+            view: 'mail.admin-new-trade-mail',
         );
     }
 

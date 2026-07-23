@@ -373,6 +373,10 @@ class extends Component {
                                     }
                                     $redeemHtml = $snap['redeem_instructions'] ?? null;
                                     $termsHtml  = $snap['terms_and_conditions'] ?? null;
+                                    // Supplier-issued redemption steps captured at fulfillment
+                                    // (plain text with newlines, e.g. the POSA portal flow for
+                                    // Discord Nitro). Distinct from the product-level HTML above.
+                                    $supplierSteps = (! empty($payload['instructions']) && is_scalar($payload['instructions'])) ? (string) $payload['instructions'] : null;
                                     // Apple gift cards: build the redeem deep-link so iPhone customers can
                                     // tap once and have Apple's eShop open the App Store redemption sheet
                                     // with the code pre-filled. Format documented at apps.apple.com/redeem.
@@ -568,7 +572,7 @@ class extends Component {
                                      from product_snapshot (HTML, sanitized via brand sync). --}}
                                 <div x-data="{ panel: null }" class="mt-2.5 max-w-[340px]">
                                     <div class="flex flex-wrap justify-center gap-x-8 gap-y-1 text-sm">
-                                        @if ($redeemHtml)
+                                        @if ($redeemHtml || $supplierSteps)
                                             <button type="button"
                                                 @click="panel = (panel === 'redeem') ? null : 'redeem'"
                                                 :aria-expanded="(panel === 'redeem').toString()"
@@ -584,8 +588,11 @@ class extends Component {
                                         @endif
                                     </div>
 
-                                    @if ($redeemHtml)
+                                    @if ($redeemHtml || $supplierSteps)
                                         <div x-show="panel === 'redeem'" x-collapse x-cloak class="mt-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
+                                            @if ($supplierSteps)
+                                                <p class="whitespace-pre-line {{ $redeemHtml ? 'mb-2' : '' }}">{{ $supplierSteps }}</p>
+                                            @endif
                                             {!! $redeemHtml !!}
                                         </div>
                                     @endif

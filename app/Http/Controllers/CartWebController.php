@@ -73,7 +73,7 @@ class CartWebController extends Controller
 
         $data = $request->validate([
             'product_variant_id' => ['required', 'exists:product_variants,id'],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
             'requested_value' => ['nullable', 'numeric', 'min:0.01'],
             'metadata' => ['nullable', 'array'],
             // Top-up recipient phone. Stored on cart_items.metadata_snapshot
@@ -112,7 +112,7 @@ class CartWebController extends Controller
     public function update(Request $request, string $item)
     {
         $data = $request->validate([
-            'quantity' => ['required', 'integer', 'min:0'],
+            'quantity' => ['required', 'integer', 'min:0', 'max:100'],
         ]);
 
         [$cart, $token] = $this->resolve($request);

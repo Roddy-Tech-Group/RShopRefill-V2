@@ -481,8 +481,21 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             // empty. It is the code the customer types at the brand's redeem page,
             // so surface it as the copyable code. Guarded by empty() so a brand
             // that returns a real code elsewhere isn't overwritten.
+            // MintRoute POSA vouchers (Discord Nitro is the known case) also send
+            // accountId, but there it is a receipt reference that contradicts the
+            // redeemable voucherId pin - rendering it as "CODE" above the PIN sent
+            // customers to Discord with the wrong string. Only trust accountId as
+            // the code when it agrees with the voucher pin (Apple sends both,
+            // equal) or when no pin exists at all (the original blank-tile Apple
+            // case); otherwise keep it off the customer card as a support-facing
+            // reference.
             if (! empty($receipt['accountId']) && empty($flat['code'])) {
-                $flat['code'] = $receipt['accountId'];
+                $receiptPin = (string) ($pins[0]['pin'] ?? '');
+                if ($receiptPin === '' || $receiptPin === (string) $receipt['accountId']) {
+                    $flat['code'] = $receipt['accountId'];
+                } else {
+                    $flat['account_reference'] = $receipt['accountId'];
+                }
             }
             if (! empty($receipt['instructions'])) {
                 $flat['instructions'] = $receipt['instructions'];

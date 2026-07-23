@@ -85,11 +85,11 @@ class extends Component {
     </div>
 
     {{-- Main Calculator --}}
-    <div class="overflow-hidden rounded-[24px] bg-white shadow-xl shadow-zinc-900/5 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/50">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-xl shadow-zinc-900/5 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-zinc-700/50">
         <div class="p-6">
             
             {{-- You Send --}}
-            <div class="relative rounded-[16px] bg-zinc-50 p-4 transition-colors focus-within:bg-blue-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 dark:bg-white/5 dark:focus-within:bg-blue-500/10 dark:focus-within:ring-blue-500/30">
+            <div class="relative rounded-[12px] bg-zinc-50 p-4 transition-colors focus-within:bg-blue-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 dark:bg-white/5 dark:focus-within:bg-blue-500/10 dark:focus-within:ring-blue-500/30">
                 <div class="flex items-center justify-between">
                     <label for="sendAmount" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">You Send</label>
                     <span class="text-xs font-medium text-zinc-500">Balance: $12,450.00</span>
@@ -114,7 +114,7 @@ class extends Component {
             </div>
 
             {{-- You Receive --}}
-            <div class="relative rounded-[16px] bg-zinc-50 p-4 transition-colors dark:bg-white/5">
+            <div class="relative rounded-[12px] bg-zinc-50 p-4 transition-colors dark:bg-white/5">
                 <div class="flex items-center justify-between">
                     <label class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">You Receive</label>
                     <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Rate: 1 {{ $fromCurrency }} = {{ number_format($rate, 2) }} {{ $toCurrency }}</span>
@@ -138,7 +138,7 @@ class extends Component {
             <button type="button" 
                 @click="amount > 0 ? confirming = true : null"
                 :class="amount > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-900/20' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600'"
-                class="w-full rounded-[16px] py-4 text-base font-bold transition-all">
+                class="w-full rounded-[12px] py-4 text-base font-bold transition-all">
                 Continue
             </button>
         </div>
@@ -147,7 +147,7 @@ class extends Component {
     {{-- PIN Confirmation Modal --}}
     <div x-show="confirming" 
          style="display: none;"
-         class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-sm sm:p-6"
+         class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-sm sm:p-6"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -155,7 +155,7 @@ class extends Component {
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
          
-        <div class="w-full max-w-sm overflow-hidden rounded-[24px] bg-white shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-white/10"
+        <div class="w-full max-w-sm overflow-hidden rounded-[12px] bg-white shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-white/10"
              @click.away="!processing && (confirming = false)"
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 translate-y-8 scale-95"

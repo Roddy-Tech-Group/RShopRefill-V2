@@ -127,7 +127,7 @@
 
             /* Collapsed: inline sub-menus disappear inline AND reappear as a
                polished floating popup on hover, positioned to the right of
-               the icon with a 15px radius matching the project standard for
+               the icon with a 12px radius matching the project standard for
                larger surfaces. Soft drop shadow + 1px hairline ring. */
             html.admin-sidebar-collapsed [data-flux-sidebar] .nav-group {
                 position: relative;
@@ -140,7 +140,7 @@
                 width: 220px !important;
                 padding: 0.5rem !important;
                 background: white !important;
-                border-radius: 10px !important;
+                border-radius: 12px !important;
                 box-shadow:
                     0 20px 45px -12px rgba(15, 23, 42, 0.28),
                     0 0 0 1px rgba(15, 23, 42, 0.06) !important;
@@ -176,7 +176,7 @@
                 justify-content: flex-start !important;
                 text-align: left !important;
                 gap: 0.75rem !important;
-                border-radius: 10px !important;
+                border-radius: 12px !important;
             }
             /* Parent rail rule auto-margins every nav img/svg to centre them
                in the icon-only column; that leaks into the submenu and pushes

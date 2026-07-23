@@ -549,10 +549,10 @@
             .variant-body:hover::after {
                 display: none;
             }
-            /* Match the header pill's 10px corner radius on hover so the
+            /* Match the header pill's 12px corner radius on hover so the
                ring reads as the same shape language. */
             .variant-body:hover {
-                border-radius: 10px;
+                border-radius: 12px;
             }
         </style>
 

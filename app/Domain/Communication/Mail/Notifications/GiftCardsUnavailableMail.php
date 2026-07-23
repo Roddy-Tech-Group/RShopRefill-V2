@@ -40,7 +40,7 @@ class GiftCardsUnavailableMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.giftcards-unavailable',
+            view: 'mail.giftcards-unavailable',
         );
     }
 

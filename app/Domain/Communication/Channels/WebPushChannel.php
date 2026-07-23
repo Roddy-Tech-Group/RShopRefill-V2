@@ -31,10 +31,14 @@ class WebPushChannel implements ChannelInterface
 
             $subscriptions = $payload->recipient->pushSubscriptions;
 
+            // Having no push subscriptions is an expected state for most
+            // users, not a delivery failure — recording it as Failed floods
+            // the failure metrics with noise (prod hot-fix ported from the
+            // legacy channel). Suppressed = intentionally not attempted.
             if ($subscriptions->isEmpty()) {
                 return new DeliveryResult(
                     channel: CommunicationChannel::Push,
-                    status: DeliveryStatus::Failed,
+                    status: DeliveryStatus::Suppressed,
                     errorMessage: 'No active push subscriptions for user.',
                 );
             }
