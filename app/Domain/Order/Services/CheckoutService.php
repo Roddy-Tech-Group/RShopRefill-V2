@@ -33,6 +33,7 @@ class CheckoutService
         private readonly WalletPaymentProvider $walletPaymentProvider,
         private readonly PaymentSessionService $paymentSessionService,
         private readonly CurrencyRateService $currencyRateService,
+        private readonly CouponApplicationService $couponApplicationService,
     ) {}
 
     /**
@@ -81,6 +82,7 @@ class CheckoutService
             $couponId = null;
             $couponCodeApplied = null;
             $couponDiscountUsd = 0.0;
+            $couponDiscountClamped = false;
             $couponModel = null;
 
             if ($couponCode !== null && $couponCode !== '') {
@@ -99,17 +101,17 @@ class CheckoutService
                     throw InvalidCouponException::notInCart($normalizedCode);
                 }
 
-                // Discount is applied per-unit then scaled by quantity. subtotal_snapshot
-                // is the line total (unit x qty) so divide back to a unit price first.
-                $unitPriceUsd = (float) $matchingItem->subtotal_snapshot / max(1, $matchingItem->quantity);
-                $discountedUnit = $couponModel->applyTo($unitPriceUsd);
-                $couponDiscountUsd = round(($unitPriceUsd - $discountedUnit) * $matchingItem->quantity, 2);
+                // Shared discount math (identical to the /coupon/preview
+                // endpoint) including the cost-floor clamp in enforce mode.
+                $quote = $this->couponApplicationService->discountFor($couponModel, $matchingItem);
+                $couponDiscountUsd = $quote['discount_usd'];
+                $couponDiscountClamped = $quote['clamped'];
 
                 if ($couponDiscountUsd > 0) {
                     $validatedTotals['total'] = max(0, $validatedTotals['total'] - $couponDiscountUsd);
                     $couponId = $couponModel->id;
                     $couponCodeApplied = $couponModel->code;
-                    
+
                     // Apply discount to the in-memory item so OrderItem captures the discounted price
                     $matchingItem->subtotal_snapshot = max(0, $matchingItem->subtotal_snapshot - $couponDiscountUsd);
                     $matchingItem->display_amount = max(0, $matchingItem->display_amount - $couponDiscountUsd);
@@ -183,6 +185,7 @@ class CheckoutService
                     'coupon_id' => $couponId,
                     'coupon_code' => $couponCodeApplied,
                     'coupon_discount_usd' => $couponDiscountUsd,
+                    'coupon_discount_clamped' => $couponDiscountClamped,
                 ],
             ]);
 
@@ -281,7 +284,7 @@ class CheckoutService
             $provider = $this->paymentGatewayFactory->getProvider($paymentMethod);
             $initResult = $provider->initializePayment($attempt);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($order, $attempt, $user) {
+            DB::transaction(function () use ($order, $attempt, $user) {
                 $order->update([
                     'order_status' => OrderStatus::Failed,
                     'payment_status' => PaymentStatus::Failed,
@@ -293,8 +296,8 @@ class CheckoutService
 
                 $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
                 if ($rcoinApplied > 0) {
-                    $walletService = app(\App\Domain\Wallet\Services\WalletService::class);
-                    $wallet = $walletService->getOrCreateWallet($user, \App\Enums\Currency::RCOIN);
+                    $walletService = app(WalletService::class);
+                    $wallet = $walletService->getOrCreateWallet($user, Currency::RCOIN);
                     $walletService->unlockFunds($wallet, $rcoinApplied);
                 }
             });

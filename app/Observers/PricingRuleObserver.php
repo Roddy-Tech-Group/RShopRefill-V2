@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\PricingRule;
+use App\Support\PricingCache;
 use Illuminate\Support\Facades\Cache;
 
 class PricingRuleObserver
@@ -25,5 +26,9 @@ class PricingRuleObserver
     private function flush(): void
     {
         Cache::forget('pricing_rules.active');
+
+        // Downstream caches (Google feed, eSIM catalog summary) embed prices
+        // computed FROM the rules, so a rule change must invalidate them too.
+        PricingCache::bustComputedPriceCaches();
     }
 }

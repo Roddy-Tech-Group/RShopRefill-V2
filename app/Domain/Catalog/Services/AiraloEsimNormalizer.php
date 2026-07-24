@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Enums\PricingBasis;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -53,6 +54,9 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
                 // country_code and name are admin-editable; preserve any edits.
                 'country_code' => $existing?->country_code ?? $countryCode,
                 'currency_code' => 'USD', // Airalo defaults to USD
+                // face_value stores Airalo's recommended retail (pkg.price) —
+                // markup runs on it. Never overwrites an existing choice.
+                'pricing_basis' => $existing?->pricing_basis ?? PricingBasis::ProviderRetail,
                 'name' => $existing?->name ?? $productName,
                 // Update description generically to accommodate both data and voice
                 'description' => "High-speed eSIM for {$regionName}. Scan QR code to activate.",

@@ -3,6 +3,7 @@
 use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Communication\Services\AdminNotificationService;
+use App\Domain\Order\Services\CouponApplicationService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\GuestClaimController;
@@ -667,9 +668,10 @@ Route::post('coupon/preview', function (Request $request, CartManager $cartManag
         return response()->json(['valid' => false, 'message' => 'This coupon does not apply to anything in your cart.']);
     }
 
-    $unitPriceUsd = (float) $item->subtotal_snapshot / max(1, (int) $item->quantity);
-    $discountedUnit = $coupon->applyTo($unitPriceUsd);
-    $discountUsd = round(($unitPriceUsd - $discountedUnit) * max(1, (int) $item->quantity), 2);
+    // Shared discount math with CheckoutService (including the cost-floor
+    // clamp) so the preview NEVER promises more than checkout grants.
+    $quote = app(CouponApplicationService::class)->discountFor($coupon, $item);
+    $discountUsd = $quote['discount_usd'];
 
     if ($discountUsd <= 0) {
         return response()->json(['valid' => false, 'message' => 'This coupon gives no discount on your cart.']);

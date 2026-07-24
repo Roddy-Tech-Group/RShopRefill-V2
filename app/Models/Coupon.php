@@ -17,6 +17,7 @@ class Coupon extends Model
         'valid_from',
         'valid_until',
         'is_active',
+        'allow_below_cost',
         'created_by',
     ];
 
@@ -29,6 +30,7 @@ class Coupon extends Model
             'valid_from' => 'datetime',
             'valid_until' => 'datetime',
             'is_active' => 'boolean',
+            'allow_below_cost' => 'boolean',
         ];
     }
 

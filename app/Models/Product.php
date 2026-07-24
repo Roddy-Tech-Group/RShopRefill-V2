@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PricingBasis;
 use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -222,6 +223,7 @@ class Product extends Model
         'brand_key',
         'country_code',
         'currency_code',
+        'pricing_basis',
         'name',
         'slug',
         'description',
@@ -240,6 +242,7 @@ class Product extends Model
     protected function casts(): array
     {
         return [
+            'pricing_basis' => PricingBasis::class,
             'is_featured' => 'boolean',
             'is_popular' => 'boolean',
             'is_active' => 'boolean',

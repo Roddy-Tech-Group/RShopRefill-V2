@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
 use App\Models\Product;
@@ -76,6 +77,12 @@ class ZenditNormalizer implements CatalogNormalizerInterface
                 'brand_key' => $existing?->brand_key ?? $brandKey,
                 'country_code' => $existing?->country_code ?? $countryCode,
                 'currency_code' => $currencyCode,
+                // Explicit markup basis for NEW products; admin/backfill
+                // choices on existing rows are never overwritten by a re-sync.
+                // Gift cards price off their (discounted-cost) face value;
+                // bill payments carry no discount, so they price off cost.
+                'pricing_basis' => $existing?->pricing_basis
+                    ?? ($isUtility ? PricingBasis::SupplierCost : PricingBasis::FaceValue),
                 'name' => $existing?->name ?? "{$brandLabel} ({$countryCode})",
                 'description' => $existing?->description
                     ?: ($rawItem['shortNotes'] ?? $rawItem['notes'] ?? $rawItem['description'] ?? "{$brandLabel} Gift Card for {$countryCode}"),
