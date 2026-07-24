@@ -55,6 +55,7 @@ class CheckoutApiController extends Controller
             // it verbatim instead of prefixing "Checkout failed:".
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('SILENT CHECKOUT ERROR: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'Checkout failed: '.$e->getMessage(),
             ], 400);

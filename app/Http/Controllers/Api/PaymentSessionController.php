@@ -23,15 +23,41 @@ use Illuminate\Support\Facades\Log;
 class PaymentSessionController extends Controller
 {
     /**
+     * Authorize access to the payment session for the current user or guest.
+     */
+    private function authorizeSessionAccess(PaymentSession $session): void
+    {
+        $attempt = $session->paymentAttempt;
+        if (! $attempt) {
+            abort(403, 'Unauthorized access to payment session.');
+        }
+
+        if (auth()->check()) {
+            $userId = auth()->id();
+            if ($attempt->user_id !== $userId) {
+                abort(403, 'Unauthorized access to payment session.');
+            }
+        } else {
+            $order = $attempt->order;
+            if (! $order) {
+                abort(403, 'Unauthorized access to payment session.');
+            }
+
+            $guestOrders = session('guest_order_numbers', []);
+            if (! in_array($order->order_number, $guestOrders)) {
+                abort(403, 'Unauthorized access to payment session.');
+            }
+        }
+    }
+
+    /**
      * Display the specified payment session details.
      */
     public function show(string $id, Request $request)
     {
-        $session = PaymentSession::with('paymentAttempt')->findOrFail($id);
+        $session = PaymentSession::with('paymentAttempt.order')->findOrFail($id);
 
-        if (! $session->paymentAttempt || $session->paymentAttempt->user_id !== $request->user()->id) {
-            abort(403, 'Unauthorized access to payment session.');
-        }
+        $this->authorizeSessionAccess($session);
 
         return new PaymentSessionResource($session);
     }
@@ -41,13 +67,11 @@ class PaymentSessionController extends Controller
      */
     public function status(string $id, Request $request)
     {
-        $session = PaymentSession::with('paymentAttempt:id,user_id')
+        $session = PaymentSession::with(['paymentAttempt:id,user_id,order_id', 'paymentAttempt.order'])
             ->select('id', 'status', 'expires_at', 'confirmed_at', 'failed_at', 'payment_attempt_id')
             ->findOrFail($id);
 
-        if (! $session->paymentAttempt || $session->paymentAttempt->user_id !== $request->user()->id) {
-            abort(403, 'Unauthorized access to payment session.');
-        }
+        $this->authorizeSessionAccess($session);
 
         return response()->json([
             'id' => $session->id,
@@ -63,11 +87,9 @@ class PaymentSessionController extends Controller
      */
     public function cancel(string $id, Request $request)
     {
-        $session = PaymentSession::with('paymentAttempt')->findOrFail($id);
+        $session = PaymentSession::with('paymentAttempt.order')->findOrFail($id);
 
-        if (! $session->paymentAttempt || $session->paymentAttempt->user_id !== $request->user()->id) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeSessionAccess($session);
 
         try {
             DB::transaction(function () use ($session) {
@@ -105,11 +127,9 @@ class PaymentSessionController extends Controller
      */
     public function verify(string $id, Request $request)
     {
-        $session = PaymentSession::with('paymentAttempt')->findOrFail($id);
+        $session = PaymentSession::with('paymentAttempt.order')->findOrFail($id);
 
-        if (! $session->paymentAttempt || $session->paymentAttempt->user_id !== $request->user()->id) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeSessionAccess($session);
 
         if ($session->status === 'confirmed') {
             return response()->json([
@@ -194,11 +214,9 @@ class PaymentSessionController extends Controller
      */
     public function pay(string $id, Request $request)
     {
-        $session = PaymentSession::with('paymentAttempt')->findOrFail($id);
+        $session = PaymentSession::with('paymentAttempt.order')->findOrFail($id);
 
-        if (! $session->paymentAttempt || $session->paymentAttempt->user_id !== $request->user()->id) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeSessionAccess($session);
 
         if (in_array($session->status, ['confirmed', 'failed', 'expired', 'cancelled'])) {
             return response()->json([

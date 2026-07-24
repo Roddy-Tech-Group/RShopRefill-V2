@@ -49,7 +49,7 @@ Route::post('webhooks/maplerad', [\App\Http\Controllers\Webhooks\MapleradWebhook
 Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
 
 // Financial Features (Requires Auth + Pin)
-Route::middleware(['auth:sanctum', 'require-pin'])->group(function () {
+Route::middleware(['auth', 'require-pin'])->group(function () {
     // Virtual Cards
     Route::middleware([\App\Http\Middleware\EnsureFeatureEnabled::class . ':virtual_cards'])->group(function () {
         Route::post('cards', [\App\Http\Controllers\Api\VirtualCardController::class, 'store']);
@@ -98,6 +98,17 @@ Route::post('push/track', [InteractionTrackingController::class, 'record'])
     ->middleware('throttle:120,1')
     ->name('api.push.track');
 
+Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function () {
+    // status is polled by the checkout UI while awaiting confirmation, so it
+    // gets a generous ceiling; the state-changing actions (cancel/verify/pay)
+    // are capped tighter to curb polling abuse and gateway-cost amplification.
+    Route::get('{id}', [PaymentSessionController::class, 'show'])->middleware('throttle:payment-session-poll')->name('show');
+    Route::get('{id}/status', [PaymentSessionController::class, 'status'])->middleware('throttle:payment-session-poll')->name('status');
+    Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
+    Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
+    Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
+});
+
 // Protected Dashboard & Wallet APIs
 Route::middleware('auth')->group(function () {
     Route::get('dashboard', [UserDashboardController::class, 'index'])->name('api.dashboard');
@@ -142,16 +153,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/', [NotificationApiController::class, 'updatePreferences'])->name('update');
     });
 
-    Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function () {
-        // status is polled by the checkout UI while awaiting confirmation, so it
-        // gets a generous ceiling; the state-changing actions (cancel/verify/pay)
-        // are capped tighter to curb polling abuse and gateway-cost amplification.
-        Route::get('{id}', [PaymentSessionController::class, 'show'])->middleware('throttle:payment-session-poll')->name('show');
-        Route::get('{id}/status', [PaymentSessionController::class, 'status'])->middleware('throttle:payment-session-poll')->name('status');
-        Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
-        Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
-        Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
-    });
+
 
     Route::get('transactions', [UserTransactionController::class, 'index'])->name('api.transactions.index');
     

@@ -151,6 +151,10 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        $exceptions->dontReport([
+            \Psy\Exception\BreakException::class,
+        ]);
+
         $exceptions->dontFlash([
             'password',
             'password_confirmation',

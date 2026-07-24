@@ -23,6 +23,11 @@ class EvaluateLoginRiskListener
             return;
         }
 
+        // Bypasses device verification if an admin is impersonating a customer
+        if (\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+            return;
+        }
+
         if (\App\Support\FeatureFlag::off('device_management')) {
             return;
         }
