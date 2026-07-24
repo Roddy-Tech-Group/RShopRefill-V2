@@ -314,7 +314,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
             $status = strtolower((string) ($body['payment_status'] ?? ''));
 
             // confirmed/sending/finished all mean the customer's crypto has landed
-            // (mirrors the webhook trigger set); partially_paid/failed/expired do not.
+            // (mirrors the webhook trigger set); failed/expired do not.
             if (in_array($status, ['confirmed', 'sending', 'finished', 'paid', 'completed'])) {
                 $attempt->payment_status = PaymentStatus::Paid;
                 $attempt->confirmed_at = now();
@@ -324,12 +324,69 @@ class NowPaymentsProvider implements PaymentProviderInterface
                 return true;
             }
 
+            // partially_paid usually means an exchange deducted network/withdrawal
+            // fees from the sent amount. A shortfall within the configured
+            // tolerance is accepted as paid; anything larger is surfaced as
+            // PartiallyPaid for support (a later top-up IPN can still re-verify).
+            if ($status === 'partially_paid') {
+                if ($this->isWithinUnderpaymentTolerance($body)) {
+                    Log::info("NowPayments verify: accepting partially_paid within tolerance for payment {$paymentId}", [
+                        'pay_amount' => $body['pay_amount'] ?? null,
+                        'actually_paid' => $body['actually_paid'] ?? null,
+                    ]);
+
+                    $attempt->payment_status = PaymentStatus::Paid;
+                    $attempt->confirmed_at = now();
+                    $attempt->verification_payload = $body;
+                    $attempt->save();
+
+                    return true;
+                }
+
+                Log::warning("NowPayments verify: partially_paid outside tolerance for payment {$paymentId}", [
+                    'pay_amount' => $body['pay_amount'] ?? null,
+                    'actually_paid' => $body['actually_paid'] ?? null,
+                ]);
+
+                $attempt->payment_status = PaymentStatus::PartiallyPaid;
+                $attempt->verification_payload = $body;
+                $attempt->save();
+
+                return false;
+            }
+
             return false;
         } catch (\Exception $e) {
             Log::error('NowPayments verify error: '.$e->getMessage());
 
             return false;
         }
+    }
+
+    /**
+     * Whether a partially_paid payment's shortfall is small enough to accept as
+     * fully paid. Compares actually_paid against pay_amount (both in the pay
+     * currency) using the configured percentage tolerance.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function isWithinUnderpaymentTolerance(array $body): bool
+    {
+        $payAmount = (float) ($body['pay_amount'] ?? 0);
+        $actuallyPaid = (float) ($body['actually_paid'] ?? 0);
+
+        if ($payAmount <= 0 || $actuallyPaid <= 0) {
+            return false;
+        }
+
+        if ($actuallyPaid >= $payAmount) {
+            return true;
+        }
+
+        $shortfallPercent = (($payAmount - $actuallyPaid) / $payAmount) * 100;
+        $tolerancePercent = (float) config('services.nowpayments.underpayment_tolerance_percent', 1.0);
+
+        return $shortfallPercent <= $tolerancePercent;
     }
 
     public function refundPayment(PaymentAttempt $attempt, float $amount): bool

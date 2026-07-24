@@ -12,31 +12,9 @@ class NowPaymentsWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        $signature = (string) $request->header('x-nowpayments-sig');
-        $ipnSecret = (string) config('services.nowpayments.ipn_secret');
-
-        // Fail closed: the IPN secret must be configured. There is no mock/bypass
-        // fallback, so a webhook is only trusted when its HMAC-SHA512 signature
-        // matches. hash_equals guards against timing attacks.
-        if ($ipnSecret === '') {
-            Log::warning('NowPayments webhook rejected: IPN secret not configured');
-
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // NOWPayments signs the JSON body with its keys sorted alphabetically
-        // (recursively) using HMAC-SHA512. We must sort identically before hashing
-        // - otherwise the signature never matches and every real payment
-        // notification is rejected, so orders never auto-confirm.
-        $signingData = json_encode($this->sortRecursive($request->all()), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $calculatedSig = hash_hmac('sha512', $signingData, $ipnSecret);
-
-        if ($signature === '' || ! hash_equals($calculatedSig, $signature)) {
-            Log::warning('NowPayments webhook rejected: invalid or missing signature');
-
-            return response()->json(['message' => 'Invalid signature'], 401);
-        }
-
+        // Signature verification (key-sorted JSON, HMAC-SHA512, fail-closed on a
+        // missing IPN secret) is handled by the VerifyWebhookSignature middleware
+        // via NowPaymentsSignature — the request is already authenticated here.
         $payload = $request->all();
         // The /payment flow (what this integration uses) keys every notification
         // by payment_id - which is exactly what the provider stores as
@@ -65,29 +43,13 @@ class NowPaymentsWebhookController extends Controller
         $attempt->webhook_payload = $payload;
         $attempt->save();
 
-        if (in_array(strtolower((string) $paymentStatus), ['confirmed', 'sending', 'finished'])) {
+        // partially_paid is included so the provider's verifyPayment() can apply
+        // the underpayment tolerance — exchanges often deduct network/withdrawal
+        // fees, leaving the received amount a fraction short of the invoice.
+        if (in_array(strtolower((string) $paymentStatus), ['confirmed', 'sending', 'finished', 'partially_paid'])) {
             VerifyPaymentJob::dispatch($attempt);
         }
 
         return response()->json(['message' => 'Webhook processed'], 200);
-    }
-
-    /**
-     * Recursively sort an array by its keys so the JSON we sign byte-matches the
-     * JSON NOWPayments signed - its IPN signature is computed over key-sorted JSON.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    private function sortRecursive(array $data): array
-    {
-        ksort($data);
-        foreach ($data as $key => $value) {
-            if (is_array($value)) {
-                $data[$key] = $this->sortRecursive($value);
-            }
-        }
-
-        return $data;
     }
 }
