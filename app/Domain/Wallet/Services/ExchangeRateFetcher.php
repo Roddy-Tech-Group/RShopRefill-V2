@@ -17,26 +17,43 @@ use Illuminate\Support\Facades\Http;
  */
 class ExchangeRateFetcher
 {
-    private const ENDPOINT = 'https://open.er-api.com/v6/latest/USD';
+    private const ENDPOINTS = [
+        'https://open.er-api.com/v6/latest/USD',
+        'https://api.exchangerate-api.com/v4/latest/USD',
+    ];
 
     /**
      * Fetch the latest USD-base FX rates from the provider.
      *
      * @return array<string, float> keyed by uppercase ISO code, e.g. ['NGN' => 1492.5, ...]
      *
-     * @throws \RuntimeException when the provider returns a non-success payload.
+     * @throws \RuntimeException when all providers fail to return a valid payload.
      */
     public function fetchUsdRates(): array
     {
-        $response = Http::timeout(10)->retry(2, 500)->get(self::ENDPOINT);
+        $body = null;
+        $lastException = null;
 
-        if (! $response->ok()) {
-            throw new \RuntimeException('FX provider HTTP error: '.$response->status());
+        foreach (self::ENDPOINTS as $endpoint) {
+            try {
+                $response = Http::timeout(30)->retry(2, 1000)->get($endpoint);
+
+                if ($response->ok()) {
+                    $json = $response->json();
+                    if (is_array($json['rates'] ?? null)) {
+                        $body = $json;
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $lastException = $e;
+
+                continue;
+            }
         }
 
-        $body = $response->json();
-        if (($body['result'] ?? null) !== 'success' || ! is_array($body['rates'] ?? null)) {
-            throw new \RuntimeException('FX provider returned no rates payload.');
+        if (! $body) {
+            throw new \RuntimeException('All FX providers failed. Last error: '.($lastException ? $lastException->getMessage() : 'Unknown error'));
         }
 
         // Normalise keys to uppercase + values to float. Force USD to 1.0

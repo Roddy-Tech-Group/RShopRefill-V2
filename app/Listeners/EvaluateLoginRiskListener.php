@@ -8,6 +8,7 @@ use App\Domain\Security\Services\DeviceTrustManager;
 use App\Domain\Security\Services\SessionSecurityManager;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Request;
@@ -25,6 +26,11 @@ class EvaluateLoginRiskListener
     {
         // Avoid running this for admin guard since this is the customer security platform
         if ($event->guard === 'admin') {
+            return;
+        }
+
+        // Bypasses device verification if an admin is impersonating a customer
+        if (Auth::guard('admin')->check()) {
             return;
         }
 

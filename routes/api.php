@@ -55,7 +55,7 @@ Route::post('webhooks/maplerad', [MapleradWebhookController::class, 'handle'])
 Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
 
 // Financial Features (Requires Auth + Pin)
-Route::middleware(['auth:sanctum', 'require-pin'])->group(function () {
+Route::middleware(['auth', 'require-pin'])->group(function () {
     // Virtual Cards
     Route::middleware([EnsureFeatureEnabled::class.':virtual_cards'])->group(function () {
         Route::post('cards', [VirtualCardController::class, 'store']);
@@ -104,6 +104,17 @@ Route::post('push/track', [InteractionTrackingController::class, 'record'])
     ->middleware('throttle:120,1')
     ->name('api.push.track');
 
+Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function () {
+    // status is polled by the checkout UI while awaiting confirmation, so it
+    // gets a generous ceiling; the state-changing actions (cancel/verify/pay)
+    // are capped tighter to curb polling abuse and gateway-cost amplification.
+    Route::get('{id}', [PaymentSessionController::class, 'show'])->middleware('throttle:payment-session-poll')->name('show');
+    Route::get('{id}/status', [PaymentSessionController::class, 'status'])->middleware('throttle:payment-session-poll')->name('status');
+    Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
+    Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
+    Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
+});
+
 // Protected Dashboard & Wallet APIs
 Route::middleware('auth')->group(function () {
     Route::get('dashboard', [UserDashboardController::class, 'index'])->name('api.dashboard');
@@ -148,18 +159,14 @@ Route::middleware('auth')->group(function () {
         Route::put('/', [NotificationApiController::class, 'updatePreferences'])->name('update');
     });
 
+    // Frontend payment telemetry stays auth-only (the core payment-session
+    // routes moved to the public block above for guest checkout): the
+    // controller's ownership check pins a session to the signed-in
+    // customer's email.
     Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function () {
-        // status is polled by the checkout UI while awaiting confirmation, so it
-        // gets a generous ceiling; the state-changing actions (cancel/verify/pay)
-        // are capped tighter to curb polling abuse and gateway-cost amplification.
-        Route::get('{id}', [PaymentSessionController::class, 'show'])->middleware('throttle:payment-session-poll')->name('show');
-        Route::get('{id}/status', [PaymentSessionController::class, 'status'])->middleware('throttle:payment-session-poll')->name('status');
-        Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
-        Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
-        Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
         Route::post('telemetry/record-failure', [PaymentTelemetryController::class, 'recordFailure'])->middleware('throttle:10,1')->name('telemetry.record-failure');
         // Signals are chattier than terminal failures (exceptions, offline
-        // blips) — looser throttle, and the controller caps rows per session.
+        // blips) - looser throttle, and the controller caps rows per session.
         Route::post('telemetry/record-signal', [PaymentTelemetryController::class, 'recordSignal'])->middleware('throttle:30,1')->name('telemetry.record-signal');
     });
 

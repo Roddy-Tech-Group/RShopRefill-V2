@@ -12,6 +12,7 @@ use App\Http\Resources\PaymentSessionResource;
 use App\Models\Cart;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class CheckoutApiController extends Controller
@@ -55,6 +56,8 @@ class CheckoutApiController extends Controller
             // it verbatim instead of prefixing "Checkout failed:".
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
+            Log::error('SILENT CHECKOUT ERROR: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
             return response()->json([
                 'message' => 'Checkout failed: '.$e->getMessage(),
             ], 400);

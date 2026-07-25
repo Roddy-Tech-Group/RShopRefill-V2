@@ -86,6 +86,9 @@ return [
         'api_key' => env('NOWPAYMENTS_API_KEY'),
         'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
         'base_url' => env('NOWPAYMENTS_BASE_URL', 'https://api.nowpayments.io/v1'),
+        // Max shortfall (as % of the invoiced crypto amount) still accepted as
+        // fully paid on partially_paid payments — covers exchange withdrawal fees.
+        'underpayment_tolerance_percent' => env('NOWPAYMENTS_UNDERPAYMENT_TOLERANCE_PERCENT', 1.0),
     ],
 
     'maplerad' => [

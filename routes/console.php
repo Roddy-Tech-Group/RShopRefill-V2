@@ -161,6 +161,13 @@ Schedule::call(function () {
 Schedule::command('reconcile:wallet-balances')->dailyAt('02:00')->sentryMonitor('reconcile-wallet-balances');
 Schedule::command('reconcile:orphaned-sessions')->hourly()->sentryMonitor('reconcile-orphaned-sessions');
 
+// Crypto safety net: re-verifies pending NOWPayments attempts against the
+// gateway so dropped/rejected IPNs (and tolerated underpayments) still confirm.
+Schedule::command('reconcile:nowpayments --hours=48')
+    ->hourly()
+    ->withoutOverlapping()
+    ->sentryMonitor('reconcile-nowpayments');
+
 // Enterprise Provider Monitoring
 Schedule::command('zendit:check-balance --threshold=250')->hourly()->sentryMonitor('zendit-check-balance');
 

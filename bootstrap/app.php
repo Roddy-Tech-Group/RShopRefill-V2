@@ -22,6 +22,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Log;
+use Psy\Exception\BreakException;
 use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -157,6 +158,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 return false; // Stop propagation — don't report to Sentry.
             }
         });
+
+        $exceptions->dontReport([
+            BreakException::class,
+        ]);
 
         $exceptions->dontFlash([
             'password',
