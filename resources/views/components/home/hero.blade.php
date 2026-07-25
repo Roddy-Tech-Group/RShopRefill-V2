@@ -99,7 +99,7 @@
         </div>
 
         <p data-anim="hero-subtitle" class="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-zinc-900">
-            Buy gift cards, eSIMs, top-ups, and more. Fast delivery, great prices, 24/7 support.
+            Everything you need to stay connected, shop globally, and manage everyday digital services and lifestyle all in one place.
         </p>
 
         {{-- CTAs --}}

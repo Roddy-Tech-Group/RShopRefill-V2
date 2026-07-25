@@ -112,8 +112,8 @@ class DiscoverGlobalTest extends TestCase
         $product = $this->makeGlobalEsim();
 
         // makeGlobalEsim() seeds a data-only plan; add a voice plan (numeric
-        // voice/sms allowance) so the "Global United States real numbers" group
-        // renders alongside the "Browsing globally anywhere you are" data group.
+        // voice/sms allowance) so the "Voice eSIMs with a Real +1 USA Number"
+        // group renders alongside the "Data-Only eSIMs" data group.
         ProductVariant::factory()->for($product)->create([
             'currency' => 'USD',
             'face_value' => 10,
@@ -126,8 +126,8 @@ class DiscoverGlobalTest extends TestCase
         $this->get(route('home'))
             ->assertOk()
             ->assertSee('Discover Global USA')
-            ->assertSee('Global United States real numbers')
-            ->assertSee('Browsing globally anywhere you are')
+            ->assertSee('Voice eSIMs with a Real +1 USA Number')
+            ->assertSee('Data-Only eSIMs for Global Travel')
             ->assertSee('Choose voice if you want the +1 real USA number');
     }
 

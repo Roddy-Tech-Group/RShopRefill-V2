@@ -1,9 +1,8 @@
 {{-- Storefront footer. Used inside the <x-layouts.app.header> shell.
-     Sits on its OWN surface tier so it never blends with the page or the
-     cards: light mode uses a soft blue (page is #eff6ff, cards are white),
+     Charcoal surface in BOTH themes: light mode uses #2f3540 (the .footer-
+     charcoal remaps in app.css flip the light-mode ink to light-on-dark),
      dark mode uses the deepest-seam token #070f1c - darker than the page
-     (#0c1a36) and the card surfaces, and the grey themes remap it to
-     near-black while their page/card tones stay grey. --}}
+     and card surfaces, remapped to near-black in the grey themes. --}}
 @php
     // Popular gift cards for the "Shop" column - the curated config/popular_brands.php
     // list, gift cards only, top few, in config order (mirrors the home Popular row).
@@ -21,7 +20,7 @@
         : collect();
 @endphp
 
-<footer class="bg-[#dbeafe] dark:bg-[#070f1c] text-zinc-900">
+<footer class="footer-charcoal bg-[#2f3540] dark:bg-[#070f1c] text-zinc-900">
     <div class="mx-auto max-w-[1550px] px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
 
         {{-- Top: brand + link columns --}}
@@ -41,7 +40,7 @@
                 </a>
 
                 <p class="mt-6 max-w-sm text-base leading-relaxed text-zinc-600">
-                    Making global digital services accessible to everyone, and direct brand shopping with zero payment failure while keeping your connected with family and friends world wide
+                    Access global digital services with confidence. Shop directly from top brands, enjoy secure payments with minimal payment failures, and stay connected worldwide.
                 </p>
 
                 {{-- Social links --}}

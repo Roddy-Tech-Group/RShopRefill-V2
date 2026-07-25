@@ -22,6 +22,13 @@ class TraceRequestMiddleware
         Context::add('correlation_id', $correlationId);
         Context::add('request_id', Str::uuid()->toString());
 
+        // Snapshot the caller for queued consumers: Context is dehydrated into
+        // queued jobs/listeners, where Request::ip() resolves the WORKER's
+        // context, not the customer's - that is how audit rows ended up with
+        // the wrong IP. Hidden so it never leaks into log lines.
+        Context::addHidden('request_ip', $request->ip());
+        Context::addHidden('request_user_agent', $request->userAgent());
+
         $response = $next($request);
 
         $response->headers->set('X-Correlation-ID', $correlationId);

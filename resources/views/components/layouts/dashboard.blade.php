@@ -1100,7 +1100,12 @@
         {{-- Blue hero — overview only. Scrolls away with the page; the floating
              wallet chip + Top Up button inside <x-slot:mobileHero> take over once
              the hero leaves the viewport. --}}
-        <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden" style="padding-top: max(1rem, env(safe-area-inset-top));">
+        {{-- Identity strip - a fixed frosted-glass nav; the page scrolls
+             beneath it. Fixed instead of sticky for the same reason as the
+             back button: the pull-to-refresh transform moves sticky
+             ancestors and makes them bounce. The z-[55] chrome pills (flag /
+             cart / bell) float on top of this band, composing one nav. --}}
+        <div class="nav-glass-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
             {{-- Compact identity strip - avatar + small online dot on the left,
                  notification bell on the right. Replaces the old "Hello /
                  Welcome back" greeting so the wallet card sits closer to the
@@ -1146,10 +1151,15 @@
                      the identity strip clear of the fixed pills above it. --}}
                 <span class="h-10 w-[8.5rem] shrink-0" aria-hidden="true"></span>
             </div>
+        </div>
 
-            {{-- Wallet card slot - sits directly under the compact identity strip
-                 so the wallet info hits the customer immediately on page load,
-                 leaving the rest of the viewport for product categories. --}}
+        {{-- Spacer holding the glass nav's room in normal flow. --}}
+        <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
+
+        {{-- Wallet card slot - scrolls with the page (under the glass nav),
+             so the wallet info hits the customer immediately on page load,
+             leaving the rest of the viewport for product categories. --}}
+        <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden">
             @isset($mobileHero)
                 <div class="mt-3">
                     {{ $mobileHero }}

@@ -30,7 +30,7 @@ new class extends Component
 
 <div>
     @if ($subscribed)
-        <p class="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-600">
+        <p class="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-400">
             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
             You're subscribed - watch your inbox.
         </p>
@@ -42,7 +42,9 @@ new class extends Component
                 required
                 placeholder="Your email address"
                 aria-label="Email address"
-                class="min-w-0 flex-1 rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
+                {{-- Frosted field on the charcoal footer (both themes are dark
+                     surfaces now, so no light-mode white box) --}}
+                class="min-w-0 flex-1 rounded-[12px] border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-500/25 dark:border-zinc-700/60 dark:bg-[#0c1a36]"
             >
             <button
                 type="submit"
@@ -54,6 +56,6 @@ new class extends Component
                 <span wire:loading wire:target="subscribe" style="display:none;">Subscribing...</span>
             </button>
         </form>
-        @error('email') <p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+        @error('email') <p class="mt-2 text-xs font-medium text-red-400">{{ $message }}</p> @enderror
     @endif
 </div>

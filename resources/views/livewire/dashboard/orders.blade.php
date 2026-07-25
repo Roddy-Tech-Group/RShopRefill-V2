@@ -53,17 +53,16 @@ class extends Component {
 @php
     $countryNames = array_flip(config('countries.codes', [])); // ISO -> name
 
-    // Unified status badge tones — same recipe as the admin list pages so the
-    // customer's view of an order matches what the admin sees. Each entry is
-    // [label, pillClass] where pillClass slots into the shared badge wrapper.
-    $statusUi = [
-        'completed'           => ['Succeeded',          'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30'],
-        'partially_completed' => ['Partially complete', 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'processing'          => ['Processing',         'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'pending'             => ['Pending',            'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
-        'failed'              => ['Failed',             'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
-        'cancelled'           => ['Cancelled',          'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-zinc-700/60'],
-        'requires_attention'  => ['Needs review',       'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
+    // Inline status line per the order-row design: [label, textTone, icon].
+    // "Delivered" (green check) is the customer word for a completed order.
+    $statusLine = [
+        'completed'           => ['Delivered',          'text-emerald-600 dark:text-emerald-400', 'check'],
+        'partially_completed' => ['Partially complete', 'text-blue-600 dark:text-blue-300',       'check'],
+        'processing'          => ['Processing',         'text-blue-600 dark:text-blue-300',       'clock'],
+        'pending'             => ['Pending',            'text-amber-600 dark:text-amber-400',     'clock'],
+        'failed'              => ['Failed',             'text-red-600 dark:text-red-400',         'x'],
+        'cancelled'           => ['Cancelled',          'text-zinc-500 dark:text-zinc-400',       'x'],
+        'requires_attention'  => ['Needs review',       'text-amber-600 dark:text-amber-400',     'clock'],
     ];
 
     // Generic payment label — the gateway/provider name is never shown.
@@ -101,8 +100,8 @@ class extends Component {
     {{-- Search + expired filter --}}
     <div>
         <label for="order-search" class="block text-sm font-bold text-zinc-900">Enter your order id</label>
-        <div class="mt-2 flex items-center gap-3">
-            <div class="relative flex-1">
+        <div class="mt-2">
+            <div class="relative">
                 <svg class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-900 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
@@ -120,7 +119,8 @@ class extends Component {
                     </svg>
                 </div>
             </div>
-            <label class="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[12px] px-1 py-2">
+            {{-- Expired filter sits under the search bar --}}
+            <label class="mt-3 flex w-fit cursor-pointer items-center gap-2.5 rounded-[12px] px-1 py-1">
                 <input type="checkbox" wire:model.live="expired" class="h-5 w-5 rounded-[12px] border-2 border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/30">
                 <span class="text-sm font-semibold text-zinc-700">Expired orders</span>
             </label>
@@ -129,71 +129,69 @@ class extends Component {
 
     @if ($orders->isNotEmpty())
         {{-- All orders live in ONE card; each order is a drop-down row.
-             State lifted to the parent so opening an order auto-closes the
-             previously-opened one (single-expanded accordion behaviour). --}}
-        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+             Opening one auto-closes the previously-opened one
+             (single-expanded accordion behaviour). --}}
+        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:border-zinc-700 dark:shadow-none">
             @foreach ($orders as $order)
                 @php
-                    [$statusLabel, $statusPillClass] = $statusUi[$order->order_status->value] ?? ['Placed', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'];
+                    [$lineLabel, $lineTone, $lineIcon] = $statusLine[$order->order_status->value] ?? ['Placed', 'text-amber-600 dark:text-amber-400', 'clock'];
                     // Rcoin is earned on the USD settlement total, never the
                     // display-currency figure (a XAF 1,561 order is ~$2.75,
                     // which earns ~3 Rcoin - not 1,561).
                     $points = app(\App\Domain\Rewards\Services\RewardEngine::class)->cashbackPreviewFor($order);
+
+                    // Row identity comes from the first item: brand art + name +
+                    // face value ("Everything Apple $20"); extra variants fold
+                    // into a "+N more" suffix.
+                    $first    = $order->items->first();
+                    $fsnap    = $first?->product_snapshot ?? [];
+                    $fvsnap   = $first?->variant_snapshot ?? [];
+                    $fbrand   = $fsnap['brand_key'] ?? null;
+                    $fname    = $fbrand ? Product::brandDisplayName($fbrand) : ($fsnap['name'] ?? 'Order');
+                    $flogo    = Product::brandLogoUrl($fbrand, $fsnap['logo_url'] ?? null);
+                    $ffaceVal = $fvsnap['face_value'] ?? null;
+                    $ffaceCur = $fvsnap['currency'] ?? ($fsnap['currency_code'] ?? 'USD');
+                    $ffaceTxt = $ffaceVal !== null
+                        ? Product::currencySymbol($ffaceCur).rtrim(rtrim(number_format((float) $ffaceVal, 2), '0'), '.')
+                        : null;
+                    $fcountry = $countryNames[strtoupper((string) ($fsnap['country_code'] ?? ''))] ?? ($fsnap['country_code'] ?? null);
+                    $extraVariants = max(0, $order->items->groupBy('product_variant_id')->count() - 1);
+                    $shortId  = str($order->id)->limit(18, '...').substr((string) $order->id, -6);
                 @endphp
                 <div wire:key="order-{{ $order->id }}">
-                    {{-- Header (always visible). Toggling sets openId to this order or null. --}}
-                    <button type="button" @click="openId = openId === @js((string) $order->id) ? null : @js((string) $order->id)" class="flex w-full items-center gap-3 px-5 pt-4 text-left">
-                        <span class="min-w-0 flex-1 truncate text-sm text-zinc-400">
-                            {{ ($order->placed_at ?? $order->created_at)->format('d/m/Y') }}
-                            <span class="px-1">|</span>
-                            <span class="text-zinc-500">{{ $order->id }}</span>
+                    {{-- Row header - brand art + title + meta + status; tap anywhere to expand. --}}
+                    <button type="button" @click="openId = openId === @js((string) $order->id) ? null : @js((string) $order->id)" class="flex w-full items-center gap-3.5 px-4 py-3.5 text-left">
+                        {{-- Mirrors the cart's gift-card tile (landscape art,
+                             object-cover) at a smaller size. --}}
+                        <span class="theme-static flex h-12 w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
+                            @if ($flogo)
+                                <img src="{{ $flogo }}" alt="{{ $fname }}" class="h-full w-full object-cover" loading="lazy">
+                            @else
+                                <span class="text-sm font-black uppercase text-zinc-400">{{ str($fname)->substr(0, 2)->upper() }}</span>
+                            @endif
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-base font-bold text-zinc-900 dark:text-white">
+                                {{ $fname }}@if ($ffaceTxt) {{ $ffaceTxt }}@endif @if ($extraVariants > 0)<span class="font-medium text-zinc-500 dark:text-zinc-400">+{{ $extraVariants }} more</span>@endif
+                            </span>
+                            <span class="mt-0.5 block truncate text-sm text-zinc-500 dark:text-zinc-400">
+                                {{ ($order->placed_at ?? $order->created_at)->format('M j') }}@if ($fcountry) <span class="px-0.5">·</span> {{ $fcountry }}@endif <span class="px-0.5">·</span> {{ $shortId }}
+                            </span>
+                            <span class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $lineTone }}">
+                                @if ($lineIcon === 'check')
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                @elseif ($lineIcon === 'x')
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                @else
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                @endif
+                                {{ $lineLabel }}
+                            </span>
                         </span>
                         <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform duration-200" :class="openId === @js((string) $order->id) && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
-
-                    {{-- Summary (always visible) --}}
-                    <div class="px-5 pb-4 pt-2.5">
-                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $statusPillClass }}">
-                            {{ $statusLabel }}
-                        </span>
-                        @php
-                            // Group exploded OrderItem rows by variant so "2× Apple $5"
-                            // shows as a single summary line instead of two "1× Apple $5".
-                            $grouped = $order->items->groupBy('product_variant_id');
-                        @endphp
-                        @foreach ($grouped as $variantId => $variantItems)
-                            @php
-                                $item     = $variantItems->first();
-                                $qty      = $variantItems->count();
-                                $snap     = $item->product_snapshot ?? [];
-                                $vsnap    = $item->variant_snapshot ?? [];
-                                $brandKey = $snap['brand_key'] ?? null;
-                                $name     = $brandKey ? Product::brandDisplayName($brandKey) : ($snap['name'] ?? 'Item');
-                                $faceVal  = $vsnap['face_value'] ?? null;
-                                $faceCur  = $vsnap['currency'] ?? ($snap['currency_code'] ?? 'USD');
-                                $faceTxt  = $faceVal !== null
-                                    ? Product::currencySymbol($faceCur).rtrim(rtrim(number_format((float) $faceVal, 2), '0'), '.')
-                                    : null;
-                                $country  = $countryNames[strtoupper((string) ($snap['country_code'] ?? ''))] ?? ($snap['country_code'] ?? null);
-                            @endphp
-                            <p class="mt-1 text-sm text-zinc-900">
-                                <span class="font-bold">{{ $qty }}</span>
-                                <span class="px-1 text-zinc-400">x</span>
-                                <span class="font-medium">{{ $name }}</span>
-                                @if ($faceTxt)
-                                    <span class="ml-1 font-bold">{{ $faceTxt }}</span>
-                                @endif
-                                @if ($country)
-                                    @if (Product::flagUrl($snap['country_code'] ?? null))
-                                        <img src="{{ Product::flagUrl($snap['country_code'] ?? null) }}" alt="" class="ml-1 inline-block h-3 w-[18px] rounded-[1px] object-cover align-[-1px] ring-1 ring-zinc-200">
-                                    @endif
-                                    <span class="ml-1 font-semibold text-zinc-700">{{ $country }}</span>
-                                @endif
-                            </p>
-                        @endforeach
-                    </div>
 
                     {{-- Expanded detail --}}
                     <div x-show="openId === @js((string) $order->id)" style="display: none;" class="px-5 pb-5">

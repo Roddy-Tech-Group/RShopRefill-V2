@@ -641,7 +641,7 @@
                                                     <span class="block space-y-2 text-sm text-zinc-900 dark:text-white">
                                                         @foreach ($features as [$fIcon, $fLabel])
                                                             <span class="flex items-center gap-2">
-                                                                <svg class="h-4 w-4 shrink-0 text-zinc-700 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
+                                                                <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
                                                                 <span>{{ $fLabel }}</span>
                                                             </span>
                                                         @endforeach

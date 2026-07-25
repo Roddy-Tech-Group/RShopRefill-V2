@@ -73,8 +73,11 @@ class AuditLogService
             'before_state' => $beforeState,
             'after_state' => $afterState,
             'correlation_id' => Context::get('correlation_id'),
-            'ip_address' => Request::ip(),
-            'user_agent' => Request::userAgent(),
+            // Prefer the request snapshot captured by TraceRequestMiddleware:
+            // it survives the queue boundary (AuditLogListener is queued),
+            // where the Request facade would report the worker, not the client.
+            'ip_address' => Context::getHidden('request_ip') ?? Request::ip(),
+            'user_agent' => Context::getHidden('request_user_agent') ?? Request::userAgent(),
             'metadata' => $mergedMetadata,
         ]);
     }
