@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Enums\PricingBasis;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -116,6 +117,9 @@ class AiraloTopupCatalogService
                 'subcategory_id' => $existing?->subcategory_id ?? $subcategory->id,
                 'country_code' => $existing?->country_code ?? $parentEsim->country_code,
                 'currency_code' => 'USD',
+                // Top-ups price off Airalo's retail (face_value), like the
+                // parent eSIM. Never overwrites an existing choice.
+                'pricing_basis' => $existing?->pricing_basis ?? PricingBasis::ProviderRetail,
                 'name' => $existing?->name ?? $name,
                 'description' => "Top-up packages for {$parentEsim->name}. Adds data/validity to an existing eSIM.",
                 'logo_url' => $existing?->logo_url ?? $parentEsim->logo_url,

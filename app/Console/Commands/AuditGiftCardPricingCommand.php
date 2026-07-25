@@ -15,8 +15,8 @@ use Illuminate\Support\Str;
  * ones that look wrong so a mispricing can't hide in a large catalogue:
  *
  *   COST-IN-LOCAL  cost_price ≈ the native face on a non-USD card - the cost was
- *                  never converted to USD (the FX-overcharge bug). Fix with
- *                  `zendit:reprice-cost-usd`.
+ *                  never converted to USD (the FX-overcharge bug). Repair by
+ *                  re-syncing the offer or correcting cost_price by the rate.
  *   OVERPRICED     retail is >1.4x the USD face - usually the same un-converted cost.
  *   BELOW-FACE     retail is under the USD face - selling at a loss, usually a
  *                  wrong/stale exchange rate for that currency.
@@ -94,7 +94,7 @@ class AuditGiftCardPricingCommand extends Command
             $counts['COST-IN-LOCAL'], $counts['OVERPRICED'], $counts['BELOW-FACE'], $counts['NO-RATE']
         ));
         if ($counts['COST-IN-LOCAL'] > 0 || $counts['OVERPRICED'] > 0) {
-            $this->warn('Run `zendit:reprice-cost-usd` to convert the un-converted costs to USD.');
+            $this->warn('COST-IN-LOCAL/OVERPRICED costs must be repaired (re-sync the offer from Zendit or correct cost_price by the currency rate) BEFORE enabling the cost-anchored floor — see `pricing:audit-below-cost` for the floor impact.');
         }
         if ($counts['BELOW-FACE'] > 0) {
             $this->warn('BELOW-FACE cards usually mean a stale/wrong exchange rate - check Rate Management.');

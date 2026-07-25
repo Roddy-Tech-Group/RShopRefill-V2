@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
 use App\Models\Product;
@@ -54,6 +55,9 @@ class ZenditEsimNormalizer implements CatalogNormalizerInterface
                 // country_code and name are admin-editable; preserve any edits.
                 'country_code' => $existing?->country_code ?? $countryCode,
                 'currency_code' => $currencyCode,
+                // eSIM face_value holds the provider's recommended retail —
+                // keep pricing off it. Never overwrites an existing choice.
+                'pricing_basis' => $existing?->pricing_basis ?? PricingBasis::ProviderRetail,
                 'name' => $existing?->name ?? $productName,
                 'description' => "High-speed data eSIM for {$regionName}. Scan QR code to activate.",
                 'redeem_instructions' => 'Go to Settings > Cellular > Add Cellular Plan and scan the QR Code.',

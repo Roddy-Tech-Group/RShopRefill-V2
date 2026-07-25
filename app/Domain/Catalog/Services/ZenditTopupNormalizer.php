@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
 use App\Models\Product;
@@ -68,6 +69,10 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
                 'brand_key' => $existing?->brand_key ?? $brandKey,
                 'country_code' => $existing?->country_code ?? $countryCode,
                 'currency_code' => $currencyCode,
+                // Airtime carries no built-in discount — supplier cost is the
+                // only honest markup base (US carriers charge at/above face).
+                // Never overwrites an admin/backfill choice on existing rows.
+                'pricing_basis' => $existing?->pricing_basis ?? PricingBasis::SupplierCost,
                 'name' => $existing?->name ?? "{$brandLabel} ({$countryCode})",
                 // A top-up product groups every operator offer, so a single offer's
                 // per-bundle shortNotes ("3GB + Call (30d)") must never stand in for

@@ -853,11 +853,11 @@
                         $valueUsd = $valueRate > 0 ? round($valueNative / $valueRate, 4) : $costUsd;
                     }
 
-                    // SALES PRICE — mirrors CartPricingService exactly: USD
-                    // face values are the markup base; non-USD denominations
-                    // base on the supplier's USD cost. What this column shows
-                    // is what checkout actually charges.
-                    $retailBase = ($valueCurrency === 'USD' || $valueCurrency === '') && $valueNative > 0 ? $valueNative : $costUsd;
+                    // SALES PRICE — the markup base comes from the engine
+                    // itself (explicit PricingBasis / legacy heuristic +
+                    // currency guard), so this column can never drift from
+                    // what checkout actually charges.
+                    $retailBase = $pricing->resolveMarkupBase($variant);
                     // resolveVariantRetailPrice honours the per-variant
                     // manual_retail_price_usd override set in the drawer; the
                     // product-level resolveRetailPrice would ignore it, so the

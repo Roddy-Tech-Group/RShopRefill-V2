@@ -11,8 +11,10 @@ use App\Models\Coupon;
 use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Support\PricingCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AdminCatalogController extends Controller
@@ -129,28 +131,68 @@ class AdminCatalogController extends Controller
      * Set the admin sales-price override on a single variant. Bypasses the
      * pricing-rule chain — used when the admin wants a fixed USD price on this
      * SKU regardless of category/global markup rules.
+     *
+     * The override does NOT silently bypass the cost floor: a price below
+     * supplier cost × (1 + min margin) is rejected unless the request
+     * explicitly sends allow_below_cost, which is persisted on the variant and
+     * logged so deliberate loss-leaders leave an audit trail.
      */
     public function setVariantPrice(Request $request, ProductVariant $variant)
     {
         $validated = $request->validate([
             'manual_retail_price_usd' => ['required', 'numeric', 'min:0.01'],
+            'allow_below_cost' => ['sometimes', 'boolean'],
         ]);
 
+        $price = (float) $validated['manual_retail_price_usd'];
+        $allowBelowCost = (bool) ($validated['allow_below_cost'] ?? false);
+        $costUsd = (float) $variant->cost_price;
+        $costFloor = round($costUsd * (1 + (float) config('pricing.min_margin_percent', 1) / 100), 4);
+
+        if ($costUsd > 0 && $price < $costFloor && ! $allowBelowCost) {
+            return response()->json([
+                'message' => sprintf(
+                    'This price is below the supplier cost floor of $%s (cost $%s + %s%% margin). Send allow_below_cost to sell at a deliberate loss.',
+                    number_format($costFloor, 2),
+                    number_format($costUsd, 2),
+                    (float) config('pricing.min_margin_percent', 1),
+                ),
+                'cost_floor_usd' => $costFloor,
+            ], 422);
+        }
+
         $variant->update([
-            'manual_retail_price_usd' => $validated['manual_retail_price_usd'],
+            'manual_retail_price_usd' => $price,
+            'allow_below_cost' => $allowBelowCost,
         ]);
+
+        if ($allowBelowCost && $costUsd > 0 && $price < $costFloor) {
+            Log::info('pricing.override_below_cost_authorized', [
+                'variant_id' => $variant->id,
+                'price_usd' => $price,
+                'cost_usd' => $costUsd,
+                'admin_id' => $request->user()?->id,
+            ]);
+        }
+
+        PricingCache::bustComputedPriceCaches();
 
         return response()->json([
             'manual_retail_price_usd' => (float) $variant->manual_retail_price_usd,
+            'allow_below_cost' => (bool) $variant->allow_below_cost,
         ]);
     }
 
     /**
-     * Clear the override so pricing falls back to the rules chain.
+     * Clear the override so pricing falls back to the rules chain. Also resets
+     * the allow_below_cost flag — it authorises a specific override, not the
+     * variant forever.
      */
     public function clearVariantPrice(ProductVariant $variant)
     {
-        $variant->update(['manual_retail_price_usd' => null]);
+        $variant->update(['manual_retail_price_usd' => null, 'allow_below_cost' => false]);
+
+        PricingCache::bustComputedPriceCaches();
 
         return response()->json(['manual_retail_price_usd' => null]);
     }
