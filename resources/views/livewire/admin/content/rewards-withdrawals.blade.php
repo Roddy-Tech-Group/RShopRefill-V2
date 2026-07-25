@@ -3,8 +3,8 @@
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\WalletService;
-use App\Mail\RcoinWithdrawalApprovedMail;
-use App\Mail\RcoinWithdrawalRejectedMail;
+use App\Domain\Communication\Mail\Rewards\RcoinWithdrawalApprovedMail;
+use App\Domain\Communication\Mail\Rewards\RcoinWithdrawalRejectedMail;
 use App\Models\RcoinWithdrawal;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;

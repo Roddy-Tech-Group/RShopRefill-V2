@@ -4,6 +4,7 @@ namespace App\Domain\Communication\Services;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Enums\CommunicationChannel;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -29,8 +30,13 @@ class ChannelResolver
     ): array {
         $channels = [];
 
-        // In-App is always enabled — the notification bell feed is universal.
-        $channels[] = CommunicationChannel::InApp;
+        // In-App writes to the customer bell feed (notifications.user_id is an
+        // FK to users), so only real User recipients get it. An Admin or
+        // NewsletterSubscriber id here would land the message on whichever
+        // customer happens to share that id.
+        if ($recipient instanceof User) {
+            $channels[] = CommunicationChannel::InApp;
+        }
 
         // Email channel: only if a mailable template exists.
         if ($hasMailable) {

@@ -1,8 +1,9 @@
 {{-- Storefront footer. Used inside the <x-layouts.app.header> shell.
-     Sits on the card surface (bg-white + dark:bg-[#1d3252]) so it reads as its
-     own grey panel - the theme flips the token to the card grey (#303030 Soft
-     Dark, #2a2a2a Extra Dark) - instead of the page tone (dark:bg-[#0c1a36]),
-     which went black in Extra Dark and blended into the background. --}}
+     Sits on its OWN surface tier so it never blends with the page or the
+     cards: light mode uses a soft blue (page is #eff6ff, cards are white),
+     dark mode uses the deepest-seam token #070f1c - darker than the page
+     (#0c1a36) and the card surfaces, and the grey themes remap it to
+     near-black while their page/card tones stay grey. --}}
 @php
     // Popular gift cards for the "Shop" column - the curated config/popular_brands.php
     // list, gift cards only, top few, in config order (mirrors the home Popular row).
@@ -20,7 +21,7 @@
         : collect();
 @endphp
 
-<footer class="bg-white dark:bg-[#1d3252] text-zinc-900">
+<footer class="bg-[#dbeafe] dark:bg-[#070f1c] text-zinc-900">
     <div class="mx-auto max-w-[1550px] px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
 
         {{-- Top: brand + link columns --}}

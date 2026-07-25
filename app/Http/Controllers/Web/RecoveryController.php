@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Http\Controllers\Controller;
 use App\Models\RecoveryAttempt;
@@ -29,11 +30,16 @@ class RecoveryController extends Controller
 
     public function feedback(Request $request, string $token)
     {
-        $recovery = TransactionRecovery::where('token', $token)->firstOrFail();
+        // Same active-window guard as show/retry: expired or already-resolved
+        // recoveries must not be reopened or overwritten by a stray POST.
+        $recovery = TransactionRecovery::where('token', $token)
+            ->where('expires_at', '>', now())
+            ->where('status', 'pending')
+            ->firstOrFail();
 
         $validated = $request->validate([
-            'reason' => 'required|string',
-            'details' => 'nullable|string',
+            'reason' => 'required|string|max:255',
+            'details' => 'nullable|string|max:2000',
         ]);
 
         RecoveryAttempt::create([
@@ -65,7 +71,14 @@ class RecoveryController extends Controller
         // Clear backoff lock
         /** @var PaymentBackoffManager $backoffManager */
         $backoffManager = app(PaymentBackoffManager::class);
-        $productLine = $recovery->paymentSession->session_type === 'wallet' ? 'wallet_funding' : 'checkout';
+
+        // Product line mirrors RecordPaymentOutcomeJob: it comes from WHAT was
+        // being paid for (the attempt's target), not the session_type - a
+        // wallet deposit paid by card has session_type 'card' but is still
+        // wallet_funding.
+        $productLine = $recovery->paymentSession->paymentAttempt?->order_id
+            ? ProductLine::Checkout->value
+            : ProductLine::WalletFunding->value;
 
         $backoffManager->resetBackoff(
             $recovery->user,

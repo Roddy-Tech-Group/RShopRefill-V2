@@ -144,7 +144,11 @@ class PaymentSession extends Model
             'awaiting_confirmation' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'processing' => ['confirmed', 'failed'],
             'confirmed' => [],
-            'failed' => [],
+            // 'failed' can still confirm: browser telemetry may report a
+            // failure (tab closed mid-payment) for money the gateway webhook
+            // later confirms. A dead-end here would roll back the credit and
+            // leave the customer charged but unfulfilled.
+            'failed' => ['confirmed'],
             'expired' => ['confirmed', 'failed'],
             'cancelled' => [],
         ];

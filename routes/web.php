@@ -887,11 +887,14 @@ if (app()->environment('local')) {
     Route::get('dev/emails/{key}', [EmailPreviewController::class, 'show'])->name('dev.emails.show');
 }
 
-// Transaction Recovery Routes (Public)
-Route::get('/recovery/thanks', [RecoveryController::class, 'thanks'])->name('recovery.thanks');
-Route::get('/recovery/{token}', [RecoveryController::class, 'show'])->name('recovery.show');
-Route::post('/recovery/{token}/feedback', [RecoveryController::class, 'feedback'])->name('recovery.feedback');
-Route::post('/recovery/{token}/retry', [RecoveryController::class, 'retry'])->name('recovery.retry');
+// Transaction Recovery Routes (public, token-addressed - throttled so tokens
+// can't be enumerated and feedback can't be spammed)
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/recovery/thanks', [RecoveryController::class, 'thanks'])->name('recovery.thanks');
+    Route::get('/recovery/{token}', [RecoveryController::class, 'show'])->name('recovery.show');
+    Route::post('/recovery/{token}/feedback', [RecoveryController::class, 'feedback'])->name('recovery.feedback');
+    Route::post('/recovery/{token}/retry', [RecoveryController::class, 'retry'])->name('recovery.retry');
+});
 
 // Security & Verification
 Route::middleware(['auth'])->prefix('security')->name('security.')->group(function () {

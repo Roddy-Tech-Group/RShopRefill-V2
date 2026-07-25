@@ -93,45 +93,22 @@
      over it. The outer relative wrapper bounds the pin, so the hero unpins
      and scrolls away with the page before the footer arrives. --}}
 <div class="relative">
-    {{-- The sticky offset tracks the live nav height (the primary row
-         collapses on scroll on mobile/tablet), so the hero pins flush under
-         the nav instead of sliding up behind it. Before Alpine boots the
-         offset is 0, which just means top-of-viewport pinning as a fallback. --}}
-    <div
-        data-hero-stage
-        class="sticky z-0"
-        x-data="{ navHeight: 0 }"
-        x-init="
-            const nav = document.querySelector('header.sticky');
-            if (nav) {
-                const sync = () => navHeight = Math.round(nav.getBoundingClientRect().height);
-                sync();
-                new ResizeObserver(sync).observe(nav);
-            }
-        "
-        :style="`top: ${navHeight}px`"
-    >
-        <x-home.hero-slider />
-    </div>
+    {{-- The hero scrolls with the page (the old sticky pin + nav-height
+         tracking was removed). --}}
+    <x-home.hero-slider />
 
-    {{-- Everything below the hero carries the opaque page background and a
-         higher stacking level, so it covers the pinned hero as it passes. --}}
+    {{-- Content below the hero: opaque page background, stacked above the
+         hero so the lifted category cards can overlap its bottom edge. --}}
     <div class="relative z-10 bg-[#eff6ff] dark:bg-[#0c1a36]">
 
 <div class="mx-auto w-full max-w-[1550px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
 
-    {{-- Hero highlight cards - Apple-style tiles right under the hero.
-         Renders nothing until the three images exist in public/assets/. --}}
-    <x-home.hero-cards />
+    {{-- Category cards - one tile per catalogue area, first thing under the hero --}}
+    <x-home.category-cards />
 
     {{-- Trust strip --}}
-    <div>
-        <x-home.trust-strip />
-    </div>
-
-    {{-- Category quick-nav --}}
     <div class="mt-8">
-        <x-home.category-tiles />
+        <x-home.trust-strip />
     </div>
 
     {{-- Brand rows - all wired to the synced catalog (one card per brand_key).

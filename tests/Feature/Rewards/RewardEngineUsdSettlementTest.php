@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Rewards;
 
+use App\Domain\Communication\Mail\Rewards\RcoinEarnedMail;
 use App\Domain\Rewards\Services\RewardEngine;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\WalletService;
-use App\Mail\RcoinEarnedMail;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\User;

@@ -4,12 +4,16 @@ namespace Tests\Feature\Payments;
 
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
+use App\Domain\Shared\Enums\Currency;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\RecoveryAttempt;
 use App\Models\TransactionRecovery;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -112,5 +116,90 @@ class RecoveryFlowTest extends TestCase
         // Backoff cache marker set — the manager must report a clean slate.
         $status = app(PaymentBackoffManager::class)->getBackoffStatus($user, 'checkout', '127.0.0.1');
         $this->assertFalse($status['is_rate_limited']);
+    }
+
+    public function test_feedback_is_refused_on_expired_or_resolved_links(): void
+    {
+        [, $expired] = $this->makeRecovery();
+        $expired->update(['expires_at' => now()->subMinute()]);
+
+        $this->post(route('recovery.feedback', $expired->token), ['reason' => 'declined'])
+            ->assertNotFound();
+
+        [, $resolved] = $this->makeRecovery();
+        $resolved->update(['status' => 'recovered']);
+
+        $this->post(route('recovery.feedback', $resolved->token), ['reason' => 'declined'])
+            ->assertNotFound();
+
+        // A stray POST must never reopen a resolved recovery.
+        $this->assertSame('recovered', $resolved->fresh()->status);
+    }
+
+    public function test_feedback_input_is_length_capped(): void
+    {
+        [, $recovery] = $this->makeRecovery();
+
+        $this->post(route('recovery.feedback', $recovery->token), [
+            'reason' => str_repeat('a', 300),
+        ])->assertSessionHasErrors('reason');
+
+        $this->post(route('recovery.feedback', $recovery->token), [
+            'reason' => 'declined',
+            'details' => str_repeat('a', 3000),
+        ])->assertSessionHasErrors('details');
+
+        $this->assertSame('pending', $recovery->fresh()->status);
+    }
+
+    /**
+     * A wallet deposit paid by card has session_type 'card' - the retry must
+     * still reset the wallet_funding backoff bucket, not checkout's.
+     */
+    public function test_wallet_funding_retry_resets_the_wallet_backoff_bucket(): void
+    {
+        $user = User::factory()->create();
+        $wallet = Wallet::create([
+            'user_id' => $user->id,
+            'currency' => Currency::USD,
+            'balance' => 0.0,
+        ]);
+        $funding = WalletFunding::create([
+            'user_id' => $user->id,
+            'wallet_id' => $wallet->id,
+            'reference' => 'FUND-USD-'.Str::random(8),
+            'currency' => 'USD',
+            'amount' => 50.0,
+            'gateway' => 'flutterwave',
+            'status' => 'pending',
+        ]);
+        $attempt = PaymentAttempt::create([
+            'user_id' => $user->id,
+            'payable_type' => WalletFunding::class,
+            'payable_id' => $funding->id,
+            'gateway' => 'flutterwave',
+            'idempotency_key' => 'test_'.Str::random(12),
+            'currency' => 'USD',
+            'amount' => 50.0,
+            'payment_status' => 'pending',
+        ]);
+        $session = app(PaymentSessionService::class)->createForWalletFunding($funding, $attempt, []);
+
+        $recovery = TransactionRecovery::create([
+            'payment_session_id' => $session->id,
+            'user_id' => $user->id,
+            'customer_email' => $user->email,
+            'token' => Str::random(40),
+            'status' => 'pending',
+            'expires_at' => now()->addDay(),
+        ]);
+
+        $this->post(route('recovery.retry', $recovery->token))
+            ->assertRedirect(route('dashboard'));
+
+        // The reset watermark must land in the wallet_funding bucket (key
+        // format mirrors PaymentBackoffManager::resetBackoff).
+        $this->assertNotNull(Cache::get("payment_backoff_reset:user:{$user->id}:wallet_funding"));
+        $this->assertNull(Cache::get("payment_backoff_reset:user:{$user->id}:checkout"));
     }
 }

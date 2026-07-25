@@ -136,6 +136,19 @@ class CommunicationLogger
     }
 
     /**
+     * Mark an existing log entry suppressed (delivery intentionally skipped,
+     * e.g. no push subscriptions). Not a failure: never retried, never
+     * counted in failure metrics.
+     */
+    public function markSuppressed(CommunicationLog $log, string $reason): void
+    {
+        $log->update([
+            'status' => DeliveryStatus::Suppressed,
+            'error_message' => $reason,
+        ]);
+    }
+
+    /**
      * Log a suppressed communication (bounced address, rate limited).
      */
     public function logSuppressed(CommunicationPayload $payload, CommunicationChannel $channel, string $reason): CommunicationLog

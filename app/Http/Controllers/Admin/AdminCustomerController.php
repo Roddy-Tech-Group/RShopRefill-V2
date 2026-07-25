@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
-use App\Mail\AdminDirectMessageMail;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;

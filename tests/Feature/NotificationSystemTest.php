@@ -2,14 +2,27 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Admin\Enums\AdminRole;
+use App\Domain\Communication\Channels\EmailChannel;
+use App\Domain\Communication\Channels\InAppChannel;
+use App\Domain\Communication\Channels\WebPushChannel;
+use App\Domain\Communication\DTOs\DeliveryResult;
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Enums\CommunicationChannel;
+use App\Domain\Communication\Enums\DeliveryStatus;
 use App\Domain\Communication\Jobs\DispatchCommunicationJob;
 use App\Domain\Communication\Mail\Marketing\NewsletterBroadcastMail;
 use App\Domain\Communication\Mail\Security\WelcomeMail;
+use App\Domain\Communication\Mail\System\AdminTwoFactorOtpMail;
+use App\Domain\Communication\Providers\WebPushProvider;
+use App\Domain\Communication\Services\CommunicationLogger;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Communication\Services\DeviceManager;
 use App\Domain\Communication\Services\PreferenceManager;
+use App\Models\Admin;
 use App\Models\CommunicationLog;
 use App\Models\Notification;
+use App\Models\PushSubscription;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -113,6 +126,207 @@ class NotificationSystemTest extends TestCase
         $this->assertDatabaseHas('communication_logs', [
             'user_id' => $user->id,
             'channel' => 'in_app',
+            'status' => 'sent',
+        ]);
+    }
+
+    /**
+     * Most users have no push subscriptions. That is an expected skip
+     * (Suppressed), never a failure - the old behaviour hard-failed the whole
+     * delivery job after the email had already sent, flooding failed_jobs.
+     */
+    public function test_push_without_subscriptions_is_suppressed_not_failed(): void
+    {
+        $user = User::factory()->create(['email' => 'no-push@example.com']);
+
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountActivation,
+            title: 'Welcome to RshopRefills!',
+            message: 'Your account was successfully registered.',
+            mailable: new WelcomeMail($user),
+            idempotencyKey: 'test_push_suppressed_key',
+        );
+
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_push_suppressed_key',
+            'channel' => 'push',
+            'status' => 'suppressed',
+        ]);
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_push_suppressed_key',
+            'channel' => 'email',
+            'status' => 'sent',
+        ]);
+        $this->assertSame(
+            0,
+            CommunicationLog::where('idempotency_key', 'test_push_suppressed_key')->where('status', 'failed')->count()
+        );
+    }
+
+    /**
+     * A genuinely failing channel must throw (so $tries/$backoff retry the
+     * job), and the retry must skip channels that already sent - never
+     * double-posting the bell feed or re-sending the email.
+     */
+    public function test_a_failing_channel_triggers_retry_without_resending_sent_channels(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountActivation,
+            title: 'Welcome to RshopRefills!',
+            message: 'Your account was successfully registered.',
+            mailable: new WelcomeMail($user),
+            idempotencyKey: 'test_failing_channel_key',
+        );
+
+        $job = null;
+        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $pushed) use (&$job) {
+            $job = $pushed;
+
+            return true;
+        });
+
+        $failingEmail = $this->createMock(EmailChannel::class);
+        $failingEmail->method('send')->willReturn(new DeliveryResult(
+            channel: CommunicationChannel::Email,
+            status: DeliveryStatus::Failed,
+            errorMessage: 'provider 500',
+        ));
+
+        $run = fn () => $job->handle(
+            $failingEmail,
+            app(InAppChannel::class),
+            app(WebPushChannel::class),
+            app(CommunicationLogger::class),
+        );
+
+        try {
+            $run();
+            $this->fail('Expected RuntimeException for the failed email channel.');
+        } catch (\RuntimeException) {
+            // The throw is the retry trigger.
+        }
+
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_failing_channel_key',
+            'channel' => 'email',
+            'status' => 'failed',
+        ]);
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_failing_channel_key',
+            'channel' => 'in_app',
+            'status' => 'sent',
+        ]);
+        $this->assertSame(1, Notification::where('user_id', $user->id)->count());
+
+        // Retry: sent/suppressed channels are skipped, only email is retried.
+        try {
+            $run();
+        } catch (\RuntimeException) {
+            // Still failing - fine, we only care that nothing double-sends.
+        }
+
+        $this->assertSame(1, Notification::where('user_id', $user->id)->count());
+    }
+
+    /**
+     * When the push service reports every endpoint expired, the dead
+     * subscriptions are pruned and the delivery records as suppressed
+     * (subscription rot), not failed.
+     */
+    public function test_expired_push_subscriptions_are_pruned_and_recorded_as_suppressed(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $user->pushSubscriptions()->create([
+            'endpoint' => 'https://push.example/ep1',
+            'p256dh_key' => 'test-p256dh',
+            'auth_token' => 'test-auth',
+        ]);
+
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountActivation,
+            title: 'Welcome to RshopRefills!',
+            message: 'Your account was successfully registered.',
+            mailable: new WelcomeMail($user),
+            idempotencyKey: 'test_push_prune_key',
+        );
+
+        $job = null;
+        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $pushed) use (&$job) {
+            $job = $pushed;
+
+            return true;
+        });
+
+        $goneProvider = $this->createMock(WebPushProvider::class);
+        $goneProvider->method('send')->willReturn([
+            'success' => false,
+            'expired_endpoints' => ['https://push.example/ep1'],
+            'failed_count' => 1,
+            'last_error' => 'Gone',
+        ]);
+
+        // No exception: an all-expired push is not a job failure.
+        $job->handle(
+            app(EmailChannel::class),
+            app(InAppChannel::class),
+            new WebPushChannel($goneProvider, app(DeviceManager::class)),
+            app(CommunicationLogger::class),
+        );
+
+        $this->assertSame(0, PushSubscription::count());
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_push_prune_key',
+            'channel' => 'push',
+            'status' => 'suppressed',
+        ]);
+    }
+
+    /**
+     * notifications.user_id is an FK to users - an Admin recipient must never
+     * produce a bell-feed row, or the customer whose users.id matches the
+     * admin's admins.id reads the admin's 2FA code.
+     */
+    public function test_admin_recipients_never_write_to_the_customer_bell_feed(): void
+    {
+        $customer = User::factory()->create();
+
+        // Force the id collision that exists in production (both tables
+        // start their auto-increment at 1).
+        $admin = new Admin([
+            'name' => 'Test Admin',
+            'email' => 'admin@example.test',
+            'password' => 'password',
+            'role' => AdminRole::SuperAdmin,
+            'is_active' => true,
+        ]);
+        $admin->id = $customer->id;
+        $admin->save();
+
+        app(CommunicationManager::class)->send(
+            recipient: $admin,
+            category: CommunicationCategory::TwoFactor,
+            title: 'Your Admin 2FA Code',
+            message: 'Your admin 2FA code is 123456.',
+            mailable: new AdminTwoFactorOtpMail($admin, '123456'),
+            idempotencyKey: 'test_admin_otp_key',
+        );
+
+        $this->assertSame(0, Notification::where('user_id', $customer->id)->count());
+
+        // The admin still receives the OTP by email.
+        $this->assertDatabaseHas('communication_logs', [
+            'idempotency_key' => 'test_admin_otp_key',
+            'channel' => 'email',
+            'recipient' => 'admin@example.test',
             'status' => 'sent',
         ]);
     }

@@ -38,7 +38,7 @@ class TestWebPushCommand extends Command
 
         $this->info("Found {$subscriptions->count()} subscription(s). Sending test push...");
 
-        $success = $provider->send(
+        $report = $provider->send(
             subscriptions: $subscriptions,
             title: '🎉 RshopRefills Push Test',
             body: 'If you see this, Web Push is working! '.now()->format('H:i:s'),
@@ -48,13 +48,13 @@ class TestWebPushCommand extends Command
 
         $this->newLine();
 
-        if ($success) {
+        if ($report['success']) {
             $this->info("Done! Push dispatched to {$subscriptions->count()} subscription(s).");
 
             return 0;
         }
 
-        $this->error('Push dispatch failed — check laravel.log for provider errors.');
+        $this->error('Push dispatch failed: '.($report['last_error'] ?? 'check laravel.log for provider errors.'));
 
         return 1;
     }

@@ -11,6 +11,7 @@ use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Services\WalletService;
 use App\Models\Cart;
 use App\Models\Order;
@@ -21,6 +22,7 @@ use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PaymentSessionService
@@ -174,18 +176,37 @@ class PaymentSessionService
                     $walletService = app(WalletService::class);
                     $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
 
-                    // Unlock and debit
-                    $walletService->unlockFunds($wallet, $rcoinApplied);
-                    $walletService->debit(
-                        wallet: $wallet,
-                        amount: $rcoinApplied,
-                        category: TransactionCategory::RewardRedemption,
-                        description: "RCOIN redeemed on Order #{$order->order_number}",
-                        metadata: [
+                    // A failed/expired session already returned the lock (this
+                    // confirm is a late webhook rescuing it) - re-unlocking
+                    // would throw and roll back the confirm, or eat a lock
+                    // belonging to a concurrent checkout.
+                    if (! ($order->metadata['rcoin_lock_released'] ?? false)) {
+                        $walletService->unlockFunds($wallet, $rcoinApplied);
+                    }
+
+                    try {
+                        $walletService->debit(
+                            wallet: $wallet,
+                            amount: $rcoinApplied,
+                            category: TransactionCategory::RewardRedemption,
+                            description: "RCOIN redeemed on Order #{$order->order_number}",
+                            metadata: [
+                                'order_id' => $order->id,
+                                'rcoin_discount_usd' => $order->metadata['rcoin_discount_usd'] ?? 0,
+                            ]
+                        );
+                    } catch (InsufficientBalanceException) {
+                        // Late confirm after the customer already spent the
+                        // returned RCOIN. Money for the order has arrived, so
+                        // never block confirmation over reward points - flag
+                        // the shortfall for admin reconciliation instead.
+                        $order->metadata = array_merge($order->metadata ?? [], ['rcoin_debt' => $rcoinApplied]);
+                        $order->save();
+                        Log::warning('RCOIN redemption could not be debited on late confirm; flagged as rcoin_debt.', [
                             'order_id' => $order->id,
-                            'rcoin_discount_usd' => $order->metadata['rcoin_discount_usd'] ?? 0,
-                        ]
-                    );
+                            'rcoin_applied' => $rcoinApplied,
+                        ]);
+                    }
                 }
             }
 
@@ -228,14 +249,18 @@ class PaymentSessionService
 
             $session->save();
 
-            // Unlock RCOIN if it was locked during checkout
+            // Unlock RCOIN if it was locked during checkout. The release is
+            // recorded on the order so a late confirm (failed -> confirmed)
+            // knows the lock is already gone.
             $order = $session->paymentAttempt?->order;
             if ($order) {
                 $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
-                if ($rcoinApplied > 0) {
+                if ($rcoinApplied > 0 && ! ($order->metadata['rcoin_lock_released'] ?? false)) {
                     $walletService = app(WalletService::class);
                     $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
                     $walletService->unlockFunds($wallet, $rcoinApplied);
+                    $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
+                    $order->save();
                 }
             }
 
@@ -257,14 +282,17 @@ class PaymentSessionService
 
             $session->transitionTo('expired');
 
-            // Unlock RCOIN if it was locked during checkout
+            // Unlock RCOIN if it was locked during checkout. Recorded on the
+            // order so a late confirm (expired -> confirmed) skips re-unlock.
             $order = $session->paymentAttempt?->order;
             if ($order) {
                 $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
-                if ($rcoinApplied > 0) {
+                if ($rcoinApplied > 0 && ! ($order->metadata['rcoin_lock_released'] ?? false)) {
                     $walletService = app(WalletService::class);
                     $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
                     $walletService->unlockFunds($wallet, $rcoinApplied);
+                    $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
+                    $order->save();
                 }
             }
 

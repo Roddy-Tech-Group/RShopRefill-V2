@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Orders\EsimLowDataMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Http\Controllers\Controller;
-use App\Mail\EsimLowDataMail;
 use App\Models\Notification;
 use App\Models\OrderItem;
 use Illuminate\Http\JsonResponse;

@@ -7,6 +7,7 @@ use App\Domain\Communication\Channels\InAppChannel;
 use App\Domain\Communication\Channels\WebPushChannel;
 use App\Domain\Communication\DTOs\CommunicationPayload;
 use App\Domain\Communication\Enums\CommunicationChannel;
+use App\Domain\Communication\Enums\DeliveryStatus;
 use App\Domain\Communication\Services\CommunicationLogger;
 use App\Models\CommunicationLog;
 use Illuminate\Bus\Queueable;
@@ -48,11 +49,13 @@ class DispatchCommunicationJob implements ShouldQueue
         WebPushChannel $webPushChannel,
         CommunicationLogger $logger
     ): void {
+        $failures = [];
+
         foreach ($this->payload->channels as $channel) {
-            $log = $this->findQueuedLog($channel);
+            $log = $this->findRetryableLog($channel);
 
             if (! $log) {
-                // If it's missing, it might have been processed by a parallel retry
+                // Already sent/suppressed, or processed by a parallel retry
                 continue;
             }
 
@@ -66,24 +69,36 @@ class DispatchCommunicationJob implements ShouldQueue
 
                 if ($result->succeeded()) {
                     $logger->logSent($log, $result->providerMessageId, $result->providerResponse);
+                } elseif ($result->status === DeliveryStatus::Suppressed) {
+                    // Expected skip (no push subscriptions, suppression list),
+                    // never a job failure
+                    $logger->markSuppressed($log, $result->errorMessage ?? 'Delivery intentionally skipped.');
                 } else {
                     $logger->logFailed($log, $result->errorMessage ?? 'Unknown channel failure.');
-                    $this->fail(new \Exception($result->errorMessage));
+                    $failures[] = $channel->value.': '.($result->errorMessage ?? 'unknown failure');
                 }
             } catch (\Throwable $e) {
                 $logger->logFailed($log, $e->getMessage());
-                $this->fail($e);
+                $failures[] = $channel->value.': '.$e->getMessage();
             }
+        }
+
+        if ($failures !== []) {
+            // Throwing (instead of $this->fail()) lets $tries/$backoff retry the
+            // failed channels; sent/suppressed logs are skipped on the next attempt.
+            throw new \RuntimeException('Channel delivery failed - '.implode('; ', $failures));
         }
     }
 
     /**
-     * Locate the 'queued' log entry created by the manager for this specific channel.
+     * Locate the log entry for this channel that still needs delivery.
+     * Sent/suppressed entries are excluded so a retry never re-sends them.
      */
-    private function findQueuedLog(CommunicationChannel $channel): ?CommunicationLog
+    private function findRetryableLog(CommunicationChannel $channel): ?CommunicationLog
     {
         return CommunicationLog::where('idempotency_key', $this->payload->idempotencyKey)
             ->where('channel', $channel->value)
+            ->whereIn('status', [DeliveryStatus::Queued->value, DeliveryStatus::Failed->value])
             ->latest('id')
             ->first();
     }

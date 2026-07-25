@@ -3,13 +3,13 @@
 namespace App\Domain\Rewards\Services;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Rewards\RcoinEarnedMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Fraud\Services\FraudDetectionService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Services\WalletService;
-use App\Mail\RcoinEarnedMail;
 use App\Models\Order;
 use App\Models\Referral;
 use App\Models\Setting;

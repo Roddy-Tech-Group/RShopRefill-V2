@@ -41,13 +41,15 @@ class HeroSectionsTest extends TestCase
             ->assertSee('One Ecosystem');
     }
 
-    public function test_hero_is_pinned_so_page_content_scrolls_over_it(): void
+    public function test_hero_scrolls_with_the_page_instead_of_pinning(): void
     {
+        // The sticky pin wrapper was removed (July 2026): the hero must render
+        // in normal flow, followed by the opaque content wrapper.
         $this->withoutVite()->get('/')
             ->assertOk()
-            ->assertSee('data-hero-stage', false)
-            ->assertSee('class="sticky z-0"', false)
-            ->assertSeeInOrder(['data-hero-stage', 'One Ecosystem', 'relative z-10 bg-[#eff6ff]'], false);
+            ->assertDontSee('data-hero-stage', false)
+            ->assertDontSee('class="sticky z-0"', false)
+            ->assertSeeInOrder(['One Ecosystem', 'relative z-10 bg-[#eff6ff]'], false);
     }
 
     public function test_homepage_hides_the_hero_when_all_sections_are_off(): void

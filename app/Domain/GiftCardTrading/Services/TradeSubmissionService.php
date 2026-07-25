@@ -3,10 +3,10 @@
 namespace App\Domain\GiftCardTrading\Services;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\System\AdminNewTradeMail;
 use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Enums\TradeStatus;
-use App\Mail\AdminNewTradeMail;
 use App\Models\GiftCardRate;
 use App\Models\GiftCardTrade;
 use App\Models\TradeAuditLog;

@@ -161,7 +161,6 @@ Route::middleware('auth')->group(function () {
         // Signals are chattier than terminal failures (exceptions, offline
         // blips) — looser throttle, and the controller caps rows per session.
         Route::post('telemetry/record-signal', [PaymentTelemetryController::class, 'recordSignal'])->middleware('throttle:30,1')->name('telemetry.record-signal');
-        Route::post('telemetry/reset-backoff', [PaymentTelemetryController::class, 'resetBackoff'])->middleware('throttle:10,1')->name('telemetry.reset-backoff');
     });
 
     Route::get('transactions', [UserTransactionController::class, 'index'])->name('api.transactions.index');

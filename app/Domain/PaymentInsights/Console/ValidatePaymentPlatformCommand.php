@@ -265,11 +265,10 @@ class ValidatePaymentPlatformCommand extends Command
         $expectations = [
             ['api.payment-sessions.telemetry.record-failure', ['auth', 'throttle:10,1']],
             ['api.payment-sessions.telemetry.record-signal', ['auth', 'throttle:30,1']],
-            ['api.payment-sessions.telemetry.reset-backoff', ['auth', 'throttle:10,1']],
-            ['recovery.show', []],
-            ['recovery.feedback', []],
-            ['recovery.retry', []],
-            ['recovery.thanks', []],
+            ['recovery.show', ['throttle:20,1']],
+            ['recovery.feedback', ['throttle:20,1']],
+            ['recovery.retry', ['throttle:20,1']],
+            ['recovery.thanks', ['throttle:20,1']],
             ['admin.payment-insights', []],
         ];
 

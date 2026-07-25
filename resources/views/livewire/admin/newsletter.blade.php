@@ -2,7 +2,7 @@
 <?php
 
 use App\Jobs\SendNewsletterBroadcastJob;
-use App\Mail\NewsletterBroadcastMail;
+use App\Domain\Communication\Mail\Marketing\NewsletterBroadcastMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Computed;

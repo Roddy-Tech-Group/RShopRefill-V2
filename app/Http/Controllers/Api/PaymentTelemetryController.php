@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Payment\Services\PaymentSessionService;
-use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentSession;
 use App\Models\PaymentTelemetryEvent;
@@ -55,7 +54,8 @@ class PaymentTelemetryController extends Controller
         }
 
         // Zero-trust: telemetry may only terminate the caller's own session.
-        if ($session->customer_email && strcasecmp($session->customer_email, (string) $request->user()?->email) !== 0) {
+        // Fail closed - a session without a customer email is nobody's to fail.
+        if (! $session->customer_email || strcasecmp($session->customer_email, (string) $request->user()?->email) !== 0) {
             return response()->json(['error' => 'Session not found'], 404);
         }
 
@@ -95,7 +95,8 @@ class PaymentTelemetryController extends Controller
         }
 
         // Zero-trust: signals may only be attached to the caller's own session.
-        if ($session->customer_email && strcasecmp($session->customer_email, (string) $request->user()?->email) !== 0) {
+        // Fail closed - a session without a customer email is nobody's to report on.
+        if (! $session->customer_email || strcasecmp($session->customer_email, (string) $request->user()?->email) !== 0) {
             return response()->json(['error' => 'Session not found'], 404);
         }
 
@@ -111,21 +112,5 @@ class PaymentTelemetryController extends Controller
         ]);
 
         return response()->json(['status' => 'recorded']);
-    }
-
-    public function resetBackoff(Request $request, PaymentBackoffManager $manager): JsonResponse
-    {
-        $validated = $request->validate([
-            'product_line' => 'required|string',
-        ]);
-
-        $manager->resetBackoff(
-            $request->user(),
-            $validated['product_line'],
-            $request->ip(),
-            $request->cookie('device_uuid') ?? $request->header('X-Installation-ID')
-        );
-
-        return response()->json(['status' => 'reset']);
     }
 }

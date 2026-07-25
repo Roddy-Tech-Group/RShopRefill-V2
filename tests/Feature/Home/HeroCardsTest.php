@@ -12,10 +12,10 @@ use Livewire\Volt\Volt;
 use Tests\TestCase;
 
 /**
- * Hero highlight cards: Apple-style tiles right under the hero, CMS-managed
- * via admin > Content > Hero Cards (hero_cards table, seeded with the three
- * original cards). A card renders only when its image file exists, so the
- * section is invisible until the assets are in place.
+ * Hero highlight cards: CMS-managed via admin > Content > Hero Cards
+ * (hero_cards table, seeded with the three original cards). The animated
+ * scrolling row was removed from the homepage in July 2026 - the storefront
+ * must never render it, while the admin CMS remains fully functional.
  */
 class HeroCardsTest extends TestCase
 {
@@ -53,50 +53,20 @@ class HeroCardsTest extends TestCase
 
     // ── Storefront ──────────────────────────────────────────────
 
-    public function test_section_is_hidden_while_the_images_are_missing(): void
+    public function test_homepage_no_longer_renders_the_hero_cards_section(): void
     {
-        if (collect(self::SEEDED_IMAGES)->some(fn ($image) => file_exists(public_path('assets/'.$image)))) {
-            $this->markTestSkipped('Hero card images are present locally.');
-        }
-
-        $this->withoutVite()->get('/')
-            ->assertOk()
-            ->assertDontSee('Hero highlights')
-            ->assertDontSee('Buy Apple Gift Cards');
-    }
-
-    public function test_seeded_cards_render_with_their_copy_once_the_images_exist(): void
-    {
+        // Even enabled cards with images present must not render: the
+        // animated row was removed from the storefront homepage.
         $created = $this->ensureSeededImages();
+        HeroCard::factory()->create(['title' => 'Should Never Render Card']);
 
         try {
             $this->withoutVite()->get('/')
                 ->assertOk()
-                ->assertSee('Hero highlights')
-                ->assertSee('data-hero-cards', false)
-                ->assertSee('Buy Apple Gift Cards')
-                ->assertSee('Discover Global eSIM')
-                ->assertSee('dashboard')
-                ->assertSee('Learn more')
-                ->assertSee('Buy now');
-        } finally {
-            foreach ($created as $path) {
-                File::delete($path);
-            }
-        }
-    }
-
-    public function test_disabled_card_and_card_with_missing_image_do_not_render(): void
-    {
-        $created = $this->ensureSeededImages();
-        HeroCard::factory()->disabled()->create(['title' => 'Disabled Promo Card']);
-        HeroCard::factory()->create(['title' => 'Ghost Card', 'image_path' => 'hero-cards/does-not-exist.png']);
-
-        try {
-            $this->withoutVite()->get('/')
-                ->assertOk()
-                ->assertDontSee('Disabled Promo Card')
-                ->assertDontSee('Ghost Card');
+                ->assertDontSee('Hero highlights')
+                ->assertDontSee('data-hero-cards', false)
+                ->assertDontSee('Buy Apple Gift Cards')
+                ->assertDontSee('Should Never Render Card');
         } finally {
             foreach ($created as $path) {
                 File::delete($path);

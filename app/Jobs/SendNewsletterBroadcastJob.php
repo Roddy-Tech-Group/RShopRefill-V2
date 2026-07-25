@@ -3,8 +3,8 @@
 namespace App\Jobs;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Marketing\NewsletterBroadcastMail;
 use App\Domain\Communication\Services\CommunicationManager;
-use App\Mail\NewsletterBroadcastMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
