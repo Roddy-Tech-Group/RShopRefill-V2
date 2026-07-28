@@ -14,17 +14,26 @@
         ? route('dashboard.shop.checkout.process')
         : route('checkout.process');
 
-    // Crypto coins for the crypto payment option — admin-managed currency rates.
-    $cryptoCoins = CurrencyRate::query()->where('is_active', true)->where('type', 'crypto')
+    // Crypto coins offered at checkout: enabled by us AND currently accepted by
+    // the gateway on our merchant account (scopePayable). A coin the gateway has
+    // stopped accepting must not be offered — it would fail at payment creation.
+    $cryptoCoins = CurrencyRate::query()->payable()->crypto()
         ->orderBy('sort_order')->orderBy('code')
-        ->get(['code', 'name', 'rate_per_usd', 'icon_path']);
+        ->get(['code', 'name', 'rate_per_usd', 'icon_path', 'network', 'min_amount_usd']);
 
-    // Code-keyed map the Alpine total calculation reads from.
+    // Code-keyed map the coin picker reads from. minUsd gates which coins can be
+    // used for this order — minimums differ by more than two orders of magnitude
+    // across our coins, so offering all of them on a small basket guarantees a
+    // rejection at the worst possible moment.
     $cryptoRatesForJs = $cryptoCoins->mapWithKeys(fn ($c) => [$c->code => [
         'code' => $c->code,
         'name' => $c->name,
         'perUsd' => (float) $c->rate_per_usd,
         'decimals' => $c->rate_per_usd < 0.01 ? 8 : ($c->rate_per_usd < 1 ? 4 : 2),
+        // null means "not synced yet" and is treated as no minimum: a missing sync
+        // must not empty the checkout, and the gateway still rejects a genuinely
+        // sub-minimum payment.
+        'minUsd' => $c->min_amount_usd !== null ? (float) $c->min_amount_usd : null,
     ]]);
 
     // Mobile-money networks. Static for now.
@@ -67,31 +76,12 @@
         'default'  => (array) config('payment_fees.default', ['transaction' => 0.0, 'international' => 0.0]),
     ];
 
-    // Crypto fee config — baked into the page so the fee breakdown renders
-    // instantly when a coin is selected (no API round-trip needed).
-    $cryptoFeeConfig = [
-        'service_fee_pct' => (float) \App\Models\Setting::get('crypto_service_fee_pct', 0.5),
-        'network_fees' => [
-            'tron'     => (float) \App\Models\Setting::get('crypto_network_fee_tron', 1.00),
-            'ethereum' => (float) \App\Models\Setting::get('crypto_network_fee_ethereum', 5.00),
-            'bnb'      => (float) \App\Models\Setting::get('crypto_network_fee_bnb', 0.50),
-            'polygon'  => (float) \App\Models\Setting::get('crypto_network_fee_polygon', 0.10),
-            'solana'   => (float) \App\Models\Setting::get('crypto_network_fee_solana', 0.05),
-            'bitcoin'  => (float) \App\Models\Setting::get('crypto_network_fee_bitcoin', 3.00),
-            'litecoin' => (float) \App\Models\Setting::get('crypto_network_fee_litecoin', 0.10),
-        ],
-        'network_map' => [
-            'btc' => 'bitcoin', 'eth' => 'ethereum',
-            'usdt' => 'tron', 'usdttrc20' => 'tron',
-            'usdterc20' => 'ethereum',
-            'usdtbsc' => 'bnb', 'usdtbep20' => 'bnb',
-            'usdtmatic' => 'polygon', 'usdtpolygon' => 'polygon',
-            'usdtsol' => 'solana',
-            'ltc' => 'litecoin',
-            'bnb' => 'bnb', 'bnbbsc' => 'bnb',
-            'matic' => 'polygon', 'sol' => 'solana', 'trx' => 'tron',
-        ],
-    ];
+    // The crypto network-fee / service-fee config that used to live here has been
+    // removed along with the client-side fee engine it fed. Those figures were only
+    // ever added to the on-screen total and never to the amount sent to the gateway,
+    // so they made the checkout page disagree with the payment page. The gateway
+    // already grosses its own fees into the amount it quotes, which is now the single
+    // figure the customer sees.
 @endphp
 
 <x-shop.layout :title="'Checkout | '.$siteName">
@@ -117,7 +107,7 @@
             class="mt-4"
         />
 
-        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees), @js($cryptoFeeConfig))">
+        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees))">
 
             {{-- Loading — until the cart store's first fetch resolves --}}
             <div x-show="!$store.cart.hydrated" class="pure-card flex items-center justify-center rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 py-24 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10">
@@ -551,25 +541,54 @@
 
                     {{-- Crypto --}}
                     <div x-show="method === 'crypto'" x-collapse x-cloak class="mt-5">
-                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Currency</p>
-                        <div class="mt-1.5 grid grid-cols-4 gap-2 sm:grid-cols-5">
+                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Pay with</p>
+                        {{-- Ticker plus network. Six of the ten coins are stablecoin
+                             variants that differ only by chain, so showing the ticker
+                             alone would make USDT on BNB Chain and USDT on Tron look
+                             like the same option — and sending on the wrong chain
+                             loses the funds. --}}
+                        <div class="mt-1.5 grid grid-cols-3 gap-2 sm:grid-cols-4">
                             @forelse ($cryptoCoins as $coin)
-                                <button type="button" @click="crypto = '{{ $coin->code }}'"
-                                    :class="crypto === '{{ $coin->code }}' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300'"
-                                    class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 transition-colors">
-                                    @if ($coin->icon_path)
-                                        <img src="{{ asset('assets/' . $coin->icon_path) }}" alt="" class="h-6 w-6 rounded-[12px]">
+                                @php
+                                    // "Tether (BNB Chain)" -> "BNB Chain"
+                                    $network = str($coin->name)->after('(')->before(')')->toString();
+                                    $asset = str($coin->name)->before(' (')->toString();
+                                @endphp
+                                <button type="button"
+                                    @click="coinUsable('{{ $coin->code }}') && (crypto = '{{ $coin->code }}')"
+                                    :disabled="!coinUsable('{{ $coin->code }}')"
+                                    :title="coinUsable('{{ $coin->code }}') ? '' : coinMinLabel('{{ $coin->code }}')"
+                                    :class="!coinUsable('{{ $coin->code }}')
+                                        ? 'cursor-not-allowed border-zinc-200 opacity-40'
+                                        : (crypto === '{{ $coin->code }}' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300')"
+                                    class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 text-center transition-colors">
+                                    @if ($coin->iconUrl())
+                                        <img src="{{ $coin->iconUrl() }}" alt="" class="h-6 w-6 rounded-[12px]">
                                     @else
                                         <span class="flex h-6 w-6 items-center justify-center rounded-[12px] bg-amber-500 text-[10px] font-black text-white">{{ substr($coin->code, 0, 1) }}</span>
                                     @endif
-                                    <span class="text-xs font-bold text-zinc-900 dark:text-white">{{ $coin->code }}</span>
+                                    <span class="text-xs font-bold leading-tight text-zinc-900 dark:text-white">{{ $asset }}</span>
+                                    @if ($network)
+                                        <span class="text-[10px] font-medium leading-tight text-zinc-500 dark:text-zinc-400">{{ $network }}</span>
+                                    @endif
+                                    {{-- The minimum is stated on the tile rather than hidden
+                                         behind a rejection, so the reason a coin is greyed
+                                         out is visible without having to try it. --}}
+                                    <template x-if="!coinUsable('{{ $coin->code }}')">
+                                        <span class="text-[9px] font-semibold leading-tight text-amber-700" x-text="coinMinLabel('{{ $coin->code }}')"></span>
+                                    </template>
                                 </button>
                             @empty
                                 <p class="col-span-full text-sm text-zinc-600 dark:text-zinc-400">No crypto currencies are enabled.</p>
                             @endforelse
                         </div>
+                        <template x-if="unusableCoinCount() > 0">
+                            <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                Some coins are unavailable for this order size — each blockchain sets its own minimum.
+                            </p>
+                        </template>
                         <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-                            Pick a coin and continue — the next step shows the exact wallet address and amount to send.
+                            Pick a coin and continue, the next step shows the exact wallet address and amount to send.
                         </p>
                     </div>
 
@@ -664,47 +683,35 @@
                         </div>
                     </div>
 
-                    {{-- Crypto Fee Breakdown --}}
-                    <div x-show="method === 'crypto' && cryptoFeeBreakdown && coinMeta()" x-cloak class="mt-5 border-t border-zinc-100 dark:border-white/10 pt-5">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">Subtotal</span>
-                            <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="cryptoFeeBreakdown?.product_price_crypto?.toFixed(coinMeta()?.decimals || 6) + ' ' + coinMeta()?.code.toUpperCase()"></span>
-                        </div>
-                        <div class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">Network Fee (<span class="capitalize" x-text="cryptoFeeBreakdown?.network"></span>, est.)</span>
-                            <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="cryptoFeeBreakdown?.network_fee_crypto?.toFixed(coinMeta()?.decimals || 6) + ' ' + coinMeta()?.code.toUpperCase()"></span>
-                        </div>
-                        <div class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">Crypto Processing Fee</span>
-                            <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="cryptoFeeBreakdown?.service_fee_crypto?.toFixed(coinMeta()?.decimals || 6) + ' ' + coinMeta()?.code.toUpperCase()"></span>
-                        </div>
-                        <div x-show="couponApplied" x-cloak class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-emerald-600" x-text="'Discount (' + couponApplied + ')'"></span>
-                            <span class="font-semibold tabular-nums text-emerald-600" x-text="'-' + $store.cart.pay(couponDiscountDisplay)"></span>
-                        </div>
-                    </div>
-
-                    {{-- Discount line when there is no processing fee (wallet/crypto without breakdown yet) --}}
-                    <div x-show="couponApplied && processingFee() <= 0 && (!cryptoFeeBreakdown || method !== 'crypto')" x-cloak class="mt-4 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-4 text-sm">
+                    {{-- Discount line when there is no processing fee (wallet / crypto) --}}
+                    <div x-show="couponApplied && processingFee() <= 0" x-cloak class="mt-4 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-4 text-sm">
                         <span class="font-medium text-emerald-600" x-text="'Discount (' + couponApplied + ')'"></span>
                         <span class="font-semibold tabular-nums text-emerald-600" x-text="'-' + $store.cart.pay(couponDiscountDisplay)"></span>
                     </div>
 
-                    {{-- Total --}}
-                    <div class="mt-5 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-5" :class="(processingFee() > 0 || (method === 'crypto' && cryptoFeeBreakdown)) && 'mt-3 border-t-0 pt-0'">
-                        <span class="text-base font-bold text-zinc-900 dark:text-white" x-text="method === 'crypto' ? 'Estimated amount to pay' : 'Total amount to pay'"></span>
+                    {{-- Total.
+                         The crypto "Network Fee" and "Crypto Processing Fee" lines that
+                         used to sit above this were display-only: they were never added
+                         to the amount sent to the gateway, so the figure quoted here
+                         disagreed with the one on the payment screen by roughly 4%.
+                         They cannot simply be made real either — the gateway already
+                         grosses the amount up to cover its own fees, so adding our own
+                         estimate on top would charge the customer for the same fees
+                         twice. The order total below is the price of the goods; the
+                         exact crypto amount is quoted once, on the payment screen. --}}
+                    <div class="mt-5 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-5" :class="processingFee() > 0 && 'mt-3 border-t-0 pt-0'">
+                        {{-- "Total amount", not "Total amount to pay": for crypto the
+                             figure actually payable is quoted on the next screen, straight
+                             from the gateway, and promising this is the amount to pay would
+                             recreate the two-numbers problem in words. --}}
+                        <span class="text-base font-bold text-zinc-900 dark:text-white">Total amount</span>
                         <span x-data="valueFlip()" x-effect="totalLabel(); flash()" class="inline-block text-lg font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="totalLabel()">0.00</span>
                     </div>
 
-                    {{-- Crypto estimated fee notice --}}
-                    <div x-show="method === 'crypto'" x-cloak class="mt-3 flex items-start gap-2 rounded-[10px] bg-amber-50 px-3.5 py-3 dark:bg-amber-900/20">
-                        <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-                        </svg>
-                        <p class="text-xs text-amber-700 dark:text-amber-300">
-                            The network fee shown above is an <span class="font-bold">estimate</span>. The final amount on the payment page may be slightly higher or lower depending on current blockchain conditions.
-                        </p>
-                    </div>
+                    {{-- The "exact amount is confirmed on the next step" notice that used to
+                         sit here said the same thing as the line under the coin picker, so it
+                         was saying it twice on one screen. The picker line is the better place
+                         for it — it sits with the choice it describes. --}}
 
                     {{-- Crypto safety warning --}}
                     <div x-show="method === 'crypto'" x-cloak class="mt-2 flex items-start gap-2 rounded-[10px] bg-red-50 px-3.5 py-3 dark:bg-red-900/20">
@@ -921,15 +928,31 @@
                             <!-- If Crypto details -->
                             <template x-if="session?.payment_payload?.qr_payload || session?.payment_payload?.pay_address">
                                 <div>
-                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white text-center mb-2">Crypto Payment Details</h3>
-                                    <p class="text-xs text-zinc-600 dark:text-zinc-400 text-center mb-4">Send the exact amount of cryptocurrency shown to the address below:</p>
+                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white text-center mb-1">Crypto Payment Details</h3>
 
-                                    <div class="flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
-                                        <!-- QR Code -->
+                                    {{-- The amount leads, because it is the one figure that
+                                         must be exact. It comes straight from the gateway and
+                                         is the same number quoted for the rest of this
+                                         payment — it is never recalculated locally. --}}
+                                    <div class="mt-3 rounded-[12px] border border-blue-200 bg-blue-50 px-4 py-3 text-center dark:border-blue-500/30 dark:bg-blue-900/20">
+                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-blue-700/70 dark:text-blue-300/70">Send exactly</span>
+                                        <div class="mt-1 flex items-center justify-center gap-2">
+                                            <span class="text-xl font-extrabold tabular-nums tracking-tight text-blue-900 dark:text-blue-100" x-text="session?.payment_payload?.pay_amount"></span>
+                                            <span class="text-sm font-bold uppercase text-blue-700 dark:text-blue-300" x-text="session?.payment_payload?.pay_currency"></span>
+                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="rounded-[12px] bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 transition-all hover:bg-white">
+                                                <span x-show="!copiedStates['amount_crypto']">Copy</span>
+                                                <span x-show="copiedStates['amount_crypto']" class="font-bold text-emerald-600">Copied!</span>
+                                            </button>
+                                        </div>
+                                        <p class="mt-1 text-[10px] text-blue-700/80 dark:text-blue-300/80">All fees included. Your wallet must send this exact amount.</p>
+                                    </div>
+
+                                    <div class="mt-4 flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
+                                        <!-- QR Code, rendered by us -->
                                         <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-3 border border-zinc-150 shadow-sm">
-                                            <img 
-                                                :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(session?.payment_payload?.qr_payload || '')" 
-                                                alt="Payment QR Code" 
+                                            <img
+                                                :src="session?.id ? ('/api/payment-sessions/' + session.id + '/crypto-qr') : ''"
+                                                alt="Payment QR code"
                                                 class="h-32 w-32 object-contain"
                                             />
                                             <span class="mt-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">Scan to pay</span>
@@ -940,19 +963,8 @@
                                             <div>
                                                 <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Cryptocurrency / Network</span>
                                                 <div class="flex items-center gap-1.5">
-                                                    <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
-                                                    <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || 'bitcoin')"></span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Amount to Send</span>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="font-extrabold text-zinc-900 dark:text-white text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[12px] border border-zinc-150" x-text="session?.payment_payload?.pay_amount"></span>
-                                                    <span class="font-bold text-zinc-600 dark:text-zinc-400 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
-                                                    <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[12px] transition-all">
-                                                        <span x-show="!copiedStates['amount_crypto']">Copy</span>
-                                                        <span x-show="copiedStates['amount_crypto']" class="text-emerald-600 font-bold">Copied!</span>
-                                                    </button>
+                                                    <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
+                                                    <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || '')"></span>
                                                 </div>
                                             </div>
                                             <div>
@@ -965,12 +977,82 @@
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {{-- Memo / destination tag. Coins that require one cannot be
+                                                 credited automatically without it, so when the gateway
+                                                 returns a tag it is shown as loudly as the address. --}}
+                                            <template x-if="session?.payment_payload?.payin_extra_id">
+                                                <div class="rounded-[12px] border border-amber-300 bg-amber-50 p-2.5 dark:border-amber-500/30 dark:bg-amber-900/20">
+                                                    <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">Memo / Destination tag — required</span>
+                                                    <div class="mt-1 flex items-center gap-1.5">
+                                                        <input type="text" readonly :value="session?.payment_payload?.payin_extra_id" class="w-full rounded-[12px] border border-amber-200 bg-white px-2.5 py-1.5 font-mono text-[10px] text-zinc-800 outline-none select-all">
+                                                        <button type="button" @click="copyToClipboard(session?.payment_payload?.payin_extra_id, 'memo')" class="shrink-0 rounded-[12px] border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-[10px] font-bold text-amber-800 transition-all">
+                                                            <span x-show="!copiedStates['memo']">Copy</span>
+                                                            <span x-show="copiedStates['memo']" class="font-bold text-emerald-600">Copied!</span>
+                                                        </button>
+                                                    </div>
+                                                    <p class="mt-1.5 text-[10px] text-amber-800/90 dark:text-amber-300/90">Without this tag your payment cannot be matched to your order automatically.</p>
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
                             </template>
 
-                            <div class="flex flex-col items-center mt-5 text-center">
+                            {{-- Short payment. Most shortfalls are not the customer's fault —
+                                 exchanges routinely deduct a withdrawal fee from the amount
+                                 sent — so this states plainly what is outstanding and offers a
+                                 one-tap way to settle it, rather than leaving them on a spinner
+                                 waiting for a confirmation that is never coming. --}}
+                            <template x-if="session?.underpayment">
+                                <div class="mt-5 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-4 dark:border-amber-500/30 dark:bg-amber-900/20">
+                                    <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Your payment was short</p>
+                                    <div class="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-300">
+                                        <div class="flex justify-between gap-3">
+                                            <span>Expected</span>
+                                            <span class="font-semibold tabular-nums" x-text="session.underpayment.expected + ' ' + session.underpayment.currency"></span>
+                                        </div>
+                                        <div class="flex justify-between gap-3">
+                                            <span>Received</span>
+                                            <span class="font-semibold tabular-nums" x-text="session.underpayment.received + ' ' + session.underpayment.currency"></span>
+                                        </div>
+                                        <div class="flex justify-between gap-3 border-t border-amber-300/60 pt-1 font-bold">
+                                            <span>Still owing</span>
+                                            <span class="tabular-nums" x-text="session.underpayment.shortfall + ' ' + session.underpayment.currency"></span>
+                                        </div>
+                                    </div>
+                                    <p class="mt-2 text-[11px] text-amber-800/90 dark:text-amber-300/90">
+                                        This usually happens when an exchange deducts its withdrawal fee from the amount sent.
+                                    </p>
+
+                                    <template x-if="session.underpayment.can_top_up">
+                                        <button type="button" @click="requestTopUp()" :disabled="topUpLoading"
+                                            class="mt-3 w-full rounded-[12px] bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60">
+                                            <span x-show="!topUpLoading">Pay the balance</span>
+                                            <span x-show="topUpLoading">Creating payment…</span>
+                                        </button>
+                                    </template>
+                                    <template x-if="!session.underpayment.can_top_up">
+                                        <p class="mt-3 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
+                                            Please contact support with your order number to complete this payment.
+                                        </p>
+                                    </template>
+                                    <p x-show="topUpError" x-cloak class="mt-2 text-[11px] font-semibold text-red-700 dark:text-red-400" x-text="topUpError"></p>
+                                </div>
+                            </template>
+
+                            {{-- A lapsed quote is not a failed payment: coins already sent still
+                                 credit once they confirm. Saying otherwise would panic customers
+                                 whose transaction is simply still on-chain. --}}
+                            <div x-show="quoteExpired && !session?.underpayment" x-cloak class="mt-5 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-center dark:border-amber-500/30 dark:bg-amber-900/20">
+                                <p class="text-xs font-bold text-amber-900 dark:text-amber-200">This quote has expired</p>
+                                <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                                    If you already sent the payment, keep this page open — it will still be credited once the network confirms it.
+                                    If you have not paid yet, start a new checkout to get a fresh amount.
+                                </p>
+                            </div>
+
+                            <div x-show="!quoteExpired && !session?.underpayment" class="flex flex-col items-center mt-5 text-center">
                                 <svg class="h-5 w-5 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1036,7 +1118,7 @@
     </div>
 
     <script>
-        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees, cryptoFeeConfig) {
+        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees) {
             return {
                 method: 'card',
                 crypto: '',
@@ -1046,7 +1128,6 @@
                 isLoggedIn: isLoggedIn || false,
                 hasTransactionPin: hasTransactionPin || false,
                 paymentFees: paymentFees || { fee_free: [], methods: {}, default: { transaction: 0, international: 0 } },
-                cryptoFeeConfig: cryptoFeeConfig || { service_fee_pct: 0.5, network_fees: {}, network_map: {} },
 
                 // Coupon live-preview state. couponApplied holds the validated
                 // code once Apply succeeds; the discount is shown on the total
@@ -1058,9 +1139,13 @@
                 couponError: '',
                 couponLoading: false,
 
-                // Crypto fee breakdown state
-                cryptoFeeBreakdown: null,
-                cryptoFeeLoading: false,
+                // Set when the gateway's quote window lapses before the customer sends.
+                // Distinct from an error: coins sent late still credit on confirmation.
+                quoteExpired: false,
+
+                // Underpayment recovery.
+                topUpLoading: false,
+                topUpError: '',
 
                 async applyCoupon() {
                     const code = (this.couponCode || '').trim();
@@ -1223,45 +1308,11 @@
                         }
                     });
 
-                    this.$watch('crypto', () => this.fetchCryptoFees());
-                    this.$watch('method', (newVal) => {
-                        if (newVal === 'crypto') this.fetchCryptoFees();
-                    });
-                },
-
-                async fetchCryptoFees() {
-                    if (this.method !== 'crypto' || !this.crypto) {
-                        this.cryptoFeeBreakdown = null;
-                        return;
-                    }
-
-                    const coin = this.coinMeta();
-                    if (!coin) { this.cryptoFeeBreakdown = null; return; }
-
-                    const usdAmount = Math.max(0, Number(this.$store.cart.subtotalUsd || 0) - Number(this.couponDiscountUsd || 0));
-                    if (usdAmount <= 0) { this.cryptoFeeBreakdown = null; return; }
-
-                    // --- Instant client-side breakdown (no API wait) ---
-                    const cfg = this.cryptoFeeConfig;
-                    const network = cfg.network_map[this.crypto.toLowerCase()] || this.crypto.toLowerCase();
-                    const networkFeeUsd = cfg.network_fees[network] ?? 1.00;
-                    const serviceFeeUsd = Math.round(usdAmount * (cfg.service_fee_pct / 100) * 100) / 100;
-                    const totalDueUsd = usdAmount + networkFeeUsd + serviceFeeUsd;
-                    const rate = coin.perUsd;
-
-                    this.cryptoFeeBreakdown = {
-                        product_price_usd: usdAmount,
-                        network_fee_usd: networkFeeUsd,
-                        service_fee_usd: serviceFeeUsd,
-                        total_due_usd: totalDueUsd,
-                        product_price_crypto: usdAmount * rate,
-                        network_fee_crypto: networkFeeUsd * rate,
-                        service_fee_crypto: serviceFeeUsd * rate,
-                        pay_currency: this.crypto.toLowerCase(),
-                        network: network,
-                        estimated_pay_amount: parseFloat((totalDueUsd * rate).toFixed(coin.decimals)),
-                        exchange_rate: rate,
-                    };
+                    // A basket or coupon change can push the order under the selected
+                    // coin's minimum. Re-validating here means the customer is told
+                    // immediately, rather than at the moment the server rejects them.
+                    this.$watch('couponDiscountUsd', () => this.enforceCoinMinimum());
+                    this.$watch('$store.cart.subtotalUsd', () => this.enforceCoinMinimum());
                 },
 
                 /**
@@ -1343,29 +1394,34 @@
 
                 startCountdown() {
                     if (this.timerInterval) clearInterval(this.timerInterval);
-                    
-                    let expiresAt = this.session?.expires_at;
+
+                    // The gateway's own expiry wins. The session window is a provisional
+                    // value set before a coin is chosen, and running the countdown on it
+                    // used to expire the screen while the customer's transaction was
+                    // still confirming on-chain.
+                    const expiresAt = this.session?.payment_payload?.expires_at || this.session?.expires_at;
                     let targetTime;
-                    
+
                     if (expiresAt) {
                         targetTime = new Date(expiresAt).getTime();
                     } else {
-                        // Fallback: 30 minutes from now
-                        targetTime = Date.now() + (30 * 60 * 1000);
+                        targetTime = Date.now() + (20 * 60 * 1000);
                     }
-                    
+
                     const updateTimer = () => {
                         const now = Date.now();
                         const diff = targetTime - now;
-                        
+
                         if (diff <= 0) {
                             clearInterval(this.timerInterval);
                             this.timerText = '00:00';
-                            this.paymentState = 'error';
-                            this.errorMessage = 'Transaction time frame expired.';
+                            // A lapsed quote is not a failed payment. Coins already sent
+                            // are still credited when they confirm, so this must not
+                            // present as an error that implies the money is lost.
+                            this.quoteExpired = true;
                             return;
                         }
-                        
+
                         const minutes = Math.floor(diff / 60000);
                         const seconds = Math.floor((diff % 60000) / 1000);
                         this.timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -1392,8 +1448,88 @@
                     this.copiedStates = {};
                 },
 
+                // Ask the server for a follow-up payment covering the outstanding
+                // balance. The response is a fresh session carrying a new address and
+                // amount, so the existing payment panel simply re-renders against it.
+                async requestTopUp() {
+                    if (this.topUpLoading || ! this.session?.id) {
+                        return;
+                    }
+
+                    this.topUpLoading = true;
+                    this.topUpError = '';
+
+                    try {
+                        const res = await fetch(`/api/payment-sessions/${this.session.id}/top-up`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                        });
+                        const body = await res.json();
+
+                        if (! res.ok) {
+                            this.topUpError = body.message || 'Could not create a top-up payment.';
+                            return;
+                        }
+
+                        this.session = body.data || body;
+                        this.quoteExpired = false;
+                        this.startCountdown();
+                    } catch (e) {
+                        this.topUpError = 'Network error. Please try again.';
+                    } finally {
+                        this.topUpLoading = false;
+                    }
+                },
+
                 coinMeta() {
                     return this.cryptoRates[this.crypto] || null;
+                },
+
+                // Order value in USD, which is the unit every coin minimum is
+                // expressed in.
+                orderUsd() {
+                    return Math.max(0, Number(this.$store.cart.subtotalUsd || 0) - Number(this.couponDiscountUsd || 0));
+                },
+
+                // Whether this order clears the gateway's minimum for a coin.
+                // Unknown minimum (never synced) counts as usable: an empty picker
+                // is a worse failure than letting the gateway do the rejecting.
+                coinUsable(code) {
+                    const coin = this.cryptoRates[code];
+                    if (! coin || coin.minUsd == null) {
+                        return true;
+                    }
+                    const usd = this.orderUsd();
+
+                    // An empty basket should not grey out the whole picker before the
+                    // customer has anything to pay for.
+                    return usd <= 0 || usd >= coin.minUsd;
+                },
+
+                coinMinLabel(code) {
+                    const coin = this.cryptoRates[code];
+                    if (! coin || coin.minUsd == null) {
+                        return '';
+                    }
+
+                    return 'Min $' + Number(coin.minUsd).toFixed(2);
+                },
+
+                unusableCoinCount() {
+                    return Object.keys(this.cryptoRates).filter((code) => ! this.coinUsable(code)).length;
+                },
+
+                // Clear a selection that the basket no longer supports — otherwise
+                // removing an item could leave a now-invalid coin selected and the
+                // customer would only find out when the server rejects it.
+                enforceCoinMinimum() {
+                    if (this.crypto && ! this.coinUsable(this.crypto)) {
+                        this.crypto = '';
+                    }
                 },
 
                 // Estimated gateway processing fee for the selected method
@@ -1417,18 +1553,18 @@
                     return Math.round(amount * pct) / 100;
                 },
 
+                // The order total, in the customer's display currency, for every
+                // method including crypto.
+                //
+                // This used to render a locally-computed crypto figure for crypto
+                // checkouts, which then disagreed with the amount the gateway actually
+                // invoiced on the very next screen. There is no way to compute that
+                // number correctly here: the gateway does not publish the formula it
+                // uses to gross the amount up for fees, so the payable amount can only
+                // be read back from the payment it creates. Quoting the order total in
+                // fiat and the crypto amount exactly once — on the payment screen,
+                // straight from the gateway — is the only way both screens can agree.
                 totalLabel() {
-                    const usd = Math.max(0, Number(this.$store.cart.subtotalUsd || 0) - Number(this.couponDiscountUsd || 0));
-                    if (this.method === 'crypto') {
-                        const coin = this.coinMeta();
-                        if (! coin) {
-                            return 'Select a coin';
-                        }
-                        if (this.cryptoFeeBreakdown) {
-                            return this.cryptoFeeBreakdown.estimated_pay_amount + ' ' + coin.code.toUpperCase();
-                        }
-                        return (usd * coin.perUsd).toFixed(coin.decimals) + ' ' + coin.code.toUpperCase();
-                    }
                     const display = Math.max(0, Number(this.$store.cart.subtotal || 0) + this.processingFee() - Number(this.couponDiscountDisplay || 0));
                     return this.$store.cart.pay(display);
                 },
@@ -1868,6 +2004,17 @@
                         try {
                             let res = await fetch(`/api/payment-sessions/${this.session.id}/status`);
                             let data = await res.json();
+
+                            // Carry the underpayment summary onto the live session so the
+                            // balance-owing panel can appear. Without this a short payment
+                            // leaves the customer on a spinner forever, waiting for a
+                            // confirmation that will never arrive.
+                            if (data.underpayment) {
+                                this.session = { ...this.session, underpayment: data.underpayment };
+                                clearInterval(this.pollInterval);
+                                return;
+                            }
+
                             if (data.status === 'confirmed') {
                                 clearInterval(this.pollInterval);
                                 this.paymentState = 'success';

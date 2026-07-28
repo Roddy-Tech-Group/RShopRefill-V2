@@ -21,7 +21,12 @@ new class extends Component
     public function with(): array
     {
         return [
-            'cryptoCoins' => CurrencyRate::query()->where('is_active', true)->where('type', 'crypto')->get()
+            // payable(), not just is_active: a coin we have enabled but the gateway
+            // no longer accepts on our account would fail at payment creation. The
+            // checkout picker already filters on this — funding must match, or the
+            // two screens offer different coin sets.
+            'cryptoCoins' => CurrencyRate::query()->payable()->crypto()
+                ->orderBy('sort_order')->orderBy('code')->get(),
         ];
     }
 
@@ -1039,8 +1044,8 @@ new class extends Component
                         @forelse ($cryptoCoins as $coin)
                             <button type="button" @click="cryptoDetails.pay_currency = '{{ strtolower($coin->code) }}'; paySession('crypto', { pay_currency: '{{ strtolower($coin->code) }}' })"
                                 class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 transition-colors border-zinc-200 hover:border-blue-500 hover:bg-blue-50">
-                                @if ($coin->icon_path)
-                                    <img src="{{ asset('assets/' . $coin->icon_path) }}" alt="" class="h-6 w-6 rounded-[12px]">
+                                @if ($coin->iconUrl())
+                                    <img src="{{ $coin->iconUrl() }}" alt="" class="h-6 w-6 rounded-[12px]">
                                 @else
                                     <span class="flex h-6 w-6 items-center justify-center rounded-[12px] bg-amber-500 text-[10px] font-black text-white uppercase">{{ substr($coin->code, 0, 1) }}</span>
                                 @endif
@@ -1107,9 +1112,13 @@ new class extends Component
                             <div class="flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
                                 <!-- QR Code -->
                                 <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-3 border border-zinc-150 shadow-sm">
-                                    <img 
-                                        :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(session?.payment_payload?.qr_payload || '')" 
-                                        alt="Payment QR Code" 
+                                    {{-- Rendered by us. This used to call a third-party image
+                                         service, which sent the customer's deposit address
+                                         off-site and would have let a compromise there swap
+                                         the address shown for an attacker's. --}}
+                                    <img
+                                        :src="session?.id ? ('/api/payment-sessions/' + session.id + '/crypto-qr') : ''"
+                                        alt="Payment QR code"
                                         class="h-32 w-32 object-contain"
                                     />
                                     <span class="mt-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">Scan to pay</span>

@@ -2,8 +2,11 @@
 
 namespace App\Domain\Wallet\Services;
 
+use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
+use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
 use Illuminate\Support\Facades\Log;
 
@@ -47,7 +50,6 @@ class FundingVerificationService
             $flwStatus = $verification['status'] ?? null;
             $flwAmount = (float) ($verification['amount'] ?? 0.0);
             $flwCurrency = strtoupper($verification['currency'] ?? '');
-            $flwRef = $verification['tx_ref'] ?? null;
 
             // 1. Status Check
             if ($flwStatus !== 'successful' && $flwStatus !== 'success') {
@@ -92,11 +94,68 @@ class FundingVerificationService
             return true;
         }
 
-        Log::error('Verification not implemented for provider', [
-            'reference' => $funding->reference,
-            'gateway' => $providerName,
-        ]);
+        // Every non-Flutterwave gateway used to fall through to this log line and
+        // return false, which the caller treats as a failed funding. For crypto that
+        // meant: the customer's coins land, NOWPayments confirms the payment, and
+        // then our own code marks the deposit failed and never credits the wallet.
+        // Retrying could not help either, because the attempt was already Paid so
+        // VerifyPaymentJob short-circuited before reaching here.
+        //
+        // The generic path below verifies through the provider contract, so any
+        // gateway implementing PaymentProviderInterface works without another
+        // bespoke branch here.
+        return $this->verifyViaPaymentAttempt($funding, $provider, $providerName);
+    }
 
-        return false;
+    /**
+     * Provider-agnostic verification for gateways whose funding is settled against
+     * a PaymentAttempt (currently NOWPayments; anything future implementing the
+     * interface is covered automatically).
+     *
+     * Server-to-server verification is delegated to the provider — the gateway is
+     * the only trustworthy source for whether money actually arrived. For crypto
+     * the tamper vector Flutterwave guards against does not exist: the customer
+     * cannot alter an on-chain amount after the fact, and the provider already
+     * enforces zero-tolerance full payment before it will report Paid.
+     */
+    private function verifyViaPaymentAttempt(WalletFunding $funding, PaymentProviderInterface $provider, string $providerName): bool
+    {
+        $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)
+            ->where('payable_id', $funding->id)
+            ->latest('created_at')
+            ->first();
+
+        if (! $attempt) {
+            Log::error('Wallet funding verification failed - no payment attempt linked', [
+                'reference' => $funding->reference,
+                'gateway' => $providerName,
+            ]);
+
+            return false;
+        }
+
+        // Already settled by an earlier verification (e.g. VerifyPaymentJob ran the
+        // provider check before dispatching here). Re-hitting the gateway would be
+        // a redundant round trip for a state that cannot regress.
+        $verified = $attempt->payment_status === PaymentStatus::Paid
+            || $provider->verifyPayment($attempt);
+
+        if (! $verified) {
+            Log::warning('Wallet funding verification failed - gateway does not report payment as settled', [
+                'reference' => $funding->reference,
+                'gateway' => $providerName,
+                'attempt_id' => $attempt->id,
+                'payment_status' => $attempt->payment_status?->value,
+            ]);
+
+            return false;
+        }
+
+        $funding->gateway_reference = $attempt->gateway_reference;
+        $funding->verification_payload_snapshot = $attempt->verification_payload ?? [];
+        $funding->verified_at = now();
+        $funding->save();
+
+        return true;
     }
 }

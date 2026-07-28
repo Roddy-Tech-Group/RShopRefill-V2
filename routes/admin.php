@@ -269,7 +269,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Volt::route('api-settings', 'admin.api-settings')->name('api-settings');
 
         // Crypto Fees
-        Volt::route('crypto-fees', 'admin.crypto-fees')->name('crypto-fees');
 
         Volt::route('account-activity', 'admin.account-activity')->name('account-activity');
 

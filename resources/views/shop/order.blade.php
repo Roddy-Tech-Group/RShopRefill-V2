@@ -813,9 +813,13 @@
                         <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start bg-zinc-50 p-4 border border-zinc-200 rounded-[12px]">
                             <!-- QR Code -->
                             <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-2 border border-zinc-150">
-                                <img 
-                                    :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(session?.payment_payload?.qr_payload || '')" 
-                                    alt="Payment QR Code" 
+                                {{-- Rendered by us. This used to call a third-party image
+                                     service, which sent the customer's deposit address
+                                     off-site and would have let a compromise there swap
+                                     the address shown for an attacker's. --}}
+                                <img
+                                    :src="session?.id ? ('/api/payment-sessions/' + session.id + '/crypto-qr') : ''"
+                                    alt="Payment QR code"
                                     class="h-28 w-28 object-contain"
                                 />
                                 <span class="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400">Scan to pay</span>

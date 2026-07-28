@@ -67,7 +67,13 @@ class PaymentSessionService
 
             $initialStatus = match ($session->session_type) {
                 'wallet' => $order->user->hasTransactionPin() ? 'awaiting_customer_action' : 'awaiting_payment',
-                'crypto' => 'awaiting_transfer',
+                // Crypto no longer opens on 'awaiting_transfer'. No payment exists
+                // until the customer picks a coin, so there is no address and no
+                // amount to transfer yet — claiming otherwise is what let the old
+                // pre-created BTC invoice masquerade as a live quote. The session
+                // moves to 'awaiting_transfer' in PaymentSessionController once
+                // chargeCrypto() returns a real address and amount.
+                'crypto' => 'awaiting_method',
                 default => 'awaiting_method',
             };
             $session->transitionTo($initialStatus);

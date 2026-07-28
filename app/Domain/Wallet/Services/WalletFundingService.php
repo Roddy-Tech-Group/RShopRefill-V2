@@ -217,7 +217,7 @@ class WalletFundingService
      */
     public function failFunding(WalletFunding $funding, string $reason, array $payload = []): void
     {
-        \Illuminate\Support\Facades\DB::transaction(function () use ($funding, $reason, $payload) {
+        DB::transaction(function () use ($funding, $reason, $payload) {
             $funding->update([
                 'status' => FundingStatus::Failed,
                 'failed_reason' => $reason,
@@ -226,13 +226,17 @@ class WalletFundingService
             ]);
 
             // Fail polymorphic payment attempt
-            $attempt = \App\Models\PaymentAttempt::where('payable_type', \App\Models\WalletFunding::class)
+            $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)
                 ->where('payable_id', $funding->id)
                 ->first();
 
             if ($attempt) {
+                // App\Enums\PaymentStatus does not exist — this referenced a class that
+                // was never created, so failFunding() threw a fatal Error the moment a
+                // funding had an attempt attached, rolling the whole transaction back and
+                // leaving the record stuck on Pending instead of Failed.
                 $attempt->update([
-                    'payment_status' => \App\Enums\PaymentStatus::Failed,
+                    'payment_status' => PaymentStatus::Failed,
                     'failed_at' => now(),
                 ]);
 
@@ -243,8 +247,8 @@ class WalletFundingService
                 }
             }
 
-            \Illuminate\Support\Facades\DB::afterCommit(function () use ($funding, $reason) {
-                event(new \App\Domain\Wallet\Events\FundingFailed($funding, $reason));
+            DB::afterCommit(function () use ($funding, $reason) {
+                event(new FundingFailed($funding, $reason));
             });
         });
     }

@@ -36,7 +36,9 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
             'services.flutterwave.secret_key' => 'FLW_SECRET_KEY_MOCK',
             'services.flutterwave.public_key' => 'FLW_PUB_KEY_MOCK',
             'services.flutterwave.direct_charge_enabled' => true,
-            'services.nowpayments.api_key' => 'NOWPAYMENTS_KEY_MOCK',
+            // Mock mode is selected by environment policy (no key + local/testing),
+            // not by a "MOCK" substring in the key, so the key is cleared here.
+            'services.nowpayments.api_key' => null,
             'pricing.safety_markup_percent' => 10.0,
             'pricing.min_margin_percent' => 1.0,
         ]);
@@ -146,6 +148,10 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
                 'is_expired' => false,
                 'confirmed_at' => null,
                 'failed_at' => null,
+                // Null unless the customer's payment came up short. The poll is the
+                // only channel that can tell a waiting customer that, since a short
+                // payment is deliberately never auto-fulfilled.
+                'underpayment' => null,
             ]);
     }
 
@@ -484,7 +490,7 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
         $payResponse = $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $sessionId), [
             'method' => 'crypto',
             'details' => [
-                'pay_currency' => 'USDT',
+                'pay_currency' => 'USDTBSC',
             ],
         ]);
 
@@ -595,7 +601,7 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
         $payCrypto = $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', ['id' => $ngnSessionId]), [
             'method' => 'crypto',
             'details' => [
-                'pay_currency' => 'USDT',
+                'pay_currency' => 'USDTBSC',
             ],
         ]);
         $payCrypto->assertStatus(200)
