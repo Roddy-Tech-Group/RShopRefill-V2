@@ -84,9 +84,35 @@ class HealthEndpointTest extends TestCase
 
     public function test_it_reports_healthy_alerting_when_a_channel_exists(): void
     {
-        config(['alerting.channels.slack.webhook_url' => 'https://hooks.slack.test/x']);
+        // Every channel is set explicitly, including the ones being switched off.
+        // This assertion originally set only a Slack webhook and still passed
+        // locally — not because Slack counted, but because the developer's .env
+        // carried real OPS_TELEGRAM_* values that satisfied it by accident. CI,
+        // with no .env, was the first place to say so.
+        config([
+            'alerting.channels.telegram.bot_token' => 'test-token',
+            'alerting.channels.telegram.chat_id' => '12345',
+            'alerting.channels.mail.to' => null,
+            'alerting.channels.slack.enabled' => false,
+            'alerting.channels.slack.webhook_url' => null,
+        ]);
 
         $this->getJson('/health')->assertJsonPath('components.alerting.status', 'ok');
+    }
+
+    public function test_a_slack_webhook_alone_is_not_a_usable_channel(): void
+    {
+        // Slack is opt-in. A webhook URL left behind after the team stopped using
+        // it must never let /health claim the platform can reach a human.
+        config([
+            'alerting.channels.telegram.bot_token' => null,
+            'alerting.channels.telegram.chat_id' => null,
+            'alerting.channels.mail.to' => null,
+            'alerting.channels.slack.enabled' => false,
+            'alerting.channels.slack.webhook_url' => 'https://hooks.slack.test/x',
+        ]);
+
+        $this->getJson('/health')->assertJsonPath('components.alerting.status', 'fail');
     }
 
     public function test_it_is_never_cached(): void

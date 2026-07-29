@@ -13,9 +13,11 @@
 /vendor
 .DS_Store
 .env
-# .env.example is intentionally NOT ignored: it is the template a new engineer
-# (or a rebuilt server) starts from. Ignoring it is why a fresh clone had no
-# usable environment reference at all.
+# .env.example is held back with the operations docs (P0-6) until both have been
+# verified together — the template and the manual that explains it are only
+# useful as a pair. Un-ignore it when docs/ ships; a fresh clone has no usable
+# environment reference until then.
+.env.example
 .env.backup
 .env.backup
 .env.production

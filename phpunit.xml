@@ -35,5 +35,17 @@
         <env name="FLW_WEBHOOK_HASH" value="FLW_WEBHOOK_HASH_MOCK"/>
         <env name="ZENDIT_API_KEY" value="ZENDIT_API_KEY_MOCK"/>
         <env name="TURNSTILE_ENABLED" value="false"/>
+        <!--
+            Alert channels are blanked so the suite behaves identically on a
+            developer machine and on CI. A real OPS_TELEGRAM_* pair in a local
+            .env once made a /health assertion pass for the wrong reason, and CI
+            was the first thing to notice. Tests that need a channel must
+            configure it themselves.
+        -->
+        <env name="OPS_TELEGRAM_BOT_TOKEN" value=""/>
+        <env name="OPS_TELEGRAM_CHAT_ID" value=""/>
+        <env name="OPS_ALERT_EMAIL" value=""/>
+        <env name="OPS_SLACK_ENABLED" value="false"/>
+        <env name="OPS_SLACK_WEBHOOK_URL" value=""/>
     </php>
 </phpunit>
