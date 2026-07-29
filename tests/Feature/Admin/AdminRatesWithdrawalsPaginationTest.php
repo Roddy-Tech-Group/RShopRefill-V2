@@ -23,6 +23,18 @@ class AdminRatesWithdrawalsPaginationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // currency_rates is NOT empty at the start of a test: the crypto launch
+        // migrations seed a fixed coin lineup, and RefreshDatabase runs migrations
+        // for every case. These tests assert exact totals over a dataset they build
+        // themselves, so the seeded coins would be counted alongside it - and every
+        // figure here would drift again the next time the lineup gains a coin.
+        CurrencyRate::query()->delete();
+    }
+
     private function asAdmin(): self
     {
         $admin = Admin::firstOrCreate(
