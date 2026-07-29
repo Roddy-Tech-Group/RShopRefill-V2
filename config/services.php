@@ -86,9 +86,30 @@ return [
         'api_key' => env('NOWPAYMENTS_API_KEY'),
         'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
         'base_url' => env('NOWPAYMENTS_BASE_URL', 'https://api.nowpayments.io/v1'),
-        // Max shortfall (as % of the invoiced crypto amount) still accepted as
-        // fully paid on partially_paid payments — covers exchange withdrawal fees.
-        'underpayment_tolerance_percent' => env('NOWPAYMENTS_UNDERPAYMENT_TOLERANCE_PERCENT', 1.0),
+
+        // Sandbox uses a SEPARATE account, API key and IPN secret from production
+        // (account-sandbox.nowpayments.io). Flipping this flag alone is not enough —
+        // the credentials above must be the sandbox pair too.
+        'sandbox' => (bool) env('NOWPAYMENTS_SANDBOX', false),
+        'sandbox_base_url' => env('NOWPAYMENTS_SANDBOX_BASE_URL', 'https://api-sandbox.nowpayments.io/v1'),
+
+        // Sandbox-only outcome simulator, passed as `case` on payment creation.
+        // One of: success, common, failed, partially_paid. Ignored in production.
+        'sandbox_case' => env('NOWPAYMENTS_SANDBOX_CASE'),
+
+        // ZERO underpayment tolerance is a deliberate business rule, not a default
+        // we inherited: RShopRefills margins are often cents, so absorbing even a
+        // 1% shortfall can erase the profit on an order. A payment is settled only
+        // when actually_paid >= pay_amount, compared in CRYPTO terms. Anything less
+        // is held as PartiallyPaid for the top-up flow and is never auto-fulfilled.
+        //
+        // Compare in crypto, never fiat: NOWPayments derives partially_paid from the
+        // fiat equivalent at settlement, so a customer who sends exactly the right
+        // crypto can still be flagged short if the market moved mid-confirmation.
+        // Requesting a fixed rate plus comparing crypto-to-crypto removes that class
+        // of false shortfall entirely.
+        'fixed_rate' => (bool) env('NOWPAYMENTS_FIXED_RATE', true),
+        'fee_paid_by_user' => (bool) env('NOWPAYMENTS_FEE_PAID_BY_USER', true),
     ],
 
     'maplerad' => [

@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -133,7 +134,12 @@ class NowPaymentsWebhookTest extends TestCase
         $attempt = $this->attempt('5524759814');
 
         Http::fake([
-            '*' => Http::response(['payment_id' => 5524759814, 'payment_status' => 'finished'], 200),
+            '*' => Http::response([
+                'payment_id' => 5524759814,
+                'payment_status' => 'finished',
+                'pay_amount' => 25,
+                'actually_paid' => 25,
+            ], 200),
         ]);
 
         $provider = new NowPaymentsProvider;
@@ -142,6 +148,24 @@ class NowPaymentsWebhookTest extends TestCase
         $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/payment/5524759814'));
+    }
+
+    /**
+     * A settled status with no amount data is anomalous — we cannot prove the
+     * customer paid in full, so the order is held rather than fulfilled. Erring
+     * toward holding is the correct direction when the money is unverifiable.
+     */
+    public function test_verify_payment_holds_when_amount_data_is_missing(): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5524759814');
+
+        Http::fake([
+            '*' => Http::response(['payment_id' => 5524759814, 'payment_status' => 'finished'], 200),
+        ]);
+
+        $this->assertFalse((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status);
     }
 
     public function test_webhook_with_unsorted_json_body_passes_signature_verification(): void
@@ -260,13 +284,19 @@ class NowPaymentsWebhookTest extends TestCase
         Bus::assertNotDispatched(VerifyPaymentJob::class);
     }
 
-    public function test_verify_payment_accepts_partially_paid_within_tolerance(): void
+    /**
+     * Zero tolerance is a deliberate business rule: RShopRefills margins are often
+     * only cents, so absorbing even a fraction of a percent can erase the profit on
+     * an order. This previously asserted the opposite — that a sub-1% shortfall was
+     * accepted as fully paid — and that behaviour has been removed.
+     */
+    public function test_verify_payment_never_accepts_a_short_payment(): void
     {
         config(['services.nowpayments.api_key' => 'live-key-xyz']);
         $attempt = $this->attempt('5519782510');
 
         // The real-world case: 39.63 received against 39.638021 invoiced —
-        // a 0.02% shortfall from an exchange withdrawal fee.
+        // a 0.02% shortfall from an exchange withdrawal fee. Tiny, but still short.
         Http::fake([
             '*' => Http::response([
                 'payment_id' => 5519782510,
@@ -278,8 +308,31 @@ class NowPaymentsWebhookTest extends TestCase
 
         $provider = new NowPaymentsProvider;
 
-        $this->assertTrue($provider->verifyPayment($attempt));
-        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+        $this->assertFalse($provider->verifyPayment($attempt));
+        $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status);
+    }
+
+    /**
+     * A settled-looking status must not fulfil on its own. NOWPayments can report
+     * `finished` while actually_paid is short, so the amount is checked
+     * independently of the status.
+     */
+    public function test_verify_payment_holds_a_short_payment_even_when_status_is_finished(): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5519782510');
+
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => 'finished',
+                'pay_amount' => 100,
+                'actually_paid' => 99.5,
+            ], 200),
+        ]);
+
+        $this->assertFalse((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status);
     }
 
     public function test_verify_payment_rejects_partially_paid_outside_tolerance(): void
@@ -320,5 +373,136 @@ class NowPaymentsWebhookTest extends TestCase
 
         $this->assertFalse($provider->verifyPayment($attempt));
         $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status);
+    }
+
+    public function test_verify_payment_settles_when_paid_in_full(): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5519782510');
+
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => 'finished',
+                'pay_amount' => 39.638021,
+                'actually_paid' => 39.638021,
+            ], 200),
+        ]);
+
+        $this->assertTrue((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+    }
+
+    /** Overpayment settles the order and is recorded so the surplus can be traced. */
+    public function test_verify_payment_settles_and_records_overpayment(): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5519782510');
+
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => 'finished',
+                'pay_amount' => 100,
+                'actually_paid' => 120,
+            ], 200),
+        ]);
+
+        $this->assertTrue((new NowPaymentsProvider)->verifyPayment($attempt));
+
+        $fresh = $attempt->fresh();
+        $this->assertSame(PaymentStatus::Paid, $fresh->payment_status);
+        $this->assertSame(20.0, (float) data_get($fresh->metadata, 'crypto.overpaid_by'));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: PaymentStatus}>
+     */
+    public static function terminalStatusProvider(): array
+    {
+        return [
+            'failed writes Failed' => ['failed', PaymentStatus::Failed],
+            'expired writes Expired' => ['expired', PaymentStatus::Expired],
+            'refunded writes Refunded' => ['refunded', PaymentStatus::Refunded],
+        ];
+    }
+
+    /**
+     * These three statuses previously fell through to a bare `return false` with no
+     * state written, leaving attempts stuck on Pending forever.
+     */
+    #[DataProvider('terminalStatusProvider')]
+    public function test_verify_payment_writes_terminal_states(string $gatewayStatus, PaymentStatus $expected): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5519782510');
+
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => $gatewayStatus,
+            ], 200),
+        ]);
+
+        $this->assertFalse((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertSame($expected, $attempt->fresh()->payment_status);
+    }
+
+    /** A late intermediate IPN must never walk back an already-settled payment. */
+    public function test_verify_payment_ignores_out_of_order_status(): void
+    {
+        config(['services.nowpayments.api_key' => 'live-key-xyz']);
+        $attempt = $this->attempt('5519782510');
+
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => 'finished',
+                'pay_amount' => 10,
+                'actually_paid' => 10,
+            ], 200),
+        ]);
+        $this->assertTrue((new NowPaymentsProvider)->verifyPayment($attempt));
+
+        // A `confirming` notification arrives after `finished`.
+        Http::fake([
+            '*' => Http::response([
+                'payment_id' => 5519782510,
+                'payment_status' => 'confirming',
+            ], 200),
+        ]);
+
+        $attempt->refresh();
+        (new NowPaymentsProvider)->verifyPayment($attempt);
+
+        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function actionableWebhookStatusProvider(): array
+    {
+        return [
+            'failed' => ['failed'],
+            'expired' => ['expired'],
+            'refunded' => ['refunded'],
+        ];
+    }
+
+    /** The webhook used to 200-ack these and drop them without verifying. */
+    #[DataProvider('actionableWebhookStatusProvider')]
+    public function test_webhook_dispatches_verification_for_terminal_statuses(string $status): void
+    {
+        Bus::fake();
+        $this->attempt('5524759814');
+
+        $payload = ['payment_id' => 5524759814, 'payment_status' => $status];
+
+        $this->withHeaders(['x-nowpayments-sig' => $this->sign($payload)])
+            ->postJson(route('api.webhooks.nowpayments'), $payload)
+            ->assertOk();
+
+        Bus::assertDispatched(VerifyPaymentJob::class);
     }
 }

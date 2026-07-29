@@ -40,7 +40,7 @@ class AdminMobileMenuTest extends TestCase
             'Campaigns', 'Pricing Rules',
             'Hero Sections', 'Hero Cards', 'Blog Posts', 'Press', 'Reviews', 'FAQs',
             'Rcoin Rewards', 'Rcoin Analytics', 'Rcoin Payouts',
-            'Crypto Fees', 'API Settings', 'Activity',
+            'API Settings', 'Activity',
         ] as $label) {
             $this->assertStringContainsString($label, $html, "Mobile menu is missing the {$label} tile.");
         }
@@ -57,7 +57,6 @@ class AdminMobileMenuTest extends TestCase
         $this->assertStringContainsString('Support', $html);
 
         // Sections outside the preset must not appear as tiles.
-        $this->assertStringNotContainsString('Crypto Fees', $html);
         $this->assertStringNotContainsString('Trades Queue', $html);
         $this->assertStringNotContainsString('API Settings', $html);
     }

@@ -52,6 +52,20 @@ class PaymentAttempt extends Model
         'failed_at',
         'expires_at',
         'metadata',
+
+        // Crypto settlement facts. Projected out of metadata->crypto so they can
+        // be queried, indexed and reconciled against a gateway settlement export.
+        'pay_currency',
+        'pay_amount',
+        'actually_paid',
+        'network',
+        'pay_address',
+        'payin_extra_id',
+        'purchase_id',
+        'outcome_amount',
+        'outcome_currency',
+        'gateway_fee',
+        'settlement_delta',
     ];
 
     protected function casts(): array
@@ -66,7 +80,43 @@ class PaymentAttempt extends Model
             'failed_at' => 'datetime',
             'expires_at' => 'datetime',
             'metadata' => 'array',
+            'gateway_fee' => 'array',
+            // Crypto amounts are NOT cast to a fixed scale. Coins differ by orders
+            // of magnitude — 8 decimals for BTC against 2 for a stablecoin — and
+            // rounding a satoshi-scale amount to 4 places would silently corrupt
+            // the very comparison that decides whether a customer paid in full.
         ];
+    }
+
+    /**
+     * Customer sent more than invoiced. Surplus is owed back to them.
+     */
+    public function isOverpaid(): bool
+    {
+        return $this->hasSettled() && (float) $this->settlement_delta > 0;
+    }
+
+    /**
+     * Customer sent less than invoiced. Never fulfilled automatically — however
+     * small the shortfall, absorbing it can erase the margin on a refill order.
+     *
+     * Requires funds to have actually arrived. An unpaid payment reports
+     * actually_paid = 0, and treating that as a shortfall told customers their
+     * payment was short before they had made one.
+     */
+    public function isUnderpaid(): bool
+    {
+        return $this->hasSettled() && (float) $this->settlement_delta < 0;
+    }
+
+    /**
+     * Whether any funds have arrived against this attempt. Distinguishes
+     * "not paid yet" from "paid the wrong amount" — the two look identical if you
+     * only compare amounts.
+     */
+    public function hasSettled(): bool
+    {
+        return $this->settlement_delta !== null && (float) $this->actually_paid > 0;
     }
 
     public function order(): BelongsTo

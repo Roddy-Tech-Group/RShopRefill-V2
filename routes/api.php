@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CheckoutApiController;
+use App\Http\Controllers\Api\CryptoQrController;
 use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
@@ -10,7 +11,6 @@ use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\Storefront\CartController;
 use App\Http\Controllers\Api\Storefront\CatalogController;
 use App\Http\Controllers\Api\Storefront\ConfigController;
-use App\Http\Controllers\Api\Storefront\CryptoFeeController;
 use App\Http\Controllers\Api\Storefront\EsimCatalogController;
 use App\Http\Controllers\Api\UserDashboardController;
 use App\Http\Controllers\Api\UserTransactionController;
@@ -49,10 +49,13 @@ Route::post('webhooks/maplerad', [MapleradWebhookController::class, 'handle'])
     ->middleware(VerifyWebhookSignature::class.':maplerad')
     ->name('api.webhooks.maplerad');
 
-// Airalo low-data + expiry notifications. Auth is HMAC inside the controller
-// (X-Airalo-Signature), not Laravel middleware — the partner can't carry our
-// CSRF token. Returns 200 even on no-match so Airalo doesn't keep retrying.
-Route::post('webhooks/airalo', AiraloWebhookController::class)->name('api.webhooks.airalo');
+// Airalo low-data + expiry notifications, HMAC-signed with X-Airalo-Signature.
+// Verification lives in the shared middleware alongside every other provider so
+// there is one implementation to audit, and so this endpoint inherits the same
+// replay protection. Returns 200 on no-match so Airalo doesn't keep retrying.
+Route::post('webhooks/airalo', AiraloWebhookController::class)
+    ->middleware(VerifyWebhookSignature::class.':airalo')
+    ->name('api.webhooks.airalo');
 
 // Financial Features (Requires Auth + Pin)
 Route::middleware(['auth', 'require-pin'])->group(function () {
@@ -78,7 +81,10 @@ Route::prefix('storefront')->name('api.storefront.')->group(function () {
     Route::get('esims/countries', [EsimCatalogController::class, 'countries'])->name('esims.countries');
     Route::get('esims/{slug}', [EsimCatalogController::class, 'show'])->name('esims.show');
 
-    Route::get('crypto/fee-estimate', [CryptoFeeController::class, 'estimate'])->name('crypto.fee-estimate');
+    // crypto/fee-estimate removed with CryptoFeeService: it computed a network +
+    // service fee locally, which is a figure we must never quote. The gateway
+    // grosses its own fees into the amount it returns, and that amount is now the
+    // only one shown to a customer.
 
     // Cart Flow. `not-suspended` is a no-op for guests (cart access is open);
     // it only blocks an authenticated suspended user from writing to the cart.
@@ -110,9 +116,16 @@ Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function
     // are capped tighter to curb polling abuse and gateway-cost amplification.
     Route::get('{id}', [PaymentSessionController::class, 'show'])->middleware('throttle:payment-session-poll')->name('show');
     Route::get('{id}/status', [PaymentSessionController::class, 'status'])->middleware('throttle:payment-session-poll')->name('status');
+    // Self-hosted payment QR. Replaces the third-party image service the checkout
+    // used to call, which required sending the customer's deposit address off-site.
+    Route::get('{id}/crypto-qr', [CryptoQrController::class, 'show'])->middleware('throttle:payment-session-poll')->name('crypto-qr');
     Route::post('{id}/cancel', [PaymentSessionController::class, 'cancel'])->middleware('throttle:payment-session-action')->name('cancel');
     Route::post('{id}/verify', [PaymentSessionController::class, 'verify'])->middleware('throttle:payment-session-action')->name('verify');
     Route::post('{id}/pay', [PaymentSessionController::class, 'pay'])->middleware('throttle:payment-session-action')->name('pay');
+    // Issues a follow-up payment for the balance on an underpaid crypto session.
+    // Without it a customer whose exchange deducted a withdrawal fee has paid,
+    // received nothing, and has no self-service way to make up the difference.
+    Route::post('{id}/top-up', [PaymentSessionController::class, 'topUp'])->middleware('throttle:payment-session-action')->name('top-up');
 });
 
 // Protected Dashboard & Wallet APIs

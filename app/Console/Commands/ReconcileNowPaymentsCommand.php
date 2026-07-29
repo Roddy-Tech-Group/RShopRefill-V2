@@ -27,12 +27,22 @@ class ReconcileNowPaymentsCommand extends Command
         $hours = $this->option('hours');
 
         $candidates = PaymentAttempt::query()
-            ->where('gateway', 'nowpayments')
+            // 'crypto' is the interim gateway an attempt carries between order
+            // placement and coin selection. Filtering on 'nowpayments' alone made
+            // every attempt abandoned before coin selection invisible to this
+            // sweep — precisely the ones most likely to need recovering.
+            ->whereIn('gateway', ['nowpayments', 'crypto'])
             ->whereNotNull('gateway_reference')
             ->whereNotIn('payment_status', [
                 PaymentStatus::Paid->value,
                 PaymentStatus::Failed->value,
                 PaymentStatus::Refunded->value,
+                // PartiallyPaid is settled at the gateway and terminal for this
+                // payment id — re-verifying it hourly forever produced no state
+                // change, only noise. Recovery is the customer's top-up (which
+                // creates a NEW payment) or an operator, not this sweep.
+                PaymentStatus::PartiallyPaid->value,
+                PaymentStatus::Expired->value,
             ])
             ->when($hours !== null, fn ($q) => $q->where('created_at', '>=', now()->subHours((int) $hours)))
             ->orderBy('id')

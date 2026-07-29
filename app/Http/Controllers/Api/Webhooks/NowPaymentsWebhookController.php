@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Webhooks;
 
+use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\PaymentAttempt;
@@ -43,10 +44,16 @@ class NowPaymentsWebhookController extends Controller
         $attempt->webhook_payload = $payload;
         $attempt->save();
 
-        // partially_paid is included so the provider's verifyPayment() can apply
-        // the underpayment tolerance — exchanges often deduct network/withdrawal
-        // fees, leaving the received amount a fraction short of the invoice.
-        if (in_array(strtolower((string) $paymentStatus), ['confirmed', 'sending', 'finished', 'partially_paid'])) {
+        // Every status except the purely informational in-flight ones triggers a
+        // server-to-server verification, INCLUDING statuses we do not recognise.
+        //
+        // This used to dispatch on a hardcoded set of four. failed, expired and
+        // refunded were acknowledged with a 200 and then dropped, so those attempts
+        // sat on Pending indefinitely — the customer saw a spinner, the sweeper had
+        // nothing to act on, and support had no signal. NOWPayments also documents
+        // statuses in its help centre that are absent from its API reference, so an
+        // unknown value must mean "go ask the API", never "assume nothing happened".
+        if (NowPaymentsStatus::warrantsVerification($paymentStatus)) {
             VerifyPaymentJob::dispatch($attempt);
         }
 

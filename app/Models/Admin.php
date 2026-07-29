@@ -89,7 +89,6 @@ class Admin extends Authenticatable
         'gift-cards' => 'Gift Cards Trading',
         'admins' => 'Admins',
         'rates' => 'Rate Management',
-        'crypto-fees' => 'Crypto Fees',
         'settings' => 'System Settings',
         'api-settings' => 'API & Integrations',
     ];
@@ -176,7 +175,7 @@ class Admin extends Authenticatable
         $name = str_starts_with($routeName, 'admin.') ? substr($routeName, 6) : $routeName;
 
         // Special rule: Moderators can never view individual customer profiles
-        if ($this->role === \App\Domain\Admin\Enums\AdminRole::Moderator) {
+        if ($this->role === AdminRole::Moderator) {
             if ($name === 'customer' || str_starts_with($name, 'customer.')) {
                 return false;
             }
@@ -221,7 +220,6 @@ class Admin extends Authenticatable
             str_starts_with($name, 'gift-cards') => 'gift-cards',
             str_starts_with($name, 'admins') => 'admins',
             str_starts_with($name, 'rates') => 'rates',
-            str_starts_with($name, 'crypto-fees') => 'crypto-fees',
             str_starts_with($name, 'settings') => 'settings',
             str_starts_with($name, 'api-settings') => 'api-settings',
             default => null,
@@ -251,7 +249,7 @@ class Admin extends Authenticatable
         if ($this->canAccessSection('support-tickets')) {
             array_push($types, 'ticket', 'support-ticket');
         }
-        
+
         // Let basic operational alerts through if they have Operations access
         if ($this->canAccessAdminRoute('operations')) {
             $types[] = 'system';

@@ -6,10 +6,16 @@
 /storage/*.key
 /storage/logs/audits/
 /storage/pail
+# Backup archives bundle the database, .env and customer PII. Committing one
+# would publish every provider credential the platform holds.
+/storage/backups/
+/storage/backup-temp/
 /vendor
 .DS_Store
 .env
-.env.example
+# .env.example is intentionally NOT ignored: it is the template a new engineer
+# (or a rebuilt server) starts from. Ignoring it is why a fresh clone had no
+# usable environment reference at all.
 .env.backup
 .env.backup
 .env.production
@@ -31,3 +37,15 @@ yarn-error.log
 ProjectMemory.md
 public/assets/Store front video 1.mp4
 /storage/partners.php
+
+# Env backups — these contain REAL credentials and must never be committed.
+.env.backup-*
+.env.*.bak
+.env.bak
+
+# Personal planning / strategy notes — local only, never committed.
+CTO.md
+CTO_roadmap.md
+crypto_implementation.md
+crypto_gateway_decision.md
+payment_provider_kill_switch_plan.md

@@ -111,6 +111,33 @@ class VerifyWebhookSignature
                     config('services.nowpayments.ipn_secret')
                 );
 
+            case 'airalo':
+                // Airalo issues partners only a client_id + client_secret pair, so
+                // the client_secret is the signing key unless a dedicated webhook
+                // secret has been arranged. The digest covers the raw body and
+                // arrives hex-encoded, sometimes with a `sha256=` prefix.
+                $secret = (string) (config('services.airalo.webhook_secret')
+                    ?: config('services.airalo.client_secret', ''));
+
+                if ($secret === '') {
+                    // Unsigned requests are a local/testing convenience only.
+                    // Staging handles real provider traffic and must stay closed,
+                    // so this deliberately does not key off isProduction().
+                    return app()->environment('local', 'testing');
+                }
+
+                $signature = (string) ($request->header('X-Airalo-Signature')
+                    ?: $request->header('Signature')
+                    ?: '');
+
+                if ($signature === '') {
+                    return false;
+                }
+
+                $signature = (string) preg_replace('/^sha256=/i', '', $signature);
+
+                return hash_equals(hash_hmac('sha256', $payload, $secret), $signature);
+
             default:
                 return false;
         }
@@ -135,6 +162,17 @@ class VerifyWebhookSignature
 
                 return $paymentId !== null
                     ? $paymentId.':'.hash('sha256', $request->getContent())
+                    : null;
+            case 'airalo':
+                // One ICCID legitimately produces several events (75 % usage, then
+                // 90 %, then expiry warnings), so keying on the ICCID alone would
+                // silently drop every notification after the first. Hashing the
+                // body dedupes byte-identical redeliveries — and replays of a
+                // captured request — while letting genuine state changes through.
+                $iccid = $data['iccid'] ?? null;
+
+                return $iccid !== null
+                    ? $iccid.':'.hash('sha256', $request->getContent())
                     : null;
             default:
                 return null;

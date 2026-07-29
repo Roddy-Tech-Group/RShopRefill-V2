@@ -5,16 +5,20 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Order\Events\PaymentConfirmed;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
+use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\FulfillOrderItemJob;
+use App\Models\CurrencyRate;
+use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
 use Illuminate\Http\Request;
@@ -68,11 +72,20 @@ class PaymentSessionController extends Controller
      */
     public function status(string $id, Request $request)
     {
-        $session = PaymentSession::with(['paymentAttempt:id,user_id,order_id', 'paymentAttempt.order'])
+        // The crypto settlement columns are selected because the poll is the only
+        // channel that can tell a waiting customer their payment came up short —
+        // without it they sit on a spinner awaiting a confirmation that will never
+        // come, since a short payment is deliberately never auto-fulfilled.
+        $session = PaymentSession::with([
+            'paymentAttempt:id,user_id,order_id,payment_status,pay_currency,pay_amount,actually_paid,settlement_delta,purchase_id',
+            'paymentAttempt.order',
+        ])
             ->select('id', 'status', 'expires_at', 'confirmed_at', 'failed_at', 'payment_attempt_id')
             ->findOrFail($id);
 
         $this->authorizeSessionAccess($session);
+
+        $attempt = $session->paymentAttempt;
 
         return response()->json([
             'id' => $session->id,
@@ -80,6 +93,13 @@ class PaymentSessionController extends Controller
             'is_expired' => $session->expires_at ? $session->expires_at->isPast() : false,
             'confirmed_at' => $session->confirmed_at?->toIso8601String(),
             'failed_at' => $session->failed_at?->toIso8601String(),
+            'underpayment' => $attempt && $attempt->isUnderpaid() ? [
+                'expected' => (string) $attempt->pay_amount,
+                'received' => (string) $attempt->actually_paid,
+                'shortfall' => (string) abs((float) $attempt->settlement_delta),
+                'currency' => strtoupper((string) $attempt->pay_currency),
+                'can_top_up' => $attempt->purchase_id !== null,
+            ] : null,
         ]);
     }
 
@@ -309,6 +329,16 @@ class PaymentSessionController extends Controller
                     'details.pay_currency' => 'required|string',
                 ]);
 
+                // Reject a coin the gateway cannot accept for this order value BEFORE
+                // creating anything. Minimums differ by more than two orders of
+                // magnitude across our coins and float with network conditions, so
+                // without this the customer commits to a payment method and only then
+                // meets a raw gateway rejection. The UI hides these coins already;
+                // this is the authoritative check, since the UI list can be stale.
+                if ($rejection = $this->rejectUnusableCoin($attempt, (string) $details['pay_currency'])) {
+                    return response()->json(['message' => $rejection], 422);
+                }
+
                 // --- FIX: Switch gateway to nowpayments for both Attempt and Funding ---
                 // By default, wallet funding initiates with flutterwave. When switching
                 // to crypto in the checkout/funding wizard, we must update the gateway
@@ -404,6 +434,18 @@ class PaymentSessionController extends Controller
             } elseif ($result['status'] === 'awaiting_transfer') {
                 $session->transitionTo('awaiting_transfer');
                 $session->payment_payload = array_merge($session->payment_payload ?? [], $result);
+
+                // Re-anchor the session to the gateway's own expiry now that a real
+                // payment exists. Until a coin is chosen there is no quote to expire,
+                // so the session carries a provisional window; keeping that window
+                // would let the sweeper cancel an order while the customer's coins
+                // are still confirming. The gateway's value is authoritative and is
+                // the same one the countdown must run on.
+                $attempt->refresh();
+                if ($attempt->expires_at) {
+                    $session->expires_at = $attempt->expires_at;
+                }
+
                 $session->save();
             } elseif ($result['status'] === 'awaiting_confirmation') {
                 $session->transitionTo('awaiting_confirmation');
@@ -445,6 +487,124 @@ class PaymentSessionController extends Controller
             Log::error('Payment session pay failed: '.$e->getMessage());
 
             return response()->json(['message' => 'Payment processing failed: '.$e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Issue a follow-up payment for the outstanding balance on an underpaid session.
+     *
+     * Zero tolerance means a short payment is never fulfilled, so without this the
+     * customer's money has arrived, their order has not, and they have no way to
+     * make up the difference. Most shortfalls are not their fault — exchanges
+     * commonly deduct a withdrawal fee from the amount sent — so the recovery path
+     * has to be self-service rather than a support ticket.
+     */
+    public function topUp(string $id)
+    {
+        $session = PaymentSession::where('id', $id)->orWhere('client_reference', $id)->firstOrFail();
+        $this->authorizeSessionAccess($session);
+
+        $attempt = $session->paymentAttempt;
+
+        if (! $attempt || $attempt->payment_status !== PaymentStatus::PartiallyPaid) {
+            return response()->json(['message' => 'This payment has no outstanding balance.'], 422);
+        }
+
+        $provider = app(PaymentGatewayFactory::class)->getProvider($attempt->gateway);
+
+        if (! $provider instanceof NowPaymentsProvider) {
+            return response()->json(['message' => 'Top-up is not available for this payment method.'], 422);
+        }
+
+        $result = $provider->createTopUpPayment($attempt);
+
+        if (($result['status'] ?? 'failed') === 'failed') {
+            return response()->json(['message' => $result['message'] ?? 'Could not create a top-up payment.'], 422);
+        }
+
+        $attempt->refresh();
+
+        // Back to awaiting_transfer: there is a live quote again, for the balance.
+        $session->payment_payload = array_merge($session->payment_payload ?? [], $result, ['is_top_up' => true]);
+        if ($attempt->expires_at) {
+            $session->expires_at = $attempt->expires_at;
+        }
+        $session->save();
+        $session->transitionTo('awaiting_transfer');
+
+        // Pending, not PartiallyPaid: the outstanding balance is now unpaid rather
+        // than short, and leaving it PartiallyPaid would keep it out of the
+        // reconciler's sweep.
+        $attempt->payment_status = PaymentStatus::Pending;
+        $attempt->save();
+
+        return new PaymentSessionResource($session->fresh());
+    }
+
+    /**
+     * Why this coin cannot be used for this order, or null if it can.
+     *
+     * Returns customer-facing copy: it names the coin, states the minimum in the
+     * money they understand, and tells them what to do instead. A raw gateway
+     * rejection here reads as a failure of the store rather than a limit of the
+     * chain they picked.
+     */
+    private function rejectUnusableCoin(PaymentAttempt $attempt, string $payCurrency): ?string
+    {
+        $coin = CurrencyRate::query()
+            ->crypto()
+            ->where('code', strtoupper(trim($payCurrency)))
+            ->first();
+
+        if (! $coin) {
+            return 'That cryptocurrency is not available. Please choose another coin.';
+        }
+
+        if (! $coin->is_active || ! $coin->is_payable) {
+            return "{$coin->name} is temporarily unavailable. Please choose another coin.";
+        }
+
+        // Fails open on an unsynced minimum — see CurrencyRate::acceptsOrderValue.
+        $usd = $this->attemptValueInUsd($attempt);
+
+        if ($usd !== null && ! $coin->acceptsOrderValue($usd)) {
+            $minimum = '$'.number_format((float) $coin->min_amount_usd, 2);
+
+            return "Orders paid with {$coin->name} must be at least {$minimum}. Please choose another coin or add more to your order.";
+        }
+
+        return null;
+    }
+
+    /**
+     * The attempt's value in USD, or null when it cannot be established.
+     *
+     * Null means "do not gate" rather than "reject": a rate lookup failure must not
+     * block a payment the gateway would have accepted.
+     */
+    private function attemptValueInUsd(PaymentAttempt $attempt): ?float
+    {
+        $currency = strtoupper((string) $attempt->currency);
+        $amount = (float) $attempt->amount;
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        if ($currency === 'USD') {
+            return $amount;
+        }
+
+        try {
+            return $amount * app(CurrencyRateService::class)->resolveRate($currency, 'USD');
+        } catch (\Throwable $e) {
+            Log::warning('Could not resolve order value in USD for crypto minimum check', [
+                'attempt_id' => $attempt->id,
+                'currency' => $currency,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 }
