@@ -1079,18 +1079,17 @@
             // page uses the slim white inner top bar (hamburger + title + bell) below.
             $skipMobileHero = ! request()->routeIs('dashboard');
 
-            // The floating TOP chrome rides on EVERY dashboard page so the mobile/PWA nav
-            // is identical everywhere. It used to disappear entirely on task pages, which
-            // gave them a different top bar to the one users learned on the overview.
-            $showMobileTopChrome = true;
+            // Top chrome placement: the glass nav band and the notification pill
+            // belong to the OVERVIEW alone. Store pages keep only the two shopping
+            // pills - cart and country switcher - floating without a band, because
+            // that is where the cart can be acted on and where the country switcher
+            // changes prices you are about to pay. Task/inner pages (orders,
+            // wallet, settings, ...) get no top chrome at all; the bottom nav bar
+            // is their navigation.
+            $showMobileTopChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
 
-            // ...but only its SHOPPING controls are route-scoped. The cart cannot be acted
-            // on outside a shopping context, and the country switcher only changes prices
-            // you are about to pay: order history renders each order's own snapshotted
-            // display_currency, so switching country there changes nothing on screen.
-            // The notification bell is NOT gated - it is global, time-sensitive, and
-            // carries the unread badge, so it keeps the band populated on every page.
-            $showShoppingChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
+            // The bell is overview-only furniture, same as the identity strip.
+            $showNotificationChrome = ! $skipMobileHero;
 
             // No back affordance anywhere: the bottom nav bar is on every page and its
             // centre Menu FAB opens the full sidebar nav, so every destination is one
@@ -1108,11 +1107,13 @@
              Pages can extend the blue area by filling the $mobileHero slot
              (e.g. wallet card on the overview). Inner pages with their own sticky header
              (settings, password, appearance) skip this hero entirely. --}}
-        {{-- Identity strip - a fixed frosted-glass nav; the page scrolls
-             beneath it. Fixed instead of sticky for the same reason as the
-             back button: the pull-to-refresh transform moves sticky
-             ancestors and makes them bounce. The z-[55] chrome pills (flag /
-             cart / bell) float on top of this band, composing one nav. --}}
+        @unless ($skipMobileHero)
+        {{-- Identity strip - OVERVIEW ONLY, a fixed frosted-glass nav; the page
+             scrolls beneath it. Fixed instead of sticky because the
+             pull-to-refresh transform moves sticky ancestors and makes them
+             bounce. The z-[55] chrome pills (flag / cart / bell) float on top
+             of this band, composing one nav. Store and task pages render no
+             band at all - store pages carry only the floating shopping pills. --}}
         <div class="nav-glass-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
             {{-- Compact identity strip - avatar + small online dot on the left,
                  notification bell on the right. Replaces the old "Hello /
@@ -1121,48 +1122,42 @@
             <div class="flex items-center justify-between gap-3 text-zinc-900 dark:text-white">
                 @php $mobileFirstName = strtok(trim((string) ($user?->name ?? '')), ' ') ?: ''; @endphp
                 <div class="flex min-w-0 items-center gap-2.5">
-                    @unless ($skipMobileHero)
-                        {{-- Identity is the OVERVIEW's own furniture. Task pages keep the
-                             band (so the nav bar looks identical everywhere) but leave this
-                             slot empty, carrying only the pinned chrome pills on the right.
-
-                             The avatar taps through to Settings. Pull-to-refresh already
-                             handles reloading fresh wallet / order data, so the tap is
-                             free for the more useful destination. --}}
-                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
-                            <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
-                                @if ($user?->avatar_url)
-                                    <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
-                                @else
-                                    {{ str($user?->name ?? '?')->substr(0, 1) }}
-                                @endif
-                            </span>
-                            @if (($user?->kyc_status ?? null) === 'verified')
-                                {{-- KYC verified: small blue tick over the avatar. The badge
-                                     has its own white edge so it pops on the blue hero. --}}
-                                <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
+                    {{-- The avatar taps through to Settings. Pull-to-refresh already
+                         handles reloading fresh wallet / order data, so the tap is
+                         free for the more useful destination. --}}
+                    <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
+                        <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
+                            @if ($user?->avatar_url)
+                                <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
                             @else
-                                <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#eff6ff] dark:ring-[#0c1a36]" aria-label="Online"></span>
+                                {{ str($user?->name ?? '?')->substr(0, 1) }}
                             @endif
-                        </a>
-                        {{-- The greeting doubles as a storefront shortcut. The tiny
-                             chip keeps an obvious door back to the storefront for PWA
-                             users, who have no browser address bar to type into. --}}
-                        <a
-                            href="{{ route('home') }}"
-                            wire:navigate.hover
-                            class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
-                            aria-label="Go to the storefront"
-                        >
-                            <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
-                            <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
-                        </a>
-                    @endunless
+                        </span>
+                        @if (($user?->kyc_status ?? null) === 'verified')
+                            {{-- KYC verified: small blue tick over the avatar. The badge
+                                 has its own white edge so it pops on the blue hero. --}}
+                            <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
+                        @else
+                            <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#eff6ff] dark:ring-[#0c1a36]" aria-label="Online"></span>
+                        @endif
+                    </a>
+                    {{-- The greeting doubles as a storefront shortcut. The tiny
+                         chip keeps an obvious door back to the storefront for PWA
+                         users, who have no browser address bar to type into. --}}
+                    <a
+                        href="{{ route('home') }}"
+                        wire:navigate.hover
+                        class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
+                        aria-label="Go to the storefront"
+                    >
+                        <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
+                        <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
+                    </a>
                 </div>
-                {{-- The locale / cart / notification chips moved to the ALWAYS
-                     pinned floating row (see the mobile top chrome below), so
-                     the hero no longer renders its own copy. This spacer keeps
-                     the identity strip clear of the fixed pills above it. --}}
+                {{-- The locale / cart / notification chips render in the pinned
+                     floating row (see the mobile top chrome below), so the hero
+                     carries no copy of its own. This spacer keeps the identity
+                     strip clear of the fixed pills above it. --}}
                 <span class="h-10 w-[8.5rem] shrink-0" aria-hidden="true"></span>
             </div>
         </div>
@@ -1170,11 +1165,9 @@
         {{-- Spacer holding the glass nav's room in normal flow. --}}
         <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
 
-        @unless ($skipMobileHero)
-        {{-- Blue hero - overview only. Scrolls away with the page; the floating
-             wallet chip + Top Up button inside <x-slot:mobileHero> take over once
-             the hero leaves the viewport. The identity strip above is NOT part of
-             this block: it is the shared nav and renders on every dashboard page. --}}
+        {{-- Blue hero - overview only, same @unless as the identity strip above.
+             Scrolls away with the page; the floating wallet chip + Top Up button
+             inside <x-slot:mobileHero> take over once the hero leaves the viewport. --}}
         {{-- Wallet card slot - scrolls with the page (under the glass nav),
              so the wallet info hits the customer immediately on page load,
              leaving the rest of the viewport for product categories. --}}
@@ -1301,9 +1294,9 @@
             {{-- ─────────────────────────────────────────────────────── --}}
             @if ($showMobileTopChrome)
             {{-- ALWAYS pinned - no scroll-triggered show/hide, so the pills can
-                 never flicker or shake. The hero strip no longer carries its own
-                 copy of these chips (this row IS the chips). Only the hamburger
-                 waits for scroll, since at the top it would sit over the avatar. --}}
+                 never flicker or shake. This row IS the chips: the overview gets
+                 flag + cart + bell floating over its glass band; shop pages get
+                 flag + cart alone, with no band underneath. --}}
             <div
                 x-data="{
                     scrolled: false,
@@ -1326,11 +1319,11 @@
                 class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-end gap-2 px-3 lg:hidden"
                 style="top: max(0.5rem, env(safe-area-inset-top));"
             >
-                {{-- Locale + cart + notification chips (right) - same glass treatment, pinned.
-                     Only the bell is unconditional; the two shopping controls are scoped to
-                     the browse hub and the shop pages. --}}
+                {{-- Locale + cart chips (right) - same glass treatment, pinned.
+                     They ride wherever this row renders (overview + shop). The
+                     bell below is additionally scoped to the overview, where the
+                     nav band it visually belongs to lives. --}}
                 <div class="pointer-events-auto flex items-center gap-2" x-data>
-                    @if ($showShoppingChrome)
                     {{-- Language + currency toggle (opens the locale modal). --}}
                     <button
                         type="button"
@@ -1357,10 +1350,11 @@
                             class="absolute -top-1 -right-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/60 dark:ring-[#0c1a36]"
                         ></span>
                     </a>
+                    @if ($showNotificationChrome)
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200">
+                            <livewire:notifications-menu tone="dark" wire:key="floating-notif-inner" />
+                        </div>
                     @endif
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200">
-                        <livewire:notifications-menu tone="dark" wire:key="floating-notif-inner" />
-                    </div>
                 </div>
             </div>
             @endif

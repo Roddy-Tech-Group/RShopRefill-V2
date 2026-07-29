@@ -11,17 +11,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Mobile chrome visibility. Both bars are now identical on every dashboard page,
- * so a user who learns the nav on the overview sees the same thing everywhere:
+ * Mobile chrome visibility, per the 2026-07-29 spec:
  *   - The floating bottom nav bar (its centre Menu button dispatches
  *     'open-mobile-menu') stays on EVERY dashboard page - it is the primary
  *     navigation and must always be reachable.
- *   - The top chrome (cart / country switcher / notification) also rides on every
- *     page. It used to be limited to the browse hub (overview + shop), which left
- *     task pages with a different top bar to the one users learned on the overview.
- *
- * The one thing that still varies is the back button, which only task/inner pages
- * need - the browse hub is a top-level destination with nothing above it.
+ *   - The glass nav band and the notification pill belong to the OVERVIEW alone.
+ *   - The two shopping pills - cart and country switcher - ride on the overview
+ *     and the shop pages, floating without a band on the latter.
+ *   - Task/inner pages (orders, wallet, settings, ...) carry no top chrome at
+ *     all; the bottom nav bar is their navigation.
  */
 class MobileNavChromeVisibilityTest extends TestCase
 {
@@ -33,13 +31,16 @@ class MobileNavChromeVisibilityTest extends TestCase
     /** Country switcher trigger - a SHOPPING control, so overview + shop only. */
     private const TOP_CHROME_MARKER = "\$dispatch('open-locale-modal')";
 
-    /** The notification bell, which is never route-scoped. */
+    /** The notification bell - overview-only furniture, like the band. */
     private const BELL_MARKER = 'floating-notif-inner';
 
     /** The cart chip - the other shopping-only control. */
     private const CART_MARKER = 'aria-label="Cart"';
 
-    public function test_overview_shows_the_bottom_nav_bar_and_the_top_chrome(): void
+    /** The glass nav band the overview's identity strip sits in. */
+    private const BAND_MARKER = 'nav-glass-top';
+
+    public function test_overview_shows_the_nav_band_bell_and_shopping_pills(): void
     {
         $this->withoutVite();
 
@@ -48,10 +49,13 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->assertOk();
 
         $response->assertSee(self::NAV_BAR_MARKER, false);
+        $response->assertSee(self::BAND_MARKER, false);
+        $response->assertSee(self::BELL_MARKER, false);
         $response->assertSee(self::TOP_CHROME_MARKER, false);
+        $response->assertSee(self::CART_MARKER, false);
     }
 
-    public function test_shop_pages_show_the_bottom_nav_bar_and_the_top_chrome(): void
+    public function test_shop_pages_show_only_the_shopping_pills(): void
     {
         $this->withoutVite();
 
@@ -59,11 +63,17 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->get('/dashboard/shop/cart')
             ->assertOk();
 
+        // Cart + country switcher ride along - this is a shopping context...
         $response->assertSee(self::NAV_BAR_MARKER, false);
         $response->assertSee(self::TOP_CHROME_MARKER, false);
+        $response->assertSee(self::CART_MARKER, false);
+
+        // ...but the nav band and the bell are the overview's furniture.
+        $response->assertDontSee(self::BAND_MARKER, false);
+        $response->assertDontSee(self::BELL_MARKER, false);
     }
 
-    public function test_inner_pages_keep_the_nav_bars_but_drop_the_shopping_controls(): void
+    public function test_inner_pages_carry_no_top_chrome_at_all(): void
     {
         $this->withoutVite();
 
@@ -71,13 +81,12 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->get('/dashboard/orders')
             ->assertOk();
 
-        // Both bars still frame the page, so the nav reads the same everywhere...
+        // The bottom nav bar is the navigation on task pages...
         $response->assertSee(self::NAV_BAR_MARKER, false);
-        $response->assertSee(self::BELL_MARKER, false);
 
-        // ...but the cart cannot be acted on here, and the country switcher only
-        // changes prices you are about to pay: order history renders each order's
-        // own snapshotted display_currency, so switching would change nothing.
+        // ...and nothing floats on top: no band, no bell, no shopping pills.
+        $response->assertDontSee(self::BAND_MARKER, false);
+        $response->assertDontSee(self::BELL_MARKER, false);
         $response->assertDontSee(self::TOP_CHROME_MARKER, false);
         $response->assertDontSee(self::CART_MARKER, false);
     }
