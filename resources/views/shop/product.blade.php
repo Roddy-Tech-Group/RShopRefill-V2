@@ -88,10 +88,24 @@
     $productBuyable  = $categoryEnabled && ! $product->is_out_of_stock;
     $redemptionVideo = data_get($product->metadata, 'redemption_video');
 
+    // Pricing — the Estimated price is the actual payable amount: provider cost
+    // + markup (CartPricingService), converted into the selected currency.
+    $pricing = app(CartPricingService::class);
+
     // Country-locked denomination range for the placeholder text ("$15 - 500").
+    // Priced through CartPricingService, not read off retail_price: the raw
+    // column is the pre-markup base, so the hint used to advertise a floor
+    // ("Between $35.00 and $55.00") that the plan cards themselves contradicted.
     $availableVariants = $variants->where('is_available', true);
-    $rangeMin = $availableVariants->pluck('retail_price')->filter()->min();
-    $rangeMax = $availableVariants->pluck('retail_price')->filter()->max();
+    $pricedRange = $availableVariants
+        ->map(function ($v) use ($pricing, $product) {
+            $v->setRelation('product', $product);
+
+            return round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
+        })
+        ->filter();
+    $rangeMin = $pricedRange->min();
+    $rangeMax = $pricedRange->max();
     if ((! $rangeMin || ! $rangeMax) && $variable) {
         $rangeMin = $variable->min_amount;
         $rangeMax = $variable->max_amount;
@@ -183,10 +197,8 @@
         ? $countryCurrency
         : ($cryptoRatesForJs->firstWhere('code', 'USD') ? 'USD' : ($cryptoRatesForJs->first()['code'] ?? 'USDT'));
 
-    // Pricing — the Estimated price is the actual payable amount: provider cost
-    // + markup (CartPricingService), converted into the selected currency.
-    $pricing = app(CartPricingService::class);
-    $markup  = $pricing->markupDescriptor($product);
+    // $pricing is resolved earlier (the denomination range needs it too).
+    $markup = $pricing->markupDescriptor($product);
 
     // A variable amount is typed in the variant's own currency; this rate
     // converts that entered face amount to USD before markup is applied.
@@ -218,6 +230,18 @@
     // synced metadata; a missing field just drops that chip.
     $topupGroups = ['credit' => [], 'data' => [], 'bundle' => []];
     if ($isTopup) {
+        // Zendit's subTypes IS the classification and is the only thing trusted
+        // here. Its catalogue defines three separate product categories - Mobile
+        // Top Up (airtime credit), Mobile Data (data plans) and Mobile Bundles
+        // (data + minutes + SMS) - so a "Mobile Top Up" offer is credit even when
+        // its metadata carries dataGB / durationDays / dataUnlimited values.
+        //
+        // Do NOT infer the kind from those allowance fields. They are populated
+        // on plain credit offers too (Straight Talk US ships durationDays 30 and
+        // dataUnlimited on what Zendit's own catalogue lists as pure credit), so
+        // inferring promotes credit denominations into Data/Bundle tabs and
+        // advertises plans the carrier does not sell. Benefits belong ON the
+        // credit card as descriptive text, not as a reclassification.
         $topupKindOf = function ($v) {
             $st = strtolower((string) ($v->metadata['subTypes'][0] ?? ''));
 
@@ -226,7 +250,13 @@
 
         foreach ($fixedDenoms as $v) {
             $m = $v->metadata ?? [];
-            $val = (float) $v->retail_price;
+            // Price through the SAME engine the cart uses. Reading retail_price
+            // straight off the column skipped the markup rules, the cost floor
+            // and the minimum margin, so a plan card advertised a figure the
+            // checkout then contradicted - a "$35" Straight Talk plan that rang
+            // up at $40. The card and the cart must never disagree.
+            $v->setRelation('product', $product);
+            $val = round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
             $topupGroups[$topupKindOf($v)][] = [
                 'id' => $v->id,
                 'disp' => round($val * $displayRate, 2),
@@ -723,7 +753,17 @@
                                                 :class="(! customMode && Number(amount) === {{ $plan['disp'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
                                                 class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                                             >
-                                                <span class="font-bold">{{ $plan['price'] }}</span>
+                                                <span class="flex min-w-0 flex-col">
+                                                    <span class="font-bold">{{ $plan['price'] }}</span>
+                                                    @php $creditNote = trim((string) ($plan['summary'] ?? '')); @endphp
+                                                    @if ($creditNote !== '')
+                                                        {{-- The supplier's own description, verbatim. Deliberately NOT
+                                                             chips derived from dataGB / dataUnlimited: those fields are
+                                                             populated on plain credit offers too, so rendering them here
+                                                             would advertise data the carrier does not actually sell. --}}
+                                                        <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $creditNote }}</span>
+                                                    @endif
+                                                </span>
                                             </button>
                                         @endforeach
                                         @if ($variable)
@@ -934,7 +974,7 @@
                                 :class="accountIdValid()
                                     ? 'border-emerald-500 ring-2 ring-emerald-500/15'
                                     : (accountId.length > 0 ? 'border-red-300' : 'border-zinc-200')"
-                                class="flex h-[52px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                                class="flex h-[52px] w-full items-center gap-3 rounded-[12px] border bg-[#eff6ff] px-4 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
                             >
                                 <input
                                     type="text"
@@ -978,7 +1018,7 @@
                                 :class="recipientPhoneValid()
                                     ? 'border-emerald-500 ring-2 ring-emerald-500/15'
                                     : (recipientPhone.length > 0 ? 'border-red-300' : 'border-zinc-200')"
-                                class="flex h-[52px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                                class="flex h-[52px] w-full items-center gap-3 rounded-[12px] border bg-[#eff6ff] px-4 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
                             >
                                 <span class="shrink-0 text-sm font-semibold text-zinc-600 dark:text-zinc-200" x-text="recipientDialCode">{{ $dialCode }}</span>
                                 <input

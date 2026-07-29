@@ -90,6 +90,46 @@ class AuditBelowCostCommandTest extends TestCase
             ->assertExitCode(0);
     }
 
+    /**
+     * A variant with no cost is only a data gap when it has a FIXED value.
+     *
+     * Variable-amount variants carry no cost_price by design: the customer picks
+     * the value and resolveRetailPrice() anchors the floor on that requested
+     * amount at cart time, so they are covered. Counting the two together read as
+     * "148 variants we cannot protect" on the live catalogue, when the real
+     * number was zero - a misreport that argues against turning enforce on.
+     */
+    public function test_variable_amount_variants_are_not_counted_as_missing_cost_data(): void
+    {
+        $this->makeVariant('Airtime Range US', [
+            'is_variable' => true,
+            'cost_price' => 0,
+            'retail_price' => 0,
+            'face_value' => 0,
+            'min_amount' => 5.00,
+            'max_amount' => 100.00,
+        ]);
+
+        // One substring per output line: Laravel registers each expectation as its
+        // own Mockery matcher on doWrite, and a single write is consumed by the
+        // first matcher it satisfies - so two substrings sharing a line can never
+        // both pass. Both counts are asserted together in one phrase instead.
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('0 MISSING cost data, 1 variable-amount')
+            ->assertExitCode(0);
+    }
+
+    /** A fixed-value variant with no cost is a genuine gap and must say so. */
+    public function test_fixed_variant_without_cost_is_reported_as_missing_and_warned_about(): void
+    {
+        $this->makeVariant('Costless Fixed Card', ['cost_price' => 0]);
+
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('1 MISSING cost data, 0 variable-amount')
+            ->expectsOutputToContain('The floor cannot protect those')
+            ->assertExitCode(0);
+    }
+
     public function test_flags_suspect_cost_data_on_oversized_would_be_raises(): void
     {
         // COST-IN-LOCAL shape: an AED-cost card mislabeled USD. Cost 97.89 vs

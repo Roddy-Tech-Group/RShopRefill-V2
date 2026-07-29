@@ -1079,11 +1079,23 @@
             // page uses the slim white inner top bar (hamburger + title + bell) below.
             $skipMobileHero = ! request()->routeIs('dashboard');
 
-            // The floating TOP chrome (cart / country switcher / notification, plus the
-            // hamburger) only rides along on the browse hub (overview) and the shop pages.
-            // Task/inner pages (orders, wallet, history, settings, ...) stay clean. The
-            // bottom floating nav bar is NOT gated by this - it stays on every page.
-            $showMobileTopChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
+            // The floating TOP chrome rides on EVERY dashboard page so the mobile/PWA nav
+            // is identical everywhere. It used to disappear entirely on task pages, which
+            // gave them a different top bar to the one users learned on the overview.
+            $showMobileTopChrome = true;
+
+            // ...but only its SHOPPING controls are route-scoped. The cart cannot be acted
+            // on outside a shopping context, and the country switcher only changes prices
+            // you are about to pay: order history renders each order's own snapshotted
+            // display_currency, so switching country there changes nothing on screen.
+            // The notification bell is NOT gated - it is global, time-sensitive, and
+            // carries the unread badge, so it keeps the band populated on every page.
+            $showShoppingChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
+
+            // No back affordance anywhere: the bottom nav bar is on every page and its
+            // centre Menu FAB opens the full sidebar nav, so every destination is one
+            // tap away without one. Removing it also keeps the top band identical on
+            // every page instead of swapping its left slot per route.
         @endphp
 
         {{-- flux:main is the single main-axis child of Flux's layout container.
@@ -1096,10 +1108,6 @@
              Pages can extend the blue area by filling the $mobileHero slot
              (e.g. wallet card on the overview). Inner pages with their own sticky header
              (settings, password, appearance) skip this hero entirely. --}}
-        @unless ($skipMobileHero)
-        {{-- Blue hero — overview only. Scrolls away with the page; the floating
-             wallet chip + Top Up button inside <x-slot:mobileHero> take over once
-             the hero leaves the viewport. --}}
         {{-- Identity strip - a fixed frosted-glass nav; the page scrolls
              beneath it. Fixed instead of sticky for the same reason as the
              back button: the pull-to-refresh transform moves sticky
@@ -1113,37 +1121,43 @@
             <div class="flex items-center justify-between gap-3 text-zinc-900 dark:text-white">
                 @php $mobileFirstName = strtok(trim((string) ($user?->name ?? '')), ' ') ?: ''; @endphp
                 <div class="flex min-w-0 items-center gap-2.5">
-                    {{-- The avatar taps through to Settings. Pull-to-refresh already
-                         handles reloading fresh wallet / order data, so the tap is
-                         free for the more useful destination. --}}
-                    <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
-                        <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
-                            @if ($user?->avatar_url)
-                                <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
+                    @unless ($skipMobileHero)
+                        {{-- Identity is the OVERVIEW's own furniture. Task pages keep the
+                             band (so the nav bar looks identical everywhere) but leave this
+                             slot empty, carrying only the pinned chrome pills on the right.
+
+                             The avatar taps through to Settings. Pull-to-refresh already
+                             handles reloading fresh wallet / order data, so the tap is
+                             free for the more useful destination. --}}
+                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
+                            <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
+                                @if ($user?->avatar_url)
+                                    <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
+                                @else
+                                    {{ str($user?->name ?? '?')->substr(0, 1) }}
+                                @endif
+                            </span>
+                            @if (($user?->kyc_status ?? null) === 'verified')
+                                {{-- KYC verified: small blue tick over the avatar. The badge
+                                     has its own white edge so it pops on the blue hero. --}}
+                                <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
                             @else
-                                {{ str($user?->name ?? '?')->substr(0, 1) }}
+                                <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#eff6ff] dark:ring-[#0c1a36]" aria-label="Online"></span>
                             @endif
-                        </span>
-                        @if (($user?->kyc_status ?? null) === 'verified')
-                            {{-- KYC verified: small blue tick over the avatar. The badge
-                                 has its own white edge so it pops on the blue hero. --}}
-                            <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
-                        @else
-                            <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#eff6ff] dark:ring-[#0c1a36]" aria-label="Online"></span>
-                        @endif
-                    </a>
-                    {{-- The greeting doubles as a storefront shortcut. The tiny
-                         chip stays visible permanently so PWA users always have
-                         an obvious door back to the storefront. --}}
-                    <a
-                        href="{{ route('home') }}"
-                        wire:navigate.hover
-                        class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
-                        aria-label="Go to the storefront"
-                    >
-                        <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
-                        <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
-                    </a>
+                        </a>
+                        {{-- The greeting doubles as a storefront shortcut. The tiny
+                             chip keeps an obvious door back to the storefront for PWA
+                             users, who have no browser address bar to type into. --}}
+                        <a
+                            href="{{ route('home') }}"
+                            wire:navigate.hover
+                            class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
+                            aria-label="Go to the storefront"
+                        >
+                            <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
+                            <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
+                        </a>
+                    @endunless
                 </div>
                 {{-- The locale / cart / notification chips moved to the ALWAYS
                      pinned floating row (see the mobile top chrome below), so
@@ -1156,6 +1170,11 @@
         {{-- Spacer holding the glass nav's room in normal flow. --}}
         <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
 
+        @unless ($skipMobileHero)
+        {{-- Blue hero - overview only. Scrolls away with the page; the floating
+             wallet chip + Top Up button inside <x-slot:mobileHero> take over once
+             the hero leaves the viewport. The identity strip above is NOT part of
+             this block: it is the shared nav and renders on every dashboard page. --}}
         {{-- Wallet card slot - scrolls with the page (under the glass nav),
              so the wallet info hits the customer immediately on page load,
              leaving the rest of the viewport for product categories. --}}
@@ -1268,59 +1287,11 @@
                     default                                       => 'Settings',
                 };
             @endphp
-            {{-- Inner-page top strip. Holds ONLY the at-top hamburger + reserves the
-                 top gap; the locale / cart / notification chips live in the FIXED
-                 chrome below (see "FLOATING TOP CHROME"), which is the single pinned
-                 copy of those pills. The chips used to be duplicated here too, which
-                 made them appear twice on scroll (this in-flow copy slid up while the
-                 fixed copy stayed pinned) on every shop page. The hamburger stays
-                 here because the fixed chrome hides its own at the top (avatar). --}}
-            @if ($showMobileTopChrome)
-            <div class="relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 lg:hidden">
-                {{-- Hamburger opens the Connect panel (social + contact channels).
-                     The app menu itself is the bottom-bar centre FAB. --}}
-                <button
-                    type="button"
-                    x-data
-                    x-on:click="$dispatch('open-connect-panel')"
-                    aria-label="Connect with us"
-                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                >
-                    <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                </button>
-            </div>
-            @else
-            {{-- Back button (task/inner pages) - a FIXED top-left affordance (these
-                 pages dropped the top chrome). Fixed instead of sticky: sticky sat
-                 inside ancestors the pull-to-refresh transform moves, which made
-                 it bounce with overscroll; fixed pins to the viewport and never
-                 shakes. Goes back when the history can, else lands on the overview
-                 (Navigation API where supported, history.length elsewhere). --}}
-            <div class="fixed z-[55] px-3 py-2.5 lg:hidden" style="top: max(0.25rem, env(safe-area-inset-top));">
-                <button
-                    type="button"
-                    x-data
-                    @click="
-                        const fallback = '{{ route('dashboard') }}';
-                        const nav = window.navigation;
-                        if (nav && 'canGoBack' in nav) {
-                            nav.canGoBack ? window.history.back() : window.location.assign(fallback);
-                        } else {
-                            window.history.length > 1 ? window.history.back() : window.location.assign(fallback);
-                        }
-                    "
-                    aria-label="Go back"
-                    style="touch-action: manipulation;"
-                    class="flex h-11 w-11 select-none items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 text-zinc-900 shadow-sm transition-transform active:scale-95 dark:border-white/10 dark:text-zinc-200"
-                >
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                    </svg>
-                </button>
-            </div>
-            {{-- Spacer holding the room the button used to occupy in flow. --}}
-            <div class="h-16 lg:hidden" aria-hidden="true"></div>
-            @endif
+            {{-- Nothing renders in flow here. The back button now lives in the
+                 identity band at the top of this file (it swaps with the avatar),
+                 and the locale / cart / notification pills live in the FIXED chrome
+                 below. Both used to be duplicated here, which made the pills appear
+                 twice on scroll. --}}
         @endif
 
             {{-- ─────────────────────────────────────────────────────── --}}
@@ -1352,32 +1323,14 @@
                     },
                 }"
                 @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode; language = $event.detail.language"
-                class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-between gap-2 px-3 lg:hidden"
+                class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-end gap-2 px-3 lg:hidden"
                 style="top: max(0.5rem, env(safe-area-inset-top));"
             >
-                {{-- Hamburger chip (left) - glass treatment so the page bleeds
-                     through (works on light + dark surfaces). --}}
-                <button
-                    type="button"
-                    x-show="scrolled"
-                    x-cloak
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100"
-                    x-transition:leave="transition ease-in duration-150"
-                    x-transition:leave-start="opacity-100"
-                    x-transition:leave-end="opacity-0"
-                    @click="$dispatch('open-connect-panel')"
-                    aria-label="Connect with us"
-                    class="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                >
-                    <img src="{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                </button>
-                {{-- Keeps justify-between spacing when the hamburger is hidden. --}}
-                <span class="h-11 w-11 shrink-0" x-show="! scrolled" aria-hidden="true"></span>
-
-                {{-- Locale + cart + notification chips (right) - same glass treatment, pinned. --}}
+                {{-- Locale + cart + notification chips (right) - same glass treatment, pinned.
+                     Only the bell is unconditional; the two shopping controls are scoped to
+                     the browse hub and the shop pages. --}}
                 <div class="pointer-events-auto flex items-center gap-2" x-data>
+                    @if ($showShoppingChrome)
                     {{-- Language + currency toggle (opens the locale modal). --}}
                     <button
                         type="button"
@@ -1385,7 +1338,7 @@
                         @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                         x-on:click="$dispatch('open-locale-modal')"
                         aria-label="Region, language and currency"
-                        class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
+                        class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
                     >
                         <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
                     </button>
@@ -1404,6 +1357,7 @@
                             class="absolute -top-1 -right-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/60 dark:ring-[#0c1a36]"
                         ></span>
                     </a>
+                    @endif
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200">
                         <livewire:notifications-menu tone="dark" wire:key="floating-notif-inner" />
                     </div>
@@ -1706,187 +1660,6 @@
                             Log out
                         </button>
                     </form>
-                </div>
-            </div>
-        </div>
-
-        {{-- ─────────────────────────────────────────────────────── --}}
-        {{-- Connect panel — slim-bar hamburger slides this out (the app    --}}
-        {{-- menu itself lives on the bottom-bar FAB). Social + contact     --}}
-        {{-- channel cards.                                                --}}
-        {{-- ─────────────────────────────────────────────────────── --}}
-        @php
-            // Each entry renders as a branded promo card in the Connect panel. Discord
-            // invite link is a placeholder until the real one lands.
-            $connectChannels = [
-                [
-                    'type' => 'instagram', 'url' => \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills'), 'bg' => 'bg-pink-500', 'external' => true,
-                    'heading' => 'Follow us on Instagram',
-                    'tagline' => 'Reels, behind-the-scenes, and weekly deal drops.',
-                    'cta' => 'Follow on Instagram',
-                ],
-                [
-                    'type' => 'tiktok', 'url' => \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills'), 'bg' => 'bg-zinc-800', 'external' => true,
-                    'badge' => 'New',
-                    'heading' => 'Follow us on TikTok',
-                    'tagline' => 'Daily drops, how-tos, and giveaway alerts. Straight from @rshoprefills.',
-                    'cta' => 'Follow on TikTok',
-                ],
-                [
-                    'type' => 'discord', 'url' => '#', 'bg' => 'bg-indigo-500', 'external' => true,
-                    'heading' => 'Join our Discord',
-                    'tagline' => 'Live community, channel drops, and quick support from the team.',
-                    'cta' => 'Join Discord',
-                ],
-                [
-                    'type' => 'whatsapp', 'url' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'bg' => 'bg-emerald-500', 'external' => true,
-                    'heading' => 'Chat on WhatsApp',
-                    'tagline' => 'Direct help on +1 (940) 238-6229. Most replies in under 5 minutes.',
-                    'cta' => 'Open WhatsApp',
-                ],
-                [
-                    'type' => 'facebook', 'url' => \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills'), 'bg' => 'bg-blue-500', 'external' => true,
-                    'heading' => 'Like us on Facebook',
-                    'tagline' => 'News, deals, and community posts at /rshoprefills.',
-                    'cta' => 'Open Facebook',
-                ],
-                [
-                    'type' => 'email', 'url' => 'mailto:support@rshoprefill.com', 'bg' => 'bg-amber-500', 'external' => false,
-                    'heading' => 'Email our team',
-                    'tagline' => 'Reach support@rshoprefill.com. Support is available 24/7.',
-                    'cta' => 'Send email',
-                ],
-                [
-                    'type' => 'phone', 'url' => 'tel:+19402386229', 'bg' => 'bg-sky-500', 'external' => false,
-                    'heading' => 'Give us a call',
-                    'tagline' => 'Talk to a human on +1 (940) 238-6229, Monday to Saturday.',
-                    'cta' => 'Call now',
-                ],
-            ];
-        @endphp
-        <div
-            x-data="{ connectOpen: false }"
-            x-on:open-connect-panel.window="$nextTick(() => connectOpen = true)"
-            x-on:keydown.escape.window="connectOpen = false"
-            class="contents lg:hidden"
-        >
-            {{-- Backdrop --}}
-            <div
-                x-show="connectOpen"
-                x-transition:enter="transition-opacity ease-out duration-200"
-                x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100"
-                x-transition:leave="transition-opacity ease-in duration-200"
-                x-transition:leave-start="opacity-100"
-                x-transition:leave-end="opacity-0"
-                @click="connectOpen = false"
-                style="display: none;"
-                class="fixed inset-0 z-[60] bg-zinc-900/45"
-                aria-hidden="true"
-            ></div>
-
-            {{-- Left slide-out drawer --}}
-            <div
-                x-show="connectOpen"
-                x-transition:enter="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                x-transition:enter-start="-translate-x-full"
-                x-transition:enter-end="translate-x-0"
-                x-transition:leave="transition-transform duration-250 ease-in"
-                x-transition:leave-start="translate-x-0"
-                x-transition:leave-end="-translate-x-full"
-                style="display: none;"
-                class="modal-norise fixed inset-y-0 left-0 z-[70] w-[86%] max-w-sm overflow-y-auto bg-white shadow-2xl shadow-zinc-900/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="connect-title"
-            >
-                <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))]" style="padding-top: max(1.25rem, env(safe-area-inset-top));">
-                    {{-- Header --}}
-                    <div class="mb-5 flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <h2 id="connect-title" class="text-lg font-bold text-zinc-900">Connect with us</h2>
-                            <p class="mt-0.5 text-xs text-zinc-600">Reach {{ $siteName }} on your favourite channel.</p>
-                        </div>
-                        {{-- Glass grey close button — same recipe as the admin sidebar's
-                             collapse toggle. Translucent fill + backdrop blur picks up the
-                             panel bg behind it; a frosted ring + inset top sheen give the
-                             glass edge. --}}
-                        <button
-                            type="button"
-                            @click="connectOpen = false"
-                            aria-label="Close"
-                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-500/30 text-zinc-700 ring-1 ring-zinc-400/40 backdrop-blur-xl backdrop-saturate-150 transition-all hover:bg-zinc-500/40 hover:text-zinc-900 active:scale-95 dark:bg-transparent dark:text-white dark:ring-white/15 dark:hover:bg-white/15"
-                            style="box-shadow: 0 6px 18px -6px rgba(15, 23, 42, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.45);"
-                        >
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    {{-- Branded promo cards — one per channel. Each is its own platform
-                         hero card (brand bg, big logo tile, copy, white CTA button). The
-                         theme-static class keeps the brand colours identical in light and
-                         dark mode so they always look like the official brand. --}}
-                    <div class="skeleton-stagger-fast flex flex-col gap-3">
-                        @foreach ($connectChannels as $i => $channel)
-                            <a
-                                href="{{ $channel['url'] }}"
-                                @if ($channel['external']) target="_blank" rel="noopener" @endif
-                                @click="connectOpen = false"
-                                style="--i: {{ $i }}"
-                                class="theme-static block overflow-hidden rounded-[15px] {{ $channel['bg'] }} p-5 text-white ring-1 ring-zinc-900/40 transition-transform active:scale-[0.99]"
-                            >
-                                <div class="flex items-start justify-between gap-3">
-                                    {{-- Inline style locks the white tile + dark icon against
-                                         dark-mode CSS remaps that would otherwise turn the
-                                         tile navy and the icon invisible (see app.css
-                                         .dark .bg-white / .dark .text-zinc-950 mappings). --}}
-                                    <span class="no-dark-invert flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]" style="background: #ffffff; color: #09090b;">
-                                        @switch ($channel['type'])
-                                            @case ('instagram')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.07 1.644.07 4.849 0 3.205-.012 3.584-.07 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-                                                @break
-                                            @case ('tiktok')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-                                                @break
-                                            @case ('discord')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
-                                                @break
-                                            @case ('whatsapp')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.414z"/></svg>
-                                                @break
-                                            @case ('facebook')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                                                @break
-                                            @case ('email')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
-                                                @break
-                                            @case ('phone')
-                                                <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-                                                @break
-                                        @endswitch
-                                    </span>
-                                    @if (! empty($channel['badge']))
-                                        <span class="rounded-[12px] bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">{{ $channel['badge'] }}</span>
-                                    @endif
-                                </div>
-
-                                <h3 class="mt-4 text-lg font-bold leading-tight tracking-tight">{{ $channel['heading'] }}</h3>
-                                <p class="mt-1 text-xs text-white/80">{{ $channel['tagline'] }}</p>
-
-                                {{-- Inline bg + text colour force a white pill with dark text
-                                     in BOTH themes. Without the inline `background`, the
-                                     `bg-white` class hits the `.dark .bg-white` -> navy remap
-                                     and the button vanishes into the brand card in dark mode.
-                                     hover:brightness-95 gives a press affordance that survives
-                                     the locked inline background. --}}
-                                <span class="mt-4 inline-flex items-center rounded-[12px] px-4 py-2 text-sm font-bold transition-[filter] hover:brightness-95" style="background: #ffffff; color: #09090b;">
-                                    {{ $channel['cta'] }}
-                                </span>
-                            </a>
-                        @endforeach
-                    </div>
                 </div>
             </div>
         </div>

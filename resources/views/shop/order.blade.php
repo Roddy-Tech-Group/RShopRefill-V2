@@ -402,7 +402,7 @@
 <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-10">
 
     {{-- Status hero --}}
-    <section class="rounded-[20px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
+    <section class="rounded-[12px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
         <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] {{ $tone['bg'] }} ring-8 {{ $tone['ring'] }}">
             <svg class="h-8 w-8 {{ $tone['fg'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
                 @if ($ui['icon'] === 'check')
@@ -633,7 +633,7 @@
                     alert('Copied to clipboard!');
                 }
             }"
-            class="mt-6 rounded-[20px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8"
+            class="mt-6 rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8"
         >
             <!-- Select Method -->
             <div x-show="paymentState === 'select_method'">
@@ -908,7 +908,7 @@
     @endif
 
     {{-- Order summary --}}
-    <section class="mt-6 rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
+    <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-bold text-zinc-900">Order summary</h2>
             <span class="inline-flex items-center rounded-[12px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
@@ -964,7 +964,7 @@
                 @endphp
                 <li class="flex items-start gap-3 py-4">
                     {{-- Brand tile — matches the catalog / cart product card (16:10, edge-to-edge logo). --}}
-                    <span class="flex aspect-[16/10] w-24 shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-white shadow-sm ring-1 ring-zinc-200 sm:w-28">
+                    <span class="flex aspect-[16/10] w-24 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-white shadow-sm ring-1 ring-zinc-200 sm:w-28">
                         @if ($logo)
                             <img src="{{ $logo }}" alt="" class="h-full w-full object-cover" loading="lazy">
                         @else
@@ -1051,7 +1051,7 @@
 
     {{-- What happens next — only while the order is still being settled --}}
     @if ($isPending)
-        <section class="mt-6 rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
+        <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
             <h2 class="text-lg font-bold text-zinc-900">What happens next</h2>
             <ol class="mt-4 space-y-4">
                 @php

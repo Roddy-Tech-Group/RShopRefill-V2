@@ -7,6 +7,7 @@ use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
@@ -233,24 +234,17 @@ class PaymentSessionController extends Controller
         $method = $request->input('method');
         $details = $request->input('details', []);
 
-        // Validate that the payment method is supported in the session's currency
+        // Validate that the payment method is supported in the session's currency.
+        // The list is shared with CheckoutController: when this copy was shorter,
+        // a method offered at checkout produced an order that could never be paid.
         $currency = strtoupper($attempt->currency);
-        $supported = [
-            'USD' => ['card', 'apple_pay', 'crypto', 'wallet'],
-            'EUR' => ['card', 'apple_pay', 'crypto', 'wallet'],
-            'GBP' => ['card', 'apple_pay', 'crypto', 'wallet'],
-            'NGN' => ['card', 'apple_pay', 'bank_transfer', 'crypto', 'wallet'],
-            'GHS' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'XAF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'XOF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        ];
 
         if ($session->session_type === 'wallet') {
             $allowedMethods = ['wallet'];
         } elseif ($session->session_type === 'crypto') {
             $allowedMethods = ['crypto'];
         } else {
-            $allowedMethods = $supported[$currency] ?? ['card', 'apple_pay'];
+            $allowedMethods = SupportedPaymentMethods::forCurrency($currency);
         }
 
         if (! in_array($method, $allowedMethods)) {

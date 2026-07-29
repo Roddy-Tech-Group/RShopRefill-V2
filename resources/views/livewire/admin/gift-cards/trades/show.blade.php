@@ -2,10 +2,12 @@
 
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use App\Models\GiftCardTrade;
 use App\Enums\TradeStatus;
+use Illuminate\Database\Eloquent\Collection;
 
 new
 #[Layout('components.layouts.admin')]
@@ -13,8 +15,11 @@ new
 class extends Component {
     use WithFileUploads;
 
+    /** How many of the newest messages the chat pane keeps on screen. */
+    private const MESSAGE_WINDOW = 50;
+
     public GiftCardTrade $trade;
-    
+
     public string $new_status = '';
     public string $status_reason = '';
     public string $new_message = '';
@@ -22,10 +27,42 @@ class extends Component {
 
     public function mount(GiftCardTrade $trade)
     {
-        $this->trade = $trade->load(['user', 'rate.brand', 'media', 'messages.sender', 'bankAccount', 'payout']);
+        // Messages are deliberately left out of this eager load. Livewire re-loads
+        // whichever relations are on the model at hydration time, so pinning
+        // messages here made every poll tick re-read the whole thread.
+        $this->trade = $trade->load(['user', 'rate.brand', 'media', 'bankAccount', 'payout']);
         $this->new_status = $this->trade->status->value;
     }
-    
+
+    /**
+     * The newest slice of the thread, flipped back to oldest-first for display.
+     *
+     * trade_messages only ever grows for the life of a trade and the chat pane
+     * polls every 2 seconds, so reading the full thread meant re-fetching every
+     * message a trade had ever collected, 30 times a minute, forever.
+     */
+    #[Computed]
+    public function chatMessages(): Collection
+    {
+        return $this->trade->messages()
+            ->with('sender')
+            ->latest('id')
+            ->limit(self::MESSAGE_WINDOW)
+            ->get()
+            ->reverse()
+            ->values();
+    }
+
+    /**
+     * Whether the window came back full, so the pane can say the thread is
+     * capped instead of silently dropping whatever sits above it.
+     */
+    #[Computed]
+    public function hasTruncatedThread(): bool
+    {
+        return $this->chatMessages->count() >= self::MESSAGE_WINDOW;
+    }
+
     public function updateStatus()
     {
         $tradeStatus = TradeStatus::tryFrom($this->new_status);
@@ -93,7 +130,8 @@ class extends Component {
         }
         $this->status_reason = '';
         $this->new_status = $this->trade->status->value;
-        $this->trade->load(['messages.sender', 'payout']);
+        $this->trade->load(['payout']);
+        unset($this->chatMessages);
     }
 
     public function sendMessage()
@@ -118,7 +156,7 @@ class extends Component {
         $this->new_message = '';
         $this->chat_image = null;
         $this->trade->refresh();
-        $this->trade->load(['messages.sender']);
+        unset($this->chatMessages);
     }
 
     public function notifyTyping()
@@ -128,8 +166,9 @@ class extends Component {
 
     public function refreshData()
     {
-        $this->trade->refresh();
-        $this->trade->load(['messages.sender']);
+        // Livewire re-reads the trade from the database when it hydrates this
+        // component, so a poll tick only has to drop the cached message slice.
+        unset($this->chatMessages);
     }
 }; ?>
 
@@ -350,7 +389,10 @@ class extends Component {
                 </div>
                 
                 <div wire:poll.2s="refreshData" class="flex-1 p-4 overflow-y-auto bg-zinc-50 dark:bg-zinc-900/50 flex flex-col gap-4">
-                    @forelse($trade->messages as $msg)
+                    @if($this->hasTruncatedThread)
+                        <div class="text-center text-[11px] text-zinc-400">Showing the 50 most recent messages.</div>
+                    @endif
+                    @forelse($this->chatMessages as $msg)
                         @php
                             $isAdmin = $msg->sender_type === \App\Models\Admin::class;
                         @endphp

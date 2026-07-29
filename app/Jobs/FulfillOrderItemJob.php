@@ -125,7 +125,7 @@ class FulfillOrderItemJob implements ShouldQueue
         } catch (\Exception $e) {
             Log::error("Fulfillment job crashed for item {$item->id}: ".$e->getMessage());
 
-            DB::transaction(function () use ($item, $walletProvider, $e) {
+            DB::transaction(function () use ($item, $e) {
                 $freshItem = OrderItem::where('id', $item->id)->lockForUpdate()->first();
                 if (! $freshItem || $freshItem->fulfillment_status === FulfillmentStatus::Fulfilled) {
                     return;
@@ -135,9 +135,12 @@ class FulfillOrderItemJob implements ShouldQueue
                 $freshItem->save();
 
                 FulfillmentFailed::dispatch($freshItem, $e->getMessage());
-                $this->handleFailureReversal($freshItem, $walletProvider);
             });
 
+            // The customer's money is deliberately NOT reversed here. This throw
+            // schedules another attempt, and a retry that succeeds after a reversal
+            // hands over a real voucher the customer was already refunded for.
+            // failed() owns the reversal, once no further attempt is coming.
             throw $e; // re-throw so Laravel can schedule retries
         }
     }
@@ -180,17 +183,22 @@ class FulfillOrderItemJob implements ShouldQueue
             ->first();
 
         if ($walletPayment) {
-            // Check if any other item in order was successfully fulfilled or still processing.
-            // If all items failed, refund/release full funds.
-            $hasSuccessfulItem = $order->items->contains(function ($i) {
+            // Releasing the whole reservation is only correct when nothing on this
+            // order can still be delivered. A sibling that is queued or has not
+            // started yet WILL buy a real voucher from its own job, so treating it
+            // as a total failure unlocks money for goods the customer then receives
+            // free - and leaves the attempt un-Reserved so finalizeDebit never runs.
+            $hasDeliverableItem = $order->items->contains(function ($i) {
                 return in_array($i->fulfillment_status, [
                     FulfillmentStatus::Fulfilled,
                     FulfillmentStatus::Processing,
                     FulfillmentStatus::Delayed,
+                    FulfillmentStatus::NotStarted,
+                    FulfillmentStatus::Queued,
                 ]);
             });
 
-            if (! $hasSuccessfulItem) {
+            if (! $hasDeliverableItem) {
                 if ($walletPayment->payment_status === PaymentStatus::Reserved) {
                     $walletProvider->releaseFunds($walletPayment);
                 } else {

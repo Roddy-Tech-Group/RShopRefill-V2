@@ -31,7 +31,10 @@ class extends Component {
 
     public function with(): array
     {
-        $query = Auth::user()->orders()->with('items')->latest();
+        // orderByDesc('id') breaks created_at ties - two orders placed in the same
+        // second would otherwise be free to swap between page loads, showing the
+        // customer one order twice and hiding another.
+        $query = Auth::user()->orders()->with('items')->latest()->orderByDesc('id');
 
         if (($term = trim($this->search)) !== '') {
             $query->where(fn ($q) => $q->where('id', 'like', "%{$term}%")
@@ -110,7 +113,7 @@ class extends Component {
                     type="text"
                     wire:model.live.debounce.300ms="search"
                     placeholder="019e34c4-9b70-726f-96cc-cf42b222d88a"
-                    class="w-full rounded-full py-2 sm:rounded-[15px] sm:py-3 border-2 border-zinc-400 bg-transparent pl-12 pr-4 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors hover:border-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                    class="w-full rounded-full py-2 sm:rounded-[12px] sm:py-3 border-2 border-zinc-400 bg-transparent pl-12 pr-4 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors hover:border-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                 >
                 <div wire:loading wire:target="search" class="absolute right-3 top-1/2 -translate-y-1/2">
                     <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -163,7 +166,7 @@ class extends Component {
                     <button type="button" @click="openId = openId === @js((string) $order->id) ? null : @js((string) $order->id)" class="flex w-full items-center gap-3.5 px-4 py-3.5 text-left">
                         {{-- Mirrors the cart's gift-card tile (landscape art,
                              object-cover) at a smaller size. --}}
-                        <span class="theme-static flex h-12 w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
+                        <span class="theme-static flex h-12 w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-white shadow-sm ring-1 ring-zinc-200">
                             @if ($flogo)
                                 <img src="{{ $flogo }}" alt="{{ $fname }}" class="h-full w-full object-cover" loading="lazy">
                             @else
@@ -171,13 +174,13 @@ class extends Component {
                             @endif
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-base font-bold text-zinc-900 dark:text-white">
+                            <span class="block truncate text-[10px] font-bold text-zinc-900 dark:text-white">
                                 {{ $fname }}@if ($ffaceTxt) {{ $ffaceTxt }}@endif @if ($extraVariants > 0)<span class="font-medium text-zinc-500 dark:text-zinc-400">+{{ $extraVariants }} more</span>@endif
                             </span>
-                            <span class="mt-0.5 block truncate text-sm text-zinc-500 dark:text-zinc-400">
+                            <span class="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">
                                 {{ ($order->placed_at ?? $order->created_at)->format('M j') }}@if ($fcountry) <span class="px-0.5">·</span> {{ $fcountry }}@endif <span class="px-0.5">·</span> {{ $shortId }}
                             </span>
-                            <span class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $lineTone }}">
+                            <span class="mt-1 flex items-center gap-1.5 text-xs font-semibold {{ $lineTone }}">
                                 @if ($lineIcon === 'check')
                                     <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                 @elseif ($lineIcon === 'x')

@@ -1026,7 +1026,7 @@
                                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                 <input x-model="netQ" type="text" placeholder="Search by country" aria-label="Search by country" class="w-full rounded-[15px] border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">
                             </div>
-                            <div class="mt-3 max-h-80 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
+                            <div class="mt-3 max-h-80 modal-scroll-fade overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
                                 <ul class="divide-y divide-zinc-100 dark:divide-zinc-700/60">
                                     @foreach ($countryNetworks as $cn)
                                         @php $cnIso = $cn['iso'] ?? ($nameToIso[$cn['name']] ?? null); @endphp
@@ -1055,7 +1055,7 @@
                     @else
                         {{-- Fallback (supplier sent no per-country networks):
                              plain country grid. --}}
-                        <div class="mt-4 max-h-72 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
+                        <div class="mt-4 max-h-72 modal-scroll-fade overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
                             <ul class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-zinc-700 sm:grid-cols-3 dark:text-zinc-300">
                                 @foreach ($coverageList as $c)
                                     <li class="truncate">{{ $c }}</li>
@@ -1068,7 +1068,7 @@
                     {{-- Global eSIMs can list 100+ carriers - cap the list like
                          the countries branch so the modal never outgrows the
                          screen; the list itself scrolls. --}}
-                    <div class="mt-4 max-h-72 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
+                    <div class="mt-4 max-h-72 modal-scroll-fade overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
                         <ul class="space-y-2.5">
                             @forelse ($carrierNetworks as $net)
                                 <li class="flex items-center gap-2.5 text-sm font-semibold text-zinc-900 dark:text-white">
@@ -1117,7 +1117,11 @@
                     </div>
                 </div>
 
-                <div class="mx-4 mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[12px] p-3 ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                {{-- The ring lives on this wrapper, not on the scroller: the fade
+                     mask dissolves everything it covers, so a ring on the scrolling
+                     element got faded away at its own top and bottom edges. --}}
+                <div class="mx-4 mb-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                <div class="modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch]">
                     {{-- iOS --}}
                     <div x-show="compatTab === 'ios'" class="space-y-0.5">
                         @foreach ($compat['ios'] as $device)
@@ -1142,13 +1146,17 @@
                         @endforeach
                     </div>
                 </div>
+                </div>
             </div>
         </div>
 
         {{-- Package details modal --}}
         <div x-show="showDetails" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="details-title">
             <div x-show="showDetails" @click="showDetails = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showDetails" x-transition class="esim-tile relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white/65 p-6 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+            <div x-show="showDetails" x-transition class="esim-tile relative max-h-[85vh] w-full max-w-lg flex flex-col overflow-hidden rounded-3xl bg-white/65 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+                {{-- Inner scroller: the sheet itself must NOT scroll, or the mask would
+                     fade its glass background and rounded corners too, not just the text. --}}
+                <div class="modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 [-webkit-overflow-scrolling:touch]">
                 <div class="flex items-start justify-between gap-4">
                     <h2 id="details-title" class="flex items-center gap-2.5 text-lg font-bold text-zinc-900 dark:text-white">
                         @if ($flag)
@@ -1283,6 +1291,7 @@
                     </div>
 
                     <p class="mt-5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">To complete your order, confirm your device is eSIM-compatible and network-unlocked.</p>
+                </div>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Order\Services;
 
+use App\Domain\Cart\Services\CartPricingService;
 use App\Models\CartItem;
 use App\Models\Coupon;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Log;
  */
 class CouponApplicationService
 {
+    public function __construct(private CartPricingService $pricing) {}
+
     /**
      * The USD discount this coupon grants on a cart line.
      *
@@ -48,8 +51,9 @@ class CouponApplicationService
             return ['discount_usd' => $discountUsd, 'clamped' => false];
         }
 
-        $minMargin = (float) config('pricing.min_margin_percent', 1);
-        $lineFloor = $costUsd * $quantity * (1 + $minMargin / 100);
+        // Same floor the markup path uses, so a coupon cannot undercut what the
+        // catalogue would refuse to price at in the first place.
+        $lineFloor = $this->pricing->costFloor($costUsd) * $quantity;
 
         // floor() (round down) keeps the discounted line >= the cost floor;
         // round() could overshoot under it by half a cent. The 1e-9 epsilon

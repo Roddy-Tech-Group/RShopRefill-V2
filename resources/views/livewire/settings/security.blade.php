@@ -12,6 +12,9 @@ use App\Livewire\Traits\EnforcesDeviceTrust;
 new #[Layout('components.layouts.dashboard')] class extends Component {
     use EnforcesDeviceTrust;
 
+    /** How many of the most recently seen trusted devices the panel lists. */
+    private const DEVICE_LIMIT = 10;
+
     public string $current_password = '';
     public string $password = '';
     public string $password_confirmation = '';
@@ -78,23 +81,21 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     
     public function with(): array
     {
+        // trusted_devices gains a row per browser/device and never sheds them, so
+        // an unbounded list meant a long-lived account rendered every device it
+        // had ever used. Only the recent ones are actionable.
+        //
+        // Nothing here may write. Repairing pre-Agent os/browser values used to
+        // happen in this loop, which turned a plain GET of the security centre
+        // into an UPDATE per stale device; that job now lives in the
+        // `devices:backfill-agents` command. The blade falls back to
+        // "Unknown OS"/"Unknown Browser" for any row not yet backfilled.
         $devices = TrustedDevice::where('user_id', Auth::id())
             ->whereNotNull('trusted_since') // Only show active devices
             ->orderByDesc('last_seen_at')
+            ->limit(self::DEVICE_LIMIT)
             ->get();
-            
-        // Auto-repair retroactively for existing devices before Agent package was installed
-        foreach ($devices as $device) {
-            if (empty($device->os) || str_contains($device->os, 'Unknown') || $device->os === '0') {
-                $agent = new \Jenssegers\Agent\Agent();
-                $agent->setUserAgent($device->user_agent);
-                $device->os = $agent->platform() ?: 'Unknown OS';
-                $device->browser = $agent->browser() ?: 'Unknown Browser';
-                $device->device_type = $agent->isDesktop() ? 'desktop' : ($agent->isTablet() ? 'tablet' : 'mobile');
-                $device->save();
-            }
-        }
-        
+
         $currentSessionId = session()->getId();
         $userSession = \App\Models\UserSession::where('laravel_session_id', $currentSessionId)->first();
         
@@ -112,6 +113,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
         return [
             'devices' => $devices,
+            'deviceLimit' => self::DEVICE_LIMIT,
             'currentDeviceId' => $currentDeviceId,
         ];
     }
@@ -330,7 +332,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                     </svg>
                                 </div>
                                 <div>
-                                    <p class="text-sm font-semibold text-black dark:text-white">{{ $device->os ?? 'Unknown OS' }} &middot; {{ $device->browser ?? 'Unknown Browser' }}</p>
+                                    <p class="text-sm font-semibold text-black dark:text-white">{{ $device->os ?: 'Unknown OS' }} &middot; {{ $device->browser ?: 'Unknown Browser' }}</p>
                                     <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $device->ip_address }} @if($device->city) &middot; {{ $device->city }} @endif</p>
                                     <p class="mt-0.5 text-[11px] text-zinc-400">Last login: {{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</p>
                                 </div>
@@ -345,6 +347,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         </li>
                     @endforeach
                 </ul>
+
+                @if($devices->count() >= $deviceLimit)
+                    <p class="mt-4 text-[11px] text-zinc-400">Showing your {{ $deviceLimit }} most recently used devices.</p>
+                @endif
             @endif
         </div>
         

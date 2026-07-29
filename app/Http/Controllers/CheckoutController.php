@@ -9,6 +9,7 @@ use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
+use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
@@ -131,21 +132,9 @@ class CheckoutController extends Controller
         // Verify currency-method compatibility behind the scenes. Mirrors the
         // frontend's `getFilteredMethods` mapping so a tampered request can't
         // route a method through a currency Flutterwave doesn't accept it on.
-        $supported = [
-            'USD' => ['card', 'apple_pay', 'crypto', 'wallet'],
-            'EUR' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
-            'GBP' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
-            'NGN' => ['card', 'apple_pay', 'bank_transfer', 'crypto', 'wallet', 'ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'],
-            'GHS' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'XAF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'XOF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'KES' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'UGX' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-            'RWF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        ];
-
-        $allowedMethods = $supported[$displayCurrency] ?? ['card', 'apple_pay'];
-        if (! in_array($data['payment_method'], $allowedMethods)) {
+        // Shared with PaymentSessionController::pay - if the two lists drift,
+        // an order gets created for a method the pay step then refuses.
+        if (! SupportedPaymentMethods::allows($displayCurrency, $data['payment_method'])) {
             $msg = "The selected payment method is not available for {$displayCurrency}.";
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['message' => $msg], 422);
@@ -166,7 +155,7 @@ class CheckoutController extends Controller
             $msg = $user->isKycVerified()
                 ? 'Your checkout attempt was flagged by our security systems. Please contact support.'
                 : 'Your checkout attempt was flagged by our security systems. Please complete KYC verification to proceed.';
-            
+
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['message' => $msg], 403);
             }

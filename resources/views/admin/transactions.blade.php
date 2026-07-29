@@ -37,13 +37,24 @@
     // straight to the customer's wallet, so they were previously invisible here.
     // Every other filter reads payment_attempts (the gateway/checkout attempts).
     // Both sources are normalised into one $rows shape the table renders.
+    // Both branches paginate instead of limit(50): wallet_transactions and
+    // payment_attempts are append-only ledgers that only ever grow, so the old
+    // cap quietly hid every refund / attempt older than the newest 50 with no
+    // way for an admin to reach them. through() maps the page in place so the
+    // paginator (and its links) survives the normalisation.
     if ($statusFilter === 'refunded') {
+        // orderByDesc('id') breaks ties. created_at is a second-granularity
+        // column and a multi-item refund writes several rows inside the same
+        // second, so latest() alone leaves the sort ambiguous. Page 1 and page 2
+        // are separate queries, and an ambiguous sort lets a tied row land on
+        // both or neither - the admin sees a refund twice, or never at all.
         $rows = WalletTransaction::with('wallet.user')
             ->whereIn('transaction_category', ['refund', 'reversal'])
             ->latest()
-            ->limit(50)
-            ->get()
-            ->map(fn ($txn) => [
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->withQueryString()
+            ->through(fn ($txn) => [
                 'customer'     => $txn->wallet?->user?->name ?? 'Unknown customer',
                 'order_number' => null,
                 'meta_label'   => $txn->transaction_category?->value === 'reversal' ? 'Wallet reversal' : 'Wallet refund',
@@ -58,11 +69,13 @@
     } else {
         // The pre-merge `payments` table was dropped and replaced by `payment_attempts`
         // (polymorphic — an attempt belongs to an Order or a WalletFunding).
-        $paymentsQuery = PaymentAttempt::with(['user', 'order'])->latest();
+        // Same tie-break as the refunded branch: a checkout that retries writes
+        // several attempts in one second.
+        $paymentsQuery = PaymentAttempt::with(['user', 'order'])->latest()->orderByDesc('id');
         if ($statusFilter !== 'all') {
             $paymentsQuery->whereIn('payment_status', $statusMap[$statusFilter]);
         }
-        $rows = $paymentsQuery->limit(50)->get()->map(function ($payment) use ($statusPillFor) {
+        $rows = $paymentsQuery->paginate(50)->withQueryString()->through(function ($payment) use ($statusPillFor) {
             $statusValue = $payment->payment_status?->value ?? 'pending';
 
             return [
@@ -80,7 +93,14 @@
         });
     }
 
-    $totalPayments = PaymentAttempt::count();
+    // Subheading denominator. It used to print a whole-table payment_attempts
+    // count even on the Refunded tab, where the rows on screen come from
+    // wallet_transactions, so the number described a different set entirely.
+    // The paginator total always counts exactly what the active filter selected.
+    $rowsTotal = $rows->total();
+    $rowsNoun = $statusFilter === 'refunded'
+        ? \Illuminate\Support\Str::plural('wallet refund', $rowsTotal)
+        : \Illuminate\Support\Str::plural('payment attempt', $rowsTotal);
 
     // KPI counts — full table totals so the strip stays stable as the
     // admin scrubs the filter chips. Same status buckets as the chips.
@@ -117,7 +137,12 @@
             </a>
         </div>
     </x-slot:heading>
-    <x-slot:subheading>{{ number_format($totalPayments) }} payment attempts total. Showing the latest 50 matching the filter.</x-slot:subheading>
+    <x-slot:subheading>
+        {{ number_format($rowsTotal) }} {{ $rowsNoun }}{{ $statusFilter === 'all' ? ' total' : ' matching this filter' }}.
+        @if ($rows->isNotEmpty())
+            Showing {{ number_format($rows->firstItem()) }}-{{ number_format($rows->lastItem()) }}.
+        @endif
+    </x-slot:subheading>
 
     {{-- KPI strip — same look as every other admin page. --}}
     <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -285,5 +310,11 @@
         @endforelse
 
         </div>
+
+        @if ($rows->hasPages())
+            <div class="border-t border-zinc-200 px-5 py-3 dark:border-zinc-700">
+                {{ $rows->links() }}
+            </div>
+        @endif
     </div>
 </x-layouts.admin>

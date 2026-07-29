@@ -798,11 +798,19 @@ Route::middleware(['auth'])->group(function () {
 
     Route::view('dashboard/wallet', 'dashboard.wallet')->name('dashboard.wallet');
 
-    // TESTING ROUTES - Functional UI for backend testing
-    Volt::route('dashboard/virtual-cards', 'dashboard.virtual-cards.index')->name('dashboard.virtual-cards');
-    Volt::route('dashboard/transfers', 'dashboard.transfers.index')->name('dashboard.transfers');
-    Volt::route('dashboard/withdrawals', 'dashboard.withdrawals.index')->name('dashboard.withdrawals');
-    Volt::route('dashboard/exchange', 'dashboard.exchange.index')->name('dashboard.exchange');
+    // Financial features still under construction (ledger, P2P, withdrawals, FX).
+    // The dashboard nav already hides these behind the same ef_* flags in
+    // components/layouts/dashboard.blade.php; the gate is repeated here so a
+    // typed URL cannot reach a half-built page while the backing services and
+    // their migrations are unfinished. Every flag defaults off.
+    Volt::route('dashboard/virtual-cards', 'dashboard.virtual-cards.index')
+        ->middleware('feature:ef_virtual_cards')->name('dashboard.virtual-cards');
+    Volt::route('dashboard/transfers', 'dashboard.transfers.index')
+        ->middleware('feature:ef_transfers')->name('dashboard.transfers');
+    Volt::route('dashboard/withdrawals', 'dashboard.withdrawals.index')
+        ->middleware('feature:ef_fiat_withdrawals')->name('dashboard.withdrawals');
+    Volt::route('dashboard/exchange', 'dashboard.exchange.index')
+        ->middleware('feature:ef_exchange')->name('dashboard.exchange');
 
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
     Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
@@ -914,9 +922,5 @@ Route::middleware(['auth'])->prefix('security')->name('security.')->group(functi
 });
 
 require __DIR__.'/admin.php';
-
-if (file_exists(__DIR__.'/debug_browser.php')) {
-    require __DIR__.'/debug_browser.php';
-}
 
 require __DIR__.'/auth.php';

@@ -70,7 +70,17 @@
         $productsQuery->orderByDesc('is_popular')->orderByDesc('is_featured')->orderBy('name');
     }
 
-    $products = $productsQuery->get();
+    // Final tie-break on the primary key so the page split is stable: the sorts
+    // above tie freely (shared names, and one popularity rank across the whole
+    // unflagged tail), and every page is a separate query.
+    $productsQuery->orderBy('id');
+
+    // Paginated: this listing renders one card per brand_key and the bill-payments
+    // catalog grows with every biller added to the products table, while each card
+    // eager-loads its variants to compute a price range. Rendering every biller on
+    // one uncached, anonymous-accessible page made the request grow without bound.
+    // withQueryString keeps the country, subcategory and search filters on the links.
+    $products = $productsQuery->paginate(60)->withQueryString();
 
     $subcategories = $billCategory
         ? Subcategory::where('category_id', $billCategory->id)->orderBy('name')->get(['name', 'slug'])
@@ -291,6 +301,12 @@
                                     </li>
                                 @endforeach
                             </ul>
+
+                            @if ($products->hasPages())
+                                <div class="mt-8">
+                                    {{ $products->links() }}
+                                </div>
+                            @endif
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">

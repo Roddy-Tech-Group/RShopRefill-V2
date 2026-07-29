@@ -28,7 +28,20 @@ class ExpireStalePaymentSessionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function staleCheckout(): array
+    /**
+     * An abandoned checkout, aged $ageMinutes.
+     *
+     * The age has to be real, not just implied by expires_at. Sessions are minted
+     * with a 15-minute TTL, so a session that lapsed 20 minutes ago was created 35
+     * minutes ago - it cannot also have been created this instant. The sweeper's
+     * promised-window floor measures from created_at, so a fixture that leaves
+     * created_at at now() describes a session that could never exist and is waved
+     * straight through the floor.
+     *
+     * The default is comfortably past both the TTL and the 30-minute floor. Pass a
+     * smaller age to model a session the customer still has time to pay.
+     */
+    private function staleCheckout(int $ageMinutes = 45): array
     {
         $user = User::factory()->create();
 
@@ -49,6 +62,8 @@ class ExpireStalePaymentSessionsTest extends TestCase
             'payment_status' => PaymentStatus::Pending,
         ]);
 
+        $createdAt = now()->subMinutes($ageMinutes);
+
         $session = PaymentSession::create([
             'payment_attempt_id' => $attempt->id,
             'provider' => 'flutterwave',
@@ -59,8 +74,13 @@ class ExpireStalePaymentSessionsTest extends TestCase
             'currency' => 'USD',
             'display_currency' => 'USD',
             'customer_email' => $user->email,
-            'expires_at' => now()->subMinutes(20),
+            // The real 15-minute TTL, measured from when the session was minted.
+            'expires_at' => now()->subMinutes($ageMinutes - 15),
         ]);
+
+        // created_at is not fillable, so create() would have stamped it now() and
+        // the session would look brand new to the promised-window floor.
+        $session->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
 
         return [$order, $attempt, $session];
     }
@@ -89,6 +109,41 @@ class ExpireStalePaymentSessionsTest extends TestCase
         $this->assertSame(PaymentStatus::Expired, $attempt->fresh()->payment_status);
         $this->assertSame(OrderStatus::Cancelled, $order->fresh()->order_status);
         $this->assertSame(PaymentStatus::Failed, $order->fresh()->payment_status);
+    }
+
+    /**
+     * The bank-transfer screens promise the customer a 30-minute window, and the
+     * virtual account really does stay open that long, so a session past its own
+     * 15-minute TTL but still inside that promise must survive the sweep. Killing
+     * it marks the funding Failed while the customer's transfer is in flight.
+     */
+    public function test_session_inside_the_promised_window_survives_the_sweep(): void
+    {
+        $this->fakeGatewayUnpaid();
+
+        // Minted 20 minutes ago: lapsed by TTL 5 minutes ago, but the customer was
+        // told they had 30 minutes and 10 of them are left.
+        [$order, $attempt, $session] = $this->staleCheckout(20);
+
+        (new ExpireStalePaymentSessionsJob)->handle(
+            app(PaymentSessionService::class),
+            app(OrderService::class),
+        );
+
+        $this->assertSame('awaiting_confirmation', $session->fresh()->status, 'The session was killed inside its promised window');
+        $this->assertSame(PaymentStatus::Pending, $attempt->fresh()->payment_status);
+        $this->assertNotSame(OrderStatus::Cancelled, $order->fresh()->order_status);
+
+        // Once the promise has run out, the same checkout does get swept.
+        $session->forceFill(['created_at' => now()->subMinutes(45)])->save();
+
+        (new ExpireStalePaymentSessionsJob)->handle(
+            app(PaymentSessionService::class),
+            app(OrderService::class),
+        );
+
+        $this->assertSame('expired', $session->fresh()->status);
+        $this->assertSame(PaymentStatus::Expired, $attempt->fresh()->payment_status);
     }
 
     public function test_paid_attempt_is_never_touched_by_the_sweeper(): void

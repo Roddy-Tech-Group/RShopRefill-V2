@@ -88,12 +88,22 @@
         $productsQuery->orderByDesc('is_popular')->orderByDesc('is_featured')->orderBy('name');
     }
 
-    // The listing shows every matching operator on one page — no pagination.
-    $products = $productsQuery->get();
+    // Final tie-break on the primary key so the page split is stable: the sorts
+    // above tie freely (shared names, and one popularity rank across the whole
+    // unflagged tail), and every page is a separate query.
+    $productsQuery->orderBy('id');
+
+    // Paginated: this listing renders one card per brand_key and the mobile-airtime
+    // catalog keeps growing with every operator sync, while each card eager-loads its
+    // variants to compute a price range. Rendering every operator on one uncached,
+    // anonymous-accessible page made the request grow without bound. withQueryString
+    // keeps the country, offer-type and search filters attached to the page links.
+    $products = $productsQuery->paginate(60)->withQueryString();
 
     // Per-operator Credit / Data / Bundle support for the tile badges. One light
     // DISTINCT query reading just the offer subtype out of the JSON, rather than
     // loading every variant's full metadata into memory across the whole listing.
+    // Scoped to the current page's products, so this query shrinks with pagination.
     $topupBadgesByProduct = \Illuminate\Support\Facades\DB::table('product_variants')
         ->whereIn('product_id', $products->pluck('id'))
         ->where('is_available', true)
@@ -336,6 +346,12 @@
                                     </li>
                                 @endforeach
                             </ul>
+
+                            @if ($products->hasPages())
+                                <div class="mt-8">
+                                    {{ $products->links() }}
+                                </div>
+                            @endif
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">

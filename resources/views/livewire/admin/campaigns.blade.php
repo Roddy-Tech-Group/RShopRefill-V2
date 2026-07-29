@@ -24,7 +24,10 @@ class extends Component {
             ->when($this->status, function ($query) {
                 $query->where('status', $this->status);
             })
+            // orderByDesc('id') breaks created_at ties so a campaign cannot
+            // render on two pages, or fall between them, as the admin pages.
             ->latest()
+            ->orderByDesc('id')
             ->paginate(10);
 
         return [

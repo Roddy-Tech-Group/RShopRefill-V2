@@ -6,6 +6,7 @@ use App\Models\Admin;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
 
@@ -13,7 +14,12 @@ new
 #[Layout('components.layouts.admin')]
 #[Title('Admins')]
 class extends Component {
+    // Locked: every public property is client-writable by default, so without
+    // this the browser could repoint an in-flight edit at any other admin row
+    // (a Super Admin's) between edit() loading one record and save() writing it.
+    #[Locked]
     public ?int $editingId = null;
+
     public bool $showForm = false;
 
     public string $name = '';
@@ -25,10 +31,25 @@ class extends Component {
     /** @var array<int, string> Section keys this admin may access. */
     public array $permissions = [];
 
+    /**
+     * Managing admins is the highest-risk surface - Super Admin only.
+     *
+     * Livewire exposes every public method as a client-callable endpoint, and
+     * the Livewire update endpoint does not re-run this route's admin
+     * middleware. Authorising in mount() alone therefore leaves save(),
+     * toggleActive() and loginAs() (account impersonation) reachable straight
+     * from the browser console by anyone holding a snapshot of this component -
+     * including an admin who has since been demoted out of Super Admin with the
+     * page still open. Every public entry point re-checks.
+     */
+    protected function authorizeSuperAdmin(): void
+    {
+        abort_unless(auth('admin')->user()?->isSuperAdmin(), 404, 'Only a Super Admin can manage admins.');
+    }
+
     public function mount(): void
     {
-        // Managing admins is the highest-risk surface - Super Admin only.
-        abort_unless(auth('admin')->user()?->isSuperAdmin(), 404, 'Only a Super Admin can manage admins.');
+        $this->authorizeSuperAdmin();
 
         $this->permissions = AdminRole::from($this->role)->defaultPermissions();
     }
@@ -37,6 +58,8 @@ class extends Component {
     #[Computed]
     public function sections(): array
     {
+        $this->authorizeSuperAdmin();
+
         return Admin::SECTIONS;
     }
 
@@ -46,12 +69,16 @@ class extends Component {
      */
     public function updatedRole(string $value): void
     {
+        $this->authorizeSuperAdmin();
+
         $this->permissions = AdminRole::from($value)->defaultPermissions();
     }
 
     #[Computed]
     public function admins()
     {
+        $this->authorizeSuperAdmin();
+
         return Admin::orderBy('name')->get();
     }
 
@@ -73,12 +100,16 @@ class extends Component {
 
     public function newAdmin(): void
     {
+        $this->authorizeSuperAdmin();
+
         $this->resetForm();
         $this->showForm = true;
     }
 
     public function edit(int $id): void
     {
+        $this->authorizeSuperAdmin();
+
         $admin = Admin::findOrFail($id);
         $this->editingId = $admin->id;
         $this->name      = $admin->name;
@@ -95,6 +126,8 @@ class extends Component {
 
     public function save(): void
     {
+        $this->authorizeSuperAdmin();
+
         $this->validate();
 
         // Super Admins always have full access, so their permission set is left
@@ -131,6 +164,8 @@ class extends Component {
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeSuperAdmin();
+
         $currentAdminId = auth()->guard('admin')->id();
 
         if ($id === $currentAdminId) {
@@ -145,6 +180,8 @@ class extends Component {
 
     public function loginAs(int $id): mixed
     {
+        $this->authorizeSuperAdmin();
+
         $currentAdminId = auth()->guard('admin')->id();
 
         if ($id === $currentAdminId) {
@@ -169,6 +206,8 @@ class extends Component {
 
     public function closeForm(): void
     {
+        $this->authorizeSuperAdmin();
+
         $this->resetForm();
     }
 

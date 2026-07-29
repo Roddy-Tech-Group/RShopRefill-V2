@@ -65,13 +65,26 @@ class OrderService
 
                 if ($walletPayment) {
                     $walletProvider = app(WalletPaymentProvider::class);
+
+                    // What is still reserved is exactly what finalizeDebit will take.
+                    // Read it before the debit: a failure path that already unlocked a
+                    // failed item's share (releasePartialFunds) shrank this reservation.
+                    $stillReserved = (float) $walletPayment->amount;
+
                     $walletProvider->finalizeDebit($walletPayment);
                     $order->payment_status = PaymentStatus::Paid;
 
                     if ($newStatus === FulfillmentStatus::PartiallyFulfilled) {
-                        $failedTotal = $order->items->where('fulfillment_status', FulfillmentStatus::Failed)->sum('subtotal_amount');
-                        if ($failedTotal > 0) {
-                            $walletProvider->refundPayment($walletPayment, $failedTotal);
+                        $failedTotal = (float) $order->items->where('fulfillment_status', FulfillmentStatus::Failed)->sum('subtotal_amount');
+
+                        // Reverse each failed item exactly once: anything already
+                        // unlocked at failure time was never debited, so refunding the
+                        // full failed total on top of it pays the customer back twice.
+                        $alreadyReleased = max(0.0, round((float) $order->total_amount - $stillReserved, 2));
+                        $refundable = round($failedTotal - $alreadyReleased, 2);
+
+                        if ($refundable > 0) {
+                            $walletProvider->refundPayment($walletPayment, $refundable);
                         }
                     }
                 }
@@ -88,8 +101,11 @@ class OrderService
             // before the Rcoin lands in the customer's wallet. The job itself
             // re-checks order status before crediting, so a refund in the
             // interim is safe.
+            // afterCommit: this runs inside an open transaction, so a worker picking
+            // the job up before the commit lands would read a stale order (or none at
+            // all) and silently drop the cashback / referral bonus.
             if ($order->wasChanged('order_status') && $order->order_status === OrderStatus::Completed) {
-                $job = ProcessOrderRewardsJob::dispatch($order)->onQueue('rewards');
+                $job = ProcessOrderRewardsJob::dispatch($order)->onQueue('rewards')->afterCommit();
 
                 if (Setting::get('fraud_hold_enabled', false)) {
                     $days = max(0, (int) Setting::get('fraud_hold_days', 0));

@@ -9,11 +9,14 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
+use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
 #[Title('Rate Management')]
 class extends Component {
+    use WithPagination;
+
     /** Row currently being edited (id) or null. */
     public ?int $editingId = null;
 
@@ -74,44 +77,63 @@ class extends Component {
         ];
     }
 
-    #[Computed]
-    public function allRates()
-    {
-        return CurrencyRate::orderBy('type')->orderBy('sort_order')->orderBy('code')->get();
-    }
-
     /**
-     * Visible row set — applies the type filter + free-text search to the
-     * complete list. Counts on the KPI strip stay sourced from allRates so
-     * filtering doesn't make the totals jump.
+     * Visible row set - the type filter and free-text search run in SQL so the
+     * page only ever loads 50 rows. currency_rates gains a row every time an
+     * admin defines a currency and every row paints a flag image, so the old
+     * "load them all, filter in PHP" version made this the heaviest table in
+     * the admin. KPI counts live on their own COUNT queries (see summary())
+     * so filtering never makes the totals jump.
      */
     #[Computed]
     public function rates()
     {
-        $rows = $this->allRates;
+        $query = CurrencyRate::query()->orderBy('type')->orderBy('sort_order')->orderBy('code');
 
         if ($this->typeFilter !== 'all') {
-            $rows = match ($this->typeFilter) {
-                'fiat'     => $rows->where('type', 'fiat'),
-                'crypto'   => $rows->where('type', 'crypto'),
-                'inactive' => $rows->where('is_active', false),
-                'stale'    => $rows->filter(function ($r) {
-                    $live = $this->freshness[$r->code] ?? null;
-                    return $live === null || $live['age_hours'] >= 24;
-                }),
-                default    => $rows,
+            $query = match ($this->typeFilter) {
+                'fiat'     => $query->where('type', 'fiat'),
+                'crypto'   => $query->where('type', 'crypto'),
+                'inactive' => $query->where('is_active', false),
+                'stale'    => $query->whereNotIn('code', $this->freshCodes()),
+                default    => $query,
             };
         }
 
         if ($this->search !== '') {
-            $needle = mb_strtolower(trim($this->search));
-            $rows = $rows->filter(fn ($r) =>
-                str_contains(mb_strtolower($r->code), $needle) ||
-                str_contains(mb_strtolower($r->name), $needle)
-            );
+            $needle = '%'.trim($this->search).'%';
+            $query->where(function ($q) use ($needle) {
+                $q->where('code', 'like', $needle)
+                    ->orWhere('name', 'like', $needle);
+            });
         }
 
-        return $rows->values();
+        return $query->paginate(50);
+    }
+
+    /**
+     * Codes whose live exchange_rates row is under 24h old. The "stale" filter
+     * is the inverse of this set (no live row at all, or one 24h+ old), so
+     * expressing it as a whereNotIn keeps that filter paginatable.
+     *
+     * @return list<string>
+     */
+    private function freshCodes(): array
+    {
+        return collect($this->freshness)
+            ->filter(fn (array $f): bool => $f['age_hours'] < 24)
+            ->keys()
+            ->all();
+    }
+
+    public function updatedTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
     }
 
     /**
@@ -163,8 +185,8 @@ class extends Component {
         }
 
         return [
-            'fiat'      => $this->allRates->where('type', 'fiat')->count(),
-            'crypto'    => $this->allRates->where('type', 'crypto')->count(),
+            'fiat'      => CurrencyRate::where('type', 'fiat')->count(),
+            'crypto'    => CurrencyRate::where('type', 'crypto')->count(),
             'fresh'     => $fresh,
             'stale'     => $stale,
             'critical'  => $critical,
@@ -224,7 +246,7 @@ class extends Component {
         $this->syncSingleRate($rate);
 
         $this->closeForm();
-        unset($this->allRates, $this->rates, $this->freshness, $this->summary);
+        unset($this->rates, $this->freshness, $this->summary);
     }
 
     public function delete(int $id): void
@@ -243,7 +265,7 @@ class extends Component {
 
         $rate->delete();
         session()->flash('status', $code.' deleted.');
-        unset($this->allRates, $this->rates, $this->freshness, $this->summary);
+        unset($this->rates, $this->freshness, $this->summary);
     }
 
     public function toggleActive(int $id): void
@@ -260,7 +282,7 @@ class extends Component {
             })
             ->update(['is_active' => $rate->is_active]);
 
-        unset($this->allRates, $this->rates, $this->freshness, $this->summary);
+        unset($this->rates, $this->freshness, $this->summary);
     }
 
     /**
@@ -528,6 +550,12 @@ class extends Component {
                     </tbody>
                 </table>
             </div>
+
+            @if ($this->rates->hasPages())
+                <div class="border-t border-zinc-100 px-5 py-3 dark:border-zinc-700/60">
+                    {{ $this->rates->links('vendor.pagination.circles-livewire') }}
+                </div>
+            @endif
         </div>
     </div>
 

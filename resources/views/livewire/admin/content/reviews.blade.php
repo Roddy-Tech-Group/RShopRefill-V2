@@ -9,11 +9,14 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
+use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
 #[Title('Reviews')]
 class extends Component {
+    use WithPagination;
+
     public ?int $editingId = null;
 
     public bool $showForm = false;
@@ -54,6 +57,8 @@ class extends Component {
         // needs approval first. The search matches the customer name (or review
         // text) so the admin can confirm whether a Google/Trustpilot review for
         // that person is already in the system.
+        // Paginated because the reviews table grows with every customer
+        // submission; the old get() hydrated the entire table on each render.
         return Review::with('user:id,kyc_status')
             ->when($this->search !== '', function ($query) {
                 $term = '%'.trim($this->search).'%';
@@ -64,7 +69,10 @@ class extends Component {
             })
             ->orderByRaw('(is_customer_submitted = 1 AND is_published = 0) DESC')
             ->orderByDesc('reviewed_at')
-            ->get();
+            // reviewed_at is a DATE and the flag above is a boolean, so both sort
+            // keys tie heavily. orderByDesc('id') makes the page split stable.
+            ->orderByDesc('id')
+            ->paginate(25);
     }
 
     #[Computed]
@@ -76,6 +84,12 @@ class extends Component {
             'since' => (int) SiteSetting::get('reviews.aggregate.since_year', date('Y')),
             'source' => (string) SiteSetting::get('reviews.aggregate.source', 'Trustpilot'),
         ];
+    }
+
+    /** A new search term makes the current page offset meaningless. */
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
     }
 
     public function newReview(): void
@@ -215,7 +229,8 @@ class extends Component {
             >
         </div>
         @if (trim($this->search) !== '')
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $this->reviews->count() }} {{ \Illuminate\Support\Str::plural('match', $this->reviews->count()) }}</span>
+            {{-- total(), not count(): count() would only report the rows on the current page. --}}
+            <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $this->reviews->total() }} {{ \Illuminate\Support\Str::plural('match', $this->reviews->total()) }}</span>
             <button type="button" wire:click="$set('search', '')" class="text-xs font-medium text-blue-600 hover:underline dark:text-blue-300">Clear</button>
         @endif
     </div>
@@ -281,6 +296,12 @@ class extends Component {
                 </tbody>
             </table>
         </div>
+
+        @if ($this->reviews->hasPages())
+            <div class="border-t border-zinc-100 px-5 py-3 dark:border-zinc-700/60">
+                {{ $this->reviews->links('vendor.pagination.circles-livewire') }}
+            </div>
+        @endif
     </div>
 
     {{-- Create/edit modal --}}

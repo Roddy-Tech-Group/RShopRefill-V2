@@ -115,7 +115,11 @@ class extends Component {
                           ->orWhere('country_code', 'like', '%' . $this->search . '%')
                           ->orWhere('currency', 'like', '%' . $this->search . '%');
                 })
+                // orderByDesc('id') breaks created_at ties - a bulk rate update
+                // writes many rows in one second, and without a total order a
+                // tied rate can appear on two pages or on neither.
                 ->latest()
+                ->orderByDesc('id')
                 ->paginate(10),
             'brands' => $brands,
             'brandOptions' => $brandOptions,

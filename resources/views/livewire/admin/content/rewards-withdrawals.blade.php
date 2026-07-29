@@ -13,11 +13,14 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
+use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
 #[Title('Rcoin Withdrawals')]
 class extends Component {
+    use WithPagination;
+
     /** 'pending' | 'approved' | 'paid' | 'rejected' - filter the queue. */
     public string $tab = 'pending';
 
@@ -29,15 +32,23 @@ class extends Component {
 
     public string $payoutReference = '';
 
+    /**
+     * The queue for the active tab. rcoin_withdrawals is append-only, so the
+     * old hard ->limit(50) permanently hid every row past the newest 50 on the
+     * paid and rejected tabs - there was no way to reach them. Paginating keeps
+     * the page bounded without losing the history.
+     */
     #[Computed]
     public function withdrawals()
     {
+        // orderByDesc('id') breaks created_at ties so a withdrawal cannot appear
+        // on two pages, or be skipped between them, while an admin works the queue.
         return RcoinWithdrawal::query()
             ->where('status', $this->tab)
             ->with('user:id,name,email')
             ->latest()
-            ->limit(50)
-            ->get();
+            ->orderByDesc('id')
+            ->paginate(25);
     }
 
     #[Computed]
@@ -53,6 +64,9 @@ class extends Component {
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['pending', 'approved', 'paid', 'rejected'], true) ? $tab : 'pending';
+        // Each tab has its own row count, so keep the deep page from the old
+        // tab out of the new one.
+        $this->resetPage();
         $this->cancelReject();
         $this->cancelPay();
     }
@@ -335,4 +349,10 @@ class extends Component {
             </div>
         @endforelse
     </div>
+
+    @if ($this->withdrawals->hasPages())
+        <div class="mt-6">
+            {{ $this->withdrawals->links('vendor.pagination.circles-livewire') }}
+        </div>
+    @endif
 </div>

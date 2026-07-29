@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use App\Models\BlogPost;
+use App\Models\PressArticle;
 use App\Models\Review;
 use Database\Seeders\AdminSeeder;
 use Database\Seeders\BlogPostSeeder;
@@ -80,6 +82,78 @@ class AdminContentSectionTest extends TestCase
             ->set('search', 'Alice')
             ->assertSee('Alice Traveller')
             ->assertDontSee('Bob Shopper');
+    }
+
+    public function test_admin_blog_page_paginates_at_25_and_badge_shows_true_total(): void
+    {
+        $this->withoutVite()->adminLogin();
+
+        foreach (range(0, 29) as $index) {
+            $label = 'Paginated post '.str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+            BlogPost::factory()->create([
+                'title' => $label,
+                'slug' => 'paginated-post-'.$index,
+                'published_at' => now()->subDays($index)->toDateString(),
+            ]);
+        }
+
+        Volt::test('admin.content.blog')
+            ->assertSee('30 posts')
+            ->assertSee('Paginated post 00')
+            ->assertDontSee('Paginated post 29')
+            ->call('gotoPage', 2)
+            ->assertSee('30 posts')
+            ->assertSee('Paginated post 29');
+    }
+
+    public function test_admin_press_page_paginates_at_25_and_badge_shows_true_total(): void
+    {
+        $this->withoutVite()->adminLogin();
+
+        foreach (range(0, 29) as $index) {
+            $label = 'Paginated article '.str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+            PressArticle::factory()->create([
+                'title' => $label,
+                'slug' => 'paginated-article-'.$index,
+                'published_at' => now()->subDays($index)->toDateString(),
+            ]);
+        }
+
+        Volt::test('admin.content.press')
+            ->assertSee('30 articles')
+            ->assertSee('Paginated article 00')
+            ->assertDontSee('Paginated article 29')
+            ->call('gotoPage', 2)
+            ->assertSee('30 articles')
+            ->assertSee('Paginated article 29');
+    }
+
+    public function test_admin_reviews_page_paginates_and_search_returns_to_first_page(): void
+    {
+        $this->withoutVite()->adminLogin();
+
+        foreach (range(0, 29) as $index) {
+            Review::factory()->create([
+                'author_name' => 'Bulk Reviewer '.str_pad((string) $index, 2, '0', STR_PAD_LEFT),
+                'reviewed_at' => now()->subDays($index + 1)->toDateString(),
+            ]);
+        }
+        Review::factory()->create([
+            'author_name' => 'Zedaiah Uniqueperson',
+            'reviewed_at' => now()->subDays(40)->toDateString(),
+        ]);
+
+        // Page 2 holds the tail of the list; searching from there must land the
+        // admin back on page 1 or the single match would render on an empty page.
+        Volt::test('admin.content.reviews')
+            ->assertSee('Bulk Reviewer 00')
+            ->assertDontSee('Zedaiah Uniqueperson')
+            ->call('gotoPage', 2)
+            ->assertSee('Zedaiah Uniqueperson')
+            ->set('search', 'Zedaiah')
+            ->assertSee('Zedaiah Uniqueperson')
+            ->assertSee('1 match')
+            ->assertDontSee('Bulk Reviewer 00');
     }
 
     public function test_faq_admin_page_lists_seeded_questions_grouped_by_topic(): void

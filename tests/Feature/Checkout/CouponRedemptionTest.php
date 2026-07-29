@@ -147,8 +147,11 @@ class CouponRedemptionTest extends TestCase
             couponCode: 'FIVEOFF',
         );
 
-        // $11.00 - $5.00 = $6.00
-        $this->assertEqualsWithDelta(6.00, (float) $order->total_amount, 0.01);
+        // $11.00 - $5.00 would be $6.00, but the cost-anchored floor (enforce
+        // mode) will not let a coupon push the line under supplier cost: the
+        // floor is cost x (1 + min_margin), so the discount is clamped and the
+        // order lands there instead. Selling at $6.00 would have been a loss.
+        $this->assertEqualsWithDelta(9.60, (float) $order->total_amount, 0.01);
     }
 
     public function test_unknown_coupon_throws_invalid_coupon_exception(): void
@@ -319,6 +322,12 @@ class CouponRedemptionTest extends TestCase
             couponCode: 'EVERYTHING',
         );
 
-        $this->assertSame(0.0, (float) $order->total_amount);
+        // A $999 coupon on an $11 line used to zero the order out. Under the
+        // cost-anchored floor it cannot: the discount is clamped so the line
+        // stays at cost x (1 + min_margin). The original guarantee (never
+        // negative) still holds, and the stronger one now does too - a coupon
+        // can no longer give the product away below what we paid for it.
+        $this->assertEqualsWithDelta(9.60, (float) $order->total_amount, 0.01);
+        $this->assertGreaterThan(0.0, (float) $order->total_amount);
     }
 }

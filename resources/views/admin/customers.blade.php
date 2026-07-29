@@ -1,7 +1,14 @@
 @php
     use App\Models\User;
 
-    $customers = User::with('wallets')->latest()->limit(50)->get();
+    // paginate, NOT limit(50): the users table only ever grows, and the hard
+    // limit silently hid every customer past the 50 newest - there was no way
+    // to reach them from this page at all. Paging keeps the row cost flat and
+    // makes the rest of the table reachable via ?page=.
+    // orderByDesc('id') breaks created_at ties (a seeded or bulk-imported batch
+    // shares one timestamp), which would otherwise let a customer appear on two
+    // pages or none.
+    $customers = User::with('wallets')->latest()->orderByDesc('id')->paginate(50)->withQueryString();
     $totalCustomers = User::count();
 
     // Wallet column shows the customer's TOTAL holdings as one USD figure.
@@ -58,7 +65,12 @@
 
 <x-layouts.admin>
     <x-slot:heading>Customers</x-slot:heading>
-    <x-slot:subheading>{{ number_format($totalCustomers) }} users total. Showing the latest 50.</x-slot:subheading>
+    <x-slot:subheading>
+        {{ number_format($totalCustomers) }} users total.
+        @if ($customers->isNotEmpty())
+            Showing {{ number_format($customers->firstItem()) }}-{{ number_format($customers->lastItem()) }}.
+        @endif
+    </x-slot:subheading>
 
     {{-- Shared grid template between header pill + each customer row so columns
          line up exactly. Same pattern as the Transactions / Products pages. --}}
@@ -175,5 +187,11 @@
         @endforelse
 
         </div>
+
+        @if ($customers->hasPages())
+            <div class="border-t border-zinc-200 px-5 py-3 dark:border-zinc-700">
+                {{ $customers->links() }}
+            </div>
+        @endif
     </div>
 </x-layouts.admin>

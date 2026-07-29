@@ -9,12 +9,15 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
 #[Title('Press Articles')]
 class extends Component {
     use WithFileUploads;
+    use WithPagination;
+
     public ?int $editingId = null;
 
     public bool $showForm = false;
@@ -73,10 +76,14 @@ class extends Component {
     #[Validate('integer|min:0|max:10000')]
     public int $sortOrder = 0;
 
+    /** Paginated because press_articles only ever grows; the old get() pulled
+     *  every article (body JSON included) into memory on each render. */
     #[Computed]
     public function articles()
     {
-        return PressArticle::orderByDesc('published_at')->get();
+        // published_at is a DATE, so same-day articles tie outright. orderByDesc('id')
+        // settles them; without it a tied article can render on two pages or neither.
+        return PressArticle::orderByDesc('published_at')->orderByDesc('id')->paginate(25);
     }
 
     /** Distinct categories already in use, alphabetical. Powers the
@@ -250,7 +257,8 @@ class extends Component {
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Newsroom posts shown at <a href="/press" target="_blank" class="text-blue-600 hover:underline dark:text-blue-300">/press</a>.</p>
         </div>
         <div class="flex items-center gap-2">
-            <span class="rounded-[12px] bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-300">{{ $this->articles->count() }} {{ \Illuminate\Support\Str::plural('article', $this->articles->count()) }}</span>
+            {{-- total(), not count(): count() would only report the rows on the current page. --}}
+            <span class="rounded-[12px] bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-300">{{ $this->articles->total() }} {{ \Illuminate\Support\Str::plural('article', $this->articles->total()) }}</span>
             <button wire:click="newArticle" type="button" class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                 New article
@@ -304,6 +312,12 @@ class extends Component {
                 </tbody>
             </table>
         </div>
+
+        @if ($this->articles->hasPages())
+            <div class="border-t border-zinc-100 px-5 py-3 dark:border-zinc-700/60">
+                {{ $this->articles->links('vendor.pagination.circles-livewire') }}
+            </div>
+        @endif
     </div>
 
     {{-- Create/edit modal --}}

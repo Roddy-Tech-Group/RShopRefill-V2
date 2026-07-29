@@ -104,7 +104,11 @@ class extends Component {
 
     public function with(): array
     {
-        $query = Notification::with('user')->latest();
+        // orderByDesc('id') breaks created_at ties - a campaign fan-out writes
+        // thousands of rows in the same second, so this list ties heavily. `id`
+        // is a UUID here and carries no chronology; it is present purely to make
+        // the sort total, which is what keeps the page split stable.
+        $query = Notification::with('user')->latest()->orderByDesc('id');
 
         if (in_array($this->filter, ['pending', 'sent', 'failed'], true)) {
             $query->where('status', $this->filter);

@@ -17,8 +17,17 @@
         $query->whereIn('payment_status', ['paid', 'reserved', 'refunded']);
     }
 
-    $orders = $query->latest()->limit(50)->get();
-    $totalOrders = $query->count();
+    // `orders` grows on every checkout attempt, and the `unpaid` tab collects the
+    // abandoned ones too, so the old limit(50) hid the tail of every tab for good:
+    // an older failed fulfilment was simply unreachable from this page. paginate()
+    // keeps the per-request cost flat and withQueryString() carries `tab` onto the
+    // page links so the active tab survives paging. total() replaces the separate
+    // count() (which ran a second query for the same number).
+    // orderByDesc('id') breaks created_at ties, which are ordinary on a
+    // second-granularity column: without it a tied order can render on two
+    // consecutive pages, or on neither.
+    $orders = $query->latest()->orderByDesc('id')->paginate(50)->withQueryString();
+    $totalOrders = $orders->total();
 
     // Status pill tone — maps OrderStatus values to the canonical x-admin.badge
     // tone palette so every list page reads the same.
@@ -36,7 +45,12 @@
 
 <x-layouts.admin>
     <x-slot:heading>Orders</x-slot:heading>
-    <x-slot:subheading>{{ number_format($totalOrders) }} orders total. Showing the latest 50.</x-slot:subheading>
+    <x-slot:subheading>
+        {{ number_format($totalOrders) }} orders total.
+        @if ($orders->isNotEmpty())
+            Showing {{ number_format($orders->firstItem()) }}-{{ number_format($orders->lastItem()) }}.
+        @endif
+    </x-slot:subheading>
 
     <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="inline-flex overflow-x-auto rounded-[12px] bg-zinc-100 p-1 font-medium text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
@@ -176,5 +190,11 @@
         @endforelse
 
         </div>
+
+        @if ($orders->hasPages())
+            <div class="border-t border-zinc-200 px-5 py-3 dark:border-zinc-700">
+                {{ $orders->links() }}
+            </div>
+        @endif
     </div>
 </x-layouts.admin>

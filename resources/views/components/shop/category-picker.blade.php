@@ -88,7 +88,13 @@
         x-transition:leave="transition-transform duration-200 ease-in"
         x-transition:leave-start="translate-y-0"
         x-transition:leave-end="translate-y-full"
-        class="fixed inset-x-0 bottom-0 z-[71] max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-[#eff6ff] ring-1 ring-zinc-200 pb-6 shadow-2xl shadow-zinc-900/30 dark:bg-[#0c1a36] dark:ring-[#24364f]"
+        {{-- Surface matches the bottom-bar menu sheet exactly (same glass, radius,
+             inset and shadow) so every slide-up in the app reads as one component.
+             `modal-norise` is an opt-OUT: [role="dialog"]:not(.modal-norise) in the
+             head partial applies a global modalRise animation, which stacked on top
+             of the x-transition below and made this sheet animate differently to the
+             menu. Opting out leaves the single x-transition in charge. --}}
+        class="modal-norise fixed inset-x-3 bottom-3 z-[71] max-h-[85dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 pb-4 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
         role="dialog"
         aria-modal="true"
         aria-label="Pick a category"

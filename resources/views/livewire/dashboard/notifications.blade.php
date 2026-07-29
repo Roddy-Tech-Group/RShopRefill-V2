@@ -37,7 +37,13 @@ class extends Component {
     public function with(): array
     {
         return [
-            'notifications' => Auth::user()->notifications()->latest()->paginate(15),
+            // orderByDesc('id') breaks created_at ties. A fan-out (order update,
+            // campaign send) writes several rows in the same second, and each page
+            // is its own query, so without a total order a tied notification can
+            // render on two pages or on neither. `id` is a UUID and carries no
+            // chronology - it is here purely to make the sort total, which is all
+            // a stable page split needs.
+            'notifications' => Auth::user()->notifications()->latest()->orderByDesc('id')->paginate(15),
             'unreadCount' => Auth::user()->notifications()->whereNull('read_at')->count(),
         ];
     }

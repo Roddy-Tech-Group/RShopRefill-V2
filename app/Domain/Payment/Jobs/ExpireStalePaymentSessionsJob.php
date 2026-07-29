@@ -46,6 +46,17 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         'awaiting_customer_action',
     ];
 
+    /**
+     * Floor on how long a gateway-backed session lives before this sweep may
+     * touch it. Sessions are minted with a 15-minute TTL, but the bank-transfer
+     * screens promise "this account expires in 30 minutes" and the virtual
+     * account really does stay open that long. Sweeping on the shorter TTL marks
+     * a transfer that lands at minute 20 as Failed while the customer's money is
+     * already on its way to us. Wallet-gateway sessions move no external money,
+     * so they keep their own TTL.
+     */
+    private const MINIMUM_GATEWAY_LIFETIME_MINUTES = 30;
+
     public function handle(
         PaymentSessionService $paymentSessionService,
         OrderService $orderService
@@ -67,15 +78,28 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
             try {
                 $attempt = $session->paymentAttempt;
 
-                // 0. LAST-CHANCE GATEWAY VERIFICATION. A customer can confirm a
-                //    payment (card / mobile money) whose webhook + return both
-                //    fail to land - the order stays Unpaid and would be wrongly
-                //    cancelled here while the gateway holds their money. Before
-                //    treating the session as abandoned, ask the gateway one more
-                //    time; if it's actually paid, VerifyPaymentJob confirms the
-                //    order and dispatches fulfillment, and we skip the expiry.
+                // 0. PROMISED-WINDOW FLOOR. Never terminate a gateway-backed
+                //    session before the window the customer was told they had -
+                //    a transfer sent at minute 20 against a 30-minute virtual
+                //    account must not find its funding already marked Failed.
                 if ($attempt
-                    && $attempt->order
+                    && $attempt->gateway !== 'wallet'
+                    && $session->created_at
+                    && $session->created_at->gt(now()->subMinutes(self::MINIMUM_GATEWAY_LIFETIME_MINUTES))) {
+                    continue;
+                }
+
+                // 1. LAST-CHANCE GATEWAY VERIFICATION. A customer can confirm a
+                //    payment (card / mobile money / bank transfer) whose webhook
+                //    + return both fail to land - the order stays Unpaid, or the
+                //    funding stays Pending, and either would be wrongly killed
+                //    here while the gateway holds their money. Before treating
+                //    the session as abandoned, ask the gateway one more time; if
+                //    it's actually paid, VerifyPaymentJob confirms the order and
+                //    dispatches fulfillment (or credits the wallet funding), and
+                //    we skip the expiry.
+                if ($attempt
+                    && ($attempt->order || $attempt->payable_type === WalletFunding::class)
                     && $attempt->gateway !== 'wallet'
                     && ! in_array($attempt->payment_status, [PaymentStatus::Paid, PaymentStatus::Failed], true)) {
                     try {
@@ -94,11 +118,11 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                     }
                 }
 
-                // 1. Expire the session itself — the existing state-machine method,
+                // 2. Expire the session itself - the existing state-machine method,
                 //    idempotent if status changed between query and lock.
                 $paymentSessionService->expireSession($session);
 
-                // 2. Cascade to the linked Order or WalletFunding so the customer's
+                // 3. Cascade to the linked Order or WalletFunding so the customer's
                 //    dashboard reflects the dead checkout instead of showing Pending
                 //    in perpetuity.
                 if (! $attempt) {

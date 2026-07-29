@@ -8,6 +8,7 @@ use App\Http\Middleware\EnforceDeviceVerification;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureAccountNotSuspended;
+use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\ResolveRegion;
@@ -85,6 +86,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // changes are refused. Admin operators always bypass.
             'maintenance-guard' => EnforceMaintenanceMode::class,
             'verify-turnstile' => VerifyTurnstile::class,
+            // Gate for features still under construction. Fails closed, so a
+            // route stays 404 until an admin turns its features.* row on.
+            'feature' => EnsureFeatureEnabled::class,
         ]);
 
         $middleware->append(TraceRequestMiddleware::class);

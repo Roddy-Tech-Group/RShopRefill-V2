@@ -187,15 +187,25 @@ class extends Component {
             $query->where('type', WalletTransactionType::Debit);
         }
 
-        // Unified feed: wallet ledger + paid order payments, newest first. Both
-        // sources are capped so a pathological account can't blow memory; 500
-        // each is years of activity for a normal customer.
-        $rows = $query->limit(500)->get()->map(fn ($txn) => $this->walletRow($txn));
+        // Unified feed: wallet ledger + paid order payments, newest first. The two
+        // sources live in different tables and are merged in PHP, so both are capped
+        // to stop a long-lived account blowing memory.
+        //
+        // Each source is fetched at CAP + 1 rows purely to detect whether the cap
+        // actually bit. Without that the truncation is SILENT: the in-memory
+        // paginator below reports a total of 500, so a customer with more history
+        // than that is shown a complete-looking list with no way to tell that older
+        // activity exists. The extra row is discarded before rendering.
+        $cap = 500;
+
+        $walletRows = $query->limit($cap + 1)->get();
+        $feedTruncated = $walletRows->count() > $cap;
+        $rows = $walletRows->take($cap)->map(fn ($txn) => $this->walletRow($txn));
 
         if ($this->filter !== 'credit') {
-            $rows = $rows->concat(
-                $this->orderPaymentsQuery($term)->limit(500)->get()->map(fn ($a) => $this->paymentRow($a))
-            );
+            $paymentRows = $this->orderPaymentsQuery($term)->limit($cap + 1)->get();
+            $feedTruncated = $feedTruncated || $paymentRows->count() > $cap;
+            $rows = $rows->concat($paymentRows->take($cap)->map(fn ($a) => $this->paymentRow($a)));
         }
 
         $rows = $rows->sortByDesc('date')->values();
@@ -221,6 +231,8 @@ class extends Component {
         return [
             'transactions' => $transactions,
             'recentDeposits' => $recentDeposits,
+            'feedTruncated' => $feedTruncated,
+            'feedCap' => $cap,
         ];
     }
 }; ?>
@@ -400,6 +412,13 @@ class extends Component {
     @endif
 
     @if ($transactions->hasPages())
+        @if ($feedTruncated)
+            {{-- The feed merges two tables in PHP, so it is capped. Say so: without
+                 this the paginator's total looks like the whole history. --}}
+            <p class="mb-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                Showing your most recent {{ number_format($feedCap) }} transactions. Contact support if you need older records.
+            </p>
+        @endif
         <div>{{ $transactions->links('vendor.pagination.circles-livewire') }}</div>
     @endif
     </div>

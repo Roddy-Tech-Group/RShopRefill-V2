@@ -7,6 +7,7 @@ use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Transaction\Exceptions\DuplicateTransactionException;
 use App\Domain\Wallet\Services\WalletService;
+use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Support\Facades\Log;
 
@@ -48,11 +49,7 @@ class GatewayRefundService
 
         // This item's share of what was actually charged (handles multi-item
         // orders where only some items failed).
-        $orderTotal = (float) $order->total_amount;
-        $paidAmount = (float) $paid->amount;
-        $share = $orderTotal > 0
-            ? round($paidAmount * ((float) $item->subtotal_amount / $orderTotal), 2)
-            : $paidAmount;
+        $share = $this->capturedShareForItem($order, $item, (float) $paid->amount);
 
         if ($share <= 0) {
             return;
@@ -80,5 +77,64 @@ class GatewayRefundService
         } catch (DuplicateTransactionException) {
             // Already refunded by an earlier attempt - safe no-op.
         }
+    }
+
+    /**
+     * This item's slice of the cash that actually settled.
+     *
+     * The captured amount is the anchor, NOT the item's list price: an order
+     * settled with an RCOIN or coupon discount captured less than the items
+     * are worth, and refunding the pre-discount price hands the customer more
+     * cash than they ever paid. Item subtotals are used only as weights.
+     *
+     * Shares are cut from a running cumulative total rather than rounded
+     * independently, so the slices of a multi-item order telescope back to
+     * exactly the captured amount - per-item rounding can never accumulate
+     * into a refund that exceeds the charge.
+     */
+    private function capturedShareForItem(Order $order, OrderItem $item, float $captured): float
+    {
+        $captured = round($captured, 2);
+
+        if ($captured <= 0) {
+            return 0.0;
+        }
+
+        $rows = $order->items()->orderBy('id')->get(['id', 'subtotal_amount']);
+
+        if ($rows->isEmpty()) {
+            return $captured;
+        }
+
+        $weights = $rows->mapWithKeys(fn (OrderItem $row) => [
+            $row->id => max(0.0, (float) $row->subtotal_amount),
+        ]);
+        $totalWeight = (float) $weights->sum();
+
+        // Legacy or zero-priced snapshots carry no usable weights; an even
+        // split is the only honest apportionment left.
+        if ($totalWeight <= 0) {
+            $weights = $weights->map(fn () => 1.0);
+            $totalWeight = (float) $weights->count();
+        }
+
+        $cumulative = 0.0;
+
+        foreach ($weights as $id => $weight) {
+            $before = round($captured * ($cumulative / $totalWeight), 2);
+            $cumulative += $weight;
+            $upTo = round($captured * ($cumulative / $totalWeight), 2);
+
+            if ($id === $item->id) {
+                return max(0.0, round($upTo - $before, 2));
+            }
+        }
+
+        Log::warning('Gateway refund could not apportion - item is not on its order', [
+            'order' => $order->order_number,
+            'item' => $item->id,
+        ]);
+
+        return 0.0;
     }
 }

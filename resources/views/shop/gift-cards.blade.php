@@ -108,8 +108,18 @@
         $productsQuery->orderBy('name');
     }
 
-    // The listing shows every matching brand on one page — no pagination.
-    $products = $productsQuery->get();
+    // Final tie-break on the primary key. Every sort above can tie (two brands
+    // sharing a name, or the whole unflagged tail sharing one popularity rank),
+    // and each page is its own query, so without it a tied brand can show up on
+    // two consecutive pages while another never appears at all.
+    $productsQuery->orderBy('id');
+
+    // Paginated: this listing renders one card per brand_key, which is ~688 brands,
+    // and each card eager-loads variants out of an 18k-row table to compute its price
+    // range. Rendering all of them on one uncached, anonymous-accessible page made this
+    // the heaviest request in the app. withQueryString keeps the country, subcategory
+    // and search filters attached to the page links.
+    $products = $productsQuery->paginate(60)->withQueryString();
 
     $subcategories = $giftCardsCategory
         ? Subcategory::where('category_id', $giftCardsCategory->id)->orderBy('name')->get(['name', 'slug'])
@@ -380,6 +390,12 @@
                                     </li>
                                 @endforeach
                             </ul>
+
+                            @if ($products->hasPages())
+                                <div class="mt-8">
+                                    {{ $products->links() }}
+                                </div>
+                            @endif
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">

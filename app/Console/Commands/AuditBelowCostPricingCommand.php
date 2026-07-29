@@ -50,6 +50,7 @@ class AuditBelowCostPricingCommand extends Command
         $wouldRaise = [];
         $overrides = [];
         $noCostData = 0;
+        $variableAmount = 0;
         $scanned = 0;
 
         $query = ProductVariant::query()->with('product:id,name,provider_name,category_id');
@@ -59,15 +60,24 @@ class AuditBelowCostPricingCommand extends Command
         }
 
         $query->orderBy('id')->chunk(500, function ($variants) use (
-            $legacyPricing, $enforcePricing, $suspectPct, $minMargin,
-            &$belowCost, &$wouldRaise, &$overrides, &$noCostData, &$scanned
+            $legacyPricing, $enforcePricing, $suspectPct,
+            &$belowCost, &$wouldRaise, &$overrides, &$noCostData, &$variableAmount, &$scanned
         ) {
             foreach ($variants as $variant) {
                 $scanned++;
                 $cost = (float) $variant->cost_price;
 
                 if ($cost <= 0) {
-                    $noCostData++;
+                    // A variable-amount variant has no fixed cost by design - the
+                    // customer picks the value and resolveRetailPrice() anchors the
+                    // floor on that requested amount at cart time. Counting those as
+                    // "without cost data" reads as a data gap and invites someone to
+                    // hold off on enforce over 148 rows that are already covered.
+                    if ($variant->is_variable) {
+                        $variableAmount++;
+                    } else {
+                        $noCostData++;
+                    }
 
                     continue;
                 }
@@ -97,7 +107,7 @@ class AuditBelowCostPricingCommand extends Command
                 }
 
                 $override = (float) ($variant->manual_retail_price_usd ?? 0);
-                $costFloor = $cost * (1 + $minMargin / 100);
+                $costFloor = $enforcePricing->costFloor($cost);
                 if ($override > 0 && $override < $costFloor && ! $variant->allow_below_cost) {
                     $overrides[] = [
                         'variant' => $variant,
@@ -118,9 +128,24 @@ class AuditBelowCostPricingCommand extends Command
 
         $this->newLine();
         $this->info(sprintf(
-            'Scanned %d variants: %d BELOW-COST, %d WOULD-RAISE (%d suspect cost data), %d OVERRIDE under floor, %d paid order units below cost, %d without cost data.',
-            $scanned, count($belowCost), count($wouldRaise), $suspectCount, count($overrides), $orderUnits, $noCostData
+            'Scanned %d variants: %d BELOW-COST, %d WOULD-RAISE (%d suspect cost data), %d OVERRIDE under floor, %d paid order units below cost.',
+            $scanned, count($belowCost), count($wouldRaise), $suspectCount, count($overrides), $orderUnits
         ));
+
+        // Kept off the line above deliberately: the combined string ran past 200
+        // characters and the console wrapped it mid-figure, so a count could be
+        // separated from its own label.
+        $this->info(sprintf(
+            'Cost coverage: %d MISSING cost data, %d variable-amount (floored on the requested value).',
+            $noCostData, $variableAmount
+        ));
+
+        if ($noCostData > 0) {
+            $this->warn(sprintf(
+                '%d fixed-value variants carry no cost. The floor cannot protect those - it has nothing to anchor on - so they sell at an unknown margin whatever PRICING_FLOOR_MODE says.',
+                $noCostData
+            ));
+        }
 
         if ($suspectCount > 0) {
             $this->warn('Repair the suspect-cost variants BEFORE setting PRICING_FLOOR_MODE=enforce — enforcing the floor on corrupt cost data raises storefront prices by the same corrupt factor.');

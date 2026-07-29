@@ -665,17 +665,31 @@ html.dark .nav-glass {
 }
 
 /* Full-width frosted TOP bar for the mobile dashboard - the page scrolls
-   beneath it. Flat sibling of .nav-glass: same heavy saturated blur, but a
-   hairline bottom edge instead of the floating-pill border + drop shadow. */
+   beneath it. Flat sibling of .nav-glass: same heavy saturated blur, but no
+   border and no drop shadow. The hairline bottom edge was removed on purpose:
+   it read as the page breaking into two pieces. The blur alone separates the
+   bar from the content scrolling under it. */
 .nav-glass-top {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.72) 100%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 html.dark .nav-glass-top {
     background: linear-gradient(180deg, rgba(12, 12, 14, 0.82) 0%, rgba(12, 12, 14, 0.72) 100%);
-    border-bottom-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Scroll-edge fade for tall modal bodies. A scrolling panel slices its content
+   dead flat at the top and bottom edges, which reads as broken text rather than
+   "there is more below". Padding cannot fix that: content scrolls THROUGH the
+   padding and is still clipped at the container edge. This masks the first and
+   last 20px so lines dissolve into the sheet instead.
+
+   The fade band is deliberately shorter than the sheet's own p-6 (24px), so at
+   rest the first and last lines sit clear of it and nothing looks washed out;
+   the fade only bites while content is actually moving past the edge. */
+.modal-scroll-fade {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.25rem, #000 calc(100% - 1.25rem), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 1.25rem, #000 calc(100% - 1.25rem), transparent 100%);
 }
 
 /* Charcoal storefront footer: a dark surface in BOTH themes (light mode uses

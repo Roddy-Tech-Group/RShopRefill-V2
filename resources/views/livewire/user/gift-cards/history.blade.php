@@ -17,7 +17,10 @@ class extends Component {
         return [
             'trades' => GiftCardTrade::with('rate.brand')
                 ->where('user_id', auth()->id())
+                // orderByDesc('id') breaks created_at ties so a trade cannot show
+                // up on two pages of the customer's own history, or vanish between them.
                 ->latest()
+                ->orderByDesc('id')
                 ->paginate(15),
         ];
     }

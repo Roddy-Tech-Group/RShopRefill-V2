@@ -8,15 +8,26 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.auth')] class extends Component {
+    // Locked: every public property is client-writable by default, so without
+    // this a restricted user could jump straight to the final step from the
+    // browser console and skip the checks that gate it.
+    #[Locked]
     public string $step = 'password'; // password, otp, pin
-    
+
+    // Server-side proof that the password AND the emailed OTP were both
+    // verified in THIS component instance. completeRecovery() refuses to lift
+    // the account restriction without it.
+    #[Locked]
+    public bool $identityVerified = false;
+
     public string $password = '';
-    
+
     public string $otp = '';
-    
+
     public string $pin = '';
 
     public int $cooldown = 0;
@@ -121,7 +132,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         Cache::forget('recovery_otp_' . $user->id);
         Cache::forget('recovery_otp_throttle_' . $user->id);
         Cache::forget('recovery_otp_attempts_' . $user->id);
-        
+
+        // Password (step 1) and OTP (step 2) are both behind us. This is the
+        // only place that may set the flag.
+        $this->identityVerified = true;
+
         if ($user->hasTransactionPin()) {
             $this->step = 'pin';
         } else {
@@ -144,10 +159,24 @@ new #[Layout('components.layouts.auth')] class extends Component {
         $this->completeRecovery();
     }
     
-    public function completeRecovery()
+    /**
+     * Lifts the account restriction and unlocks the transaction PIN.
+     *
+     * PROTECTED, not public, and deliberately so: Livewire exposes every public
+     * method as a client-callable endpoint, so as a public method this could be
+     * invoked straight from the browser console ($wire.completeRecovery()) by a
+     * restricted user, clearing their own fraud restriction without supplying
+     * the password, the emailed OTP or the transaction PIN.
+     *
+     * The $identityVerified guard is the second layer: it can only be set by
+     * verifyOtp(), and it is #[Locked] so the client cannot forge it.
+     */
+    protected function completeRecovery()
     {
+        abort_unless($this->identityVerified, 403);
+
         $user = Auth::user();
-        
+
         // 1. Clear restriction
         $user->restricted_at = null;
         

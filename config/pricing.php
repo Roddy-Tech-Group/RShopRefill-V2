@@ -35,6 +35,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Minimum cash margin
+    |--------------------------------------------------------------------------
+    |
+    | A flat USD floor on profit per unit, applied alongside the percentage
+    | above — the effective floor is cost plus whichever of the two is larger.
+    |
+    | The percentage alone leaves cheap-to-buy items earning almost nothing: 1%
+    | of a $39 top-up is 39 cents, which does not cover the cost of making the
+    | sale. This guarantees every unit is worth selling. Expensive items are
+    | unaffected, since there the percentage is already the larger figure.
+    |
+    | Defaults to 0 (off) so it is opt-in per environment, the same staged
+    | rollout floor_mode uses: set PRICING_MIN_MARGIN_USD=1 to require a dollar
+    | of profit on every unit. Verify with `pricing:audit-below-cost` first —
+    | raising it reprices the thin end of the catalogue.
+    |
+    */
+
+    'min_margin_usd' => (float) env('PRICING_MIN_MARGIN_USD', 0),
+
+    /*
+    |--------------------------------------------------------------------------
     | Floor mode
     |--------------------------------------------------------------------------
     |
@@ -54,8 +76,16 @@ return [
     |             overrides are clamped too unless the variant is explicitly
     |             flagged allow_below_cost.
     |
+    | Enforcing since 2026-07-26. Before flipping, `pricing:audit-below-cost`
+    | reported 40 variants selling under supplier cost across 18,672 scanned.
+    | The 8 variants it flagged SUSPECT-COST (Alfa LB, whose cost sits at a
+    | uniform 1.762x face across every denomination, and one Airalo eSIM) were
+    | pinned to their existing price via manual_retail_price_usd +
+    | allow_below_cost first, so enforcing could not spike them on data that is
+    | almost certainly wrong. Repair those costs and drop the pins.
+    |
     */
 
-    'floor_mode' => env('PRICING_FLOOR_MODE', 'legacy'),
+    'floor_mode' => env('PRICING_FLOOR_MODE', 'enforce'),
 
 ];

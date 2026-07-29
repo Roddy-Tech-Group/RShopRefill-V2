@@ -100,7 +100,9 @@ class extends Component {
 
     public function with(): array
     {
-        $query = ContactMessage::query()->latest();
+        // orderByDesc('id') breaks created_at ties so a ticket cannot be shown
+        // twice, or skipped, as an admin pages through the queue.
+        $query = ContactMessage::query()->latest()->orderByDesc('id');
 
         if ($this->statusFilter !== 'all') {
             $query->where('status', $this->statusFilter);

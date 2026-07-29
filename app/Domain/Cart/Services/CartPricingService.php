@@ -194,7 +194,7 @@ class CartPricingService
 
         $minMultiplier = 1 + $this->minMarginPercent() / 100;
         $baseFloor = $base * $minMultiplier;
-        $costFloor = $costUsd * $minMultiplier;
+        $costFloor = $this->costFloor($costUsd);
 
         $legacyPrice = max($retail, $baseFloor);
 
@@ -235,7 +235,7 @@ class CartPricingService
      */
     private function guardOverridePrice(ProductVariant $variant, float $override, float $costUsd): float
     {
-        $costFloor = $costUsd * (1 + $this->minMarginPercent() / 100);
+        $costFloor = $this->costFloor($costUsd);
 
         if ($override >= $costFloor
             || $costUsd <= 0
@@ -353,6 +353,36 @@ class CartPricingService
     private function minMarginPercent(): float
     {
         return (float) config('pricing.min_margin_percent', 1);
+    }
+
+    private function minMarginUsd(): float
+    {
+        return (float) config('pricing.min_margin_usd', 0);
+    }
+
+    /**
+     * The lowest USD price a unit may be sold at: supplier cost plus the LARGER
+     * of the percentage margin and the flat cash margin.
+     *
+     * The percentage alone leaves cheap-to-buy items earning almost nothing (1%
+     * of a $39 top-up is 39 cents), so a flat floor guarantees each sale is
+     * worth making. On expensive items the percentage is the larger of the two
+     * and still wins, so this only ever lifts the thin end of the catalogue.
+     *
+     * Single source of truth: the markup path, the manual-override guard, the
+     * coupon clamp and the audit command all anchor here, or they would disagree
+     * about what "below cost" means.
+     */
+    public function costFloor(float $costUsd): float
+    {
+        if ($costUsd <= 0) {
+            return 0.0;
+        }
+
+        return max(
+            $costUsd * (1 + $this->minMarginPercent() / 100),
+            $costUsd + $this->minMarginUsd(),
+        );
     }
 
     /**

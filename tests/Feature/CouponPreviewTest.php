@@ -67,7 +67,10 @@ class CouponPreviewTest extends TestCase
         $this->actingAs($user)
             ->postJson('/coupon/preview', ['code' => 'launchv2', 'currency' => 'USD'])
             ->assertOk()
-            ->assertJson(['valid' => true, 'code' => 'LAUNCHV2', 'discount_usd' => 9.0]);
+            // The $9 coupon is clamped: the $89 line carries an $80.10 unit cost,
+            // so the floor is $80.10 x 1.01 = $80.90 and at most $8.09 can come
+            // off. The full $9 would have sold it a cent under cost.
+            ->assertJson(['valid' => true, 'code' => 'LAUNCHV2', 'discount_usd' => 8.09]);
     }
 
     public function test_percent_coupon_scales_by_quantity(): void
@@ -83,11 +86,13 @@ class CouponPreviewTest extends TestCase
             'is_active' => true,
         ]);
 
-        // 10% of $50 unit = $5, x2 qty = $10.
+        // 10% of $50 unit = $5, x2 qty = $10 before the floor. The line's cost
+        // is $45/unit, so the cost floor is $45 x 2 x 1.01 = $90.90 and the most
+        // the coupon may take off a $100 line is $9.10.
         $this->actingAs($user)
             ->postJson('/coupon/preview', ['code' => 'TEN', 'currency' => 'USD'])
             ->assertOk()
-            ->assertJson(['valid' => true, 'discount_usd' => 10.0]);
+            ->assertJson(['valid' => true, 'discount_usd' => 9.1]);
     }
 
     public function test_unknown_coupon_is_rejected(): void

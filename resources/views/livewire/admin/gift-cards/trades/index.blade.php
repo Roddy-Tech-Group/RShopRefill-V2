@@ -25,7 +25,10 @@ class extends Component {
             ->when($this->status, function ($query) {
                 $query->where('status', $this->status);
             })
+            // orderByDesc('id') breaks created_at ties so a trade cannot be shown
+            // twice, or skipped entirely, while an admin works down the queue.
             ->latest()
+            ->orderByDesc('id')
             ->paginate(15);
 
         return [
