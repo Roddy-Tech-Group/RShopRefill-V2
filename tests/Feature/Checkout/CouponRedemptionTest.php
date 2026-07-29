@@ -42,6 +42,11 @@ class CouponRedemptionTest extends TestCase
             'services.nowpayments.api_key' => 'NOWPAYMENTS_KEY_MOCK',
             'pricing.safety_markup_percent' => 10.0,
             'pricing.min_margin_percent' => 1.0,
+            // Several tests here assert the cost-anchored coupon clamp, which
+            // only exists in enforce mode. Pin it: the config DEFAULT is legacy
+            // (and per-environment), so inheriting it would make these tests
+            // assert whatever ops last exported rather than the clamp itself.
+            'pricing.floor_mode' => 'enforce',
         ]);
 
         $this->user = User::factory()->create();

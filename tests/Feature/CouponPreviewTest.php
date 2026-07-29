@@ -21,6 +21,16 @@ class CouponPreviewTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The preview must mirror CheckoutService's cost-anchored coupon clamp,
+        // which only exists in enforce mode. Pin it: the config default is
+        // legacy (per-environment), so these assertions must not inherit it.
+        config(['pricing.floor_mode' => 'enforce']);
+    }
+
     private function cartWithVariant(User $user, float $unitUsd, int $qty = 1): ProductVariant
     {
         $category = Category::factory()->create(['slug' => 'gift-cards']);

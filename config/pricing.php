@@ -76,16 +76,34 @@ return [
     |             overrides are clamped too unless the variant is explicitly
     |             flagged allow_below_cost.
     |
-    | Enforcing since 2026-07-26. Before flipping, `pricing:audit-below-cost`
-    | reported 40 variants selling under supplier cost across 18,672 scanned.
-    | The 8 variants it flagged SUSPECT-COST (Alfa LB, whose cost sits at a
-    | uniform 1.762x face across every denomination, and one Airalo eSIM) were
-    | pinned to their existing price via manual_retail_price_usd +
-    | allow_below_cost first, so enforcing could not spike them on data that is
-    | almost certainly wrong. Repair those costs and drop the pins.
+    | DEFAULTS TO LEGACY - enforcing is a deliberate per-environment decision,
+    | not a side effect of a missing env var. Production audit 2026-07-29,
+    | across 24,404 variants: 396 selling below supplier cost, 460 the floor
+    | would reprice (Alfa LB +76%, Somalia/Lebanon airtime +10-15%, Straight
+    | Talk US +10%), 1 paid order unit below cost in the store's whole history
+    | (-$3.30, a Straight Talk 38).
+    |
+    | Those below-cost figures are REAL, not corrupt data. Zendit's docs state
+    | the catalog cost block is "provided in your wallet currency" - it is the
+    | actual USD deduction - and cost.fx is a value-per-cost ratio, not a
+    | currency conversion. Some offers genuinely cost more than the face value
+    | they deliver (fee-loaded US prepaid plans; Lebanese airtime, where Alfa's
+    | $77.28 face costs $136.18 and Zendit's own suggested retail is $161).
+    | Face-anchored legacy pricing sells every such row at a loss by
+    | construction. `zendit:audit-costs` lists them (COST OVER FACE), verifies
+    | stored costs against real purchase responses, and flags the one genuine
+    | corruption class: cost blocks labeled in a non-wallet currency.
+    |
+    | Before flipping to enforce per environment: run `zendit:audit-costs`,
+    | confirm the transaction evidence matches the stored costs, and eyeball
+    | the big raises in `pricing:audit-below-cost` - they are real costs, but a
+    | +76% Alfa reprice is still a product decision (reprice vs. delist).
+    |
+    | Do not trust a clean LOCAL audit for any of this: the local catalog runs
+    | thousands of variants behind production and misses whole operators.
     |
     */
 
-    'floor_mode' => env('PRICING_FLOOR_MODE', 'enforce'),
+    'floor_mode' => env('PRICING_FLOOR_MODE', 'legacy'),
 
 ];

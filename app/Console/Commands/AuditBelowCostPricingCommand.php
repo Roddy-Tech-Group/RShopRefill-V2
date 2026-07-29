@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Cart\Services\CartPricingService;
+use App\Domain\Catalog\Support\ZenditCostBlocks;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Models\OrderItem;
 use App\Models\ProductVariant;
@@ -44,7 +45,6 @@ class AuditBelowCostPricingCommand extends Command
         $legacyPricing = $pricing->withFloorMode('legacy');
         $enforcePricing = $pricing->withFloorMode('enforce');
         $suspectPct = (float) $this->option('suspect-pct');
-        $minMargin = (float) config('pricing.min_margin_percent', 1);
 
         $belowCost = [];
         $wouldRaise = [];
@@ -85,24 +85,41 @@ class AuditBelowCostPricingCommand extends Command
                 $legacy = (float) $legacyPricing->calculatePricing($variant, 1)['unit_price_snapshot'];
                 $enforced = (float) $enforcePricing->calculatePricing($variant, 1)['unit_price_snapshot'];
 
+                // Two Zendit-specific annotations, per Zendit's documented
+                // semantics (see ZenditCostBlocks). BAD-CCY marks a cost block
+                // labeled in a non-wallet currency - documented as impossible,
+                // so the stored USD cost is untrustworthy and the row is
+                // suspect whatever its raise. COST>FACE marks offers that
+                // genuinely cost more than the value they deliver (fee-loaded
+                // US prepaid, Lebanese airtime): the loss is REAL, structural
+                // to face-anchored pricing, and exactly what enforce fixes -
+                // flagged so nobody mistakes those rows for corrupt data.
+                $badCurrency = ZenditCostBlocks::hasWalletCurrencyViolation($variant);
+                $costOverFace = ZenditCostBlocks::costExceedsFace($variant);
+
                 if ($legacy < $cost - 0.005) {
                     $belowCost[] = [
                         'variant' => $variant,
                         'cost' => $cost,
                         'price' => $legacy,
                         'loss' => $cost - $legacy,
+                        'bad_currency' => $badCurrency,
+                        'cost_over_face' => $costOverFace,
                     ];
                 }
 
                 if ($enforced > $legacy + 0.005) {
                     $raisePct = $legacy > 0 ? (($enforced - $legacy) / $legacy) * 100 : 100.0;
+
                     $wouldRaise[] = [
                         'variant' => $variant,
                         'cost' => $cost,
                         'legacy' => $legacy,
                         'enforced' => $enforced,
                         'raise_pct' => $raisePct,
-                        'suspect' => $raisePct > $suspectPct,
+                        'suspect' => $raisePct > $suspectPct || $badCurrency,
+                        'bad_currency' => $badCurrency,
+                        'cost_over_face' => $costOverFace,
                     ];
                 }
 
@@ -165,8 +182,17 @@ class AuditBelowCostPricingCommand extends Command
                 number_format($r['cost'], 2),
                 number_format($r['price'], 2),
                 '-'.number_format($r['loss'], 2),
+                // BAD-CCY: the cost side of this subtraction is untrustworthy.
+                // COST>FACE: the loss is real and structural - the offer costs
+                // more than the value it delivers, so face-anchored pricing
+                // cannot help but sell it below cost.
+                match (true) {
+                    $r['bad_currency'] ?? false => 'BAD-CCY',
+                    $r['cost_over_face'] ?? false => 'COST>FACE',
+                    default => 'ok',
+                },
             ];
-        }, ['Variant', 'Product', 'SKU', 'Cost$', 'Charged$', 'Loss/unit$'], fn ($r) => -$r['loss']);
+        }, ['Variant', 'Product', 'SKU', 'Cost$', 'Charged$', 'Loss/unit$', 'Flag'], fn ($r) => -$r['loss']);
     }
 
     /** @param array<int, array<string, mixed>> $rows */
@@ -180,7 +206,12 @@ class AuditBelowCostPricingCommand extends Command
                 number_format($r['legacy'], 2),
                 number_format($r['enforced'], 2),
                 '+'.number_format($r['raise_pct'], 1).'%',
-                $r['suspect'] ? 'SUSPECT-COST' : 'ok',
+                match (true) {
+                    $r['bad_currency'] ?? false => 'BAD-CCY',
+                    $r['suspect'] => 'SUSPECT-COST',
+                    $r['cost_over_face'] ?? false => 'COST>FACE',
+                    default => 'ok',
+                },
             ];
         }, ['Variant', 'Product', 'Cost$', 'Now$', 'Floored$', 'Raise', 'Flag'], fn ($r) => -$r['raise_pct']);
     }

@@ -147,6 +147,74 @@ class AuditBelowCostCommandTest extends TestCase
             ->assertExitCode(1); // it is also below cost today
     }
 
+    /**
+     * Per Zendit's docs the cost block IS the USD wallet deduction, so an
+     * offer costing more than the face value it delivers (fee-loaded US
+     * prepaid, Lebanese airtime) is REAL data, not corruption: it must be
+     * annotated COST>FACE - the loss is structural to face-anchored pricing -
+     * and must NOT count toward the suspect-data tally that blocks enforce.
+     */
+    public function test_cost_over_face_is_annotated_but_not_suspect(): void
+    {
+        // face 35 x 1.02 = 35.70 charged; genuine cost 39 -> raise +10.3%.
+        $this->makeVariant('Straight Talk US', [
+            'face_value' => 35.00,
+            'cost_price' => 39.00,
+            'retail_price' => 35.00,
+            'metadata' => [
+                'cost' => ['fx' => 0.8974359, 'fee' => 0, 'fixed' => 3900, 'currency' => 'USD', 'discount' => 0.04878049, 'currencyDivisor' => 100],
+                'send' => ['fx' => 1, 'fixed' => 3500, 'currency' => 'USD', 'currencyDivisor' => 100],
+            ],
+        ]);
+
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('COST>FACE')
+            ->expectsOutputToContain('0 suspect cost data');
+    }
+
+    /**
+     * Zendit documents that the cost block is always in the wallet currency
+     * (USD). A block labeled otherwise - the historically-observed AED case -
+     * cannot be trusted as USD and must be suspect regardless of raise size.
+     */
+    public function test_non_wallet_cost_currency_is_flagged_suspect(): void
+    {
+        $this->makeVariant('Mislabeled Gift Card AE', [
+            'face_value' => 35.00,
+            'cost_price' => 39.00,
+            'retail_price' => 35.00,
+            'metadata' => [
+                'cost' => ['fx' => 1, 'fixed' => 3900, 'currency' => 'AED', 'currencyDivisor' => 100],
+                'send' => ['fx' => 1, 'fixed' => 3500, 'currency' => 'AED', 'currencyDivisor' => 100],
+            ],
+        ]);
+
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('BAD-CCY')
+            ->expectsOutputToContain('1 suspect cost data')
+            ->expectsOutputToContain('Repair the suspect-cost variants');
+    }
+
+    /**
+     * A legitimate cross-currency row (USD cost, NGN send) above face is a
+     * real raise: fx there is an actual exchange rate, nothing is suspect.
+     */
+    public function test_legitimate_cross_currency_metadata_is_not_flagged(): void
+    {
+        $this->makeVariant('Abuja Electricity NG', [
+            'face_value' => 35.00,
+            'cost_price' => 39.00,
+            'retail_price' => 35.00,
+            'metadata' => [
+                'cost' => ['fx' => 400, 'fixed' => 3900, 'currency' => 'USD', 'currencyDivisor' => 100],
+                'send' => ['fx' => 1, 'fixed' => 1560000, 'currency' => 'NGN', 'currencyDivisor' => 100],
+            ],
+        ]);
+
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('0 suspect cost data');
+    }
+
     public function test_flags_manual_overrides_under_the_cost_floor(): void
     {
         // Override keeps the variant off the BELOW-COST list only if priced
