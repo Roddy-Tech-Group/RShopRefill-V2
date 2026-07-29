@@ -39,13 +39,23 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->country = $user->country;
         $this->gender  = $user->gender;
 
+        // Read the REAL communication_preferences columns. This block used to
+        // read the retired NotificationPreference names (order_notifications,
+        // marketing_enabled, ...), which do not exist on the model - every
+        // category toggle rendered as OFF after a refresh regardless of what
+        // was stored. Each UI toggle spans a category's email+push pair, so it
+        // reads as ON while either channel is still enabled.
         $prefs = app(\App\Domain\Communication\Services\PreferenceManager::class)->getPreferences($user);
         $this->notifyEmail     = (bool) $prefs->email_enabled;
         $this->notifyPush      = (bool) $prefs->push_enabled;
-        $this->notifyMarketing = (bool) $prefs->marketing_enabled;
-        $this->notifyOrders    = (bool) $prefs->order_notifications;
-        $this->notifyWallet    = (bool) $prefs->wallet_notifications;
-        $this->notifySecurity  = (bool) $prefs->security_notifications;
+        $this->notifyMarketing = (bool) ($prefs->marketing_email || $prefs->marketing_push);
+        $this->notifyOrders    = (bool) ($prefs->orders_email || $prefs->orders_push);
+        $this->notifyWallet    = (bool) ($prefs->wallet_email || $prefs->wallet_push);
+
+        // Security alerts are mandatory (CommunicationCategory::isUserDisableable
+        // is false for the Security domain, and PreferenceManager bypasses
+        // preferences entirely for it), so the switch is always on.
+        $this->notifySecurity = true;
     }
 
     /**
@@ -152,17 +162,26 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     }
 
     /**
-     * Flip one notification preference and persist all five immediately.
+     * Flip one notification preference and persist it immediately.
+     *
+     * Writes the REAL communication_preferences columns: the master switches
+     * map to email_enabled / push_enabled, and each category toggle sets its
+     * email+push pair together - those per-category columns are what
+     * PreferenceManager::isAllowed() consults when dispatching, so anything
+     * else is a write the pipeline never reads. The retired
+     * NotificationPreference key names this used to send were silently
+     * dropped by mass assignment, which is why only Email and Web Push ever
+     * survived a refresh.
      */
     public function toggleNotification(string $key): void
     {
+        // Security alerts are mandatory and cannot be toggled off.
         $map = [
             'email'     => 'notifyEmail',
             'push'      => 'notifyPush',
             'marketing' => 'notifyMarketing',
             'orders'    => 'notifyOrders',
             'wallet'    => 'notifyWallet',
-            'security'  => 'notifySecurity',
         ];
 
         if (! isset($map[$key])) {
@@ -173,14 +192,13 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->{$property} = ! $this->{$property};
 
         app(\App\Domain\Communication\Services\PreferenceManager::class)
-            ->updatePreferences(Auth::user(), [
-                'email_enabled'          => $this->notifyEmail,
-                'push_enabled'           => $this->notifyPush,
-                'marketing_enabled'      => $this->notifyMarketing,
-                'order_notifications'    => $this->notifyOrders,
-                'wallet_notifications'   => $this->notifyWallet,
-                'security_notifications' => $this->notifySecurity,
-            ]);
+            ->updatePreferences(Auth::user(), match ($key) {
+                'email'     => ['email_enabled' => $this->notifyEmail],
+                'push'      => ['push_enabled' => $this->notifyPush],
+                'marketing' => ['marketing_email' => $this->notifyMarketing, 'marketing_push' => $this->notifyMarketing],
+                'orders'    => ['orders_email' => $this->notifyOrders, 'orders_push' => $this->notifyOrders],
+                'wallet'    => ['wallet_email' => $this->notifyWallet, 'wallet_push' => $this->notifyWallet],
+            });
 
         $this->dispatch('preferences-saved');
     }
@@ -686,7 +704,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     ['push',      $notifyPush,      'Web Push',            'Real-time push notifications',       'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0'],
                     ['orders',    $notifyOrders,    'Order updates',       'Delivery, fulfillment and refunds',  'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z'],
                     ['wallet',    $notifyWallet,    'Wallet activity',     'Funding, credits and debits',        'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z'],
-                    ['security',  $notifySecurity,  'Security alerts',     'Login attempts and account changes', 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z'],
+                    ['security',  $notifySecurity,  'Security alerts',     'Login attempts and account changes - always on', 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z'],
                     ['marketing', $notifyMarketing, 'Promotions',          'Deals, offers and new arrivals',     'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z'],
                     ['email',     $notifyEmail,     'Email notifications', 'Master switch for all emails',       'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75'],
                 ];
@@ -704,16 +722,30 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                             <span class="block text-[13px] text-zinc-600">{{ $desc }}</span>
                         </span>
                     </span>
-                    <button
-                        type="button"
-                        role="switch"
-                        aria-checked="{{ $on ? 'true' : 'false' }}"
-                        aria-label="{{ $label }}"
-                        wire:click="toggleNotification('{{ $key }}')"
-                        class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-[12px] transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 {{ $on ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"
-                    >
-                        <span class="theme-static pointer-events-none absolute top-0.5 inline-block h-5 w-5 rounded-[12px] bg-white shadow ring-0 transition-transform duration-300 {{ $on ? 'translate-x-5' : 'translate-x-0.5' }}"></span>
-                    </button>
+                    @if ($key === 'security')
+                        {{-- Locked on: security alerts are mandatory, so the switch
+                             is presentational - no wire:click, no pretend toggle. --}}
+                        <span
+                            role="switch"
+                            aria-checked="true"
+                            aria-disabled="true"
+                            aria-label="{{ $label }} (always on)"
+                            class="relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-[12px] bg-blue-600 opacity-60"
+                        >
+                            <span class="theme-static pointer-events-none absolute top-0.5 inline-block h-5 w-5 translate-x-5 rounded-[12px] bg-white shadow ring-0"></span>
+                        </span>
+                    @else
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked="{{ $on ? 'true' : 'false' }}"
+                            aria-label="{{ $label }}"
+                            wire:click="toggleNotification('{{ $key }}')"
+                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-[12px] transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 {{ $on ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"
+                        >
+                            <span class="theme-static pointer-events-none absolute top-0.5 inline-block h-5 w-5 rounded-[12px] bg-white shadow ring-0 transition-transform duration-300 {{ $on ? 'translate-x-5' : 'translate-x-0.5' }}"></span>
+                        </button>
+                    @endif
                 </div>
             @endforeach
         </div>
