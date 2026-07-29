@@ -18,7 +18,11 @@ class ReleaseReservedFundsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(protected PaymentAttempt $attempt) {}
+    public function __construct(protected PaymentAttempt $attempt)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('payments');
+    }
 
     public function handle(
         WalletPaymentProvider $walletProvider,

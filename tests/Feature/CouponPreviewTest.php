@@ -95,6 +95,78 @@ class CouponPreviewTest extends TestCase
             ->assertJson(['valid' => true, 'discount_usd' => 9.1]);
     }
 
+    public function test_a_fixed_coupon_is_clamped_to_the_cost_floor_in_enforce_mode(): void
+    {
+        // Unit $89.00, supplier cost $80.10, min margin 1% → floor $80.901.
+        // The requested $9.00 would sell at $80.00, below cost-plus-margin, so
+        // the platform grants $8.09 and eats the smaller discount instead of the
+        // loss. Rounding is downward by design: never a cent under the floor.
+        config(['pricing.floor_mode' => 'enforce', 'pricing.min_margin_percent' => 1]);
+
+        $user = User::factory()->create();
+        $variant = $this->cartWithVariant($user, 89.00);
+
+        Coupon::create([
+            'product_variant_id' => $variant->id,
+            'code' => 'LAUNCHV2',
+            'discount_type' => 'fixed',
+            'discount_value' => 9.00,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson('/coupon/preview', ['code' => 'launchv2', 'currency' => 'USD'])
+            ->assertOk()
+            ->assertJson(['valid' => true, 'discount_usd' => 8.09]);
+    }
+
+    public function test_a_percent_coupon_is_clamped_to_the_cost_floor_in_enforce_mode(): void
+    {
+        // Unit $50.00 × 2, cost $45.00/unit → line floor $90.90 against a $100
+        // line, so the most that can be given away is $9.10 rather than $10.00.
+        config(['pricing.floor_mode' => 'enforce', 'pricing.min_margin_percent' => 1]);
+
+        $user = User::factory()->create();
+        $variant = $this->cartWithVariant($user, 50.00, 2);
+
+        Coupon::create([
+            'product_variant_id' => $variant->id,
+            'code' => 'TEN',
+            'discount_type' => 'percent',
+            'discount_value' => 10,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson('/coupon/preview', ['code' => 'TEN', 'currency' => 'USD'])
+            ->assertOk()
+            ->assertJson(['valid' => true, 'discount_usd' => 9.10]);
+    }
+
+    public function test_a_coupon_flagged_allow_below_cost_is_not_clamped(): void
+    {
+        // A deliberate loss-leader promo still has to be possible — but only when
+        // someone has explicitly said so on the coupon.
+        config(['pricing.floor_mode' => 'enforce', 'pricing.min_margin_percent' => 1]);
+
+        $user = User::factory()->create();
+        $variant = $this->cartWithVariant($user, 89.00);
+
+        Coupon::create([
+            'product_variant_id' => $variant->id,
+            'code' => 'LOSSLEADER',
+            'discount_type' => 'fixed',
+            'discount_value' => 9.00,
+            'is_active' => true,
+            'allow_below_cost' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson('/coupon/preview', ['code' => 'LOSSLEADER', 'currency' => 'USD'])
+            ->assertOk()
+            ->assertJson(['valid' => true, 'discount_usd' => 9.0]);
+    }
+
     public function test_unknown_coupon_is_rejected(): void
     {
         $user = User::factory()->create();

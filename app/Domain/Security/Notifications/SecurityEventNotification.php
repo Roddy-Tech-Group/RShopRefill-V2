@@ -14,7 +14,10 @@ class SecurityEventNotification extends Notification implements ShouldQueue
     public function __construct(
         public string $eventType,
         public string $details
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-critical');
+    }
 
     public function via(object $notifiable): array
     {
@@ -24,11 +27,11 @@ class SecurityEventNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Security Alert: ' . $this->eventType)
-            ->greeting('Hello ' . $notifiable->name . ',')
+            ->subject('Security Alert: '.$this->eventType)
+            ->greeting('Hello '.$notifiable->name.',')
             ->line('A security-related change was made to your account:')
-            ->line('**Event:** ' . $this->eventType)
-            ->line('**Details:** ' . $this->details)
+            ->line('**Event:** '.$this->eventType)
+            ->line('**Details:** '.$this->details)
             ->line('If you made this change, no further action is needed.')
             ->line('If you did not make this change, please contact support immediately.');
     }

@@ -20,6 +20,12 @@ class ExpireStaleRecoveriesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct()
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('intelligence');
+    }
+
     public $tries = 3;
 
     public function backoff(): array

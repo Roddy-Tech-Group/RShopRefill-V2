@@ -96,8 +96,41 @@ return [
     |
     */
 
+    /*
+     * Every real queue needs a threshold, not just `default`. With only
+     * redis:default listed, a drowning `webhooks` or `fulfillment` queue — the
+     * two that decide whether a paying customer receives what they bought —
+     * could never raise LongWaitDetected.
+     *
+     * Thresholds are set by blast radius, not by volume: how long can this queue
+     * be stalled before a customer or the money is affected?
+     */
     'waits' => [
-        'redis:default' => 60,
+        // Money and delivery. A stalled webhook queue means payments are
+        // arriving and going unrecorded.
+        'redis:critical' => 30,
+        'redis:webhooks' => 30,
+        'redis:critical-alerts' => 30,
+
+        // The customer has paid and is waiting for their voucher/eSIM/airtime.
+        'redis:payments' => 60,
+        'redis:fulfillment' => 60,
+        'redis:zendit' => 60,
+        'redis:airalo' => 60,
+
+        // Customer-visible messages: receipts, OTPs, delivery notifications.
+        'redis:comm-critical' => 60,
+        'redis:comm-transactional' => 120,
+        'redis:notifications' => 120,
+        'redis:emails' => 120,
+
+        // Background work; lateness is untidy rather than harmful.
+        'redis:default' => 300,
+        'redis:rewards' => 300,
+        'redis:intelligence' => 300,
+        'redis:comm-push' => 300,
+        'redis:comm-marketing' => 600,
+        'redis:long-running' => 900,
     ],
 
     /*

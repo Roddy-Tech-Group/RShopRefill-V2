@@ -7,6 +7,7 @@ use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
+use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Models\PaymentAttempt;
@@ -26,6 +27,14 @@ class WalletPaymentProvider implements PaymentProviderInterface
         if (! $currencyEnum) {
             throw new \Exception("Unsupported wallet currency: {$attempt->currency}");
         }
+
+        $wallet = $this->walletService->getOrCreateWallet($user, $currencyEnum);
+
+        if (! $wallet->is_active) {
+            throw new WalletOnHoldException;
+        }
+
+        $this->walletService->ensureSufficientBalance($wallet, $attempt->amount);
 
         if (! $user->hasTransactionPin()) {
             throw new MissingTransactionPinException(

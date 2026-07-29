@@ -33,6 +33,12 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct()
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('payments');
+    }
+
     /**
      * Non-terminal session statuses we'll consider for expiry. Matches the set
      * `PaymentSessionService::expireSession()` itself will act on — anything

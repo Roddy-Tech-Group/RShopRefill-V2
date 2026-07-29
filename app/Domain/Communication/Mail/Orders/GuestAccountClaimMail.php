@@ -22,7 +22,11 @@ class GuestAccountClaimMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public readonly User $user) {}
+    public function __construct(public readonly User $user)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-transactional');
+    }
 
     public function envelope(): Envelope
     {

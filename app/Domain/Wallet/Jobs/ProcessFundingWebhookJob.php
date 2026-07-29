@@ -2,6 +2,7 @@
 
 namespace App\Domain\Wallet\Jobs;
 
+use App\Domain\Transaction\Exceptions\DuplicateTransactionException;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\PaymentWebhook;
 use Illuminate\Bus\Queueable;
@@ -25,7 +26,7 @@ class ProcessFundingWebhookJob implements ShouldQueue
     public function __construct(
         private readonly int $paymentWebhookId
     ) {
-        $this->queue = 'default';
+        $this->onQueue('webhooks');
     }
 
     /**
@@ -78,7 +79,7 @@ class ProcessFundingWebhookJob implements ShouldQueue
                     'processed_at' => now(),
                 ]);
             }
-        } catch (\App\Domain\Transaction\Exceptions\DuplicateTransactionException $e) {
+        } catch (DuplicateTransactionException $e) {
             Log::info('ProcessFundingWebhookJob encountered duplicate transaction, ignoring.', [
                 'webhook_id' => $webhook->id,
                 'message' => $e->getMessage(),
@@ -88,7 +89,7 @@ class ProcessFundingWebhookJob implements ShouldQueue
                 'processed' => true,
                 'processing_status' => 'completed',
                 'processed_at' => now(),
-                'exception_traces' => 'Ignored: ' . $e->getMessage(),
+                'exception_traces' => 'Ignored: '.$e->getMessage(),
             ]);
 
             return;

@@ -22,7 +22,10 @@ class RcoinWithdrawalRejectedMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public RcoinWithdrawal $withdrawal,
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-transactional');
+    }
 
     public function envelope(): Envelope
     {

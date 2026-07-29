@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Models\OrderItem;
 use App\Models\ProductVariant;
 use Illuminate\Console\Command;
@@ -151,7 +153,37 @@ class AuditBelowCostPricingCommand extends Command
             $this->warn('Repair the suspect-cost variants BEFORE setting PRICING_FLOOR_MODE=enforce — enforcing the floor on corrupt cost data raises storefront prices by the same corrupt factor.');
         }
 
-        return (count($belowCost) > 0 || count($overrides) > 0) ? self::FAILURE : self::SUCCESS;
+        // The exit code tracks *current* exposure only — variants priced below cost
+        // right now, and overrides sitting under the floor. Paid order units are a
+        // historical count over a rolling window: they are realised loss that
+        // cannot be un-sold, and failing on them would keep the alert firing for
+        // days over something no action can change. They ride along as context.
+        if (count($belowCost) === 0 && count($overrides) === 0) {
+            return self::SUCCESS;
+        }
+
+        // Margin leakage is money bleeding now, but it is not an outage: it is
+        // worked in business hours, not at 3 a.m.
+        app(OperationalAlerter::class)->send(
+            severity: AlertSeverity::Sev2,
+            key: 'pricing:below-cost',
+            title: 'Margin leak detected',
+            message: sprintf(
+                '%d variant(s) selling below supplier cost, %d manual override(s) under the floor, %d paid order unit(s) sold below cost.',
+                count($belowCost),
+                count($overrides),
+                $orderUnits
+            ),
+            context: [
+                'below_cost_variants' => count($belowCost),
+                'overrides_under_floor' => count($overrides),
+                'paid_units_below_cost' => $orderUnits,
+                'floor_mode' => config('pricing.floor_mode', 'legacy'),
+            ],
+            runbook: 'docs/runbooks/pricing-anomaly.md',
+        );
+
+        return self::FAILURE;
     }
 
     /** @param array<int, array<string, mixed>> $rows */

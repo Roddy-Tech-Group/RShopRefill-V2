@@ -42,6 +42,9 @@ class CouponRedemptionTest extends TestCase
             'services.nowpayments.api_key' => 'NOWPAYMENTS_KEY_MOCK',
             'pricing.safety_markup_percent' => 10.0,
             'pricing.min_margin_percent' => 1.0,
+            // Floor mode is deliberately NOT pinned: these tests assert the
+            // clamped totals the platform actually charges, so they must track
+            // the configured default rather than a mode frozen at write time.
         ]);
 
         $this->user = User::factory()->create();

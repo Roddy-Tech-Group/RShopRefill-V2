@@ -15,6 +15,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class AuditLogListener implements ShouldQueue
 {
+    /**
+     * Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+     * A property rather than onQueue() because this listener implements
+     * ShouldQueue without using the Queueable trait.
+     */
+    public $queue = 'default';
+
     public function __construct(private AuditLogService $auditLogService) {}
 
     public function handle($event): void

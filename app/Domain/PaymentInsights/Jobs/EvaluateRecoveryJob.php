@@ -36,7 +36,10 @@ class EvaluateRecoveryJob implements ShouldQueue
     public function __construct(
         public readonly int $paymentOutcomeId,
         public readonly ?string $correlationId = null,
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('intelligence');
+    }
 
     public function backoff(): array
     {

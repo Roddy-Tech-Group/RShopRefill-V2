@@ -4,6 +4,7 @@ use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
+use App\Domain\Shared\Services\HealthCheckService;
 use App\Domain\Wallet\Jobs\ReconcilePendingFundingsJob;
 use App\Domain\Wallet\Jobs\SyncExchangeRatesJob;
 use App\Jobs\FulfillOrderItemJob;
@@ -13,12 +14,15 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
+// Kept as an on-demand command but no longer scheduled: it ran hourly in
+// production, adding noise to the scheduler for no operational value.
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote')->hourly();
+})->purpose('Display an inspiring quote');
 
 // Pull live FX rates from open.er-api.com and push them into exchange_rates.
 // Daily cadence is plenty - ECB / interbank rates only refresh once a day.
@@ -157,16 +161,128 @@ Schedule::call(function () {
         });
 })->everyMinute()->name('fulfillment:poll-pending')->withoutOverlapping();
 
+// Horizon metrics snapshot (P0-5).
+//
+// Without this the Horizon dashboard's throughput and runtime graphs are empty,
+// which is why they have never shown anything: the panels exist, the data was
+// never collected. Five minutes is Horizon's documented cadence.
+Schedule::command('horizon:snapshot')
+    ->everyFiveMinutes()
+    ->name('horizon:snapshot-5m');
+
+// Scheduler heartbeat (P0-3).
+//
+// A dead crontab silently stops backups, reconciliation, sweepers and catalog
+// syncs all at once, and nothing else in the system notices — the app keeps
+// serving pages perfectly while its entire nervous system is switched off.
+// This stamp is what /health reads to prove cron is still ticking.
+Schedule::call(function () {
+    Cache::put(HealthCheckService::SCHEDULER_HEARTBEAT_KEY, now(), now()->addDay());
+})->everyMinute()->name('ops:scheduler-heartbeat');
+
+// Disaster recovery — nightly encrypted, off-site backups.
+//
+// Ordering is deliberate: prune first, then dump at 01:30 so the fresh archive is
+// never the one a failing cleanup deletes, and both land before the 02:00
+// reconciliation window so the archive captures a database that the integrity
+// fleet then verifies. runInBackground keeps a multi-minute dump from stalling
+// the every-minute fulfillment and campaign sweepers that share this scheduler.
+Schedule::command('backup:clean')
+    ->dailyAt('01:15')
+    ->withoutOverlapping(60)
+    ->runInBackground()
+    ->name('backup:clean-nightly')
+    ->sentryMonitor('backup-clean-nightly');
+
+Schedule::command('backup:run')
+    ->dailyAt('01:30')
+    ->withoutOverlapping(120)
+    ->runInBackground()
+    ->name('backup:run-nightly')
+    ->sentryMonitor('backup-run-nightly');
+
+// Independent verification that a recent, correctly-sized, encrypted, off-site
+// archive actually exists. `backup:run` reporting success is not the same claim:
+// this catches a backup that has been quietly writing nowhere useful. Runs before
+// the morning sweep so a bad night is known before the day starts.
+Schedule::command('backup:health')
+    ->dailyAt('08:00')
+    ->name('backup:health-daily')
+    ->sentryMonitor('backup-health-daily');
+
+// Financial integrity fleet (P0-4).
+//
+// These commands all existed and were all manual-only, which meant drift was
+// detected when somebody remembered rather than when it happened. Reconciliation
+// as a continuously-running product is the practice that separates a fintech
+// from an app that moves money; scheduling them is what makes it real.
+//
+// Each exits non-zero on a violation, alerts on its own severity, and carries a
+// Sentry cron monitor so a *missed run* is as visible as a failed one — a check
+// that silently stops running looks exactly like a check that keeps passing.
+//
+// 02:30 places the ledger verification after the 01:30 backup (so the archive
+// captures the state being verified) and after the 02:00 wallet reconciliation.
+Schedule::command('ledger:verify')
+    ->dailyAt('02:30')
+    ->withoutOverlapping()
+    ->name('ledger:verify-nightly')
+    ->sentryMonitor('ledger-verify-nightly');
+
+// Margin protection. Runs before the morning sweep so any below-cost sale from
+// overnight is on the desk before the day starts.
+Schedule::command('pricing:audit-below-cost')
+    ->dailyAt('06:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('pricing:audit-below-cost-daily')
+    ->sentryMonitor('pricing-audit-below-cost-daily');
+
+// Platform self-validation suites. Weekly rather than daily: they assert wiring
+// and configuration, which only change when someone deploys.
+Schedule::command('payments:validate')
+    ->weeklyOn(1, '05:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('payments:validate-weekly')
+    ->sentryMonitor('payments-validate-weekly');
+
+Schedule::command('communication:validate')
+    ->weeklyOn(1, '05:15')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('communication:validate-weekly')
+    ->sentryMonitor('communication-validate-weekly');
+
 // Enterprise Reconciliation Engine Scheduling
 Schedule::command('reconcile:wallet-balances')->dailyAt('02:00')->sentryMonitor('reconcile-wallet-balances');
 Schedule::command('reconcile:orphaned-sessions')->hourly()->sentryMonitor('reconcile-orphaned-sessions');
 
-// Crypto safety net: re-verifies pending NOWPayments attempts against the
-// gateway so dropped/rejected IPNs (and tolerated underpayments) still confirm.
+// Crypto safety net: re-verifies pending NOWPayments attempts against the gateway
+// so dropped IPNs still confirm. This is not optional cover — NOWPayments stops
+// sending callbacks once a payment expires while still crediting deposits that
+// arrive afterwards, so polling is the only way those are ever seen.
 Schedule::command('reconcile:nowpayments --hours=48')
     ->hourly()
     ->withoutOverlapping()
     ->sentryMonitor('reconcile-nowpayments');
+
+// Surfaces crypto payments that settled short or over. Exits non-zero when the
+// queue is non-empty so the monitor trips and a human actually looks at it —
+// these have no automatic resolution and used to accumulate silently.
+Schedule::command('crypto:settlements --days=7')
+    ->dailyAt('07:30')
+    ->withoutOverlapping()
+    ->sentryMonitor('crypto-settlement-audit');
+
+// Per-coin minimums float with network fee conditions — USDT on Tron has sat as
+// high as ~$12 while USDC on Base clears at ~$0.02 — so a stale table would let
+// checkout offer a coin the gateway then rejects. Six-hourly keeps it honest
+// without hammering the rate-limited min-amount endpoint.
+Schedule::command('crypto:sync-currencies')
+    ->everySixHours()
+    ->withoutOverlapping()
+    ->sentryMonitor('crypto-sync-currencies');
 
 // Enterprise Provider Monitoring
 Schedule::command('zendit:check-balance --threshold=250')->hourly()->sentryMonitor('zendit-check-balance');

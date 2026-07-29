@@ -19,7 +19,11 @@ class SyncZenditEsimsJob implements ShouldQueue
 
     public int $maxExceptions = 1;
 
-    public function __construct(private int $page = 1) {}
+    public function __construct(private int $page = 1)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('zendit');
+    }
 
     public function handle(): void
     {

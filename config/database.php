@@ -60,6 +60,22 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+
+            /*
+             * Consumed by spatie/db-dumper during `backup:run`.
+             *
+             * useSingleTransaction wraps the dump in one consistent InnoDB snapshot
+             * instead of locking tables — a lock here would stall checkout and the
+             * ledger for the duration of the dump.
+             *
+             * dump_binary_path must point at the directory holding mysqldump when it
+             * is not on PATH (XAMPP on Windows). Leave empty on Linux servers.
+             */
+            'dump' => array_filter([
+                'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
+                'useSingleTransaction' => true,
+                'timeout' => (int) env('DB_DUMP_TIMEOUT', 900),
+            ], fn ($value) => $value !== '' && $value !== null),
         ],
 
         'mariadb' => [
