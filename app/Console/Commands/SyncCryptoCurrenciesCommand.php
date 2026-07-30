@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Payment\Providers\NowPaymentsProvider;
+use App\Domain\Payment\Support\PaymentStripBadges;
 use App\Models\CurrencyRate;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -87,6 +88,11 @@ class SyncCryptoCurrenciesCommand extends Command
 
             return self::SUCCESS;
         }
+
+        // The storefront "Pay your way" strip caches the payable lineup for 30
+        // minutes. Without this, a coin the gateway just stopped accepting keeps
+        // being advertised on the homepage for the rest of the window.
+        PaymentStripBadges::forgetCryptoCache();
 
         if ($unavailable > 0) {
             Log::warning('Crypto sync: coins unavailable at the gateway', ['count' => $unavailable]);

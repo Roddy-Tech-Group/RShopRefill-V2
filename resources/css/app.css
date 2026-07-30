@@ -626,6 +626,58 @@ html.dark .wallet-glass {
     .pill-shake { animation: none; }
 }
 
+/* Homepage "Pay your way" strip - the accepted payment methods scroll as a
+   marquee so the full list (card networks, mobile money, bank rails, crypto)
+   fits on one line instead of wrapping into a tall block.
+
+   The track renders the badge list TWICE and translates exactly -50%, which
+   lands the second copy where the first began. That only holds if the two
+   halves are exactly equal, so spacing lives on each badge as a trailing margin
+   and the track itself carries NO flex gap and NO padding: 2N items with a gap
+   between them is 2N-1 gaps, and -50% of that (plus any track padding) misses
+   one copy's width by (padding - gap/2), which snapped the loop back a dozen
+   pixels every cycle.
+
+   Duration is deliberately slow: this is ambient trust signalling, not
+   something anyone should feel chased by. Hover pauses it for a pointer user,
+   and the markup ships an explicit pause button for everyone else (WCAG 2.2.2).
+
+   The strip CLIPS rather than scrolls while animating: an animated transform
+   inside an overflow-x-auto box continuously rewrites that box's scroll range,
+   which fights a touch drag. Under prefers-reduced-motion the animation stops,
+   the aria-hidden clone is hidden (otherwise every method appears twice in a
+   row, reading as a rendering bug) and it becomes an ordinary scrollable row. */
+@keyframes pay-strip-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+.pay-strip { overflow: hidden; }
+.pay-strip-track { animation: pay-strip-scroll 45s linear infinite; }
+.pay-strip:hover .pay-strip-track,
+.pay-strip-paused .pay-strip-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+    .pay-strip {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .pay-strip::-webkit-scrollbar { display: none; }
+    .pay-strip-track { animation: none; }
+    .pay-strip-track > [aria-hidden="true"] { display: none; }
+}
+
+/* Strip surface + its triangle notch. These exist because the global dark
+   remaps `.dark .bg-white { #2a2a2a }` (and `.dark:not(.pure-dark)` -> #363636)
+   outrank Tailwind's `dark:` variant, so a `dark:bg-black` on the card never
+   applied while `dark:border-b-black` on the notch did - leaving a pure-black
+   arrow pointing at a grey panel. Both are pinned here to the same value per
+   theme tier so they can never drift apart again. */
+.pay-strip-card { background-color: #ffffff; }
+.pay-strip-notch { border-bottom-color: #ffffff; }
+.dark .pay-strip-card { background-color: #2a2a2a; }
+.dark .pay-strip-notch { border-bottom-color: #2a2a2a; }
+.dark:not(.pure-dark) .pay-strip-card { background-color: #363636; }
+.dark:not(.pure-dark) .pay-strip-notch { border-bottom-color: #363636; }
+
 /* Liquid-glass active pill (mobile bottom nav): a near-transparent water bead
    that refracts the frosted bar behind it rather than sitting on a solid tint.
    The inset top highlight + soft inner/drop shadow give the convex "water" gloss. */

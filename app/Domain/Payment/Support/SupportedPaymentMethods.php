@@ -57,4 +57,17 @@ final class SupportedPaymentMethods
     {
         return $method !== null && in_array($method, self::forCurrency($currency), true);
     }
+
+    /**
+     * Every method key accepted by at least one currency.
+     *
+     * Used to prove the storefront's "Pay your way" strip only advertises rails
+     * checkout can actually take - see PaymentStripBadgesTest.
+     *
+     * @return list<string>
+     */
+    public static function allMethods(): array
+    {
+        return array_values(array_unique(array_merge(...array_values(self::BY_CURRENCY))));
+    }
 }
