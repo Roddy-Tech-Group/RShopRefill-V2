@@ -165,6 +165,21 @@ class MobileNavChromeVisibilityTest extends TestCase
         }
     }
 
+    /** The rewards page is the Rcoin programme; its menu tile says so. */
+    public function test_the_menu_names_rcoin_not_the_old_referrals_alias(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs(User::factory()->create())
+            ->get('/dashboard')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('>Rcoin<', $html);
+        $this->assertStringContainsString('dashboard/rewards', $html);
+        $this->assertStringNotContainsString('Referrals', $html);
+    }
+
     public function test_orders_tab_shows_the_completed_order_count_badge(): void
     {
         $this->withoutVite();

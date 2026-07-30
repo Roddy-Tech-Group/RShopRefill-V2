@@ -56,8 +56,7 @@ class RewardEngine
     /**
      * The Rcoin cashback an order earns (before velocity caps): settlement
      * USD x cashback percentage, through the buyer's multiplier. Public so
-     * the delivery email can print the same figure the credit will use -
-     * there is no separate "you earned Rcoin" email.
+     * the delivery email can print the same figure the credit will use.
      */
     public function cashbackPreviewFor(Order $order): int
     {
@@ -88,8 +87,9 @@ class RewardEngine
     }
 
     /**
-     * Award buyer cashback for their purchase. The figure is surfaced on the
-     * order-delivery email instead of a dedicated cashback email.
+     * Award buyer cashback for their purchase. The credit itself raises
+     * WalletCredited, and WalletCreditListener sends the dedicated cashback
+     * email (RcoinEarnedMail) from there - no mail is dispatched here.
      */
     private function awardCashback(Order $order): void
     {

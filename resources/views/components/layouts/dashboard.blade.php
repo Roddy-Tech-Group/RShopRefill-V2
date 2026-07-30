@@ -540,10 +540,10 @@
                 </a>
                 --}}
 
-                <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover data-tip="Referrals" class="{{ $navItem(request()->routeIs('dashboard.rewards')) }}">
+                <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover data-tip="Rcoin Rewards" class="{{ $navItem(request()->routeIs('dashboard.rewards')) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/referals.webp') }}" alt="" class="h-5 w-5 shrink-0 object-contain" loading="lazy">
-                        Referrals
+                        <img src="{{ asset('assets/' . rawurlencode('wallet 2.svg')) }}" alt="" class="h-5 w-5 shrink-0 object-contain" loading="lazy">
+                        Rcoin Rewards
                     </span>
                     <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">Earn</span>
                 </a>
@@ -1572,7 +1572,10 @@
                 // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
                 // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
                 ['label' => 'Trade Card',    'href' => route('dashboard.gift-cards.history'), 'icon' => 'gift cards.svg', 'tone' => 'bg-orange-500', 'nav' => true],
-                ['label' => 'Referrals',     'href' => route('dashboard.rewards'),    'icon' => 'referals.webp',       'tone' => 'bg-yellow-500',   'nav' => true],
+                // The rewards page is the Rcoin programme (cashback, referrals,
+                // withdrawals, conversion) - the tile carries the Rcoin name,
+                // not the old "Referrals" alias that hid it.
+                ['label' => 'Rcoin',         'href' => route('dashboard.rewards'),    'icon' => 'wallet 2.svg',        'tone' => 'bg-yellow-500',   'nav' => true],
                 ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'tone' => 'bg-cyan-500', 'nav' => false],
             ];
         @endphp
