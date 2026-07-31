@@ -176,6 +176,10 @@ class CheckoutController extends Controller
                 //   - false  -> no Rcoin
                 applyRcoin: $request->input('apply_rcoin') === 'full' ? 'full' : $request->boolean('apply_rcoin'),
                 couponCode: $data['coupon_code'] ?? null,
+                // The tile the customer actually picked. $paymentMethod above
+                // collapses eight Flutterwave methods into one gateway name, so
+                // this is the only place the real choice is still visible.
+                selectedMethod: $data['payment_method'],
             );
 
             $fraudService->recordCheckout($user, $request->ip());

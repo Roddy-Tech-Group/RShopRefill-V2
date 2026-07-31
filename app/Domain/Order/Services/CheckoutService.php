@@ -10,6 +10,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\PaymentMethodNormaliser;
 use App\Domain\Rewards\Services\RewardEngine;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\CurrencyRateService;
@@ -40,9 +41,18 @@ class CheckoutService
      * Coordinate the checkout and order placement process.
      * Enforces row locking and atomic persistence.
      *
+     * @param  string  $paymentMethod  The gateway that will process this order
+     *                                 (wallet / crypto / flutterwave).
+     * @param  string|null  $selectedMethod  The method the customer actually
+     *                                       picked (card, ussd, bank_transfer…).
+     *                                       Flutterwave fronts eight of these, so
+     *                                       the gateway alone cannot identify it.
+     *                                       Falls back to the gateway, which is
+     *                                       exact for wallet and crypto.
+     *
      * @throws \Exception
      */
-    public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null): Order
+    public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null): Order
     {
         // 1. Recalculate and validate cart items/prices (in raw USD)
         $validatedTotals = $this->orderValidationService->validateForCheckout($cart);
@@ -266,6 +276,9 @@ class CheckoutService
             'order_id' => $order->id,
             'user_id' => $user->id,
             'gateway' => $paymentMethod,
+            // Null when Flutterwave was chosen without a specific method — the
+            // session's pay() call records it the moment the customer commits.
+            'payment_method' => PaymentMethodNormaliser::normalise($selectedMethod ?? $paymentMethod),
             'idempotency_key' => 'PAY-'.Str::uuid()->toString(),
             'currency' => $displayCurrency,
             'amount' => $order->total_amount,

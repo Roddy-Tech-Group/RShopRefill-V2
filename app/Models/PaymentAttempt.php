@@ -3,18 +3,21 @@
 namespace App\Models;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Support\PaymentMethodNormaliser;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @property string $id
  * @property string $order_id
  * @property int $user_id
  * @property string $gateway
+ * @property string|null $payment_method
  * @property string|null $gateway_reference
  * @property string $idempotency_key
  * @property string $currency
@@ -39,6 +42,7 @@ class PaymentAttempt extends Model
         'payable_type',
         'payable_id',
         'gateway',
+        'payment_method',
         'gateway_reference',
         'idempotency_key',
         'currency',
@@ -117,6 +121,47 @@ class PaymentAttempt extends Model
     public function hasSettled(): bool
     {
         return $this->settlement_delta !== null && (float) $this->actually_paid > 0;
+    }
+
+    /**
+     * Record how the customer chose to pay, canonicalised.
+     *
+     * The method is not always known when the attempt is created: wallet funding
+     * mints an attempt first and only learns the method when the customer picks
+     * one on the funding sheet. So this is called from every point that learns
+     * it, and is safe to call repeatedly.
+     *
+     * Only a confidently identified method is stored, and only when it differs
+     * from what is already there — an unrecognised value must never overwrite a
+     * method we already know to be true.
+     *
+     * This never throws. It is called on the live payment path, immediately
+     * before the gateway is charged, and it records observability rather than
+     * money: a write that fails here must cost us a row of telemetry, never a
+     * customer's payment.
+     */
+    public function recordPaymentMethod(?string $method): bool
+    {
+        $canonical = PaymentMethodNormaliser::normalise($method);
+
+        if ($canonical === null || $canonical === $this->payment_method) {
+            return false;
+        }
+
+        try {
+            $this->payment_method = $canonical;
+            $this->save();
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Could not record payment method on attempt.', [
+                'payment_attempt_id' => $this->id,
+                'method' => $canonical,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function order(): BelongsTo
