@@ -91,6 +91,7 @@ class Admin extends Authenticatable
         'rates' => 'Rate Management',
         'settings' => 'System Settings',
         'api-settings' => 'API & Integrations',
+        'management' => 'Management',
     ];
 
     /**
@@ -222,6 +223,9 @@ class Admin extends Authenticatable
             str_starts_with($name, 'rates') => 'rates',
             str_starts_with($name, 'settings') => 'settings',
             str_starts_with($name, 'api-settings') => 'api-settings',
+            // Payment Insights lives under the Management group in the sidebar,
+            // so it shares the management section grant.
+            str_starts_with($name, 'management') || str_starts_with($name, 'payment-insights') => 'management',
             default => null,
         };
     }
