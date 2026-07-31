@@ -20,7 +20,10 @@ class ProcessOrderRewardsJob implements ShouldQueue
      */
     public function __construct(
         public readonly Order $order
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('rewards');
+    }
 
     /**
      * Execute the job.

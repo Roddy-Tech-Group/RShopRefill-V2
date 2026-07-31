@@ -6,7 +6,6 @@ use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Orders\EsimLowDataMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Http\Controllers\Controller;
-use App\Models\Notification;
 use App\Models\OrderItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,21 +32,15 @@ use Throwable;
  *     ...
  *   }
  *
- * Signature verification: Airalo HMAC-signs the body with the partner shared
- * secret. We compare in constant time. Falls back to skip-verification only
- * when `services.airalo.webhook_secret` is empty (local dev convenience —
- * production deploys MUST set it).
+ * Authentication happens before this controller runs: the route is wrapped in
+ * VerifyWebhookSignature:airalo, which performs the constant-time HMAC check and
+ * the replay/idempotency guard shared with every other provider webhook. Anything
+ * reaching __invoke has already been authenticated.
  */
 class AiraloWebhookController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        if (! $this->verifySignature($request)) {
-            Log::warning('Airalo webhook: signature mismatch', ['ip' => $request->ip()]);
-
-            return response()->json(['error' => 'invalid signature'], 401);
-        }
-
         $payload = $request->json()->all();
         $iccid = (string) ($payload['iccid'] ?? '');
         $eventType = strtoupper((string) ($payload['event_type'] ?? ''));
@@ -116,38 +109,6 @@ class AiraloWebhookController extends Controller
         }
 
         return response()->json(['status' => 'ok'], 200);
-    }
-
-    /**
-     * Constant-time HMAC verification. Airalo issues partners only a
-     * client_id + client_secret pair, so by default webhooks are signed
-     * with the client_secret. A dedicated AIRALO_WEBHOOK_SECRET is honoured
-     * if set (for partners on a custom signing arrangement), otherwise we
-     * fall back to AIRALO_CLIENT_SECRET. The signing payload is the raw
-     * request body; the signature can land in either header Airalo uses.
-     */
-    private function verifySignature(Request $request): bool
-    {
-        $secret = (string) (config('services.airalo.webhook_secret') ?: config('services.airalo.client_secret', ''));
-        if ($secret === '') {
-            // Local-dev convenience: with no Airalo creds set we accept
-            // unsigned requests so curl tests work. Production refuses.
-            return ! app()->isProduction();
-        }
-
-        $signature = (string) ($request->header('X-Airalo-Signature') ?: $request->header('Signature') ?: '');
-        if ($signature === '') {
-            return false;
-        }
-
-        // Airalo sends the digest as hex; some integrations send the raw
-        // header value with a "sha256=" prefix. Normalise both before
-        // constant-time compare.
-        $signature = preg_replace('/^sha256=/i', '', $signature);
-
-        $expected = hash_hmac('sha256', $request->getContent(), $secret);
-
-        return hash_equals($expected, (string) $signature);
     }
 
     private function titleFor(string $eventType, array $payload): string

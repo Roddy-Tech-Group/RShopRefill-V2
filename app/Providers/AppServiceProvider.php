@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Domain\Audit\Listeners\AuditLogListener;
 use App\Http\View\Composers\CartComposer;
 use App\Http\View\Composers\SiteIdentityComposer;
+use App\Listeners\BackupFailureListener;
+use App\Listeners\ScheduledTaskFailureListener;
 use App\Support\FeatureFlag;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,6 +31,15 @@ class AppServiceProvider extends ServiceProvider
 
         // Append security-relevant events to the audit log.
         Event::subscribe(AuditLogListener::class);
+
+        // Escalate backup failures to Sentry + the critical log channel. A backup
+        // that stops running silently is the failure mode backups exist to avoid.
+        Event::subscribe(BackupFailureListener::class);
+
+        // Any scheduled task that fails alerts the phone directly; the
+        // scheduler carries reconciliation, backups, syncs and sweepers, and a
+        // silently-failing cron looks identical to a passing one.
+        Event::subscribe(ScheduledTaskFailureListener::class);
 
         View::composer('*', CartComposer::class);
 

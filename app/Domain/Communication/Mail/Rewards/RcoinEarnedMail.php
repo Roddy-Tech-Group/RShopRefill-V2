@@ -26,7 +26,10 @@ class RcoinEarnedMail extends Mailable implements ShouldQueue
         public string $kind,          // 'cashback' | 'referral'
         public ?string $orderNumber = null,
         public ?string $referredName = null,
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-transactional');
+    }
 
     public function envelope(): Envelope
     {

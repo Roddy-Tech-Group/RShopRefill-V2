@@ -57,6 +57,38 @@ return [
             'throw' => false,
         ],
 
+        /*
+         * On-box staging copy of the encrypted backup archives. Deliberately rooted
+         * outside storage/app so a backup can never contain a previous backup.
+         * This disk is a convenience, never the disaster-recovery copy — a dead VPS
+         * takes it with it. `throw` is on: a silent write failure here is the exact
+         * failure mode backups exist to prevent.
+         */
+        'backup-local' => [
+            'driver' => 'local',
+            'root' => storage_path('backups'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
+        /*
+         * Off-site, versioned, object-locked bucket (Cloudflare R2 / Backblaze B2 /
+         * S3). This is the copy that survives disk failure, a bad migration, and
+         * ransomware. Credentials are separate from the application `s3` disk on
+         * purpose: compromising the app must not grant reach over the backups.
+         */
+        'backup-remote' => [
+            'driver' => 's3',
+            'key' => env('BACKUP_REMOTE_ACCESS_KEY_ID'),
+            'secret' => env('BACKUP_REMOTE_SECRET_ACCESS_KEY'),
+            'region' => env('BACKUP_REMOTE_REGION', 'auto'),
+            'bucket' => env('BACKUP_REMOTE_BUCKET'),
+            'endpoint' => env('BACKUP_REMOTE_ENDPOINT'),
+            'use_path_style_endpoint' => env('BACKUP_REMOTE_USE_PATH_STYLE', true),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
     ],
 
     /*

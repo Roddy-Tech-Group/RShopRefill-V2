@@ -11,6 +11,7 @@ use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentWebhook;
 use App\Models\WalletFunding;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +29,11 @@ class VerifyPaymentJob implements ShouldQueue
 
     public int $backoff = 10;
 
-    public function __construct(protected PaymentAttempt $attempt) {}
+    public function __construct(protected PaymentAttempt $attempt)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('payments');
+    }
 
     public function handle(
         PaymentGatewayFactory $gatewayFactory,
@@ -106,7 +111,7 @@ class VerifyPaymentJob implements ShouldQueue
 
                 // 5. Update any pending webhooks related to this attempt
                 if ($attempt->idempotency_key) {
-                    \App\Models\PaymentWebhook::where('reference', $attempt->idempotency_key)
+                    PaymentWebhook::where('reference', $attempt->idempotency_key)
                         ->where('processing_status', 'pending')
                         ->update([
                             'processed' => true,

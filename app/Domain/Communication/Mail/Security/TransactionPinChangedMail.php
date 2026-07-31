@@ -16,7 +16,10 @@ class TransactionPinChangedMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public User $user
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-critical');
+    }
 
     public function envelope(): Envelope
     {

@@ -15,7 +15,10 @@ class CriticalSystemAlert extends Notification implements ShouldQueue
         public string $title,
         public string $description,
         public array $context = []
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('critical-alerts');
+    }
 
     /**
      * Get the notification's delivery channels.

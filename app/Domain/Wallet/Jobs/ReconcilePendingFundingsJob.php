@@ -16,6 +16,12 @@ class ReconcilePendingFundingsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct()
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('payments');
+    }
+
     /**
      * Execute the job.
      */

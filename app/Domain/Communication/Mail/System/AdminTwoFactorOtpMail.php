@@ -20,7 +20,10 @@ class AdminTwoFactorOtpMail extends Mailable implements ShouldQueue
     public function __construct(
         public readonly Admin $admin,
         public readonly string $otp
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-critical');
+    }
 
     /**
      * Get the message envelope.

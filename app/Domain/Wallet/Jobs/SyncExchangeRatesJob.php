@@ -20,7 +20,7 @@ class SyncExchangeRatesJob implements ShouldQueue
      */
     public function __construct()
     {
-        $this->queue = 'default';
+        $this->onQueue('intelligence');
     }
 
     /**

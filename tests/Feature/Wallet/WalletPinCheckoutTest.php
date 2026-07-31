@@ -6,6 +6,7 @@ use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
+use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Jobs\FulfillOrderItemJob;
@@ -195,5 +196,15 @@ class WalletPinCheckoutTest extends TestCase
         $this->actingAs($this->user)
             ->postJson(route('api.wallets.pin.verify'), ['pin' => '9182'])
             ->assertStatus(422);
+    }
+
+    public function test_wallet_checkout_with_insufficient_funds_throws_insufficient_balance_exception(): void
+    {
+        Queue::fake([FulfillOrderItemJob::class]);
+        app(TransactionPinService::class)->setupPin($this->user, self::PIN);
+        $this->fundedWallet(5.00); // Order total is 11.00
+
+        $this->expectException(InsufficientBalanceException::class);
+        $this->placeWalletOrder();
     }
 }

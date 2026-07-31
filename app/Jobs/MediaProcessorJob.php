@@ -17,7 +17,10 @@ class MediaProcessorJob implements ShouldQueue
     public function __construct(
         private readonly int $productId,
         private readonly string $url
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('long-running');
+    }
 
     public function handle(): void
     {

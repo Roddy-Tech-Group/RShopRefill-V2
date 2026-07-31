@@ -14,7 +14,10 @@ class NewDeviceDetectedNotification extends Notification implements ShouldQueue
 
     public function __construct(
         public TrustedDevice $device
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-critical');
+    }
 
     public function via(object $notifiable): array
     {
@@ -25,17 +28,17 @@ class NewDeviceDetectedNotification extends Notification implements ShouldQueue
     {
         $lockUrl = route('security.compromise', [
             'device' => $this->device->id,
-            'token' => hash_hmac('sha256', $this->device->id, config('app.key'))
+            'token' => hash_hmac('sha256', $this->device->id, config('app.key')),
         ]);
 
         return (new MailMessage)
             ->subject('New device signed into your account')
-            ->greeting('Hello ' . $notifiable->name . ',')
+            ->greeting('Hello '.$notifiable->name.',')
             ->line('We noticed a new sign-in to your RShopRefill account.')
-            ->line('**Device:** ' . $this->device->os . ' / ' . $this->device->browser)
-            ->line('**IP Address:** ' . $this->device->ip_address)
-            ->line('**Location:** ' . ($this->device->city ?: 'Unknown City') . ', ' . ($this->device->country ?: 'Unknown Country'))
-            ->line('**Time:** ' . now()->toDayDateTimeString())
+            ->line('**Device:** '.$this->device->os.' / '.$this->device->browser)
+            ->line('**IP Address:** '.$this->device->ip_address)
+            ->line('**Location:** '.($this->device->city ?: 'Unknown City').', '.($this->device->country ?: 'Unknown Country'))
+            ->line('**Time:** '.now()->toDayDateTimeString())
             ->line('If this was you, you can safely ignore this email.')
             ->line('If you did not sign in recently, please secure your account immediately.')
             ->action('NO, SECURE MY ACCOUNT', $lockUrl)

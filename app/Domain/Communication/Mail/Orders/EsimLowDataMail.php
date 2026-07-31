@@ -30,7 +30,10 @@ class EsimLowDataMail extends Mailable implements ShouldQueue
         public string $iccid,
         public string $eventType,
         public array $payload,
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-transactional');
+    }
 
     public function envelope(): Envelope
     {
