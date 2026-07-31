@@ -188,7 +188,15 @@ class FulfillOrderItemJob implements ShouldQueue
             // started yet WILL buy a real voucher from its own job, so treating it
             // as a total failure unlocks money for goods the customer then receives
             // free - and leaves the attempt un-Reserved so finalizeDebit never runs.
-            $hasDeliverableItem = $order->items->contains(function ($i) {
+            //
+            // Re-read the siblings under a row lock rather than trusting the
+            // already-loaded relation: this decision releases money, and a
+            // concurrent sibling job flipping to Fulfilled between the read and
+            // the release is precisely the race that would refund an order the
+            // customer is about to receive. Both callers run inside a
+            // transaction, so the lock is held until the reversal commits.
+            $orderItems = $order->items()->lockForUpdate()->get();
+            $hasDeliverableItem = $orderItems->contains(function ($i) {
                 return in_array($i->fulfillment_status, [
                     FulfillmentStatus::Fulfilled,
                     FulfillmentStatus::Processing,
@@ -234,14 +242,16 @@ class FulfillOrderItemJob implements ShouldQueue
             return;
         }
 
-        $isOrderFinished = $order->items->every(fn ($i) => in_array($i->fulfillment_status, [
+        $orderItems = $order->items()->lockForUpdate()->get();
+
+        $isOrderFinished = $orderItems->every(fn ($i) => in_array($i->fulfillment_status, [
             FulfillmentStatus::Fulfilled,
             FulfillmentStatus::Failed,
         ]));
 
         if ($isOrderFinished) {
-            $allFailed = $order->items->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Failed);
-            $allFulfilled = $order->items->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Fulfilled);
+            $allFailed = $orderItems->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Failed);
+            $allFulfilled = $orderItems->every(fn ($i) => $i->fulfillment_status === FulfillmentStatus::Fulfilled);
 
             if ($allFailed) {
                 $orderService->transitionFulfillmentStatus($order, FulfillmentStatus::Failed);

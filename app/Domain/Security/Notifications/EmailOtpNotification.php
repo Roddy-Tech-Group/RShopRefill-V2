@@ -14,7 +14,10 @@ class EmailOtpNotification extends Notification implements ShouldQueue
     public function __construct(
         public string $otp,
         public string $context = 'login'
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-critical');
+    }
 
     public function via(object $notifiable): array
     {
@@ -25,12 +28,12 @@ class EmailOtpNotification extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject('Your RShopRefill Authentication Code')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line($this->context === 'recovery' 
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line($this->context === 'recovery'
                 ? 'You are attempting to recover your Protected Mode account.'
                 : 'You are attempting to sign in from a new or unrecognized device.')
             ->line('Here is your one-time verification code:')
-            ->line('**' . $this->otp . '**')
+            ->line('**'.$this->otp.'**')
             ->line('This code will expire in 10 minutes. Do not share this code with anyone.');
     }
 }

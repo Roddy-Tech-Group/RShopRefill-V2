@@ -28,7 +28,11 @@ class DispatchCampaignJob implements ShouldQueue
      */
     public int $timeout = 1800;
 
-    public function __construct(private readonly NotificationCampaign $campaign) {}
+    public function __construct(private readonly NotificationCampaign $campaign)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-marketing');
+    }
 
     public function handle(CampaignService $campaignService): void
     {

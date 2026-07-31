@@ -22,7 +22,7 @@ class RetryFailedFundingVerificationJob implements ShouldQueue
     public function __construct(
         private readonly int $fundingId
     ) {
-        $this->queue = 'default';
+        $this->onQueue('payments');
     }
 
     /**

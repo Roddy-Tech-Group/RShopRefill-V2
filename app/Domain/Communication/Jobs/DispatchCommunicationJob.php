@@ -41,7 +41,10 @@ class DispatchCommunicationJob implements ShouldQueue
 
     public function __construct(
         public readonly CommunicationPayload $payload
-    ) {}
+    ) {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('comm-transactional');
+    }
 
     public function handle(
         EmailChannel $emailChannel,

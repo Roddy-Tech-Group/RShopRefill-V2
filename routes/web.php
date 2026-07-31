@@ -15,6 +15,7 @@ use App\Http\Controllers\EmailPreviewController;
 use App\Http\Controllers\EsimStoreController;
 use App\Http\Controllers\EsimTopupController;
 use App\Http\Controllers\GoogleMerchantFeedController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\KycController;
 use App\Http\Controllers\PressController;
 use App\Http\Controllers\RcoinConvertController;
@@ -924,3 +925,19 @@ Route::middleware(['auth'])->prefix('security')->name('security.')->group(functi
 require __DIR__.'/admin.php';
 
 require __DIR__.'/auth.php';
+
+/*
+ * Deep health check for the external uptime probe (P0-3).
+ *
+ * Laravel's built-in /up only proves PHP is executing. This one proves the
+ * platform can actually serve customers: database reachable, cache working,
+ * Redis alive, Horizon running, cron still ticking, and a SEV-1 alert path
+ * configured. Returns 503 when a critical component is down so a probe that
+ * only reads status codes still pages correctly.
+ *
+ * Deliberately unauthenticated and secret-free — a probe cannot log in — and
+ * excluded from maintenance mode so it stays answerable during an incident.
+ */
+Route::get('health', HealthController::class)
+    ->withoutMiddleware(['maintenance-guard'])
+    ->name('health');

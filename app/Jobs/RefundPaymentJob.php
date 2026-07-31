@@ -20,7 +20,11 @@ class RefundPaymentJob implements ShouldQueue
 
     public int $backoff = 30;
 
-    public function __construct(protected PaymentAttempt $attempt) {}
+    public function __construct(protected PaymentAttempt $attempt)
+    {
+        // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
+        $this->onQueue('payments');
+    }
 
     public function handle(PaymentGatewayFactory $gatewayFactory): void
     {
