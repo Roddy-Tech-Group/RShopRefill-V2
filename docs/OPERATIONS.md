@@ -16,34 +16,34 @@ Companion documents:
 
 ## 1 · Topology
 
-| Layer | What runs | Notes |
-|---|---|---|
-| Edge | Cloudflare (proxied DNS) | Origin IP must never be exposed; DNS records stay orange-clouded |
-| Web | nginx → PHP-FPM 8.2 | Laravel 12 |
-| Queue | Horizon (Redis) under Supervisor | 5 supervisors, ~17 queues |
-| Data | MySQL · Redis | Both bound to localhost / private network only |
-| Scheduler | system cron → `schedule:run` every minute | Its heartbeat is checked by `/health` |
-| Errors | Sentry (exceptions + cron monitors) | |
-| Alerts | Telegram (primary) + mail (backstop) via `OperationalAlerter` | See §6 |
+| Layer     | What runs                                                     | Notes                                                            |
+| --------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Edge      | Cloudflare (proxied DNS)                                      | Origin IP must never be exposed; DNS records stay orange-clouded |
+| Web       | nginx → PHP-FPM 8.2                                           | Laravel 12                                                       |
+| Queue     | Horizon (Redis) under Supervisor                              | 5 supervisors, ~17 queues                                        |
+| Data      | MySQL · Redis                                                 | Both bound to localhost / private network only                   |
+| Scheduler | system cron → `schedule:run` every minute                     | Its heartbeat is checked by `/health`                            |
+| Errors    | Sentry (exceptions + cron monitors)                           |                                                                  |
+| Alerts    | Telegram (primary) + mail (backstop) via `OperationalAlerter` | See §6                                                           |
 
-**Application root:** `/var/www/rshoprefills` (adjust if different — verify before an incident, not during one).
+**Application root:** `/home/rshoprefills-v2/htdocs/rshoprefill.com` (adjust if different — verify before an incident, not during one).
 
 ### Production URLs
 
 Canonical host is **`www.rshoprefill.com`** (verified live 2026-07-31: the
 bare apex `rshoprefill.com` 301-redirects onto it). The plural
-`rshoprefills.com` is an *alternate* host that folds in the same way (see
+`rshoprefills.com` is an _alternate_ host that folds in the same way (see
 `APP_ALTERNATE_HOSTS` in [config/app.php](../config/app.php)). Note the
-`seo.canonical_base_url` site setting was *seeded* with the plural default;
+`seo.canonical_base_url` site setting was _seeded_ with the plural default;
 verify the production value reads `https://www.rshoprefill.com`, because
 sitemaps and email links build from it.
 
-| What | URL | Auth |
-|---|---|---|
-| Storefront | `https://www.rshoprefill.com` | public |
-| Health check | `https://www.rshoprefill.com/health` | none; this is what the uptime probe watches |
-| Admin panel | `https://www.rshoprefill.com/admin` | admin login + 2FA |
-| Horizon (queues) | `https://www.rshoprefill.com/horizon` | session-gated; path is `HORIZON_PATH` |
+| What             | URL                                   | Auth                                        |
+| ---------------- | ------------------------------------- | ------------------------------------------- |
+| Storefront       | `https://www.rshoprefill.com`         | public                                      |
+| Health check     | `https://www.rshoprefill.com/health`  | none; this is what the uptime probe watches |
+| Admin panel      | `https://www.rshoprefill.com/admin`   | admin login + 2FA                           |
+| Horizon (queues) | `https://www.rshoprefill.com/horizon` | session-gated; path is `HORIZON_PATH`       |
 
 ⚠️ **Verify on the VPS that `APP_URL` agrees with the setting above.** Two
 independent canonicals exist in this codebase and nothing forces them to match:
@@ -70,7 +70,7 @@ revoke.
 > procedure, not the destination.
 
 ```bash
-cd /var/www/rshoprefills
+cd /home/rshoprefills-v2/htdocs/rshoprefill.com
 php artisan down --render="errors::503"      # customer-visible maintenance page
 
 git fetch origin && git checkout main && git pull
@@ -107,7 +107,7 @@ Then watch Sentry and the storefront for one full checkout cycle.
 
 - **Code only:** `git checkout <previous-sha>` and repeat the deploy steps.
 - **If the deploy migrated:** **never blind-rollback.** Old code against new
-  schema can corrupt data. Prefer rolling *forward* with a revert commit. If data
+  schema can corrupt data. Prefer rolling _forward_ with a revert commit. If data
   is already damaged, restore the pre-deploy snapshot
   ([runbooks/database-restore.md](runbooks/database-restore.md)).
 
@@ -162,20 +162,20 @@ flood cannot starve unrelated work.
 
 `php artisan schedule:list` is the source of truth. The critical entries:
 
-| When | Command | Purpose |
-|---|---|---|
-| every minute | scheduler heartbeat | Proves cron is alive to `/health` |
-| every 5 min | `horizon:snapshot` | Horizon metrics |
-| every 5 min | fulfillment rescue sweeper | Catches dropped webhooks |
-| 01:15 | `backup:clean` | Prune old archives |
-| 01:30 | `backup:run` | Nightly encrypted backup |
-| 02:00 | `reconcile:wallet-balances` | Wallet vs transaction history |
-| 02:30 | `ledger:verify` | Double-entry integrity — **SEV-1 on failure** |
-| 03:00 | `rates:fetch` | FX rates |
-| 06:00 | `pricing:audit-below-cost` | Margin protection |
-| 08:00 | `backup:health` | Proves a restorable backup exists |
-| Mon 05:00 | `payments:validate` | Payment platform self-test |
-| Mon 05:15 | `communication:validate` | Comms platform self-test |
+| When         | Command                     | Purpose                                       |
+| ------------ | --------------------------- | --------------------------------------------- |
+| every minute | scheduler heartbeat         | Proves cron is alive to `/health`             |
+| every 5 min  | `horizon:snapshot`          | Horizon metrics                               |
+| every 5 min  | fulfillment rescue sweeper  | Catches dropped webhooks                      |
+| 01:15        | `backup:clean`              | Prune old archives                            |
+| 01:30        | `backup:run`                | Nightly encrypted backup                      |
+| 02:00        | `reconcile:wallet-balances` | Wallet vs transaction history                 |
+| 02:30        | `ledger:verify`             | Double-entry integrity — **SEV-1 on failure** |
+| 03:00        | `rates:fetch`               | FX rates                                      |
+| 06:00        | `pricing:audit-below-cost`  | Margin protection                             |
+| 08:00        | `backup:health`             | Proves a restorable backup exists             |
+| Mon 05:00    | `payments:validate`         | Payment platform self-test                    |
+| Mon 05:15    | `communication:validate`    | Comms platform self-test                      |
 
 If cron dies, **all of this stops at once** and the app gives no other sign.
 That is exactly what the heartbeat check exists to catch.
@@ -194,11 +194,11 @@ The command prints a **per-channel delivery table** and exits non-zero if every
 channel failed. Read that table rather than the exit banner: a channel can accept
 a message and still not reach you.
 
-| Severity | Reaches | Meaning |
-|---|---|---|
-| SEV-1 | Telegram → mail | Money is wrong or the platform is down. Wake up. |
-| SEV-2 | Telegram | A revenue path is degraded. Act within hours. |
-| SEV-3 | Mail | Degradation with a workaround. Next working day. |
+| Severity | Reaches         | Meaning                                          |
+| -------- | --------------- | ------------------------------------------------ |
+| SEV-1    | Telegram → mail | Money is wrong or the platform is down. Wake up. |
+| SEV-2    | Telegram        | A revenue path is degraded. Act within hours.    |
+| SEV-3    | Mail            | Degradation with a workaround. Next working day. |
 
 **Telegram is the primary channel** (`OPS_TELEGRAM_BOT_TOKEN` +
 `OPS_TELEGRAM_CHAT_ID`) because a phone can be set to override silent mode for a
@@ -213,8 +213,8 @@ is ignored — deliberately, so a dormant channel can never be counted as a work
 escalation path by `/health` or by `alerting:test`.
 
 > **Telegram accepting a message is not the same as your phone alerting you.**
-> After any deploy or credential rotation, fire the drill *and look at the
-> handset.* Confirm the chat overrides silent mode; otherwise a 3 a.m. SEV-1
+> After any deploy or credential rotation, fire the drill _and look at the
+> handset._ Confirm the chat overrides silent mode; otherwise a 3 a.m. SEV-1
 > arrives politely and waits until morning.
 
 Identical alerts are throttled for `ALERTING_THROTTLE_MINUTES` so a five-minute
@@ -246,10 +246,10 @@ Self-hosted monitoring cannot tell you the server is unreachable.
 
 Two monitors, both on the free plan's 5-minute interval:
 
-| Monitor | Type | Target | Settings |
-|---|---|---|---|
-| `RShopRefills health` | HTTP(s) | `https://www.rshoprefill.com/health` | Any non-2xx counts as down; `/health` returns 503 when the platform cannot serve customers, so this pages on real outages, not cosmetic ones. **Create only after `/health` is deployed** (it 404s until then, which reads as down) |
-| `RShopRefills storefront` | Keyword | `https://www.rshoprefill.com/` | Keyword `RshopRefills` (renders in the footer copyright line). In UptimeRobot's settings this must be **"start incident when keyword does not exist"**; the "when keyword exists" option is inverted and alarms on every healthy page load, which is exactly what happened on first setup (2026-07-31). Catches "server up but page broken", which a status-code check cannot see |
+| Monitor                   | Type    | Target                               | Settings                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RShopRefills health`     | HTTP(s) | `https://www.rshoprefill.com/health` | Any non-2xx counts as down; `/health` returns 503 when the platform cannot serve customers, so this pages on real outages, not cosmetic ones. **Create only after `/health` is deployed** (it 404s until then, which reads as down)                                                                                                                                               |
+| `RShopRefills storefront` | Keyword | `https://www.rshoprefill.com/`       | Keyword `RshopRefills` (renders in the footer copyright line). In UptimeRobot's settings this must be **"start incident when keyword does not exist"**; the "when keyword exists" option is inverted and alarms on every healthy page load, which is exactly what happened on first setup (2026-07-31). Catches "server up but page broken", which a status-code check cannot see |
 
 Alert contacts: email, plus the UptimeRobot mobile app (free) with push
 notifications enabled; in the app's notification settings allow it to bypass
@@ -277,10 +277,10 @@ php artisan backup:health         # is a recent, encrypted, off-site archive pre
 php artisan backup:restore-drill  # restore into a scratch DB and verify it
 ```
 
-| Objective | Target | Measured |
-|---|---|---|
-| RPO (max data loss) | ≤ 24h (≤ 5 min once P1-5 managed DB lands) | 24h — nightly archive |
-| RTO (time to restore) | ≤ 4h | **19.4s** for the database restore itself (2026-07-26 drill, 78 tables / 35 MB) |
+| Objective             | Target                                     | Measured                                                                        |
+| --------------------- | ------------------------------------------ | ------------------------------------------------------------------------------- |
+| RPO (max data loss)   | ≤ 24h (≤ 5 min once P1-5 managed DB lands) | 24h — nightly archive                                                           |
+| RTO (time to restore) | ≤ 4h                                       | **19.4s** for the database restore itself (2026-07-26 drill, 78 tables / 35 MB) |
 
 The measured RTO above covers restoring the data only. Rebuilding a lost server
 around it has not yet been drilled — that is roadmap **P5-4** (the "VPS is gone"
@@ -297,15 +297,15 @@ value loses every backup.** It belongs in the credential escrow, not only in
 
 ## 9 · Incident quick reference
 
-| Symptom | First move |
-|---|---|
-| Site down | `/health` → which component? → [runbooks/](runbooks/) |
+| Symptom                | First move                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| Site down              | `/health` → which component? → [runbooks/](runbooks/)                             |
 | `ledger:verify` failed | **SEV-1.** Freeze wallet ops. Do not "fix" the ledger — investigate to root cause |
-| Backup unhealthy | [runbooks/database-restore.md](runbooks/database-restore.md) |
-| Payments failing | Disable the failing method in checkout; customers route to working rails |
-| Provider outage | Feature-flag the affected product lines off; keep the rest selling |
-| Queue backlog | `horizon:status`, `supervisorctl status`; check for a poison job |
-| Suspected breach | **Preserve evidence first** — copy logs off-box before any cleanup |
+| Backup unhealthy       | [runbooks/database-restore.md](runbooks/database-restore.md)                      |
+| Payments failing       | Disable the failing method in checkout; customers route to working rails          |
+| Provider outage        | Feature-flag the affected product lines off; keep the rest selling                |
+| Queue backlog          | `horizon:status`, `supervisorctl status`; check for a poison job                  |
+| Suspected breach       | **Preserve evidence first** — copy logs off-box before any cleanup                |
 
 **Sequence, every time:** Declare severity out loud → Stabilise (smallest lever
 that stops harm) → Communicate → Diagnose → Verify recovery → Postmortem within
@@ -348,14 +348,14 @@ from what the code actually reads, and is the reference for a rebuild.
 
 The values that will hurt most if wrong:
 
-| Variable | Why it matters |
-|---|---|
-| `APP_KEY` | Rotating it without `APP_PREVIOUS_KEYS` makes existing encrypted data unreadable |
-| `BACKUP_ARCHIVE_PASSWORD` | Lose it and every backup is unrecoverable |
-| `PRICING_FLOOR_MODE` | `enforce` with bad cost data raises storefront prices by the same corrupt factor |
-| `PAYMENT_MOCK` | `true` in production short-circuits real gateways |
-| `APP_DEBUG` | `true` in production leaks stack traces and config |
-| `*_WEBHOOK_*` secrets | A wrong value silently drops real provider events |
+| Variable                  | Why it matters                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `APP_KEY`                 | Rotating it without `APP_PREVIOUS_KEYS` makes existing encrypted data unreadable |
+| `BACKUP_ARCHIVE_PASSWORD` | Lose it and every backup is unrecoverable                                        |
+| `PRICING_FLOOR_MODE`      | `enforce` with bad cost data raises storefront prices by the same corrupt factor |
+| `PAYMENT_MOCK`            | `true` in production short-circuits real gateways                                |
+| `APP_DEBUG`               | `true` in production leaks stack traces and config                               |
+| `*_WEBHOOK_*` secrets     | A wrong value silently drops real provider events                                |
 
 ---
 
@@ -372,7 +372,7 @@ Verify quarterly; record the date here.
 - [ ] TLS certificate auto-renewal verified
 - [ ] Disk usage < 75% (`storage/logs` grows fastest)
 
-*Last verified: — (not yet done)*
+_Last verified: — (not yet done)_
 
 ---
 
@@ -381,16 +381,16 @@ Verify quarterly; record the date here.
 Honesty here is worth more than a clean-looking document. Tracked in
 [CTO_roadmap.md](../CTO_roadmap.md).
 
-| Gap | Roadmap |
-|---|---|
+| Gap                                                                                                                                                                                                                                                                        | Roadmap                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | **Off-site uploads not yet enabled in production** — the R2 bucket and credentials exist and are verified, but `BACKUP_DESTINATION_DISKS` must include `backup-remote` on the VPS. Until it does, backups accumulate on the same disk they exist to protect against losing | P0-1 (operator action) |
-| **Object lock / versioning on the backup bucket unconfirmed** — the backup credentials can currently delete objects outright, so ransomware on the VPS could destroy backup history along with the data | P0-1 (operator action) |
-| No staging environment — changes go from a dev laptop to production | P1-4 |
-| Deploys are manual; no one-command rollback | P1-3 |
-| External uptime probe: UptimeRobot account created 2026-07-31; the two monitors in §7 still need creating, the Cloudflare skip rule applying, and the stop-nginx fire drill passing | P0-3 (operator action) |
-| Mail alert delivery proven only against the `log` mailer; unproven over real SMTP | P0-3 (verify on VPS) |
-| Bus factor is 1; nobody else has rehearsed access, and `BACKUP_ARCHIVE_PASSWORD` is not yet in escrow | P5-1 / P0-6 |
-| Server checklist above has never been formally verified | P4-1 |
+| **Object lock / versioning on the backup bucket unconfirmed** — the backup credentials can currently delete objects outright, so ransomware on the VPS could destroy backup history along with the data                                                                    | P0-1 (operator action) |
+| No staging environment — changes go from a dev laptop to production                                                                                                                                                                                                        | P1-4                   |
+| Deploys are manual; no one-command rollback                                                                                                                                                                                                                                | P1-3                   |
+| External uptime probe: UptimeRobot account created 2026-07-31; the two monitors in §7 still need creating, the Cloudflare skip rule applying, and the stop-nginx fire drill passing                                                                                        | P0-3 (operator action) |
+| Mail alert delivery proven only against the `log` mailer; unproven over real SMTP                                                                                                                                                                                          | P0-3 (verify on VPS)   |
+| Bus factor is 1; nobody else has rehearsed access, and `BACKUP_ARCHIVE_PASSWORD` is not yet in escrow                                                                                                                                                                      | P5-1 / P0-6            |
+| Server checklist above has never been formally verified                                                                                                                                                                                                                    | P4-1                   |
 
 **On object lock:** do not solve this by removing delete permission from the
 backup credentials — `backup:clean` needs it to enforce retention. The correct

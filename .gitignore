@@ -40,6 +40,11 @@ public/assets/Store front video 1.mp4
 .env.*.bak
 .env.bak
 
+# Local-only credential scratch notes. Real credentials belong in the
+# password-manager vault (see docs/ONCALL.md escrow process), NEVER in git:
+# repo history keeps them retrievable forever, even after deletion.
+/docs/runbook/
+
 # Personal planning / strategy notes — local only, never committed.
 CTO.md
 CTO_roadmap.md
