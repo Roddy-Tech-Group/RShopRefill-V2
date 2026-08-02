@@ -13,11 +13,6 @@
 /vendor
 .DS_Store
 .env
-# .env.example is held back with the operations docs (P0-6) until both have been
-# verified together — the template and the manual that explains it are only
-# useful as a pair. Un-ignore it when docs/ ships; a fresh clone has no usable
-# environment reference until then.
-.env.example
 .env.backup
 .env.backup
 .env.production
@@ -45,10 +40,10 @@ public/assets/Store front video 1.mp4
 .env.*.bak
 .env.bak
 
-# Operations manual, on-call break-glass and runbooks (P0-6). Held back
-# deliberately until they have been verified by a second person — a runbook
-# nobody has followed is a draft. Remove this entry when they ship.
-/docs/
+# Local-only credential scratch notes. Real credentials belong in the
+# password-manager vault (see docs/ONCALL.md escrow process), NEVER in git:
+# repo history keeps them retrievable forever, even after deletion.
+/docs/runbook/
 
 # Personal planning / strategy notes — local only, never committed.
 CTO.md

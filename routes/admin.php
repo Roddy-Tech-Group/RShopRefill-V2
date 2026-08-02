@@ -252,6 +252,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Volt::route('rates', 'admin.rates')->name('rates');
         Volt::route('account', 'admin.account')->name('account');
         Volt::route('payment-insights', 'admin.payment-insights.dashboard')->name('payment-insights');
+
+        // Management — CTO-level operational control: system monitoring,
+        // company finances, user leaderboards and incident runbooks. Grouped
+        // under the `management` permission section (Super Admin by default).
+        Route::prefix('management')->name('management.')->group(function () {
+            Volt::route('monitoring', 'admin.management.monitoring')->name('monitoring');
+            Volt::route('finances', 'admin.management.finances')->name('finances');
+            Volt::route('leaderboards', 'admin.management.leaderboards')->name('leaderboards');
+            Volt::route('runbooks/{runbook?}', 'admin.management.runbooks')->name('runbooks');
+        });
         Volt::route('notifications', 'admin.notifications')->name('notifications');
         Volt::route('reports', 'admin.reports')->name('reports');
         Route::get('reports/export.csv', [AdminReportExportController::class, 'csv'])->name('reports.export');

@@ -273,6 +273,15 @@ class PaymentSessionController extends Controller
             ], 422);
         }
 
+        // The customer has now committed to a method, and this is the only point
+        // where wallet funding ever learns which one: the funding sheet mints the
+        // attempt first and picks the method afterwards. Recorded after the
+        // allow-list check so a rejected method is never persisted, and before
+        // the gateway call so an attempt that fails at the provider still tells
+        // us what was being attempted — which is exactly the case we most need
+        // to see when deciding whether a method is broken.
+        $attempt->recordPaymentMethod($method);
+
         $gatewayFactory = app(PaymentGatewayFactory::class);
 
         try {

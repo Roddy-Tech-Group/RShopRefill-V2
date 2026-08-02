@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
+use App\Domain\Fulfillment\Support\SweeperPickupCounter;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
@@ -121,22 +122,28 @@ Artisan::command('zendit:sync-giftcards', function () {
 // any paid order whose items are still NotStarted after a 10-minute grace window.
 Schedule::call(function () {
     $cutoff = now()->subMinutes(10);
+    $pickups = 0;
 
     Order::query()
         ->where('payment_status', PaymentStatus::Paid)
         ->where('fulfillment_status', FulfillmentStatus::NotStarted)
         ->where('placed_at', '<=', $cutoff)
         ->with('items')
-        ->chunkById(100, function ($orphanedOrders) {
+        ->chunkById(100, function ($orphanedOrders) use (&$pickups) {
             foreach ($orphanedOrders as $order) {
                 foreach ($order->items as $item) {
                     if ($item->fulfillment_status === FulfillmentStatus::NotStarted) {
                         Log::warning("Fulfillment sweeper: re-dispatching FulfillOrderItemJob for orphaned item {$item->id} on order {$order->order_number}");
                         FulfillOrderItemJob::dispatch($item);
+                        $pickups++;
                     }
                 }
             }
         });
+
+    // Every pickup is a webhook that went missing; Monitoring and
+    // monitor:operations read these buckets.
+    SweeperPickupCounter::record($pickups);
 })->everyFiveMinutes()->name('fulfillment:rescue-orphaned-orders')->sentryMonitor('fulfillment-rescue-orphaned-orders');
 
 // Pending-fulfillment poll sweeper.
@@ -209,6 +216,19 @@ Schedule::command('backup:health')
     ->dailyAt('08:00')
     ->name('backup:health-daily')
     ->sentryMonitor('backup-health-daily');
+
+// The CTO alert fleet: every five minutes, evaluate the same signals the
+// Management → Monitoring page shows (health components, disk, reconciliation
+// breaks, stuck orders, failed-job spikes, queue waits, sweeper pickups, FX
+// staleness, provider degradation and float) and push anything unhealthy to
+// Telegram. The alerter's throttle window keeps a standing problem from
+// re-sending on every run.
+Schedule::command('monitor:operations')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('monitor:operations-5m')
+    ->sentryMonitor('monitor-operations');
 
 // Financial integrity fleet (P0-4).
 //

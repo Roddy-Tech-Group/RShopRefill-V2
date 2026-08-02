@@ -484,13 +484,55 @@
                     Reports
                 </a>
 
-                @php $activeInsights = $isCurrent('admin.payment-insights*'); @endphp
-                <a href="{{ route('admin.payment-insights') }}" wire:navigate data-tip="Payment Insights" class="{{ $navItemClass($activeInsights) }}">
-                    <svg class="{{ $imgIconClass($activeInsights) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    Payment Insights
-                </a>
+                @endif
+
+                {{-- Management (expandable group — CTO-level control: monitoring,
+                     payments, finances, leaderboards, runbooks) --}}
+                @if ($can('admin.management.monitoring'))
+                @php
+                    $mgmtActive = $isCurrent('admin.management.*', 'admin.payment-insights*');
+                @endphp
+                <div
+                    x-data="{
+                        open: {{ $mgmtActive ? 'true' : 'false' }},
+                        active() { return ['/admin/management', '/admin/payment-insights'].some(p => window.location.pathname.includes(p)); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
+                    class="nav-group flex flex-col gap-1"
+                >
+                    <button
+                        type="button"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
+                        class="{{ $navItemClass($mgmtActive) }} w-full justify-between"
+                    >
+                        <span class="flex items-center gap-3">
+                            <svg class="{{ $iconClass($mgmtActive) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                            </svg>
+                            Management
+                        </span>
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $mgmtActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    @php
+                        $mgmtSubItemClass = fn (bool $active) => $active
+                            ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
+                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                    @endphp
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                        <a href="{{ route('admin.management.monitoring') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.monitoring')) }}">Monitoring</a>
+                        <a href="{{ route('admin.payment-insights') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.payment-insights*')) }}">Payment Insights</a>
+                        <a href="{{ route('admin.management.finances') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.finances')) }}">Finances</a>
+                        <a href="{{ route('admin.management.leaderboards') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.leaderboards')) }}">Leaderboards</a>
+                        <a href="{{ route('admin.management.runbooks') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.runbooks')) }}">Runbooks</a>
+                    </div>
+                </div>
                 @endif
 
                 {{-- Newsletter --}}

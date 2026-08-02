@@ -281,8 +281,11 @@ class DashboardMetricsQuery
      * to USD via the order's metadata exchange-rate snapshot. Orders without a
      * snapshot divide by 1 — for those legacy rows the stored amount is the
      * only honest figure available (mirrors Order::usdTotal()'s fallback).
+     *
+     * Public so FinanceReportQuery / LeaderboardQuery reuse the exact same
+     * conversion rule — two pages must never disagree about a USD figure.
      */
-    private function itemUsdSql(): string
+    public function itemUsdSql(): string
     {
         $rate = $this->jsonDecimalSql('orders.metadata', '$.exchange_rate');
 
@@ -294,7 +297,7 @@ class DashboardMetricsQuery
      * JSON_UNQUOTE + DECIMAL cast; SQLite (the test driver) unquotes inside
      * json_extract already and casts with NUMERIC.
      */
-    private function jsonDecimalSql(string $column, string $path): string
+    public function jsonDecimalSql(string $column, string $path): string
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             return "CAST(json_extract({$column}, '{$path}') AS NUMERIC)";
@@ -306,7 +309,7 @@ class DashboardMetricsQuery
     /**
      * Driver-aware text extraction from a JSON column.
      */
-    private function jsonTextSql(string $column, string $path): string
+    public function jsonTextSql(string $column, string $path): string
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             return "json_extract({$column}, '{$path}')";
@@ -319,7 +322,7 @@ class DashboardMetricsQuery
      * Driver-aware date bucketing. The format tokens used here (%Y, %m, %d)
      * mean the same thing to MySQL's DATE_FORMAT and SQLite's strftime.
      */
-    private function dateFormatSql(string $column, string $format): string
+    public function dateFormatSql(string $column, string $format): string
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             return "strftime('{$format}', {$column})";

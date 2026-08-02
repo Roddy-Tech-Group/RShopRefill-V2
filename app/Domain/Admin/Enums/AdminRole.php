@@ -52,8 +52,10 @@ enum AdminRole: string
 
         return match ($this) {
             self::SuperAdmin => $all,
-            // Everything except managing admins + integration keys.
-            self::Admin => array_values(array_diff($all, ['admins', 'api-settings'])),
+            // Everything except managing admins, integration keys and the
+            // CTO-level Management section (finances, monitoring, runbooks) —
+            // a Super Admin can still grant `management` per admin.
+            self::Admin => array_values(array_diff($all, ['admins', 'api-settings', 'management'])),
             self::Moderator => ['content', 'support-tickets', 'newsletter'],
         };
     }
