@@ -62,6 +62,15 @@ class RecoveryEligibilityService
             }
         }
 
+        // The classifier's verdict: a non-retryable failure (stolen card,
+        // expired card, suspected fraud) can never succeed on retry, so a
+        // "complete your payment" email is at best noise and at worst an
+        // engraved invitation to a fraudster. Null (pre-upgrade rows) passes
+        // through: absence of a verdict is not a verdict.
+        if ($outcome->retryable === false) {
+            return $this->skip(IneligibilityReason::NonRetryableFailure);
+        }
+
         // Guests get analytics but no recovery email — there is no account to
         // authenticate the recovery against.
         $user = $outcome->user_id ? User::find($outcome->user_id) : null;

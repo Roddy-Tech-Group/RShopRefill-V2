@@ -93,15 +93,21 @@ class ValidatePaymentPlatformCommand extends Command
      * @var array<string, array{0: string, 1: string}>
      */
     private const CLASSIFIER_MATRIX = [
-        'Insufficient funds' => ['customer', 'bank_declined'],
-        'Do not honor' => ['customer', 'bank_declined'],
+        // Issuer verdicts now grade to precise reason codes (the whole point
+        // of the diagnostics upgrade); generic "declined" stays the fallback.
+        'Insufficient funds' => ['customer', 'insufficient_funds'],
+        'Do not honor' => ['customer', 'do_not_honor'],
+        'Expired Card' => ['customer', 'expired_card'],
+        'Incorrect PIN' => ['customer', 'incorrect_pin'],
+        'Transaction not permitted to cardholder' => ['customer', 'card_restricted'],
+        'Fraudulent transaction suspected' => ['customer', 'suspected_fraud'],
         'Card declined by issuer' => ['customer', 'bank_declined'],
         'User closed modal' => ['customer', 'user_cancelled'],
         'User cancelled the payment' => ['customer', 'user_cancelled'],
         'Payment page abandoned' => ['customer', 'user_cancelled'],
         'Gateway timeout' => ['provider', 'provider_timeout'],
-        'Gateway unavailable' => ['provider', 'provider_timeout'],
-        'Provider error 502' => ['provider', 'provider_timeout'],
+        'Gateway unavailable' => ['provider', 'provider_error'],
+        'Provider error 502' => ['provider', 'provider_error'],
         'Ad blocker detected' => ['frontend', 'frontend_issue'],
         'JS exception during checkout' => ['frontend', 'frontend_issue'],
         'Popup blocked by browser' => ['frontend', 'frontend_issue'],
@@ -111,7 +117,9 @@ class ValidatePaymentPlatformCommand extends Command
         'Slow network during payment' => ['frontend', 'frontend_issue'],
         'Browser refresh mid-payment' => ['frontend', 'frontend_issue'],
         'Internal server error' => ['system', 'system_error'],
-        'orphaned_timeout' => ['system', 'system_error'],
+        // Sweeper verdict keeps its own code now instead of dissolving into
+        // the generic system bucket.
+        'orphaned_timeout' => ['system', 'orphaned_timeout'],
         'Completely novel failure text' => ['system', 'unknown_error'],
         // Enumerated client telemetry codes (payment-telemetry.js) keep
         // their own granular reason codes.
@@ -409,16 +417,22 @@ class ValidatePaymentPlatformCommand extends Command
             $this->ensure($session->fresh()->status === 'confirmed', 'session not confirmed');
         });
 
-        // Failed payment (bank decline).
-        $this->probe('Payment Outcomes', 'failed → classified customer/bank_declined + failure stage', function () {
+        // Failed payment (bank decline). The gateway verdict travels in the
+        // GatewayFailure block and must surface as the precise reason code
+        // plus the verbatim provider_code on the outcome row.
+        $this->probe('Payment Outcomes', 'failed → classified customer/insufficient_funds + provider code', function () {
             [, $session] = $this->makeCheckoutSession();
-            app(PaymentSessionService::class)->failSession($session, 'Insufficient funds - do not honor');
+            app(PaymentSessionService::class)->failSession($session, 'Transaction could not be completed', [
+                'failure' => ['provider_code' => 'Insufficient Funds', 'provider_message' => 'Insufficient Funds', 'http_status' => null],
+            ]);
 
             $outcome = $this->latestOutcome($session, 'failed');
             $this->ensure($outcome->failure_category->value === 'customer', "category {$outcome->failure_category->value}");
-            $this->ensure($outcome->failure_reason_code === 'bank_declined', "code {$outcome->failure_reason_code}");
+            $this->ensure($outcome->failure_reason_code === 'insufficient_funds', "code {$outcome->failure_reason_code}");
+            $this->ensure($outcome->provider_code === 'Insufficient Funds', 'gateway verdict not stored on outcome');
+            $this->ensure($outcome->retryable === true, 'insufficient funds must stay retryable');
             $this->ensure($outcome->failure_stage !== null, 'failure stage missing');
-            $this->ensure(($outcome->metadata['raw_reason'] ?? null) === 'Insufficient funds - do not honor', 'raw reason not preserved');
+            $this->ensure(($outcome->metadata['raw_reason'] ?? null) === 'Transaction could not be completed', 'raw reason not preserved');
         });
 
         // Cancelled payment (customer closed the modal).

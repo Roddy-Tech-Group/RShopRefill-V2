@@ -5,103 +5,292 @@ namespace App\Domain\PaymentInsights\Services;
 use App\Domain\PaymentInsights\Enums\FailureCategory;
 use App\Domain\PaymentInsights\Enums\FailureStage;
 
+/**
+ * Grades a payment failure into an actionable verdict.
+ *
+ * Priority order mirrors trustworthiness of the evidence:
+ *   1. The gateway's own verdict (GatewayFailure block: provider_code /
+ *      provider_message) matched against known decline codes.
+ *   2. Enumerated client telemetry codes from the browser tracker.
+ *   3. Keyword heuristics over whatever prose reason we were handed.
+ *   4. HTTP-status heuristics when only a transport failure is known.
+ *   5. `unknown_error`, which after this pipeline means genuinely unknown.
+ *
+ * Every verdict carries `retryable`: whether asking this customer to try
+ * again could ever work. Insufficient funds: yes, payday exists. Stolen
+ * card: no, and the recovery mailer must never invite them back.
+ */
 class FailureReasonClassifier
 {
     /**
-     * Enumerated codes emitted by the browser telemetry module
-     * (resources/js/payment-telemetry.js). Exact matches — checked before
-     * the prose keyword fallback so each keeps its own reason code instead
-     * of collapsing into a generic bucket.
+     * Browser telemetry codes (resources/js/payment-telemetry.js). Exact
+     * matches, checked before prose heuristics so each keeps its own code.
      *
-     * @var array<string, array{0: FailureCategory, 1: string}>
+     * @var array<string, array{0: FailureCategory, 1: string, 2: bool}>
      */
     private const CLIENT_CODES = [
-        'popup_closed' => [FailureCategory::Customer, 'user_cancelled'],
-        'page_abandoned' => [FailureCategory::Customer, 'user_cancelled'],
-        'popup_blocked' => [FailureCategory::Frontend, 'popup_blocked'],
-        'sdk_load_failed' => [FailureCategory::Frontend, 'sdk_load_failed'],
-        'ad_blocker' => [FailureCategory::Frontend, 'ad_blocker'],
-        'js_exception' => [FailureCategory::Frontend, 'js_exception'],
-        'network_offline' => [FailureCategory::Frontend, 'network_offline'],
-        'network_timeout' => [FailureCategory::Frontend, 'network_timeout'],
-        'slow_network' => [FailureCategory::Frontend, 'slow_network'],
+        'popup_closed' => [FailureCategory::Customer, 'user_cancelled', true],
+        'page_abandoned' => [FailureCategory::Customer, 'user_cancelled', true],
+        'popup_blocked' => [FailureCategory::Frontend, 'popup_blocked', true],
+        'sdk_load_failed' => [FailureCategory::Frontend, 'sdk_load_failed', true],
+        'ad_blocker' => [FailureCategory::Frontend, 'ad_blocker', true],
+        'js_exception' => [FailureCategory::Frontend, 'js_exception', true],
+        'network_offline' => [FailureCategory::Frontend, 'network_offline', true],
+        'network_timeout' => [FailureCategory::Frontend, 'network_timeout', true],
+        'slow_network' => [FailureCategory::Frontend, 'slow_network', true],
     ];
 
     /**
-     * Classifies a failure reason into a Category and Stage.
-     * Returns an array with ['category' => FailureCategory, 'stage' => FailureStage, 'code' => string]
+     * Internal platform verdicts (GatewayFailure::internal + sweeper codes).
+     * Exact matches on the code.
+     *
+     * @var array<string, array{0: FailureCategory, 1: string, 2: bool}>
      */
-    public function classify(string $provider, string $rawReason, string $sessionStatus): array
+    private const INTERNAL_CODES = [
+        'orphaned_timeout' => [FailureCategory::System, 'orphaned_timeout', true],
+        'session_expired' => [FailureCategory::Customer, 'session_expired', true],
+        'invalid_otp' => [FailureCategory::Customer, 'authentication_failed', true],
+        'no_outstanding_balance' => [FailureCategory::System, 'no_outstanding_balance', false],
+        'missing_purchase_id' => [FailureCategory::System, 'missing_purchase_id', false],
+        'missing_virtual_account' => [FailureCategory::Provider, 'provider_error', true],
+        'missing_checkout_link' => [FailureCategory::Provider, 'provider_error', true],
+    ];
+
+    /**
+     * NOWPayments statuses / API error codes. Exact matches.
+     *
+     * @var array<string, array{0: FailureCategory, 1: string, 2: bool}>
+     */
+    private const NOWPAYMENTS_CODES = [
+        'expired' => [FailureCategory::Customer, 'crypto_quote_expired', true],
+        'partially_paid' => [FailureCategory::Customer, 'crypto_underpaid', true],
+        'refunded' => [FailureCategory::Provider, 'refunded_by_gateway', false],
+        'amount_minimal_error' => [FailureCategory::Customer, 'below_minimum_amount', true],
+        'invalid_api_key' => [FailureCategory::System, 'gateway_config_error', false],
+        'bad_create_payment_request' => [FailureCategory::System, 'gateway_config_error', false],
+    ];
+
+    /**
+     * Prose patterns over the gateway verdict or raw reason, most specific
+     * first. Substring matches on the normalised text. Order matters: an
+     * "expired card" must never fall into crypto "expired", and specific
+     * decline reasons must win over the generic "declined".
+     *
+     * @var array<int, array{0: string, 1: FailureCategory, 2: string, 3: bool}>
+     */
+    private const PROSE_PATTERNS = [
+        // Issuer verdicts (Flutterwave processor_response / ISO 8583 prose)
+        ['insufficient fund', FailureCategory::Customer, 'insufficient_funds', true],
+        ['not sufficient fund', FailureCategory::Customer, 'insufficient_funds', true],
+        ['do not honor', FailureCategory::Customer, 'do_not_honor', true],
+        ['do not honour', FailureCategory::Customer, 'do_not_honor', true],
+        ['expired card', FailureCategory::Customer, 'expired_card', false],
+        ['card expired', FailureCategory::Customer, 'expired_card', false],
+        ['incorrect pin', FailureCategory::Customer, 'incorrect_pin', true],
+        ['invalid pin', FailureCategory::Customer, 'incorrect_pin', true],
+        ['pin tries exceeded', FailureCategory::Customer, 'incorrect_pin', false],
+        ['invalid otp', FailureCategory::Customer, 'authentication_failed', true],
+        ['incorrect otp', FailureCategory::Customer, 'authentication_failed', true],
+        ['otp validation failed', FailureCategory::Customer, 'authentication_failed', true],
+        ['3d secure', FailureCategory::Customer, 'authentication_failed', true],
+        ['authentication failed', FailureCategory::Customer, 'authentication_failed', true],
+        ['invalid card', FailureCategory::Customer, 'invalid_card_details', true],
+        ['incorrect card', FailureCategory::Customer, 'invalid_card_details', true],
+        ['invalid cvv', FailureCategory::Customer, 'invalid_card_details', true],
+        ['card number', FailureCategory::Customer, 'invalid_card_details', true],
+        ['lost card', FailureCategory::Customer, 'card_reported_lost', false],
+        ['stolen card', FailureCategory::Customer, 'card_reported_lost', false],
+        ['pick up card', FailureCategory::Customer, 'card_reported_lost', false],
+        ['fraud', FailureCategory::Customer, 'suspected_fraud', false],
+        ['restricted card', FailureCategory::Customer, 'card_restricted', false],
+        ['not permitted', FailureCategory::Customer, 'card_restricted', false],
+        ['exceeds withdrawal', FailureCategory::Customer, 'limit_exceeded', true],
+        ['limit exceeded', FailureCategory::Customer, 'limit_exceeded', true],
+        ['transaction limit', FailureCategory::Customer, 'limit_exceeded', true],
+        ['address verification', FailureCategory::Customer, 'avs_failed', true],
+
+        // Crypto prose (NOWPayments messages)
+        ['minimal amount', FailureCategory::Customer, 'below_minimum_amount', true],
+        ['less than the minimal', FailureCategory::Customer, 'below_minimum_amount', true],
+
+        // Customer behaviour
+        ['insufficient balance', FailureCategory::Customer, 'insufficient_funds', true],
+        ['closed modal', FailureCategory::Customer, 'user_cancelled', true],
+        ['user cancelled', FailureCategory::Customer, 'user_cancelled', true],
+        ['changed mind', FailureCategory::Customer, 'user_cancelled', true],
+        ['abandoned', FailureCategory::Customer, 'user_cancelled', true],
+
+        // Internal system markers ('orphaned_timeout' is a sweeper verdict,
+        // not a gateway timeout — must outrank the provider bucket below)
+        ['orphaned_timeout', FailureCategory::System, 'orphaned_timeout', true],
+        ['internal server error', FailureCategory::System, 'system_error', true],
+        ['system', FailureCategory::System, 'system_error', true],
+
+        // Gateway / transport
+        ['timed out', FailureCategory::Provider, 'provider_timeout', true],
+        ['timeout', FailureCategory::Provider, 'provider_timeout', true],
+        ['could not resolve', FailureCategory::Provider, 'provider_unreachable', true],
+        ['connection refused', FailureCategory::Provider, 'provider_unreachable', true],
+        ['gateway unavailable', FailureCategory::Provider, 'provider_error', true],
+        ['provider error', FailureCategory::Provider, 'provider_error', true],
+        ['currency not supported', FailureCategory::System, 'gateway_config_error', false],
+        ['invalid api key', FailureCategory::System, 'gateway_config_error', false],
+        ['authorization required', FailureCategory::System, 'gateway_config_error', false],
+
+        // Generic decline LAST among card verdicts: only when nothing more
+        // specific matched does "declined" become the verdict itself.
+        ['declined', FailureCategory::Customer, 'bank_declined', true],
+    ];
+
+    /**
+     * Frontend environment prose, kept from the original vocabulary.
+     *
+     * @var array<int, string>
+     */
+    private const FRONTEND_MARKERS = ['ad blocker', 'js exception', 'javascript', 'popup', 'network issue', 'sdk', 'offline', 'browser refresh', 'slow network'];
+
+    /**
+     * Human labels for every reason code the taxonomy can emit, kept beside
+     * the taxonomy so a new code cannot ship without its display name.
+     *
+     * @var array<string, string>
+     */
+    public const LABELS = [
+        'insufficient_funds' => 'Insufficient funds',
+        'do_not_honor' => 'Bank declined (no reason given)',
+        'bank_declined' => 'Bank declined',
+        'expired_card' => 'Expired card',
+        'incorrect_pin' => 'Incorrect PIN',
+        'authentication_failed' => 'OTP / 3DS authentication failed',
+        'invalid_card_details' => 'Invalid card details',
+        'card_reported_lost' => 'Card reported lost or stolen',
+        'suspected_fraud' => 'Flagged as suspected fraud',
+        'card_restricted' => 'Card restricted for this purchase',
+        'limit_exceeded' => 'Card limit exceeded',
+        'avs_failed' => 'Address verification failed',
+        'user_cancelled' => 'Customer cancelled',
+        'session_expired' => 'Session expired (abandoned)',
+        'crypto_quote_expired' => 'Crypto quote expired unpaid',
+        'crypto_underpaid' => 'Crypto payment underpaid',
+        'below_minimum_amount' => 'Below gateway minimum amount',
+        'refunded_by_gateway' => 'Refunded by gateway',
+        'provider_timeout' => 'Gateway timed out',
+        'provider_unreachable' => 'Gateway unreachable',
+        'provider_error' => 'Gateway error',
+        'provider_rate_limited' => 'Gateway rate-limited us',
+        'gateway_config_error' => 'Gateway configuration error (ours)',
+        'orphaned_timeout' => 'Stuck session swept (webhook loss?)',
+        'system_error' => 'Platform error',
+        'no_outstanding_balance' => 'No outstanding balance',
+        'missing_purchase_id' => 'Top-up missing purchase link',
+        'frontend_issue' => 'Browser / device issue',
+        'popup_blocked' => 'Payment popup blocked',
+        'sdk_load_failed' => 'Payment SDK failed to load',
+        'ad_blocker' => 'Ad blocker interference',
+        'js_exception' => 'Browser script error',
+        'network_offline' => 'Customer went offline',
+        'network_timeout' => 'Customer network timed out',
+        'slow_network' => 'Customer network too slow',
+        'unknown_error' => 'Unknown (no diagnostic captured)',
+    ];
+
+    public static function label(string $code): string
     {
-        $normalized = strtolower(trim($rawReason));
+        return self::LABELS[$code] ?? str_replace('_', ' ', ucfirst($code));
+    }
+
+    /**
+     * Classify a failure into category, stage, reason code and retryability.
+     *
+     * @param  array{provider_code?: ?string, provider_message?: ?string, http_status?: ?int}|null  $failure  GatewayFailure block when one was captured
+     * @return array{category: FailureCategory, stage: FailureStage, code: string, retryable: bool, provider_code: ?string}
+     */
+    public function classify(string $provider, string $rawReason, string $sessionStatus, ?array $failure = null): array
+    {
         $stage = $this->inferStage($sessionStatus);
+        $providerCode = $this->normalise($failure['provider_code'] ?? null);
+        $providerMessage = $this->normalise($failure['provider_message'] ?? null);
+        $reason = $this->normalise($rawReason) ?? '';
 
-        // Enumerated client telemetry codes carry their own classification.
-        if (isset(self::CLIENT_CODES[$normalized])) {
-            [$category, $code] = self::CLIENT_CODES[$normalized];
+        // 1 · Exact code tables, most trustworthy evidence first.
+        foreach ([$providerCode, $reason] as $candidate) {
+            if ($candidate === null || $candidate === '') {
+                continue;
+            }
 
-            return [
-                'category' => $category,
-                'stage' => $stage,
-                'code' => $code,
-            ];
-        }
+            $tables = self::INTERNAL_CODES + self::CLIENT_CODES
+                + ($provider === 'nowpayments' ? self::NOWPAYMENTS_CODES : []);
 
-        // Categorize based on keywords and patterns
-        if (str_contains($normalized, 'insufficient funds') || str_contains($normalized, 'do not honor') || str_contains($normalized, 'declined')) {
-            return [
-                'category' => FailureCategory::Customer,
-                'stage' => $stage,
-                'code' => 'bank_declined',
-            ];
-        }
+            if (isset($tables[$candidate])) {
+                [$category, $code, $retryable] = $tables[$candidate];
 
-        if (str_contains($normalized, 'closed modal') || str_contains($normalized, 'user cancelled') || str_contains($normalized, 'changed mind') || str_contains($normalized, 'abandoned')) {
-            return [
-                'category' => FailureCategory::Customer,
-                'stage' => $stage,
-                'code' => 'user_cancelled',
-            ];
-        }
-
-        // System markers outrank the provider bucket: 'orphaned_timeout' is an
-        // internal sweeper verdict, not a gateway timeout.
-        if (str_contains($normalized, 'orphaned_timeout') || str_contains($normalized, 'internal server error') || str_contains($normalized, 'system')) {
-            return [
-                'category' => FailureCategory::System,
-                'stage' => $stage,
-                'code' => 'system_error',
-            ];
-        }
-
-        if (str_contains($normalized, 'timeout') || str_contains($normalized, 'gateway unavailable') || str_contains($normalized, 'provider error')) {
-            return [
-                'category' => FailureCategory::Provider,
-                'stage' => $stage,
-                'code' => 'provider_timeout',
-            ];
-        }
-
-        // Frontend telemetry vocabulary: everything the browser tracker can
-        // report about its own environment (blocked/failed popups, SDK load
-        // failures, JS exceptions, connectivity loss).
-        $frontendMarkers = ['ad blocker', 'js exception', 'javascript', 'popup', 'network issue', 'sdk', 'offline', 'browser refresh', 'slow network'];
-        foreach ($frontendMarkers as $marker) {
-            if (str_contains($normalized, $marker)) {
-                return [
-                    'category' => FailureCategory::Frontend,
-                    'stage' => $stage,
-                    'code' => 'frontend_issue',
-                ];
+                return $this->verdict($category, $stage, $code, $retryable, $failure);
             }
         }
 
-        // Default fallback
+        // 2 · Prose patterns over the best text available: the gateway's own
+        // words first, then whatever reason we were handed.
+        foreach ([$providerCode, $providerMessage, $reason] as $text) {
+            if ($text === null || $text === '') {
+                continue;
+            }
+
+            foreach (self::PROSE_PATTERNS as [$needle, $category, $code, $retryable]) {
+                if (str_contains($text, $needle)) {
+                    return $this->verdict($category, $stage, $code, $retryable, $failure);
+                }
+            }
+        }
+
+        // 3 · Frontend environment vocabulary (original behaviour preserved).
+        foreach (self::FRONTEND_MARKERS as $marker) {
+            if (str_contains($reason, $marker)) {
+                return $this->verdict(FailureCategory::Frontend, $stage, 'frontend_issue', true, $failure);
+            }
+        }
+
+        // 4 · Transport-level heuristics when all we know is the HTTP status.
+        $httpStatus = $failure['http_status'] ?? null;
+        if (is_int($httpStatus)) {
+            if ($httpStatus === 429) {
+                return $this->verdict(FailureCategory::Provider, $stage, 'provider_rate_limited', true, $failure);
+            }
+            if ($httpStatus >= 500) {
+                return $this->verdict(FailureCategory::Provider, $stage, 'provider_error', true, $failure);
+            }
+            if (in_array($httpStatus, [401, 403], true)) {
+                return $this->verdict(FailureCategory::System, $stage, 'gateway_config_error', false, $failure);
+            }
+        }
+
+        // 5 · Genuinely unknown — after the pipeline above, this bucket is
+        // finally allowed to mean what it says.
+        return $this->verdict(FailureCategory::System, $stage, 'unknown_error', true, $failure);
+    }
+
+    /**
+     * @return array{category: FailureCategory, stage: FailureStage, code: string, retryable: bool, provider_code: ?string}
+     */
+    private function verdict(FailureCategory $category, FailureStage $stage, string $code, bool $retryable, ?array $failure): array
+    {
         return [
-            'category' => FailureCategory::System,
+            'category' => $category,
             'stage' => $stage,
-            'code' => 'unknown_error',
+            'code' => $code,
+            'retryable' => $retryable,
+            'provider_code' => $failure['provider_code'] ?? null,
         ];
+    }
+
+    private function normalise(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = strtolower(trim($value));
+
+        return $value === '' ? null : preg_replace('/\s+/', ' ', $value);
     }
 
     private function inferStage(string $sessionStatus): FailureStage

@@ -4,6 +4,7 @@ namespace App\Domain\Payment\Providers;
 
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
+use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\Payment\Support\MockMode;
 use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
@@ -145,6 +146,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                     'status' => 'failed',
                     // Customer-facing — strip the gateway brand (per [[feedback-no-provider-names]]).
                     'message' => 'Card charge request failed: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -173,6 +175,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => 'Error processing card charge: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -252,9 +255,12 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             ];
         }
 
+        // This is the path real card declines take: HTTP 200, but
+        // data.processor_response carries the issuer's verdict.
         return [
             'status' => 'failed',
             'message' => $message ?: 'Card charge could not be processed',
+            'failure' => GatewayFailure::fromFlutterwave($data),
         ];
     }
 
@@ -277,6 +283,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => 'Invalid OTP',
+                'failure' => GatewayFailure::internal('invalid_otp', 'Mock OTP rejected'),
             ];
         }
 
@@ -292,6 +299,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'OTP validation failed: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -314,11 +322,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => $data['message'] ?? 'OTP validation failed',
+                'failure' => GatewayFailure::fromFlutterwave($data),
             ];
         } catch (\Exception $e) {
             return [
                 'status' => 'failed',
                 'message' => 'OTP verification failed: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -354,6 +364,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize bank transfer: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -363,6 +374,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize bank transfer: '.($data['message'] ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($data),
                 ];
             }
 
@@ -372,6 +384,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to generate bank transfer virtual account. Please try again or contact support.',
+                    'failure' => GatewayFailure::internal('missing_virtual_account', 'Gateway returned success without a transfer account'),
                 ];
             }
 
@@ -391,6 +404,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => 'Failed to initialize bank transfer: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -420,6 +434,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize mobile money: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -436,11 +451,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => $data['message'] ?? 'Mobile money charge could not be initiated.',
+                'failure' => GatewayFailure::fromFlutterwave($data),
             ];
         } catch (\Exception $e) {
             return [
                 'status' => 'failed',
                 'message' => 'Failed to initialize mobile money: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -508,6 +525,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize Apple Pay: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -543,11 +561,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => $data['message'] ?? 'Apple Pay payment could not be completed.',
+                'failure' => GatewayFailure::fromFlutterwave($data),
             ];
         } catch (\Exception $e) {
             return [
                 'status' => 'failed',
                 'message' => 'Failed to charge Apple Pay: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -555,6 +575,21 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
     private function simulateMockCardCharge(PaymentAttempt $attempt, array $cardDetails, ?array $auth): array
     {
         $cardNumber = str_replace(' ', '', $cardDetails['card_number']);
+
+        // Magic declining card: exercises the full failure-diagnostics
+        // pipeline (GatewayFailure block → outcome row → insights drill-down)
+        // without a real gateway. Mirrors a genuine issuer decline shape.
+        if ($cardNumber === '4444444444444444') {
+            return [
+                'status' => 'failed',
+                'message' => 'Card charge could not be processed',
+                'failure' => GatewayFailure::fromFlutterwave([
+                    'status' => 'success',
+                    'message' => 'Charge attempted',
+                    'data' => ['status' => 'failed', 'processor_response' => 'Insufficient Funds'],
+                ]),
+            ];
+        }
 
         if ($cardNumber === '5555555555555555' && (! $auth || ! isset($auth['pin']))) {
             return [
@@ -663,6 +698,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialise payment: '.($response->json('message') ?? 'Unknown error'),
+                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
                 ];
             }
 
@@ -679,6 +715,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 return [
                     'status' => 'failed',
                     'message' => 'Payment provider returned no checkout link.',
+                    'failure' => GatewayFailure::internal('missing_checkout_link', 'Gateway returned success without a hosted checkout link'),
                 ];
             }
 
@@ -700,6 +737,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => 'Failed to initialise payment: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }

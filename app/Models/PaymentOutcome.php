@@ -18,6 +18,7 @@ class PaymentOutcome extends Model
         'outcome' => OutcomeType::class,
         'failure_stage' => FailureStage::class,
         'failure_category' => FailureCategory::class,
+        'retryable' => 'boolean',
         'metadata' => 'array',
     ];
 

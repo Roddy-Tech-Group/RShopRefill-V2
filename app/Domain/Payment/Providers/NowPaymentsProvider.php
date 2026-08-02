@@ -4,6 +4,7 @@ namespace App\Domain\Payment\Providers;
 
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
+use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\Payment\Support\MockMode;
 use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Domain\Wallet\Services\CurrencyRateService;
@@ -160,11 +161,13 @@ class NowPaymentsProvider implements PaymentProviderInterface
                     'body' => $response->json(),
                 ]);
 
-                // Gateway text is logged, never surfaced — it leaks internals and
-                // reads as gibberish to a customer.
+                // Gateway text is logged and carried in the failure block for
+                // telemetry, never surfaced to the customer — it leaks internals
+                // and reads as gibberish.
                 return [
                     'status' => 'failed',
                     'message' => 'We could not start this crypto payment. Please try another coin or payment method.',
+                    'failure' => GatewayFailure::fromNowPayments($response->json(), $response->status()),
                 ];
             }
 
@@ -178,6 +181,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
             return [
                 'status' => 'failed',
                 'message' => 'We could not start this crypto payment. Please try again.',
+                'failure' => GatewayFailure::fromException($e),
             ];
         }
     }
@@ -666,7 +670,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
         $actuallyPaid = (float) $attempt->actually_paid;
 
         if ($payAmount <= 0 || $actuallyPaid >= $payAmount) {
-            return ['status' => 'failed', 'message' => 'This payment has no outstanding balance.'];
+            return ['status' => 'failed', 'message' => 'This payment has no outstanding balance.', 'failure' => GatewayFailure::internal('no_outstanding_balance')];
         }
 
         if (! $attempt->purchase_id) {
@@ -677,7 +681,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
                 'attempt_id' => $attempt->id,
             ]);
 
-            return ['status' => 'failed', 'message' => 'This payment cannot be topped up automatically. Please contact support.'];
+            return ['status' => 'failed', 'message' => 'This payment cannot be topped up automatically. Please contact support.', 'failure' => GatewayFailure::internal('missing_purchase_id', 'Top-up requested without a purchase_id to bind it to')];
         }
 
         $shortfallRatio = ($payAmount - $actuallyPaid) / $payAmount;
@@ -691,7 +695,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
         $topUpPrice = round($originalPrice * $shortfallRatio, 2);
 
         if ($topUpPrice <= 0) {
-            return ['status' => 'failed', 'message' => 'This payment has no outstanding balance.'];
+            return ['status' => 'failed', 'message' => 'This payment has no outstanding balance.', 'failure' => GatewayFailure::internal('no_outstanding_balance')];
         }
 
         try {
@@ -716,7 +720,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
                     'body' => $response->json(),
                 ]);
 
-                return ['status' => 'failed', 'message' => 'We could not create a top-up payment. Please contact support.'];
+                return ['status' => 'failed', 'message' => 'We could not create a top-up payment. Please contact support.', 'failure' => GatewayFailure::fromNowPayments($response->json(), $response->status())];
             }
 
             // The top-up replaces the attempt's live quote: gateway_reference moves to
@@ -729,7 +733,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return ['status' => 'failed', 'message' => 'We could not create a top-up payment. Please try again.'];
+            return ['status' => 'failed', 'message' => 'We could not create a top-up payment. Please try again.', 'failure' => GatewayFailure::fromException($e)];
         }
     }
 

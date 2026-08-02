@@ -24,6 +24,7 @@ class PaymentInsightsMetrics
      *     successRate: float, failureRate: float, abandonRate: float,
      *     buckets: array<string, int>,
      *     topReasons: Collection,
+     *     recentFailures: Collection,
      *     providers: Collection,
      * }
      */
@@ -45,12 +46,46 @@ class PaymentInsightsMetrics
             ->pluck('count', 'failure_category')
             ->toArray();
 
-        $topReasons = (clone $query)->whereIn('outcome', ['failed', 'expired', 'cancelled'])
-            ->select('failure_reason_code', DB::raw('count(*) as count'))
+        $unsuccessful = (clone $query)->whereIn('outcome', ['failed', 'expired', 'cancelled']);
+        $unsuccessfulCount = (clone $unsuccessful)->count();
+
+        $topReasons = (clone $unsuccessful)
+            ->select(
+                'failure_reason_code',
+                DB::raw('count(*) as count'),
+                DB::raw('sum(case when retryable = 1 then 1 else 0 end) as retryable_count'),
+            )
             ->groupBy('failure_reason_code')
             ->orderByDesc('count')
-            ->limit(5)
-            ->get();
+            ->limit(8)
+            ->get()
+            ->map(function ($row) use ($unsuccessfulCount) {
+                $row->label = FailureReasonClassifier::label((string) $row->failure_reason_code);
+                $row->share = $unsuccessfulCount > 0 ? round(($row->count / $unsuccessfulCount) * 100, 1) : 0.0;
+                $row->retryable = $row->count > 0 && (int) $row->retryable_count >= $row->count;
+
+                return $row;
+            });
+
+        // Drill-down: the latest failures with the gateway's verbatim verdict,
+        // for support cases ("why did my payment fail?") answered from one
+        // screen instead of log spelunking. Admin eyes only.
+        $recentFailures = (clone $query)->where('outcome', 'failed')
+            ->orderByDesc('created_at')
+            ->limit(15)
+            ->get()
+            ->map(fn (PaymentOutcome $outcome) => [
+                'at' => $outcome->created_at?->toDateTimeString(),
+                'provider' => $outcome->provider,
+                'payment_method' => $outcome->payment_method,
+                'code' => $outcome->failure_reason_code,
+                'label' => FailureReasonClassifier::label((string) $outcome->failure_reason_code),
+                'provider_code' => $outcome->provider_code,
+                'provider_message' => $outcome->metadata['failure_details']['provider_message'] ?? null,
+                'raw_reason' => $outcome->metadata['raw_reason'] ?? null,
+                'retryable' => $outcome->retryable,
+                'user_id' => $outcome->user_id,
+            ]);
 
         // Per-provider success rate: confirmed / all outcomes for the provider.
         $providers = (clone $query)->whereNotNull('provider')
@@ -83,6 +118,7 @@ class PaymentInsightsMetrics
                 'Frontend' => $bucketCounts[FailureCategory::Frontend->value] ?? 0,
             ],
             'topReasons' => $topReasons,
+            'recentFailures' => $recentFailures,
             'providers' => $providers,
         ];
     }

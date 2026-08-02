@@ -102,29 +102,85 @@ class extends Component {
 
         <!-- Top Failure Reasons -->
         <div class="rounded-[16px] bg-white p-6 shadow-sm border border-zinc-100">
-            <h2 class="text-lg font-bold text-zinc-900 mb-4">Top Failure Reasons</h2>
+            <h2 class="text-lg font-bold text-zinc-900 mb-1">Top Failure Reasons</h2>
+            <p class="text-xs text-zinc-500 mb-4">The gateway's actual verdicts, graded. "Retryable" means asking the customer to try again could work; those are recovery-email candidates.</p>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-zinc-200">
                     <thead>
                         <tr>
                             <th class="py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Reason</th>
+                            <th class="py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Share</th>
                             <th class="py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Count</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
                         @forelse($topReasons as $reason)
                             <tr>
-                                <td class="py-3 text-sm text-zinc-900">{{ $reason->failure_reason_code ?: 'Unknown' }}</td>
+                                <td class="py-3 pr-3 text-sm text-zinc-900">
+                                    <span class="font-medium">{{ $reason->label }}</span>
+                                    @if ($reason->retryable)
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">retryable</span>
+                                    @endif
+                                    <span class="mt-0.5 block text-[11px] text-zinc-400">{{ $reason->failure_reason_code ?: 'unknown' }}</span>
+                                </td>
+                                <td class="py-3 text-sm text-zinc-500 text-right whitespace-nowrap">
+                                    {{ $reason->share }}%
+                                    <div class="mt-1 ml-auto h-1.5 w-16 overflow-hidden rounded-full bg-zinc-100">
+                                        <div class="h-1.5 rounded-full bg-zinc-400" style="width: {{ min(100, $reason->share) }}%"></div>
+                                    </div>
+                                </td>
                                 <td class="py-3 text-sm text-zinc-500 text-right">{{ number_format($reason->count) }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="2" class="py-8 text-center text-sm text-zinc-500">No failures recorded in this timeframe.</td>
+                                <td colspan="3" class="py-8 text-center text-sm text-zinc-500">No failures recorded in this timeframe.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Recent failures: per-payment drill-down with the gateway's verbatim verdict -->
+    <div class="rounded-[16px] bg-white p-6 shadow-sm border border-zinc-100">
+        <h2 class="text-lg font-bold text-zinc-900 mb-1">Recent Failures</h2>
+        <p class="text-xs text-zinc-500 mb-4">Latest failed payments with the gateway's own words; the first place to look when a customer asks "why did my payment fail?". Never shown to customers.</p>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+                <thead>
+                    <tr>
+                        <th class="py-3 pr-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">When</th>
+                        <th class="py-3 pr-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Provider · Method</th>
+                        <th class="py-3 pr-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Verdict</th>
+                        <th class="py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Gateway said</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                    @forelse($recentFailures as $failure)
+                        <tr>
+                            <td class="py-3 pr-3 text-sm text-zinc-500 whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($failure['at'])->diffForHumans(short: true) }}</td>
+                            <td class="py-3 pr-3 text-sm text-zinc-700 whitespace-nowrap">{{ $failure['provider'] ?: 'unknown' }}{{ $failure['payment_method'] ? ' · '.$failure['payment_method'] : '' }}</td>
+                            <td class="py-3 pr-3 text-sm whitespace-nowrap">
+                                <span class="font-medium text-zinc-900">{{ $failure['label'] }}</span>
+                                @if ($failure['retryable'])
+                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">retryable</span>
+                                @endif
+                            </td>
+                            <td class="py-3 text-sm text-zinc-500">
+                                {{ $failure['provider_message'] ?? $failure['raw_reason'] ?? 'No diagnostic captured' }}
+                                @if ($failure['provider_code'] && $failure['provider_code'] !== $failure['provider_message'])
+                                    <span class="block text-[11px] text-zinc-400">code: {{ $failure['provider_code'] }}</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="py-8 text-center text-sm text-zinc-500">No failed payments in this timeframe.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 

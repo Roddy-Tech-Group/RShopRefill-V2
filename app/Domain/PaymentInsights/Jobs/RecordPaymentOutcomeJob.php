@@ -57,10 +57,25 @@ class RecordPaymentOutcomeJob implements ShouldQueue
         $attempt = $session->paymentAttempt;
         $productLine = $attempt?->order_id ? ProductLine::Checkout : ProductLine::WalletFunding;
 
-        // Extract reason from metadata if not explicitly passed
-        $reasonText = $this->reason ?? ($session->metadata['failure_reason'] ?? 'unknown');
+        // The diagnostic evidence, best first: the structured gateway verdict
+        // captured at failure time, then whatever reason text reached us.
+        // Expired and cancelled sessions get honest default codes instead of
+        // dissolving into the unknown bucket.
+        $failureDetails = $session->metadata['failure_details'] ?? null;
+        $reasonText = $this->reason
+            ?? ($session->metadata['failure_reason'] ?? null)
+            ?? match ($this->outcomeType) {
+                OutcomeType::Expired => 'session_expired',
+                OutcomeType::Cancelled => 'user cancelled',
+                default => 'unknown',
+            };
 
-        $classification = $classifier->classify($session->provider ?? 'unknown', $reasonText, $session->status);
+        $classification = $classifier->classify(
+            $session->provider ?? 'unknown',
+            $reasonText,
+            $session->status,
+            is_array($failureDetails) ? $failureDetails : null,
+        );
 
         // Compute consecutive failures for this user on this product line
         $consecutiveFailures = 1;
@@ -99,6 +114,8 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 'failure_stage' => $classification['stage']->value,
                 'failure_category' => $classification['category']->value,
                 'failure_reason_code' => $classification['code'],
+                'provider_code' => $classification['provider_code'],
+                'retryable' => $classification['retryable'],
                 'consecutive_failure_count' => $consecutiveFailures,
                 'session_duration_seconds' => $duration,
                 'device_uuid' => $session->device_uuid,
@@ -106,6 +123,7 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 'correlation_id' => $session->correlation_id,
                 'metadata' => [
                     'raw_reason' => $reasonText,
+                    'failure_details' => $failureDetails,
                     'provider_payload' => $session->metadata['failure_payload'] ?? null,
                 ],
             ]

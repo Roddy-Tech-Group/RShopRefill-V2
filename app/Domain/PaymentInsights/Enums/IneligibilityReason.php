@@ -12,4 +12,5 @@ enum IneligibilityReason: string
     case MaxAttemptsReached = 'max_attempts_reached';
     case NotApplicable = 'not_applicable';
     case InternalWalletPayment = 'internal_wallet_payment';
+    case NonRetryableFailure = 'non_retryable_failure';
 }

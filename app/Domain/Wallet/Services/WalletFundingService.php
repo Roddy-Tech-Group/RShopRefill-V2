@@ -5,6 +5,7 @@ namespace App\Domain\Wallet\Services;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -217,6 +218,14 @@ class WalletFundingService
      */
     public function failFunding(WalletFunding $funding, string $reason, array $payload = []): void
     {
+        // Callers on the webhook path hand us the raw Flutterwave payload;
+        // derive the structured failure block from it when none was supplied,
+        // so the outcome classifier sees the gateway's verdict (e.g. the
+        // issuer's processor_response) instead of our summary sentence.
+        if (! isset($payload['failure']) && $payload !== []) {
+            $payload['failure'] = GatewayFailure::fromFlutterwave($payload);
+        }
+
         DB::transaction(function () use ($funding, $reason, $payload) {
             $funding->update([
                 'status' => FundingStatus::Failed,

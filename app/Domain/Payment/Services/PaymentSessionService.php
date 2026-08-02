@@ -239,9 +239,14 @@ class PaymentSessionService
             $session->transitionTo('failed');
 
             // Full audit trail goes to metadata — never exposed to the client.
+            // `failure_details` is the structured gateway verdict (GatewayFailure
+            // block): provider_code + verbatim provider_message. It is what the
+            // outcome classifier reads, so telemetry grades the gateway's truth
+            // rather than the polite customer copy in $reason.
             $session->metadata = array_merge($session->metadata ?? [], [
                 'failure_reason' => $reason,
                 'failure_payload' => $payload,
+                'failure_details' => $payload['failure'] ?? null,
             ]);
 
             // Customer-facing reason ALSO goes on payment_payload — that's the
