@@ -177,7 +177,11 @@
                 [
                     'illo'     => 'shield',
                     'title'    => 'Verified customer reviews',
-                    'subtitle' => 'Real feedback from buyers on Trustpilot and Google',
+                    // Describes what /reviews actually shows. The page renders
+                    // only the reviews our own form collected, so promising
+                    // Trustpilot and Google feedback there would be a claim the
+                    // destination cannot keep.
+                    'subtitle' => 'Real feedback from customers who bought here',
                     'href'     => route('shop.reviews'),
                 ],
                 [

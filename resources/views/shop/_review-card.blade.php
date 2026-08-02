@@ -13,10 +13,19 @@
 --}}
 @php
     $sourceKey = strtolower(trim((string) $review->source));
-    $isGoogle = $sourceKey === 'google';
     // Our own "system" reviews (source set by ReviewController, e.g. "RshopRefills")
     // use the brand mark + blue stars, distinct from Trustpilot's emerald.
-    $isSystem = str_contains($sourceKey, 'rshop');
+    //
+    // is_customer_submitted wins over the label for the same reason the model
+    // scope leads with it: reviews.source defaults to 'Trustpilot' in the schema,
+    // so a submission can carry a platform label it never came from. Rendering
+    // that as a Trustpilot review would put their name on feedback they never
+    // collected, so the mark and the printed label both follow the fact.
+    $isSystem = (bool) $review->is_customer_submitted || str_contains($sourceKey, 'rshop');
+    $isGoogle = ! $isSystem && $sourceKey === 'google';
+    $sourceLabel = $isSystem && in_array($sourceKey, \App\Models\Review::EXTERNAL_SOURCES, true)
+        ? ($siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefills'))
+        : $review->source;
 
     // Half-star bucketing: 3.5 renders as 3 full + 1 half + 1 empty.
     $r        = max(0, min(5, (float) $review->rating));
@@ -66,7 +75,7 @@
                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                     </svg>
                 @endif
-                <span class="text-[10px] font-bold text-zinc-900 dark:text-white">{{ $review->source }}</span>
+                <span class="text-[10px] font-bold text-zinc-900 dark:text-white">{{ $sourceLabel }}</span>
             </div>
 
             <div class="flex gap-0.5" aria-label="{{ number_format($r, 1) }} out of 5 stars">

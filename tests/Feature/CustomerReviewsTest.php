@@ -49,18 +49,65 @@ class CustomerReviewsTest extends TestCase
     }
 
     /**
-     * The seeder ships 20 curated Trustpilot/Google entries. None of them are
-     * ours, so none of them may appear on the storefront.
+     * reviews.source defaults to 'Trustpilot' in the schema, so anything that
+     * writes a review without naming a source picks up a platform label it never
+     * came from. A review the customer left through our own form is ours however
+     * it ended up labelled, and filtering on the label alone would silently bury
+     * real feedback.
      */
-    public function test_the_seeded_platform_reviews_stay_off_the_homepage(): void
+    public function test_a_customer_submission_is_ours_whatever_its_source_says(): void
     {
         $this->withoutVite();
+        Review::factory()->external('Trustpilot')->create([
+            'author_name' => 'Mislabelled Buyer',
+            'is_customer_submitted' => true,
+        ]);
+
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Mislabelled Buyer', $html);
+        // And it must not wear Trustpilot's name: they did not collect it. This
+        // targets the review card's own source label, not the collector card
+        // further up the row, which says Trustpilot legitimately.
+        $this->assertStringNotContainsString('dark:text-white">Trustpilot</span>', $html);
+    }
+
+    /**
+     * The seeder used to manufacture 20 reviews attributed to Trustpilot and
+     * Google. They were deleted for good, and because it wrote them with
+     * updateOrCreate, every db:seed brought all 20 straight back. Nothing may
+     * invent a review again: they come from a customer or from an admin.
+     */
+    public function test_the_seeder_manufactures_no_reviews(): void
+    {
         $this->seed(ReviewSeeder::class);
 
-        $this->get('/')
-            ->assertOk()
-            ->assertDontSee('Adaeze O.')
-            ->assertDontSee('Daniel Owusu');
+        $this->assertSame(0, Review::count());
+        // It still seeds the aggregate the nav badge and score card read.
+        $this->assertNotNull(\App\Models\SiteSetting::get('reviews.aggregate.rating'));
+    }
+
+    /**
+     * ownCollected() and externalSourced() must partition the table: every row
+     * belongs to exactly one. The cleanup that prunes platform rows runs off
+     * externalSourced(), so a gap between the two would delete something the
+     * storefront was still showing, and an overlap would delete a real review.
+     */
+    public function test_the_shown_and_prunable_sets_partition_the_table(): void
+    {
+        Review::factory()->create(['author_name' => 'Ours']);
+        Review::factory()->external('Trustpilot')->create(['author_name' => 'Theirs']);
+        Review::factory()->external('google')->create(['author_name' => 'Theirs Lowercase']);
+        Review::factory()->external('Trustpilot')->create(['author_name' => 'Mislabelled', 'is_customer_submitted' => true]);
+
+        $shown = Review::ownCollected()->pluck('id');
+        $prunable = Review::externalSourced()->pluck('id');
+
+        $this->assertCount(4, Review::all());
+        $this->assertSame(4, $shown->count() + $prunable->count(), 'Every review must fall in exactly one set.');
+        $this->assertEmpty($shown->intersect($prunable), 'No review may be both shown and prunable.');
+        // The mislabelled customer submission belongs to the shown set.
+        $this->assertContains(Review::where('author_name', 'Mislabelled')->value('id'), $shown->all());
     }
 
     /** The slot that used to flip aggregate scores now collects for Trustpilot. */
