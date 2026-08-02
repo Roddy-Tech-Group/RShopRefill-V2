@@ -118,6 +118,18 @@ html {
     text-size-adjust: 100%;
 }
 
+/* Horizontal safe-area insets. viewport-fit=cover (partials/head) is what makes
+   the vertical insets resolve on the installed PWA, but it extends the page
+   under the sensor housing in landscape too, where the LEFT/RIGHT insets stop
+   being 0. Reserving them on the body keeps body copy clear of the notch there.
+   Zero in portrait and on every device without a cutout, so this changes nothing
+   anywhere else. Full-bleed rows (w-screen carousels, the payment marquee) are
+   fixed/viewport-sized and deliberately still run edge to edge. */
+body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
 /* iOS/touch Safari zooms the whole page in when a form control whose font-size
    is below 16px gains focus, which makes the page appear to "grow" (e.g. the
    top-up amount input, search boxes, admin form fields). Forcing every
@@ -626,21 +638,29 @@ html.dark .wallet-glass {
     .pill-shake { animation: none; }
 }
 
-/* Homepage "Pay your way" strip - the accepted payment methods scroll as a
-   marquee so the full list (card networks, mobile money, bank rails, crypto)
-   fits on one line instead of wrapping into a tall block.
+/* Homepage "Payment Methods We Accept" row - the accepted payment methods drift
+   right to left as a marquee of bare marks, so the full list (card networks,
+   mobile money, bank rails, crypto) reads as one row instead of wrapping into a
+   tall block.
 
-   The track renders the badge list TWICE and translates exactly -50%, which
+   The row bleeds to the RIGHT only, so the clip below is what lands its left
+   cut-off exactly on the heading (see payment-methods.blade.php).
+
+   The track renders the mark list TWICE and translates exactly -50%, which
    lands the second copy where the first began. That only holds if the two
-   halves are exactly equal, so spacing lives on each badge as a trailing margin
+   halves are exactly equal, so spacing lives on each mark as a trailing margin
    and the track itself carries NO flex gap and NO padding: 2N items with a gap
    between them is 2N-1 gaps, and -50% of that (plus any track padding) misses
    one copy's width by (padding - gap/2), which snapped the loop back a dozen
    pixels every cycle.
 
-   Duration is deliberately slow: this is ambient trust signalling, not
-   something anyone should feel chased by. Hover pauses it for a pointer user,
-   and the markup ships an explicit pause button for everyone else (WCAG 2.2.2).
+   Duration is set per-render as --pay-strip-duration (3s per mark, see
+   payment-methods.blade.php) rather than fixed here: the crypto lineup changes
+   with every sync, and a fixed duration silently sped the whole row up each time
+   a coin was added. It is deliberately slow either way - this is ambient trust
+   signalling, not something anyone should feel chased by. Hover pauses it for a
+   pointer user, and the markup ships an explicit pause button for everyone else
+   (WCAG 2.2.2).
 
    The strip CLIPS rather than scrolls while animating: an animated transform
    inside an overflow-x-auto box continuously rewrites that box's scroll range,
@@ -652,7 +672,7 @@ html.dark .wallet-glass {
     to   { transform: translateX(-50%); }
 }
 .pay-strip { overflow: hidden; }
-.pay-strip-track { animation: pay-strip-scroll 45s linear infinite; }
+.pay-strip-track { animation: pay-strip-scroll var(--pay-strip-duration, 45s) linear infinite; }
 .pay-strip:hover .pay-strip-track,
 .pay-strip-paused .pay-strip-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
@@ -664,19 +684,6 @@ html.dark .wallet-glass {
     .pay-strip-track { animation: none; }
     .pay-strip-track > [aria-hidden="true"] { display: none; }
 }
-
-/* Strip surface + its triangle notch. These exist because the global dark
-   remaps `.dark .bg-white { #2a2a2a }` (and `.dark:not(.pure-dark)` -> #363636)
-   outrank Tailwind's `dark:` variant, so a `dark:bg-black` on the card never
-   applied while `dark:border-b-black` on the notch did - leaving a pure-black
-   arrow pointing at a grey panel. Both are pinned here to the same value per
-   theme tier so they can never drift apart again. */
-.pay-strip-card { background-color: #ffffff; }
-.pay-strip-notch { border-bottom-color: #ffffff; }
-.dark .pay-strip-card { background-color: #2a2a2a; }
-.dark .pay-strip-notch { border-bottom-color: #2a2a2a; }
-.dark:not(.pure-dark) .pay-strip-card { background-color: #363636; }
-.dark:not(.pure-dark) .pay-strip-notch { border-bottom-color: #363636; }
 
 /* Liquid-glass active pill (mobile bottom nav): a near-transparent water bead
    that refracts the frosted bar behind it rather than sitting on a solid tint.

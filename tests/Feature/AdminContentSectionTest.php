@@ -50,10 +50,16 @@ class AdminContentSectionTest extends TestCase
             ->assertSee('RshopRefills launches the Rcoin rewards program');
     }
 
-    public function test_reviews_admin_page_lists_seeded_reviews_and_aggregate(): void
+    /**
+     * The seeder no longer manufactures reviews (see ReviewSeeder), so the row
+     * this asserts on is created here. It still seeds the aggregate, which the
+     * page prints above the list.
+     */
+    public function test_reviews_admin_page_lists_reviews_and_aggregate(): void
     {
         $this->withoutVite()->adminLogin();
         $this->seed(ReviewSeeder::class);
+        Review::factory()->create(['author_name' => 'Adaeze O.']);
 
         $this->get(route('admin.content.reviews'))
             ->assertOk()

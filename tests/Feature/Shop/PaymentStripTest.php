@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The homepage "Pay your way" strip.
+ * The homepage "Payment Methods We Accept" row.
  *
  * Every badge is a promise that checkout accepts that rail, so the badge list is
  * asserted against SupportedPaymentMethods rather than eyeballed, and the crypto
@@ -235,7 +235,7 @@ class PaymentStripTest extends TestCase
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
         $this->assertStringContainsString('pay-strip-track', $html);
-        $this->assertStringContainsString('Pay your way', $html);
+        $this->assertStringContainsString('Payment Methods We Accept', $html);
 
         // Every badge is rendered twice so the -50% translate loops seamlessly;
         // one copy is aria-hidden so screen readers hear one set of methods. The
@@ -251,9 +251,9 @@ class PaymentStripTest extends TestCase
         $this->assertSame(1, substr_count($html, 'sr-only">Verve</span>'));
         $this->assertStringContainsString('alt=""', $html);
 
-        // Spacing lives on the badges, not as a flex gap on the track: a gap
+        // Spacing lives on the marks, not as a flex gap on the track: a gap
         // makes 2N-1 gaps for 2N items and -50% then misses a full copy.
-        $this->assertStringContainsString('mr-7 sm:mr-9', $html);
+        $this->assertStringContainsString('mr-7 flex h-[52px] w-[104px] shrink-0', $html);
         $this->assertStringNotContainsString('pay-strip-track flex w-max items-center gap-', $html);
 
         // A pause control exists (WCAG 2.2.2) - hover alone excludes keyboard
@@ -261,15 +261,50 @@ class PaymentStripTest extends TestCase
         $this->assertStringContainsString('aria-pressed', $html);
     }
 
-    public function test_the_strip_surface_does_not_rely_on_remapped_dark_utilities(): void
+    /**
+     * The heading IS the row's left edge: marks travel left and clip out exactly
+     * where "Payment Methods We Accept" starts, while the right side runs off to
+     * the viewport edge so they enter from off-screen instead of popping in
+     * mid-column. That is a one-sided bleed - a full `mx-` bleed would push the
+     * left cut-off out to the screen edge and break the alignment.
+     */
+    public function test_the_row_starts_on_the_heading_and_bleeds_right_only(): void
     {
+        $component = File::get(resource_path('views/components/home/payment-methods.blade.php'));
+
+        $this->assertStringContainsString('pay-strip mr-[calc(50%-50vw)]', $component);
+        $this->assertStringNotContainsString('mx-[calc(50%-50vw)]', $component);
+        $this->assertStringNotContainsString('ml-[calc(50%-50vw)]', $component);
+
+        // The clip is what enforces the left edge, so the track must never be
+        // given its own left padding or margin to sit inside.
+        $this->assertStringNotContainsString('pay-strip-track flex w-max items-center pl-', $component);
+    }
+
+    /** Bare marks, no card plate: the gift-card tiles below own that treatment. */
+    public function test_the_marks_carry_no_card_plate(): void
+    {
+        $component = File::get(resource_path('views/components/home/payment-methods.blade.php'));
+
+        foreach (['aspect-[16/10]', 'rounded-[15px]'] as $plateClass) {
+            $this->assertStringNotContainsString($plateClass, $component);
+        }
+    }
+
+    /**
+     * A fixed duration meant the row sped up every time the crypto sync added a
+     * coin, because the same seconds had to cover a longer track. Pinning it to
+     * seconds-per-mark keeps the drift at one cadence whatever the lineup is.
+     */
+    public function test_the_drift_speed_scales_with_the_mark_count(): void
+    {
+        $this->coin('BTC', 'Bitcoin', 'BTC.svg');
+
+        $expected = max(45, count(PaymentStripBadges::all()) * 3);
+
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        // app.css remaps `.dark .bg-white`, which outranks Tailwind's dark:
-        // variant - so `dark:bg-black` silently never applied and the notch
-        // (which has no remap) ended up pure black on a grey panel.
-        $this->assertStringContainsString('pay-strip-card', $html);
-        $this->assertStringContainsString('pay-strip-notch', $html);
+        $this->assertStringContainsString('--pay-strip-duration: '.$expected.'s', $html);
     }
 
     public function test_an_empty_coin_table_still_renders_the_strip(): void
@@ -277,7 +312,7 @@ class PaymentStripTest extends TestCase
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
         // No coins configured is not a broken page: the fixed rails stand alone.
-        $this->assertStringContainsString('Pay your way', $html);
+        $this->assertStringContainsString('Payment Methods We Accept', $html);
         $this->assertStringContainsString('alt="Visa"', $html);
     }
 }

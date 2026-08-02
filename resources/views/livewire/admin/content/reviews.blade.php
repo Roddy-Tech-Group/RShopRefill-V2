@@ -38,8 +38,12 @@ class extends Component {
     #[Validate('required|numeric|min:1|max:5')]
     public float $rating = 5.0;
 
+    // Defaults to our own source: only reviews we collected render on the
+    // storefront (Review::scopeOwnCollected), so a review added here defaulting
+    // to a platform would save fine, list fine, and then never appear on the
+    // site. Trustpilot and Google stay selectable for recording what they hold.
     #[Validate('required|in:Trustpilot,Google,RshopRefills')]
-    public string $source = 'Trustpilot';
+    public string $source = 'RshopRefills';
 
     #[Validate('required|date')]
     public string $reviewedAt = '';
@@ -171,7 +175,7 @@ class extends Component {
         $this->initials = '';
         $this->body = '';
         $this->rating = 5.0;
-        $this->source = 'Trustpilot';
+        $this->source = 'RshopRefills';
         $this->reviewedAt = now()->toDateString();
         $this->isPublished = true;
         $this->sortOrder = 0;
@@ -340,7 +344,7 @@ class extends Component {
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Source</label>
-                            <x-admin.select wire:model="source" :options="['Trustpilot' => 'Trustpilot (emerald star)', 'Google' => 'Google (multi-colour G)', 'RshopRefills' => 'RshopRefills (our website)']" />
+                            <x-admin.select wire:model="source" :options="['RshopRefills' => 'RshopRefills (our website, shows on the site)', 'Trustpilot' => 'Trustpilot (record only, not shown)', 'Google' => 'Google (record only, not shown)']" />
                             <p class="mt-1 text-[10px] text-zinc-500">Picks the brand icon and star colour on the storefront card.</p>
                             @error('source') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>

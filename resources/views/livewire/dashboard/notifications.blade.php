@@ -178,7 +178,7 @@ class extends Component {
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="translate-y-0"
             x-transition:leave-end="translate-y-full"
-            class="w-full max-w-lg rounded-t-[20px] bg-white p-5 pb-7 shadow-2xl shadow-zinc-900/20"
+            class="w-full max-w-lg rounded-t-[20px] bg-white p-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] shadow-2xl shadow-zinc-900/20"
         >
             <div class="mx-auto mb-4 h-1.5 w-10 rounded-[12px] bg-zinc-200"></div>
 

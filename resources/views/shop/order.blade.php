@@ -388,9 +388,6 @@
                 </div>
             @endforeach
 
-            {{-- Google Customer Reviews opt-in (instant digital delivery). --}}
-            @include('shop._google-customer-reviews', ['order' => $order])
-
         </div>
     </div>
 

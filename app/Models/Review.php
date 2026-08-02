@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A single customer review surfaced on the homepage carousel.
@@ -53,9 +54,53 @@ class Review extends Model
         ];
     }
 
+    /**
+     * Review platforms we link out to for collection but never render reviews
+     * from. Trustpilot and Google host and display their own reviews on their
+     * own surfaces; the storefront shows only what our own form collected, so a
+     * curated row labelled "Trustpilot" can never be mistaken for a real one
+     * pulled from that platform. Compared case-insensitively - editors type the
+     * source by hand.
+     */
+    public const EXTERNAL_SOURCES = ['trustpilot', 'google'];
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('is_published', true);
+    }
+
+    /**
+     * The only reviews the storefront renders: the ones our own site collected.
+     * Admin still lists every row, so entries attributed to an external platform
+     * stay editable (and countable) without ever reaching a customer.
+     *
+     * `is_customer_submitted` is checked FIRST and on its own, because it is the
+     * fact while `source` is only a label: the reviews.source column defaults to
+     * 'Trustpilot' at the schema level, so anything that writes a review without
+     * naming a source picks up a platform label by accident. A review a customer
+     * left through our own form is ours however it ended up labelled, and must
+     * never be filtered out for carrying the column default.
+     */
+    public function scopeOwnCollected(Builder $query): Builder
+    {
+        return $query->where(function (Builder $ownQuery): void {
+            $ownQuery
+                ->where('is_customer_submitted', true)
+                ->orWhereNotIn(DB::raw('LOWER(source)'), self::EXTERNAL_SOURCES);
+        });
+    }
+
+    /**
+     * The exact complement of ownCollected(): rows attributed to an external
+     * platform that no customer submitted here. This is precisely the set the
+     * storefront hides, so it is the only set that is safe to prune, and having
+     * it defined once means a cleanup can never delete more than was hidden.
+     */
+    public function scopeExternalSourced(Builder $query): Builder
+    {
+        return $query
+            ->where('is_customer_submitted', false)
+            ->whereIn(DB::raw('LOWER(source)'), self::EXTERNAL_SOURCES);
     }
 
     public function scopeOrdered(Builder $query): Builder

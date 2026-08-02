@@ -270,20 +270,24 @@ class CustomerReviewSubmissionTest extends TestCase
     {
         $this->withoutVite();
 
-        Review::create([
-            'author_name' => 'Wanderer Jane',
+        $base = [
             'initials' => 'WJ',
             'body' => 'Bought a global eSIM and it worked the moment I landed.',
             'rating' => 5.0,
-            'source' => 'Trustpilot',
             'reviewed_at' => now()->toDateString(),
             'is_published' => true,
             'is_customer_submitted' => false,
-        ]);
+        ];
+
+        Review::create($base + ['author_name' => 'Wanderer Jane', 'source' => 'RshopRefills']);
+        // Same review, attributed to a platform that displays its own reviews on
+        // its own surface. Published, curated, and still never rendered here.
+        Review::create($base + ['author_name' => 'Platform Jane', 'initials' => 'PJ', 'source' => 'Trustpilot']);
 
         $this->get(route('shop.reviews'))
             ->assertOk()
             ->assertSee('Recent reviews')
-            ->assertSee('Wanderer Jane');
+            ->assertSee('Wanderer Jane')
+            ->assertDontSee('Platform Jane');
     }
 }

@@ -106,7 +106,8 @@
     {{-- Category cards - one tile per catalogue area, first thing under the hero --}}
     <x-home.category-cards />
 
-    {{-- Every payment method the platform accepts, pointed up at the cards --}}
+    {{-- Every payment method the platform accepts, as a slow self-scrolling row
+         of marks that clips out on the heading's left edge --}}
     <x-home.payment-methods />
 
     {{-- Trust strip --}}

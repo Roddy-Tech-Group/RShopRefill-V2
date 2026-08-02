@@ -46,6 +46,9 @@ class CouponRedemptionTest extends TestCase
             // only exists in enforce mode. Pin it: the config DEFAULT is legacy
             // (and per-environment), so inheriting it would make these tests
             // assert whatever ops last exported rather than the clamp itself.
+            // (An earlier note argued for tracking the default - that was
+            // written when the default was enforce, and these clamp assertions
+            // go red the moment an environment runs legacy.)
             'pricing.floor_mode' => 'enforce',
         ]);
 
