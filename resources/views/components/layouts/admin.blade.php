@@ -644,7 +644,10 @@
              the body grid settles (wire:navigate morph, slow paint) it captures the header's
              block-flow position below the sidebar (~478px) and the bar floats mid-page.
              The `sticky top-0` classes below are pure CSS — no race. --}}
-        <flux:header class="sticky top-0 z-40 min-h-[60px] items-center gap-2 !border-b-0 bg-[#eff6ff] dark:bg-[#0c1a36] px-3 py-2 sm:gap-3 sm:px-6">
+        {{-- pt-[env(...)]: the page is viewport-fit=cover, so this bar reserves
+             the status-bar strip itself when admin is opened from a home-screen
+             icon. Resolves to 0 in a browser. --}}
+        <flux:header class="sticky top-0 z-40 min-h-[60px] items-center gap-2 !border-b-0 bg-[#eff6ff] dark:bg-[#0c1a36] px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:gap-3 sm:px-6">
             {{-- Plain button toggle. Bypasses <flux:sidebar.toggle>, which is a self-closing wrapper
                  around <flux:button square /> and doesn't render slot children. Dispatching
                  'flux-sidebar-toggle' is exactly what Flux's own toggle does internally. --}}

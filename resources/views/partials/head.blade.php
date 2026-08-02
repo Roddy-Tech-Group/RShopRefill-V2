@@ -1,5 +1,14 @@
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{{-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to real
+     numbers. Without it iOS reports every inset as 0, so the safe-area padding
+     this app already carries on its fixed chrome (dashboard top bar, floating
+     locale/cart pills, mobile drawer, bottom nav) silently collapsed to its
+     small fallback - which is fine in a browser, where browser UI occupies that
+     space, but put the chrome under the status bar once the site was installed
+     to the home screen and ran standalone. Every top- and bottom-anchored
+     surface pads for the inset; see the storefront header below and
+     layouts/dashboard. --}}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="csrf-token" content="{{ csrf_token() }}" />
 <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
 

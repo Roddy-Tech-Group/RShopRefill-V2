@@ -1,9 +1,16 @@
 {{--
     Google Customer Reviews - opt-in survey snippet.
 
-    Rendered on the completed-order confirmation page only. After purchase Google
-    shows an opt-in so the buyer can be surveyed later; their rating then rolls up
-    into the seller rating shown by the badge (see partials/google-reviews-badge).
+    NOT CURRENTLY INCLUDED ANYWHERE. It used to render on the completed-order
+    confirmation page, where the Google survey overlay landed on top of the
+    buyer's codes the moment their order completed - the wrong moment to
+    interrupt someone. The snippet is kept intact (and tested) so re-enabling it
+    is a one-line @include on shop/order.blade.php; the rest of the Google
+    Customer Reviews integration, including the seller-rating badge, is untouched.
+
+    After purchase Google shows an opt-in so the buyer can be surveyed later;
+    their rating then rolls up into the seller rating shown by the badge (see
+    partials/google-reviews-badge).
 
     Off until services.google_reviews.merchant_id is set, so dev/staging render
     nothing. GTINs are intentionally omitted: this catalog ships no product

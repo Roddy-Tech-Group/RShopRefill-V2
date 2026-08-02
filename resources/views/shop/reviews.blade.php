@@ -1,14 +1,14 @@
 @php
     // Customer Reviews page. Linked from the footer (Company column).
     //
-    // Free-tier Trustpilot only lets us display the Review Collector widget
-    // (a CTA that opens Trustpilot for the customer to leave a review). Live
-    // review feeds would need a paid plan. Until we upgrade we lean on the
-    // curated Review model for the public-facing review cards, and let
-    // Trustpilot collect the actual reviews behind the scenes.
+    // The wall below renders ONLY the reviews our own form collected
+    // (Review::ownCollected). Trustpilot and Google host and display their own
+    // reviews on their own surfaces, so this page collects for them - the
+    // Trustpilot Review Collector widget and the Google review CTA below - and
+    // never re-renders their content as if it were ours.
     $tp = config('services.trustpilot');
     $google = config('services.google_reviews');
-    $reviews = \App\Models\Review::published()->with('user:id,kyc_status')->ordered()->get();
+    $reviews = \App\Models\Review::published()->ownCollected()->with('user:id,kyc_status')->ordered()->get();
     $aggregate = [
         'rating' => (float) \App\Models\SiteSetting::get('reviews.aggregate.rating', 0),
         'count' => (int) \App\Models\SiteSetting::get('reviews.aggregate.count', 0),
@@ -114,12 +114,10 @@
         </div>
     </section>
 
-    {{-- Reviews carousel - two full-bleed rows scrolling in opposite directions
-         so curated entries + future Trustpilot + Google reviews all blend in
-         one continuous wall. Pause on hover. CSS-only marquee (no JS). --}}
+    {{-- Reviews wall - our own customers' reviews, in three rows. --}}
     @php
-        // Split the published reviews across three rows (interleaved so each row
-        // mixes sources). Rendered as three independent, manually-scrollable
+        // Split the published reviews across three rows (round-robin so the rows
+        // stay evenly filled). Rendered as three independent, manually-scrollable
         // carousels using the shared gift-card scroll controls - no auto-scroll.
         $reviewRows = collect(range(0, 2))
             ->map(fn ($r) => $reviews->values()->filter(fn ($_, $i) => $i % 3 === $r)->values())
@@ -132,7 +130,7 @@
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">Recent reviews</h2>
-                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Reviews collected from Google Business, Trustpilot and our system. Scroll each row to read more.</p>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Reviews left by customers on {{ $siteName }}. Scroll each row to read more.</p>
                 </div>
                 <a href="{{ $tp['profile_url'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-400">
                     View all on {{ $aggregate['source'] }}

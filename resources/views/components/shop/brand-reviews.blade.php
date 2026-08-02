@@ -9,7 +9,7 @@
 
 @php
     $brandReviews = $brandKey
-        ? \App\Models\Review::published()->forBrand($brandKey)->with('user:id,kyc_status')->ordered()->get()
+        ? \App\Models\Review::published()->ownCollected()->forBrand($brandKey)->with('user:id,kyc_status')->ordered()->get()
         : collect();
 @endphp
 

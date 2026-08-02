@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A single customer review surfaced on the homepage carousel.
@@ -53,9 +54,29 @@ class Review extends Model
         ];
     }
 
+    /**
+     * Review platforms we link out to for collection but never render reviews
+     * from. Trustpilot and Google host and display their own reviews on their
+     * own surfaces; the storefront shows only what our own form collected, so a
+     * curated row labelled "Trustpilot" can never be mistaken for a real one
+     * pulled from that platform. Compared case-insensitively - editors type the
+     * source by hand.
+     */
+    public const EXTERNAL_SOURCES = ['trustpilot', 'google'];
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('is_published', true);
+    }
+
+    /**
+     * The only reviews the storefront renders: the ones our own site collected.
+     * Admin still lists every row, so entries attributed to an external platform
+     * stay editable (and countable) without ever reaching a customer.
+     */
+    public function scopeOwnCollected(Builder $query): Builder
+    {
+        return $query->whereNotIn(DB::raw('LOWER(source)'), self::EXTERNAL_SOURCES);
     }
 
     public function scopeOrdered(Builder $query): Builder

@@ -338,8 +338,8 @@
     // Real published-review aggregate + a few sample reviews so Product rich
     // results can show stars (fixes Search Console "missing aggregateRating /
     // review"). Cached for an hour since it's identical across every product.
-    $reviewSchema = \Illuminate\Support\Facades\Cache::remember('product-schema-reviews-v1', now()->addHour(), function () {
-        $published = \App\Models\Review::published()->ordered()->get();
+    $reviewSchema = \Illuminate\Support\Facades\Cache::remember('product-schema-reviews-v2', now()->addHour(), function () {
+        $published = \App\Models\Review::published()->ownCollected()->ordered()->get();
 
         if ($published->isEmpty()) {
             return ['count' => 0];
@@ -365,8 +365,8 @@
     // top-ups and bills never carry a per-product rating.
     $brandReviewAgg = ['count' => 0];
     if ($isGiftCard) {
-        $brandReviewAgg = \Illuminate\Support\Facades\Cache::remember("product-brand-reviews-v1-{$brandKey}", now()->addHour(), function () use ($brandKey) {
-            $reviews = \App\Models\Review::published()->forBrand($brandKey)->ordered()->get();
+        $brandReviewAgg = \Illuminate\Support\Facades\Cache::remember("product-brand-reviews-v2-{$brandKey}", now()->addHour(), function () use ($brandKey) {
+            $reviews = \App\Models\Review::published()->ownCollected()->forBrand($brandKey)->ordered()->get();
 
             if ($reviews->isEmpty()) {
                 return ['count' => 0];

@@ -59,8 +59,19 @@
             {{-- The whole header is sticky as one block (sticky needs a tall
                  containing block, the body provides that here). main-nav's
                  own Alpine then collapses the primary row on scroll, leaving
-                 just the top bar + category strip pinned. --}}
-            <header class="sticky top-0 z-50 w-full">
+                 just the top bar + category strip pinned.
+
+                 pt-[env(safe-area-inset-top)] + the matching bg: with
+                 viewport-fit=cover (see partials/head) the page paints
+                 edge-to-edge, so the header has to reserve the status-bar strip
+                 itself or the top bar sits under the clock in the installed
+                 PWA. The padding is on the <header>, not the top bar, so
+                 `document.querySelector('header.sticky')` - which the eSIM
+                 floating plan bars measure to place themselves - grows with it
+                 and those bars stay clear of the nav. bg-zinc-50 matches
+                 x-nav.top-bar so the reserved strip is the same colour as the
+                 bar under it (the dark remap sends both to the card grey). --}}
+            <header class="sticky top-0 z-50 w-full bg-zinc-50 pt-[env(safe-area-inset-top)]">
                 <x-nav.top-bar />
                 <x-nav.main-nav />
             </header>

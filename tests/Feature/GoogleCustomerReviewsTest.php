@@ -57,6 +57,19 @@ class GoogleCustomerReviewsTest extends TestCase
         $this->assertStringNotContainsString('surveyoptin', $html);
     }
 
+    /**
+     * The opt-in is no longer wired to the order confirmation page: the Google
+     * survey overlay landed on top of the buyer's codes the moment the order
+     * completed. The snippet itself stays (tested above) so it can be switched
+     * back on with one @include.
+     */
+    public function test_the_order_page_no_longer_renders_the_opt_in(): void
+    {
+        $blade = file_get_contents(resource_path('views/shop/order.blade.php'));
+
+        $this->assertStringNotContainsString('_google-customer-reviews', $blade);
+    }
+
     public function test_badge_snippet_renders_when_enabled(): void
     {
         config()->set('services.google_reviews.merchant_id', '5808056900');

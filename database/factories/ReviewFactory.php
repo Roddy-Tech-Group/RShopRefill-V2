@@ -20,10 +20,21 @@ class ReviewFactory extends Factory
             'author_name' => $name,
             'body' => fake()->sentence(15),
             'rating' => fake()->numberBetween(4, 5),
-            'source' => 'Trustpilot',
+            // Our own collector is the default: those are the only reviews the
+            // storefront renders (see Review::scopeOwnCollected).
+            'source' => 'RshopRefills',
             'reviewed_at' => fake()->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
             'is_published' => true,
             'sort_order' => 0,
         ];
+    }
+
+    /**
+     * A review attributed to an external platform. Kept out of every customer
+     * facing surface - those platforms display their own reviews themselves.
+     */
+    public function external(string $platform = 'Trustpilot'): static
+    {
+        return $this->state(fn (): array => ['source' => $platform]);
     }
 }
