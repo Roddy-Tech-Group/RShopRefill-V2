@@ -67,7 +67,7 @@ class extends Component {
             @endphp
             
             @foreach($metrics as $metric)
-                <div class="flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+                <div class="flex flex-col justify-between rounded-[12px] border border-zinc-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ $metric['label'] }}</span>
                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
@@ -98,7 +98,8 @@ class extends Component {
         </div>
 
         {{-- Campaigns Table --}}
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900/50">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
                     <tr>
@@ -116,7 +117,7 @@ class extends Component {
                         <tr class="hover:bg-zinc-50 dark:hover:bg-white/5">
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                                         <flux:icon.megaphone class="size-5" />
                                     </div>
                                     <div>
@@ -206,6 +207,7 @@ class extends Component {
                     @endforelse
                 </tbody>
             </table>
+            </div>
 
             @if($campaigns->hasPages())
                 <div class="border-t border-zinc-200 px-4 py-3 dark:border-white/10">
