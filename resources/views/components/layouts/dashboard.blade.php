@@ -1359,6 +1359,23 @@
             </div>
             @endif
 
+            {{-- Status-bar / floating-pill spacer for every page that is NOT the
+                 overview. The overview has its own spacer above (it holds the
+                 glass band's room); nothing held room here, so once
+                 viewport-fit=cover made env(safe-area-inset-top) resolve to a
+                 real number the viewport grew upward under the status bar and
+                 these pages had only pt-5 to survive on - the whole page read as
+                 shifted up. Shop pages additionally float the 2.75rem pill row
+                 (flag + cart) over the page with no band beneath it, so they
+                 reserve its height too; task pages only owe the inset. --}}
+            @if ($skipMobileHero)
+                <div
+                    class="lg:hidden"
+                    style="height: {{ $showMobileTopChrome ? 'calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem)' : 'env(safe-area-inset-top)' }};"
+                    aria-hidden="true"
+                ></div>
+            @endif
+
             <div data-page-content class="flex flex-col bg-[#eff6ff] px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
                 <div class="w-full min-w-0 lg:flex-1">
                     {{-- Suspension banner: visible on every dashboard page when the
@@ -1444,7 +1461,13 @@
                     requestAnimationFrame(() => { this.shaking = true; });
                 },
             }"
-            class="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:hidden"
+            {{-- The bar is already detached from the edge by design, so it does
+                 not owe the full inset on top of that gap - taking the float's
+                 own 12px back out of the inset keeps it clear of the home
+                 indicator without sitting as high as a flush bar would have to.
+                 The max() floor keeps the original 12px on devices with no
+                 inset at all. --}}
+            class="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(12px,calc(env(safe-area-inset-bottom)_-_12px))] lg:hidden"
         >
             <nav
                 class="nav-glass mx-auto max-w-md rounded-full p-1.5"

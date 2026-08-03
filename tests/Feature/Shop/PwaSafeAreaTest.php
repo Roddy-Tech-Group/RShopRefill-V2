@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Shop;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -70,8 +71,13 @@ class PwaSafeAreaTest extends TestCase
             'height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);',
             // Floating locale / cart / bell pills.
             'top: max(0.5rem, env(safe-area-inset-top));',
-            // Bottom tab bar.
-            'pb-[max(12px,env(safe-area-inset-bottom))]',
+            // Bottom tab bar. It floats 12px clear of the edge already, so it
+            // takes that back out of the inset rather than stacking on top of
+            // it; the max() floor keeps the 12px where there is no inset.
+            // The underscores are Tailwind's escape for the spaces CSS requires
+            // around a calc() minus; without them the declaration is invalid
+            // and padding-bottom silently collapses to 0.
+            'pb-[max(12px,calc(env(safe-area-inset-bottom)_-_12px))]',
         ] as $rule) {
             $this->assertStringContainsString($rule, $layout);
         }
@@ -82,5 +88,61 @@ class PwaSafeAreaTest extends TestCase
         $nav = File::get(resource_path('views/components/nav/main-nav.blade.php'));
 
         $this->assertStringContainsString('pt-[max(0.75rem,env(safe-area-inset-top))]', $nav);
+    }
+
+    /**
+     * Padding the fixed chrome is only half the job. viewport-fit=cover also
+     * pulls the viewport up under the status bar, so the page content needs
+     * something holding that strip in normal flow. Only the overview had it
+     * (the spacer under its glass band); every other page started on pt-5
+     * alone and read as shifted up, with the floating flag/cart pills landing
+     * on top of the first card on the shop pages.
+     */
+    public function test_a_task_page_reserves_the_status_bar_strip_in_flow(): void
+    {
+        $html = $this->withoutVite()
+            ->actingAs(User::factory()->create())
+            ->get(route('dashboard.orders'))
+            ->assertOk()
+            ->getContent();
+
+        // No floating pills on a task page, so it owes the inset and nothing more.
+        $this->assertStringContainsString('height: env(safe-area-inset-top);', $html);
+    }
+
+    /**
+     * Shop pages float the flag + cart pills over the page with no band beneath
+     * them, so they have to reserve the pill row's height on top of the inset.
+     */
+    public function test_a_shop_page_reserves_the_floating_pill_row_too(): void
+    {
+        $html = $this->withoutVite()
+            ->actingAs(User::factory()->create())
+            ->get(route('dashboard.shop.gift-cards'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString(
+            'height: calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem);',
+            $html,
+        );
+    }
+
+    /**
+     * The overview already holds the band's room. Rendering the new spacer
+     * there as well would push its content down by a second status bar.
+     */
+    public function test_the_overview_does_not_stack_a_second_spacer(): void
+    {
+        $html = $this->withoutVite()
+            ->actingAs(User::factory()->create())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->getContent();
+
+        // Its own band spacer, and only that one.
+        $this->assertStringContainsString('height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);', $html);
+        $this->assertStringNotContainsString('height: calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem);', $html);
+        $this->assertStringNotContainsString('height: env(safe-area-inset-top);', $html);
     }
 }
