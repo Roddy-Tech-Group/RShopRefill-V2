@@ -270,7 +270,8 @@ class extends Component {
     </div>
 
     {{-- ── Recent lost payments ───────────────────────────────────── --}}
-    <section class="{{ $card }} !p-0 overflow-hidden">
+    @php $visibleFailures = 6; @endphp
+    <section x-data="{ expanded: false }" class="{{ $card }} !p-0 overflow-hidden">
         <header class="px-5 pt-5 pb-3">
             <h2 class="{{ $sectionTitle }}">Recent Lost Payments</h2>
             <p class="{{ $subtle }}">
@@ -299,7 +300,7 @@ class extends Component {
                                 default => 'bg-zinc-100 text-zinc-600 ring-zinc-200 dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10',
                             };
                         @endphp
-                        <tr>
+                        <tr @if ($loop->index >= $visibleFailures) x-show="expanded" x-cloak @endif>
                             <td class="{{ $td }} pl-5 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ \Illuminate\Support\Carbon::parse($failure['at'])->diffForHumans(short: true) }}</td>
                             <td class="{{ $td }} whitespace-nowrap">
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tone }}">
@@ -327,6 +328,13 @@ class extends Component {
                 </tbody>
             </table>
         </div>
+        @if (count($recentFailures) > $visibleFailures)
+            <button type="button" @click="expanded = ! expanded" class="flex w-full items-center justify-center gap-1 border-t border-zinc-100 px-5 py-2.5 text-[11px] font-semibold text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-600 dark:border-white/10 dark:hover:bg-white/5 dark:hover:text-zinc-200">
+                <span x-show="! expanded">Show {{ count($recentFailures) - $visibleFailures }} more</span>
+                <span x-show="expanded" x-cloak>Show less</span>
+                <svg :class="expanded && 'rotate-180'" class="h-3 w-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+        @endif
     </section>
 
     {{-- ── Transaction recovery ───────────────────────────────────── --}}

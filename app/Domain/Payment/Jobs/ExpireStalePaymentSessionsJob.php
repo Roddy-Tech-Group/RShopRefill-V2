@@ -18,13 +18,30 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Sweep PaymentSessions past their expires_at and still pre-terminal, transitioning
- * them to 'expired' and cascading the cancellation to the linked Order (-> Cancelled)
- * or WalletFunding (-> Failed).
+ * Sweep PaymentSessions past their expires_at whose Order / WalletFunding never
+ * reached a terminal state, transitioning the session to 'expired' where needed
+ * and cascading to the linked Order (-> Cancelled) or WalletFunding (-> Failed).
  *
- * Without this, a customer who closes the tab mid-payment (or fails a card charge in
- * a way that doesn't fail-the-session synchronously) leaves an "RSR-..." order sitting
- * in Pending on their dashboard forever, polluting Recent Orders and the order count.
+ * Two populations are swept, and the second one is the subtle one:
+ *
+ *  1. Sessions still pre-terminal past their TTL — the customer closed the tab
+ *     and nothing else ever spoke for them.
+ *
+ *  2. Sessions ALREADY terminal (failed / cancelled) whose order or attempt is
+ *     still open. `PaymentSessionService::failSession()` deliberately does not
+ *     cascade, so every caller that fails a session without cascading itself
+ *     (the browser telemetry endpoint on popup-close, and
+ *     `reconcile:orphaned-sessions`) used to strand the parent order in Pending
+ *     forever: the session was no longer in ACTIVE_STATUSES, so this sweep
+ *     skipped it, and nothing else was watching. Confirmed against production
+ *     orders sitting Pending for hours behind a session that failed in seconds.
+ *
+ * Handling both here rather than cascading inside failSession() is deliberate.
+ * A customer can close the popup *after* authorising, so an immediate cascade
+ * would cancel orders whose money is already in flight. Routing every case
+ * through this sweep keeps the two guards below in play — the promised-window
+ * floor and the last-chance gateway verification — which exist precisely to
+ * stop a paid order being cancelled.
  *
  * Scheduled in routes/console.php — runs every 5 minutes. Can also be triggered on
  * demand with `php artisan payments:expire-stale` (see the same file).
@@ -53,6 +70,27 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
     ];
 
     /**
+     * Terminal session states that still leave work to do upstream. A session
+     * here is finished, but its order / attempt may never have been told.
+     * 'confirmed' is deliberately absent: money arrived, nothing to cancel.
+     */
+    private const ORPHANING_STATUSES = [
+        'failed',
+        'cancelled',
+        'expired',
+    ];
+
+    /**
+     * Order / attempt states that mean "still waiting for money". Anything
+     * outside this set has already been resolved and must not be touched.
+     */
+    private const OPEN_PAYMENT_STATUSES = [
+        'unpaid',
+        'pending',
+        'processing',
+    ];
+
+    /**
      * Floor on how long a gateway-backed session lives before this sweep may
      * touch it. Sessions are minted with a 15-minute TTL, but the bank-transfer
      * screens promise "this account expires in 30 minutes" and the virtual
@@ -68,9 +106,21 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         OrderService $orderService
     ): void {
         $stale = PaymentSession::query()
-            ->whereIn('status', self::ACTIVE_STATUSES)
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', now())
+            ->where(function ($query) {
+                $query
+                    // Population 1: still live, nobody spoke for them.
+                    ->whereIn('status', self::ACTIVE_STATUSES)
+                    // Population 2: already dead, but their order never heard.
+                    ->orWhere(function ($orphaned) {
+                        $orphaned
+                            ->whereIn('status', self::ORPHANING_STATUSES)
+                            ->whereHas('paymentAttempt', function ($attempt) {
+                                $attempt->whereIn('payment_status', self::OPEN_PAYMENT_STATUSES);
+                            });
+                    });
+            })
             ->with('paymentAttempt.order', 'paymentAttempt.payable')
             ->get();
 
@@ -125,8 +175,14 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                 }
 
                 // 2. Expire the session itself - the existing state-machine method,
-                //    idempotent if status changed between query and lock.
-                $paymentSessionService->expireSession($session);
+                //    idempotent if status changed between query and lock. Skipped
+                //    for sessions that are already terminal: those are here only
+                //    because their order never followed them, and re-expiring a
+                //    failed session would rewrite the reason the customer was
+                //    given for a failure that already has one.
+                if (in_array($session->status, self::ACTIVE_STATUSES, true)) {
+                    $paymentSessionService->expireSession($session);
+                }
 
                 // 3. Cascade to the linked Order or WalletFunding so the customer's
                 //    dashboard reflects the dead checkout instead of showing Pending
@@ -146,8 +202,11 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                 }
 
                 if ($order = $attempt->order) {
-                    // Skip if a late webhook already moved the order past Unpaid.
-                    if ($order->payment_status === PaymentStatus::Unpaid) {
+                    // Skip if a late webhook already resolved the order. Pending
+                    // counts as open alongside Unpaid: orders stranded behind a
+                    // telemetry-failed session sit in either state, and leaving
+                    // Pending out was half the reason they never got cleaned up.
+                    if (in_array($order->payment_status, [PaymentStatus::Unpaid, PaymentStatus::Pending], true)) {
                         $orderService->transitionPaymentStatus($order, PaymentStatus::Failed, [
                             'reason' => 'Payment session expired',
                             'expired_at' => $session->expires_at?->toIso8601String(),
