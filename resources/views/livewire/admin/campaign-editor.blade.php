@@ -191,11 +191,15 @@ class extends Component {
                 <div class="sticky top-24">
                     <flux:heading size="lg" class="mb-4">OS Preview</flux:heading>
                     
-                    {{-- Fake Windows 11 Notification --}}
-                    <div class="rounded-xl bg-[#2b2b2b] p-4 text-left shadow-2xl ring-1 ring-white/10 overflow-hidden transform transition-all">
+                    {{-- Fake Windows 11 Notification. Radii here imitate Windows,
+                         NOT our design tokens: 8px is the WinUI OverlayCornerRadius
+                         used for toasts and flyouts, 4px the ControlCornerRadius for
+                         the surfaces nested inside one. Deliberately literal px so a
+                         retune of the app scale can never drift the simulation. --}}
+                    <div class="rounded-[8px] bg-[#2b2b2b] p-4 text-left shadow-2xl ring-1 ring-white/10 overflow-hidden transform transition-all">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
-                                <img src="{{ asset('assets/icon-192.png') }}" class="w-4 h-4 rounded-sm" alt="{{ $siteName }}">
+                                <img src="{{ asset('assets/icon-192.png') }}" class="w-4 h-4 rounded-[2px]" alt="{{ $siteName }}">
                                 <span class="text-xs text-zinc-300 font-medium">{{ $siteName }}</span>
                             </div>
                             <span class="text-xs text-zinc-400">{{ now()->format('h:i A') }}</span>
@@ -210,13 +214,13 @@ class extends Component {
                                     {{ $pushBody ?: 'This is how your message will look when delivered to the user\'s desktop or mobile device.' }}
                                 </p>
                             </div>
-                            <div class="w-16 h-16 shrink-0 bg-white/5 rounded flex items-center justify-center p-1">
-                                <img src="{{ asset('assets/icon-512.png') }}" class="w-full h-full object-contain rounded-sm" alt="App Icon">
+                            <div class="w-16 h-16 shrink-0 bg-white/5 rounded-[4px] flex items-center justify-center p-1">
+                                <img src="{{ asset('assets/icon-512.png') }}" class="w-full h-full object-contain rounded-[2px]" alt="App Icon">
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mt-6 text-sm text-zinc-500 dark:text-zinc-400 bg-blue-50 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                    <div class="mt-6 text-sm text-zinc-500 dark:text-zinc-400 bg-blue-50 dark:bg-blue-500/10 p-4 rounded-[12px] border border-blue-100 dark:border-blue-500/20">
                         <p class="font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-2">
                             <flux:icon.information-circle class="w-4 h-4" /> Preview Note
                         </p>
