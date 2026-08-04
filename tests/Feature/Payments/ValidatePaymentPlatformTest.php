@@ -47,7 +47,15 @@ class ValidatePaymentPlatformTest extends TestCase
     public function test_payment_insights_dashboard_renders_with_all_metric_sections(): void
     {
         Volt::test('admin.payment-insights.dashboard')
-            ->assertSee('Total Attempts')
+            ->assertSee('Checkouts Started')
+            // The two rates must both be present: one blended number hides
+            // whichever of the two problems the platform actually has.
+            ->assertSee('Payment Success')
+            ->assertSee('Checkout Conversion')
+            ->assertSee('Where Payments Die')
+            ->assertSee('Daily Trend')
+            ->assertSee('By Payment Method')
+            ->assertSee('Recent Lost Payments')
             ->assertSee('Frontend Failures')
             ->assertSee('Environment Signals')
             ->assertSee('Transaction Recovery')

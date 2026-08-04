@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Web;
 
 use App\Domain\PaymentInsights\Enums\ProductLine;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
+use App\Domain\PaymentInsights\Support\RecoveryCopy;
 use App\Http\Controllers\Controller;
 use App\Models\RecoveryAttempt;
 use App\Models\TransactionRecovery;
@@ -13,29 +15,31 @@ class RecoveryController extends Controller
 {
     public function show(string $token)
     {
-        $recovery = TransactionRecovery::where('token', $token)
-            ->where('expires_at', '>', now())
-            ->where('status', 'pending')
-            ->with('paymentSession')
-            ->firstOrFail();
+        $recovery = $this->openRecovery($token, ['paymentSession']);
 
-        // Log the view action
         RecoveryAttempt::create([
             'transaction_recovery_id' => $recovery->id,
             'action' => 'clicked_link',
         ]);
 
-        return view('recovery.show', compact('recovery'));
+        // First click only: the timestamp records when they first engaged, and
+        // a revisit must not reset it or downgrade a retry back to a click.
+        $recovery->update([
+            'clicked_at' => $recovery->clicked_at ?? now(),
+            'status' => $recovery->status === RecoveryStatus::Pending
+                ? RecoveryStatus::Clicked
+                : $recovery->status,
+        ]);
+
+        return view('recovery.show', [
+            'recovery' => $recovery,
+            'copy' => RecoveryCopy::for($recovery->failure_reason_code),
+        ]);
     }
 
     public function feedback(Request $request, string $token)
     {
-        // Same active-window guard as show/retry: expired or already-resolved
-        // recoveries must not be reopened or overwritten by a stray POST.
-        $recovery = TransactionRecovery::where('token', $token)
-            ->where('expires_at', '>', now())
-            ->where('status', 'pending')
-            ->firstOrFail();
+        $recovery = $this->openRecovery($token);
 
         $validated = $request->validate([
             'reason' => 'required|string|max:255',
@@ -48,27 +52,29 @@ class RecoveryController extends Controller
             'payload' => $validated,
         ]);
 
-        $recovery->update(['status' => 'feedback_received']);
+        $recovery->update(['status' => RecoveryStatus::FeedbackReceived]);
 
         return redirect()->route('recovery.thanks');
     }
 
     public function retry(string $token)
     {
-        $recovery = TransactionRecovery::where('token', $token)
-            ->where('expires_at', '>', now())
-            ->where('status', 'pending')
-            ->with('paymentSession')
-            ->firstOrFail();
+        $recovery = $this->openRecovery($token, ['paymentSession']);
 
         RecoveryAttempt::create([
             'transaction_recovery_id' => $recovery->id,
             'action' => 'retried_payment',
         ]);
 
-        $recovery->update(['status' => 'recovered']);
+        // Retrying, NOT recovered: the customer has gone back to checkout,
+        // which is intent, not money. The recovery is marked recovered only
+        // when a payment actually confirms (RecordPaymentOutcomeJob), and the
+        // link stays live meanwhile so a second attempt is not locked out.
+        $recovery->update([
+            'status' => RecoveryStatus::Retrying,
+            'retried_at' => $recovery->retried_at ?? now(),
+        ]);
 
-        // Clear backoff lock
         /** @var PaymentBackoffManager $backoffManager */
         $backoffManager = app(PaymentBackoffManager::class);
 
@@ -102,5 +108,20 @@ class RecoveryController extends Controller
     public function thanks()
     {
         return view('recovery.thanks');
+    }
+
+    /**
+     * A recovery the customer can still act on: unexpired, and not already
+     * resolved. Shared by every route so the guard cannot drift between them.
+     *
+     * @param  array<int, string>  $with
+     */
+    private function openRecovery(string $token, array $with = []): TransactionRecovery
+    {
+        return TransactionRecovery::where('token', $token)
+            ->where('expires_at', '>', now())
+            ->whereIn('status', RecoveryStatus::openValues())
+            ->with($with)
+            ->firstOrFail();
     }
 }

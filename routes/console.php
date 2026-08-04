@@ -5,6 +5,7 @@ use App\Domain\Fulfillment\Support\SweeperPickupCounter;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
+use App\Domain\PaymentInsights\Jobs\SendRecoveryRemindersJob;
 use App\Domain\Shared\Services\HealthCheckService;
 use App\Domain\Wallet\Jobs\ReconcilePendingFundingsJob;
 use App\Domain\Wallet\Jobs\SyncExchangeRatesJob;
@@ -91,6 +92,11 @@ Schedule::job(new ExpireStalePaymentSessionsJob)->everyFiveMinutes()->sentryMoni
 // terminal `abandoned` state, so recovery analytics stay truthful. Hourly is
 // plenty — the read paths already refuse expired tokens.
 Schedule::job(new ExpireStaleRecoveriesJob)->hourly()->sentryMonitor('expire-stale-recoveries');
+
+// Second recovery touch. Hourly is the right resolution: the reminder is due
+// ~20h after the failure, so precision beyond an hour buys nothing and only
+// risks emailing someone at 3am in their own timezone.
+Schedule::job(new SendRecoveryRemindersJob)->hourly()->sentryMonitor('send-recovery-reminders');
 
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.

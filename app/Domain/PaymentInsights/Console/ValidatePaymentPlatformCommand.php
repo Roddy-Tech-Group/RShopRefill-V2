@@ -15,6 +15,7 @@ use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\PaymentInsights\Enums\FailureCategory;
 use App\Domain\PaymentInsights\Enums\IneligibilityReason;
 use App\Domain\PaymentInsights\Enums\OutcomeType;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Jobs\EvaluateRecoveryJob;
 use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
@@ -602,9 +603,12 @@ class ValidatePaymentPlatformCommand extends Command
 
             $recovery = TransactionRecovery::where('payment_session_id', $session->id)->first();
             $this->ensure($recovery !== null, 'no recovery created');
-            $this->ensure($recovery->status === 'pending', "status {$recovery->status}");
+            $this->ensure($recovery->status === RecoveryStatus::Pending, "status {$recovery->status->value}");
             $this->ensure(strlen($recovery->token) === 40, 'token not generated');
-            $this->ensure($recovery->expires_at->gt(now()->addHours(23)), 'expiry not ~24h');
+            // 48h, so the ~20h reminder always lands on a live link.
+            $this->ensure($recovery->expires_at->gt(now()->addHours(47)), 'expiry not ~48h');
+            $this->ensure($recovery->failure_reason_code !== null, 'failure reason not snapshotted onto the recovery');
+            $this->ensure($recovery->payment_outcome_id !== null, 'recovery not linked back to its outcome');
 
             $log = CommunicationLog::where('correlation_id', 'payment_recovery_'.$recovery->id)
                 ->where('channel', 'email')->first();
@@ -696,8 +700,10 @@ class ValidatePaymentPlatformCommand extends Command
             $this->ensure($reason === IneligibilityReason::GuestNoAccount->value, "reason {$reason}");
         });
 
-        // Successful payment auto-cancels pending recoveries.
-        $this->probe('Recovery Engine', 'confirmed payment auto-cancels pending recovery', function () {
+        // A payment for a DIFFERENT order closes the recovery as superseded:
+        // real revenue, but not revenue this recovery brought back. Counting
+        // it as recovered is how a recovery programme flatters itself.
+        $this->probe('Recovery Engine', 'confirmed payment on another order → recovery superseded, not recovered', function () {
             [$user, $session, $outcome] = $this->failWithDeferredEvaluation('declined');
             $this->runEvaluation($outcome);
             $recovery = TransactionRecovery::where('payment_session_id', $session->id)->first();
@@ -706,7 +712,28 @@ class ValidatePaymentPlatformCommand extends Command
             $retrySession = $this->makeSessionFor($user);
             app(PaymentSessionService::class)->confirmSession($retrySession);
 
-            $this->ensure($recovery->fresh()->status === 'cancelled', "recovery status {$recovery->fresh()->status}, expected cancelled");
+            $fresh = $recovery->fresh();
+            $this->ensure($fresh->status === RecoveryStatus::Cancelled, "recovery status {$fresh->status->value}, expected cancelled");
+            $this->ensure($fresh->recovered_at === null, 'superseded recovery must not claim a recovery timestamp');
+        });
+
+        // The genuine article: the same order finally pays.
+        $this->probe('Recovery Engine', 'confirmed payment on the same order → recovered with attribution', function () {
+            [$user, $session, $outcome] = $this->failWithDeferredEvaluation('declined');
+            $this->runEvaluation($outcome);
+            $recovery = TransactionRecovery::where('payment_session_id', $session->id)->first();
+            $this->ensure($recovery !== null, 'no recovery created');
+
+            // Same order, new session: exactly what happens when a customer
+            // follows the email back to checkout and pays.
+            $order = $session->paymentAttempt->order;
+            $retrySession = $this->makeSessionFor($user, $order);
+            app(PaymentSessionService::class)->confirmSession($retrySession);
+
+            $fresh = $recovery->fresh();
+            $this->ensure($fresh->status === RecoveryStatus::Recovered, "recovery status {$fresh->status->value}, expected recovered");
+            $this->ensure($fresh->recovered_at !== null, 'recovered_at not stamped');
+            $this->ensure($fresh->recovered_payment_session_id === $retrySession->id, 'recovery not attributed to the paying session');
         });
 
         // Stale recovery sweep.
@@ -722,7 +749,7 @@ class ValidatePaymentPlatformCommand extends Command
 
             (new ExpireStaleRecoveriesJob)->handle();
 
-            $this->ensure($recovery->fresh()->status === 'abandoned', "status {$recovery->fresh()->status}");
+            $this->ensure($recovery->fresh()->status === RecoveryStatus::Abandoned, "status {$recovery->fresh()->status->value}");
         });
 
         // Recovery page interactions: feedback + retry tracking.
@@ -740,14 +767,17 @@ class ValidatePaymentPlatformCommand extends Command
             $this->step('feedback', fn () => $controller->feedback($feedbackRequest, $recovery->token));
             $attempt = RecoveryAttempt::where('transaction_recovery_id', $recovery->id)->where('action', 'provided_feedback')->first();
             $this->ensure($attempt !== null && ($attempt->payload['reason'] ?? null) === 'declined', 'feedback not tracked with payload');
-            $this->ensure($recovery->fresh()->status === 'feedback_received', 'feedback status not applied');
+            $this->ensure($recovery->fresh()->status === RecoveryStatus::FeedbackReceived, 'feedback status not applied');
 
-            // Retry needs a pending recovery — reset the probe row. refresh()
+            // Retry needs an open recovery — reset the probe row. refresh()
             // first: the in-memory instance still says 'pending' from creation,
             // and update() skips clean attributes.
-            $recovery->refresh()->update(['status' => 'pending']);
+            $recovery->refresh()->update(['status' => RecoveryStatus::Pending]);
             $redirect = $this->step('retry', fn () => $controller->retry($recovery->token));
-            $this->ensure($recovery->fresh()->status === 'recovered', 'retry did not mark recovered');
+            // Retrying, not recovered: intent is not revenue. Only a confirmed
+            // payment may mark a recovery recovered.
+            $this->ensure($recovery->fresh()->status === RecoveryStatus::Retrying, 'retry did not mark retrying');
+            $this->ensure($recovery->fresh()->retried_at !== null, 'retried_at not stamped');
             $this->ensure(RecoveryAttempt::where('transaction_recovery_id', $recovery->id)->where('action', 'retried_payment')->exists(), 'retried_payment not tracked');
             $this->ensure(str_contains($redirect->getTargetUrl(), '/order/'), "redirected to {$redirect->getTargetUrl()}");
         });

@@ -4,6 +4,7 @@ namespace App\Domain\PaymentInsights\Jobs;
 
 use App\Domain\PaymentInsights\Enums\OutcomeType;
 use App\Domain\PaymentInsights\Enums\ProductLine;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Domain\PaymentInsights\Services\FailureReasonClassifier;
 use App\Models\PaymentOutcome;
 use App\Models\PaymentSession;
@@ -138,18 +139,69 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 ->delay(now()->addMinutes(20));
         }
 
-        // A confirmed payment moots any still-pending recovery invitations for
-        // this customer — cancel them so no stale "complete your payment"
-        // email journey stays open.
+        // A confirmed payment closes any open recovery for this customer, but
+        // HOW it closes is the difference between measuring revenue and
+        // measuring clicks. A recovery is only "recovered" when the payment
+        // that confirmed is the one it was chasing; anything else is closed
+        // as superseded so it cannot inflate the recovery numbers.
         if ($this->outcomeType === OutcomeType::Confirmed && $session->customer_email) {
-            TransactionRecovery::where('status', 'pending')
-                ->where(function ($query) use ($session, $outcome) {
-                    $query->where('customer_email', $session->customer_email);
-                    if ($outcome->user_id) {
-                        $query->orWhere('user_id', $outcome->user_id);
-                    }
-                })
-                ->update(['status' => 'cancelled']);
+            $this->closeOpenRecoveries($session, $outcome);
         }
+    }
+
+    /**
+     * Resolve every open recovery for this customer against the payment that
+     * just confirmed.
+     */
+    private function closeOpenRecoveries(PaymentSession $session, PaymentOutcome $outcome): void
+    {
+        $openRecoveries = TransactionRecovery::query()
+            ->whereIn('status', RecoveryStatus::openValues())
+            ->where(function ($query) use ($session, $outcome) {
+                $query->where('customer_email', $session->customer_email);
+                if ($outcome->user_id) {
+                    $query->orWhere('user_id', $outcome->user_id);
+                }
+            })
+            ->with('paymentSession')
+            ->get();
+
+        foreach ($openRecoveries as $recovery) {
+            $attributable = $this->isAttributable($recovery, $session, $outcome);
+
+            $recovery->update([
+                'status' => $attributable ? RecoveryStatus::Recovered : RecoveryStatus::Cancelled,
+                'recovered_at' => $attributable ? now() : null,
+                'recovered_payment_session_id' => $attributable ? $session->id : null,
+            ]);
+        }
+    }
+
+    /**
+     * Whether this confirmed payment is the one the recovery was chasing.
+     *
+     * Checkout: the same order paid. Wallet funding: the same customer topping
+     * up again while the recovery was live. Anything else (a different order,
+     * a payment that predates the email) is real revenue but not recovered
+     * revenue, and claiming it would make the recovery ROI a flattering lie.
+     */
+    private function isAttributable(TransactionRecovery $recovery, PaymentSession $session, PaymentOutcome $outcome): bool
+    {
+        // The confirming payment must come after the recovery was created,
+        // otherwise the customer had already paid by another route.
+        if ($session->created_at && $recovery->created_at && $session->created_at->lt($recovery->created_at)) {
+            return false;
+        }
+
+        $recoveredOrderId = $recovery->paymentSession?->paymentAttempt?->order_id;
+        $confirmedOrderId = $session->paymentAttempt?->order_id;
+
+        if ($recoveredOrderId && $confirmedOrderId) {
+            return $recoveredOrderId === $confirmedOrderId;
+        }
+
+        // Wallet funding has no order to match on: same customer, still-open
+        // recovery, payment after the email. That is the whole signal there is.
+        return $recoveredOrderId === null && $confirmedOrderId === null;
     }
 }
