@@ -6,6 +6,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -40,6 +41,12 @@ class WalletFundingService
      */
     public function initializeFunding(User $user, Wallet $wallet, float $amount, Currency $currency, ?string $displayCurrency = null): array
     {
+        // Rate limit before the first write, matching CheckoutService. This
+        // path was already safe (everything below runs inside one transaction)
+        // but the guard belongs at the entry point so the rule holds uniformly:
+        // no backoff check ever runs after a flow has started writing.
+        $this->paymentSessionService->assertNotRateLimited($user, ProductLine::WalletFunding->value);
+
         if ($wallet->currency->value !== $currency->value) {
             throw new \InvalidArgumentException('Funding currency must match wallet currency.');
         }

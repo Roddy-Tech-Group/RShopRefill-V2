@@ -11,6 +11,7 @@ use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\PaymentMethodNormaliser;
+use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Rewards\Services\RewardEngine;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\CurrencyRateService;
@@ -35,6 +36,7 @@ class CheckoutService
         private readonly PaymentSessionService $paymentSessionService,
         private readonly CurrencyRateService $currencyRateService,
         private readonly CouponApplicationService $couponApplicationService,
+        private readonly CouponRedemptionService $couponRedemptionService,
     ) {}
 
     /**
@@ -54,6 +56,13 @@ class CheckoutService
      */
     public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null): Order
     {
+        // 0. Rate limit BEFORE anything is written. A throttled checkout must
+        //    cost zero rows: this guard used to sit in createForOrder (step 6),
+        //    by which point the order, its items, the attempt, the coupon
+        //    reservation and OrderPlaced had all committed, so a throttled
+        //    customer got a 500 and an order stranded at Pending forever.
+        $this->paymentSessionService->assertNotRateLimited($user, ProductLine::Checkout->value);
+
         // 1. Recalculate and validate cart items/prices (in raw USD)
         $validatedTotals = $this->orderValidationService->validateForCheckout($cart);
 
@@ -70,10 +79,22 @@ class CheckoutService
         $orderNumber = 'RSR-'.date('Ymd').'-'.strtoupper(Str::random(6));
 
         // 2b. Cancel any earlier still-pending order for this cart so retrying the
-        //     same cart does not pile up Pending rows for admins.
-        Order::where('cart_id', $cart->id)
+        //     same cart does not pile up Pending rows for admins. Release their
+        //     coupon reservations too: this is a bulk update, so it fires no
+        //     model events, and a superseded order that keeps holding a slot is
+        //     exactly how repeat checkouts used to eat a promotion alive.
+        $supersededOrders = Order::where('cart_id', $cart->id)
             ->where('order_status', OrderStatus::Pending)
-            ->update(['order_status' => OrderStatus::Cancelled]);
+            ->get();
+
+        if ($supersededOrders->isNotEmpty()) {
+            Order::whereIn('id', $supersededOrders->pluck('id'))
+                ->update(['order_status' => OrderStatus::Cancelled]);
+
+            foreach ($supersededOrders as $supersededOrder) {
+                $this->couponRedemptionService->releaseForOrder($supersededOrder, 'superseded_checkout');
+            }
+        }
 
         // 3. Atomically build Order + snapshot items. The cart is read-locked here
         //    but intentionally NOT deleted yet - see step 7. If the gateway init
@@ -262,10 +283,14 @@ class CheckoutService
                 $walletService->lockFunds($wallet, $rcoinApplied);
             }
 
-            // Increment the coupon's redemption counter inside the same lock so
-            // a max_uses cap can't be exceeded under concurrent checkouts.
+            // Reserve the coupon slot inside the same lock so a max_uses cap
+            // can't be exceeded under concurrent checkouts. This used to be a
+            // straight used_count increment, which nothing ever undid: an
+            // abandoned checkout consumed a redemption forever, so a customer
+            // clicking Pay repeatedly could exhaust a capped promotion without
+            // paying once. The reservation lapses on its own if they never pay.
             if ($couponModel !== null && $couponId !== null) {
-                $couponModel->increment('used_count');
+                $this->couponRedemptionService->reserve($couponModel, $order, $user, $couponDiscountUsd);
             }
 
             return $order;
@@ -313,6 +338,10 @@ class CheckoutService
                     $wallet = $walletService->getOrCreateWallet($user, Currency::RCOIN);
                     $walletService->unlockFunds($wallet, $rcoinApplied);
                 }
+
+                // Gateway init died, so no session will ever exist for this
+                // order and nothing downstream can release its coupon slot.
+                $this->couponRedemptionService->releaseForOrder($order, 'gateway_init_failed');
             });
 
             throw $e;

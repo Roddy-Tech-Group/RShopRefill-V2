@@ -2,11 +2,11 @@
 
 namespace App\Domain\Payment\Services;
 
+use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
-use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
@@ -32,8 +32,13 @@ class PaymentSessionService
      */
     public function createForOrder(Order $order, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
-        $this->enforceBackoff($order->user, ProductLine::Checkout->value);
-
+        // NO backoff check here. CheckoutService commits the order, its items,
+        // the attempt, the coupon reservation and the OrderPlaced event long
+        // before it reaches this call, so throwing at this point stranded the
+        // order at Pending with no session at all - and the stale-session
+        // sweeper keys off payment_sessions, so nothing could ever clean it up.
+        // The guard now runs pre-flight in CheckoutService::placeOrder, before
+        // the first durable write. See assertNotRateLimited().
         return DB::transaction(function () use ($order, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -89,8 +94,8 @@ class PaymentSessionService
      */
     public function createForWalletFunding(WalletFunding $funding, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
-        $this->enforceBackoff($funding->user, ProductLine::WalletFunding->value);
-
+        // Guard runs pre-flight in WalletFundingService::initializeFunding, for
+        // the same reason as createForOrder above.
         return DB::transaction(function () use ($funding, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -216,6 +221,12 @@ class PaymentSessionService
                 }
             }
 
+            // The coupon slot is only truly consumed now that the money has
+            // arrived. Safe to call for orders with no coupon at all.
+            if ($order) {
+                app(CouponRedemptionService::class)->redeemForOrder($order);
+            }
+
             event(new PaymentSessionConfirmed($session));
         });
     }
@@ -275,6 +286,12 @@ class PaymentSessionService
                 }
             }
 
+            // Hand the coupon slot back so the next customer can use it. A late
+            // confirm on this same session reclaims it (see redeemForOrder).
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, $reason);
+            }
+
             event(new PaymentSessionFailed($session, $reason));
         });
     }
@@ -307,6 +324,10 @@ class PaymentSessionService
                 }
             }
 
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, 'session_expired');
+            }
+
             event(new PaymentSessionExpired($session));
         });
     }
@@ -324,7 +345,19 @@ class PaymentSessionService
         };
     }
 
-    private function enforceBackoff(?User $user, string $productLine): void
+    /**
+     * Refuse a payment attempt from a customer who is currently rate limited.
+     *
+     * MUST be called pre-flight, before the calling flow makes its first
+     * durable write. A backoff check placed after a commit cannot undo what it
+     * has already created, so it leaves an unpayable order (or funding) behind
+     * and manufactures exactly the orphan records the sweeper cannot see. That
+     * is not a tuning problem, it is a defect by construction, so the guard
+     * lives at the entry point of each flow and nowhere else.
+     *
+     * @throws PaymentBackoffException
+     */
+    public function assertNotRateLimited(?User $user, string $productLine): void
     {
         // Kill switch: disabling progressive backoff removes the rate limit
         // without touching outcome recording or recovery.

@@ -4,6 +4,7 @@ namespace Tests\Feature\Checkout;
 
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Jobs\FulfillOrderItemJob;
@@ -11,6 +12,8 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Coupon;
+use App\Models\CouponRedemption;
+use App\Models\Order;
 use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -110,7 +113,7 @@ class CouponRedemptionTest extends TestCase
         app(TransactionPinService::class)->setupPin($this->user, '5283');
     }
 
-    public function test_percent_coupon_discounts_the_order_total_and_increments_used_count(): void
+    public function test_percent_coupon_discounts_the_order_total_and_reserves_a_redemption(): void
     {
         $coupon = Coupon::create([
             'product_variant_id' => $this->variant->id,
@@ -133,8 +136,18 @@ class CouponRedemptionTest extends TestCase
         $this->assertSame('SAVE10', $order->metadata['coupon_code']);
         $this->assertEqualsWithDelta(1.10, (float) $order->metadata['coupon_discount_usd'], 0.01);
 
+        // Checkout reserves the slot; it does not spend it. used_count stays at
+        // zero until the money actually arrives, which is the whole point: the
+        // old increment-on-checkout counted intent and never gave it back.
+        $redemption = CouponRedemption::where('order_id', $order->id)->sole();
+        $this->assertSame(CouponRedemption::STATUS_RESERVED, $redemption->status);
+        $this->assertTrue($redemption->expires_at->isFuture());
+
         $coupon->refresh();
-        $this->assertSame(1, $coupon->used_count);
+        $this->assertSame(0, $coupon->used_count);
+
+        // The reservation still holds the slot against everyone else.
+        $this->assertSame(1, $coupon->consumedCount());
     }
 
     public function test_fixed_coupon_subtracts_a_flat_amount(): void
@@ -200,14 +213,29 @@ class CouponRedemptionTest extends TestCase
 
     public function test_used_up_coupon_is_rejected(): void
     {
-        Coupon::create([
+        $coupon = Coupon::create([
             'product_variant_id' => $this->variant->id,
             'code' => 'MAXED',
             'discount_type' => 'percent',
             'discount_value' => 10,
             'is_active' => true,
             'max_uses' => 1,
-            'used_count' => 1,
+        ]);
+
+        // Availability comes from the redemptions table now, so exhausting the
+        // coupon means a real redemption exists, not a hand-set counter.
+        $paidOrder = Order::create([
+            'user_id' => $this->user->id,
+            'order_number' => 'RSR-MAXED-1',
+            'payment_method' => 'wallet',
+            'payment_status' => PaymentStatus::Paid,
+        ]);
+        CouponRedemption::create([
+            'coupon_id' => $coupon->id,
+            'order_id' => $paidOrder->id,
+            'user_id' => $this->user->id,
+            'status' => CouponRedemption::STATUS_REDEEMED,
+            'redeemed_at' => now(),
         ]);
 
         $this->expectException(InvalidCouponException::class);

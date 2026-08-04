@@ -807,10 +807,15 @@ class ValidatePaymentPlatformCommand extends Command
                     $this->ensure($status['wait_seconds'] > $expectedWait - 5 && $status['wait_seconds'] <= $expectedWait,
                         "fail {$failNumber}: wait {$status['wait_seconds']}s, expected ~{$expectedWait}s");
 
-                    // Session creation must be blocked while limited…
+                    // The guard must refuse while limited. It is asserted here
+                    // rather than through session creation because enforcement
+                    // moved pre-flight: refusing at createForOrder meant the
+                    // order, its items and the attempt were already committed,
+                    // so a throttled customer was left with an unpayable order
+                    // no sweeper could see.
                     try {
-                        $this->makeSessionFor($user, $order);
-                        $this->ensure(false, 'session created while rate limited');
+                        app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
+                        $this->ensure(false, 'guard allowed a rate limited customer through');
                     } catch (PaymentBackoffException $e) {
                         $response = $e->render(request());
                         $this->ensure($response->getStatusCode() === 429, "backoff renders {$response->getStatusCode()}");
@@ -913,6 +918,11 @@ class ValidatePaymentPlatformCommand extends Command
 
             $this->setFlag('progressive_backoff', false);
             try {
+                // The kill switch has to disarm the guard itself, which is what
+                // checkout consults pre-flight. Asserting only that a session
+                // can be created would pass even if the flag did nothing.
+                app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
+
                 $session = $this->makeSessionFor($user, $order); // must NOT throw
                 $this->ensure($session->exists, 'session not created');
                 // Outcome recording keeps working with backoff disabled.

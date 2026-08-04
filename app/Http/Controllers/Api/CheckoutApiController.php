@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
@@ -51,6 +52,14 @@ class CheckoutApiController extends Controller
                 'order' => new OrderResource($order),
                 'payment_session' => $paymentSession ? new PaymentSessionResource($paymentSession) : null,
             ], 201);
+        } catch (PaymentBackoffException $e) {
+            // 429 with the wait, not a generic 400. Nothing was written, so the
+            // client is safe to retry once the window passes.
+            return response()->json([
+                'message' => $e->customerMessage(),
+                'is_rate_limited' => true,
+                'wait_seconds' => $e->waitSeconds,
+            ], 429);
         } catch (WalletOnHoldException|InsufficientBalanceException|MissingTransactionPinException $e) {
             // Friendly wallet errors carry a customer-ready message — return
             // it verbatim instead of prefixing "Checkout failed:".

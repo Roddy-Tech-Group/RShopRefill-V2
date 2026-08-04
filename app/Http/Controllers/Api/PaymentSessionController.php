@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Order\Events\PaymentConfirmed;
+use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
@@ -128,6 +129,13 @@ class PaymentSessionController extends Controller
                         'payment_status' => PaymentStatus::Failed,
                         'failed_at' => now(),
                     ]);
+                }
+
+                // Give the coupon slot back. This path bypasses failSession()
+                // and expireSession(), so without an explicit release a customer
+                // who cancels deliberately would hold the slot until it lapsed.
+                if ($order = $attempt?->order) {
+                    app(CouponRedemptionService::class)->releaseForOrder($order, 'customer_cancelled');
                 }
             });
 
