@@ -74,19 +74,28 @@ return new class extends Migration
         $now = now();
         $redeemedPerCoupon = [];
 
+        // An order's metadata carries the coupon_id it was placed with, but
+        // coupons cascade-delete with their product variant, so a historical
+        // order can name a coupon that no longer exists. Those references
+        // cannot be backfilled (there is no allowance left to consume) and
+        // inserting them violates the foreign key, which failed this migration
+        // in production. Resolve the surviving ids once rather than querying
+        // per row.
+        $liveCouponIds = DB::table('coupons')->pluck('id')->flip();
+
         DB::table('orders')
             ->select('id', 'user_id', 'metadata', 'created_at')
             ->whereNotNull('metadata')
             ->where('payment_status', 'paid')
             ->orderBy('id')
-            ->chunk(500, function ($orders) use (&$redeemedPerCoupon, $now) {
+            ->chunk(500, function ($orders) use (&$redeemedPerCoupon, $now, $liveCouponIds) {
                 $rows = [];
 
                 foreach ($orders as $order) {
                     $metadata = json_decode((string) $order->metadata, true);
                     $couponId = $metadata['coupon_id'] ?? null;
 
-                    if (! $couponId) {
+                    if (! $couponId || ! $liveCouponIds->has($couponId)) {
                         continue;
                     }
 
