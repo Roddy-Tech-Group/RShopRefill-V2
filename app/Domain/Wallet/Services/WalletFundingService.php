@@ -166,8 +166,19 @@ class WalletFundingService
 
         // 3. Now execute database transaction to credit the wallet under pessimistic lock
         DB::transaction(function () use ($funding, $flwTransactionId, $rawPayload) {
-            // Re-lock funding row
-            $funding->lockForUpdate();
+            // A REAL row lock. The previous `$funding->lockForUpdate()` built a
+            // query builder and never executed it, locking nothing, so two
+            // concurrent webhooks both sailed past the stale Pending check
+            // above. The ledger's unique idempotency key still made a double
+            // credit impossible, but the loser crashed out on a constraint
+            // violation instead of exiting cleanly. Lock, re-read, re-check.
+            $funding = WalletFunding::query()->lockForUpdate()->findOrFail($funding->id);
+
+            if ($funding->status === FundingStatus::Completed) {
+                Log::info('Wallet funding already completed; concurrent webhook stood down.', ['tx_ref' => $funding->reference]);
+
+                return;
+            }
 
             // Retrieve associated polymorphic attempt and mark confirmed
             $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)

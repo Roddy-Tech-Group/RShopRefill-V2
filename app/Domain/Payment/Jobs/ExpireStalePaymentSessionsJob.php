@@ -7,6 +7,7 @@ use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Wallet\Services\WalletFundingService;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
@@ -215,8 +216,14 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                     }
                 } elseif ($attempt->payable_type === WalletFunding::class) {
                     $funding = $attempt->payable;
-                    if ($funding && $funding->status !== FundingStatus::Completed) {
-                        $funding->update(['status' => FundingStatus::Failed]);
+                    if ($funding && ! in_array($funding->status, [FundingStatus::Completed, FundingStatus::Failed, FundingStatus::Cancelled], true)) {
+                        // Through the service, not a bare update: the direct
+                        // status write skipped the FundingFailed event, so the
+                        // customer never heard their top-up died, and the
+                        // attempt kept no failure payload. failFunding's own
+                        // session-fail no-ops safely on the session this sweep
+                        // already expired.
+                        app(WalletFundingService::class)->failFunding($funding, 'session_expired');
                     }
                 }
 

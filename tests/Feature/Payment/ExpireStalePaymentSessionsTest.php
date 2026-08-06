@@ -9,11 +9,17 @@ use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Shared\Enums\Currency;
+use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Wallet\Events\FundingFailed;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -206,6 +212,79 @@ class ExpireStalePaymentSessionsTest extends TestCase
 
         $this->assertSame('expired', $session->fresh()->status);
         $this->assertSame(PaymentStatus::Expired, $attempt->fresh()->payment_status);
+    }
+
+    /**
+     * An abandoned WALLET FUNDING must fail through the service, not a bare
+     * status write. The direct update skipped the FundingFailed event, so the
+     * customer never heard their top-up died and no failure payload reached
+     * the attempt.
+     */
+    public function test_abandoned_wallet_funding_fails_through_the_service_and_notifies(): void
+    {
+        $this->fakeGatewayUnpaid();
+
+        $user = User::factory()->create();
+        $wallet = Wallet::create([
+            'user_id' => $user->id,
+            'currency' => Currency::USD,
+            'balance' => 0.00,
+            'locked_balance' => 0.00,
+            'is_active' => true,
+        ]);
+
+        $funding = WalletFunding::create([
+            'user_id' => $user->id,
+            'wallet_id' => $wallet->id,
+            'reference' => 'FUND-'.Str::upper(Str::random(10)),
+            'currency' => 'USD',
+            'display_currency' => 'USD',
+            'amount' => 50,
+            'requested_amount' => 50,
+            'settled_amount_usd' => 50,
+            'exchange_rate_snapshot' => 1.0,
+            'gateway' => 'flutterwave',
+            'status' => FundingStatus::Pending,
+            'idempotency_key' => 'fund_init_'.Str::random(16),
+        ]);
+
+        $attempt = PaymentAttempt::create([
+            'user_id' => $user->id,
+            'payable_type' => WalletFunding::class,
+            'payable_id' => $funding->id,
+            'gateway' => 'flutterwave',
+            'idempotency_key' => (string) Str::uuid(),
+            'currency' => 'USD',
+            'amount' => 50,
+            'payment_status' => PaymentStatus::Pending,
+        ]);
+
+        $createdAt = now()->subMinutes(45);
+        $session = PaymentSession::create([
+            'payment_attempt_id' => $attempt->id,
+            'provider' => 'flutterwave',
+            'session_type' => 'card',
+            'status' => 'awaiting_payment',
+            'client_reference' => 'SESS_'.Str::random(20),
+            'amount' => 50.00,
+            'currency' => 'USD',
+            'display_currency' => 'USD',
+            'customer_email' => $user->email,
+            'expires_at' => now()->subMinutes(30),
+        ]);
+        $session->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
+
+        Event::fake([FundingFailed::class]);
+
+        (new ExpireStalePaymentSessionsJob)->handle(
+            app(PaymentSessionService::class),
+            app(OrderService::class),
+        );
+
+        $this->assertSame(FundingStatus::Failed, $funding->fresh()->status);
+        $this->assertSame(PaymentStatus::Failed, $attempt->fresh()->payment_status, 'the attempt must carry the failure');
+        $this->assertNotNull($funding->fresh()->failed_reason, 'the funding must record why it died');
+        Event::assertDispatched(FundingFailed::class);
     }
 
     public function test_paid_attempt_is_never_touched_by_the_sweeper(): void

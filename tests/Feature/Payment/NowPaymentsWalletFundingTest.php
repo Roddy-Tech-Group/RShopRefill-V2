@@ -5,6 +5,7 @@ namespace Tests\Feature\Payment;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Wallet\Events\FundingCompleted;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -142,6 +144,27 @@ class NowPaymentsWalletFundingTest extends TestCase
         $service->processSuccessfulFunding($funding->reference, '5519782510');
 
         $this->assertSame(140.0, (float) $this->wallet->fresh()->balance);
+    }
+
+    /**
+     * The redelivered IPN must also stand down QUIETLY. The old code held no
+     * real row lock (a query builder was built and never executed), so the
+     * loser of a concurrent race crashed out on the ledger's unique
+     * idempotency constraint instead of exiting cleanly, and a crashed
+     * webhook gets retried by the gateway forever.
+     */
+    public function test_repeat_processing_completes_once_and_fires_completion_once(): void
+    {
+        [$funding] = $this->cryptoFunding(40.0, PaymentStatus::Paid);
+
+        Event::fake([FundingCompleted::class]);
+
+        $service = app(WalletFundingService::class);
+        $service->processSuccessfulFunding($funding->reference, '5519782510');
+        $service->processSuccessfulFunding($funding->reference, '5519782510');
+
+        $this->assertSame(140.0, (float) $this->wallet->fresh()->balance);
+        Event::assertDispatchedTimes(FundingCompleted::class, 1);
     }
 
     /** A short payment must never credit, however small the shortfall. */
