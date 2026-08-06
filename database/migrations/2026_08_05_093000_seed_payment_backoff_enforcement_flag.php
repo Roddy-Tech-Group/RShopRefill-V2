@@ -24,11 +24,15 @@ return new class extends Migration
     public function up(): void
     {
         if (! SiteSetting::query()->where('key', self::ENFORCE_KEY)->exists()) {
+            // Descriptions must stay under 255 chars: site_settings.description
+            // is a VARCHAR(255) on MySQL. SQLite does not enforce the limit, so
+            // the test suite cannot catch an overrun - the first MySQL migrate
+            // does, by failing.
             SiteSetting::put(
                 self::ENFORCE_KEY,
                 'off',
                 'features',
-                'On applies the payment cooldown to customers. Off keeps the limiter in shadow: it still measures and records every decision (see payments:backoff-report) but nobody is blocked. Leave off until the report shows the thresholds are hitting abuse rather than buyers.',
+                'On applies the payment cooldown to customers. Off keeps shadow mode: every decision is recorded (payments:backoff-report) but nobody is blocked. Enable once the report shows it hits abuse, not buyers.',
             );
         }
 
@@ -36,7 +40,7 @@ return new class extends Migration
         // which is no longer what is counted: abandonment is deliberately
         // excluded, and there are now two separate counters.
         SiteSetting::query()->where('key', self::MASTER_KEY)->update([
-            'description' => 'Master switch for payment rate limiting. Off removes it entirely, including measurement. On counts two signals separately: declines (a payment was submitted and refused) and no-shows (checkout opened, no payment method ever engaged). Abandoning at the payment screen is deliberately not counted. Whether a limit is actually applied is controlled by payment_backoff_enforce.',
+            'description' => 'Master switch for payment rate limiting. Off disables limiting and measurement. Counts declines and no-shows separately; abandonment at the payment screen is never counted. Enforcement is gated by payment_backoff_enforce.',
         ]);
 
         Cache::forget('site_setting_'.self::MASTER_KEY);

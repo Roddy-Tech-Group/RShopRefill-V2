@@ -238,6 +238,24 @@ class extends Component {
         </div>
     </section>
 
+    {{-- ── Payment gateway kill switches ─────────────────────────── --}}
+    {{-- Flag state next to provider health so "degraded AND disabled"
+         reads in one glance. Toggled from admin settings; each flip also
+         fires a Telegram ops alert. --}}
+    <section class="{{ $card }}">
+        <header class="mb-3 flex items-center justify-between">
+            <h2 class="{{ $sectionTitle }}">Payment gateway kill switches</h2>
+        </header>
+        <div class="flex flex-wrap gap-2">
+            @foreach ($snapshot['gateway_flags'] ?? [] as $gatewayKey => $accepting)
+                <span class="{{ $accepting ? $ok : $bad }} capitalize">
+                    {{ $gatewayKey }}: {{ $accepting ? 'accepting payments' : 'DISABLED' }}
+                </span>
+            @endforeach
+        </div>
+        <p class="mt-2 text-[11px] text-zinc-400">Off refuses new payments and greys the checkout tiles; in-flight payments, webhooks and refunds always continue</p>
+    </section>
+
     {{-- ── Fulfilment providers ──────────────────────────────────── --}}
     <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         @foreach ($providers as $providerKey => $provider)

@@ -8,6 +8,7 @@ use App\Domain\Reconciliation\Models\ReconciliationReport;
 use App\Domain\Shared\Services\BackupHealthService;
 use App\Domain\Shared\Services\CircuitBreaker;
 use App\Domain\Shared\Services\HealthCheckService;
+use App\Support\FeatureFlag;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,10 @@ class MonitoringSnapshotService
             'orders' => $this->orderBacklog(),
             'fx' => $this->fxFreshness(),
             'providers' => Cache::remember('management:monitoring:providers', 60, fn () => $this->fulfillmentProviders()),
+            // Kill-switch state next to provider health, so "degraded AND
+            // disabled at 14:32" reads in one glance. Uncached: after flipping
+            // a switch mid-incident the page must tell the truth immediately.
+            'gateway_flags' => $this->gatewayFlags(),
             'zendit_balance' => Cache::remember('management:monitoring:zendit-balance', 300, fn () => $this->zenditBalance()),
             'airalo_balance' => Cache::remember('management:monitoring:airalo-balance', 300, fn () => $this->airaloBalance()),
             'disk' => $this->diskSpace(),
@@ -181,6 +186,23 @@ class MonitoringSnapshotService
      *
      * @return array{active_rates: int, newest_age_hours: ?float}
      */
+    /**
+     * Payment gateway kill-switch state, from the same canonical map the
+     * checkout tiles and server guards read.
+     *
+     * @return array<string, bool> gateway => accepting new payments
+     */
+    private function gatewayFlags(): array
+    {
+        $flags = [];
+
+        foreach (array_keys(FeatureFlag::GATEWAY_FLAGS) as $gateway) {
+            $flags[$gateway] = FeatureFlag::gatewayEnabled($gateway);
+        }
+
+        return $flags;
+    }
+
     private function fxFreshness(): array
     {
         $newest = DB::table('currency_rates')->where('is_active', true)->max('updated_at');

@@ -34,6 +34,82 @@ class FeatureFlag
     ];
 
     /**
+     * The ONE canonical map from a payment gateway to its kill-switch flag.
+     * Same contract as CATEGORY_FLAGS: the checkout tiles, the pre-flight
+     * guard in CheckoutService/WalletFundingService and the pay endpoint all
+     * resolve through here, so "greyed out" in the UI and "refused" on the
+     * server can never disagree.
+     *
+     * A disabled gateway stops NEW money entering the pipe only. Webhooks,
+     * verification, the sweeper's last-chance check and refunds are never
+     * gated: money already in flight must always land.
+     *
+     * @var array<string, string>
+     */
+    public const GATEWAY_FLAGS = [
+        'flutterwave' => 'gateway_flutterwave',
+        'nowpayments' => 'gateway_nowpayments',
+        'wallet' => 'gateway_wallet',
+        // Future backups plug in here (korapay, cryptomus) - their
+        // integrations seed the flag OFF and add the row.
+    ];
+
+    /**
+     * Checkout method key => the gateway that fronts it. Flutterwave fronts
+     * every fiat rail, so one outage greys them together.
+     *
+     * @var array<string, string>
+     */
+    public const METHOD_GATEWAYS = [
+        'card' => 'flutterwave',
+        'apple_pay' => 'flutterwave',
+        'bank_transfer' => 'flutterwave',
+        'pay_with_bank' => 'flutterwave',
+        'ussd' => 'flutterwave',
+        'bank_qr' => 'flutterwave',
+        'mobile_wallet' => 'flutterwave',
+        'mobile_money' => 'flutterwave',
+        'crypto' => 'nowpayments',
+        'wallet' => 'wallet',
+    ];
+
+    /**
+     * Is the gateway accepting NEW payments? Unknown gateways default to on
+     * so a future integration without a flag row behaves like every other
+     * missing flag.
+     */
+    public static function gatewayEnabled(string $gateway): bool
+    {
+        $key = self::GATEWAY_FLAGS[$gateway] ?? null;
+
+        return $key === null ? true : self::on($key);
+    }
+
+    /**
+     * Is the checkout method key payable right now? Resolves the method to
+     * its fronting gateway and asks gatewayEnabled().
+     */
+    public static function methodEnabled(string $method): bool
+    {
+        $gateway = self::METHOD_GATEWAYS[$method] ?? null;
+
+        return $gateway === null ? true : self::gatewayEnabled($gateway);
+    }
+
+    /**
+     * Gateways currently switched off - what the checkout page greys out.
+     *
+     * @return list<string>
+     */
+    public static function disabledGateways(): array
+    {
+        return array_values(array_filter(
+            array_keys(self::GATEWAY_FLAGS),
+            fn (string $gateway) => ! self::gatewayEnabled($gateway),
+        ));
+    }
+
+    /**
      * Feature-flag key for a category slug, or null when the category has no gate
      * (e.g. Flights/Stays, or a future category without a flag - treated as on).
      */

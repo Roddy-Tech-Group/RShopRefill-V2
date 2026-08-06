@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Generic site-wide key/value setting. Use the `get()` / `put()` statics so
@@ -61,14 +65,46 @@ class SiteSetting extends Model
         Cache::forget(self::cacheKey($key));
 
         if ($key === 'features.gift_cards_enabled') {
-            $isTruthy = fn($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
+            $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
             $wasOn = $isTruthy($oldValue ?? 'on');
             $isOn = $isTruthy($value);
 
-            if ($wasOn && !$isOn) {
-                \Illuminate\Support\Facades\Artisan::call('app:broadcast-gift-card-outage');
-            } elseif (!$wasOn && $isOn) {
-                \Illuminate\Support\Facades\Artisan::call('notify:giftcards-restored');
+            if ($wasOn && ! $isOn) {
+                Artisan::call('app:broadcast-gift-card-outage');
+            } elseif (! $wasOn && $isOn) {
+                Artisan::call('notify:giftcards-restored');
+            }
+        }
+
+        // A payment gateway kill switch flipping is an operational event that
+        // must never be invisible history: whoever is on call sees WHO turned
+        // WHAT off, the moment it happens, next to the provider-health alerts
+        // it usually accompanies.
+        if (str_starts_with($key, 'features.gateway_') && str_ends_with($key, '_enabled')) {
+            $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
+            $wasOn = $isTruthy($oldValue ?? 'on');
+            $isOn = $isTruthy($value);
+
+            if ($wasOn !== $isOn) {
+                $gateway = str_replace(['features.gateway_', '_enabled'], '', $key);
+
+                try {
+                    app(OperationalAlerter::class)->send(
+                        AlertSeverity::Sev2,
+                        // Distinct per gateway AND direction, so re-enabling is
+                        // never throttled away by the disable alert before it.
+                        'gateway_flag.'.$gateway.'.'.($isOn ? 'enabled' : 'disabled'),
+                        'Payment gateway '.($isOn ? 'RE-ENABLED' : 'DISABLED').': '.$gateway,
+                        $isOn
+                            ? "The {$gateway} kill switch was turned back on. New payments through it resume immediately."
+                            : "New payments through {$gateway} are now refused; its checkout tiles are greyed out. In-flight payments and webhooks still process. Re-enable via admin settings once the provider recovers.",
+                        ['flag' => $key, 'actor' => auth()->user()?->email ?? 'system'],
+                    );
+                } catch (\Throwable $e) {
+                    // Alerting must never block the toggle itself: flipping the
+                    // switch during an incident is the one moment it has to work.
+                    Log::error('Gateway flag alert failed', ['key' => $key, 'error' => $e->getMessage()]);
+                }
             }
         }
 

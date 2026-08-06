@@ -7,6 +7,7 @@ use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\OrderPlaced;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
@@ -24,6 +25,7 @@ use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -77,6 +79,14 @@ class CheckoutService
 
     public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null): Order
     {
+        // -1. Gateway kill switch, before EVERYTHING including re-entry. This
+        //     deliberately outranks reuse: backoff throttles the customer,
+        //     whose existing session is healthy, so reuse runs first there.
+        //     A disabled gateway means the pipe itself is broken, and handing
+        //     back a live session on it would invite the customer to push
+        //     money into a known-bad provider.
+        $this->assertGatewayEnabled($paymentMethod);
+
         // 0. Idempotent re-entry. A customer who taps Pay again on an unchanged
         //    cart while their previous checkout is still live gets that same
         //    checkout back instead of a second order. Repeat taps are the single
@@ -437,6 +447,24 @@ class CheckoutService
         }
 
         return $order->load(['paymentAttempts', 'paymentAttempts.paymentSession']);
+    }
+
+    /**
+     * Refuse a checkout aimed at a gateway an admin has switched off.
+     *
+     * Runs pre-flight so a refused attempt writes zero rows. The order
+     * page's payment_method vocabulary is gateway-level (wallet /
+     * flutterwave / crypto), where crypto is fronted by NOWPayments.
+     *
+     * @throws GatewayDisabledException
+     */
+    private function assertGatewayEnabled(string $paymentMethod): void
+    {
+        $gateway = $paymentMethod === 'crypto' ? 'nowpayments' : $paymentMethod;
+
+        if (! FeatureFlag::gatewayEnabled($gateway)) {
+            throw new GatewayDisabledException($gateway);
+        }
     }
 
     /**

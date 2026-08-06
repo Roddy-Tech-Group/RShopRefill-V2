@@ -374,6 +374,14 @@ class ValidatePaymentPlatformCommand extends Command
         // real traffic, so "off" here is the correct, healthy state.
         $enforcing = FeatureFlag::on('payment_backoff_enforce', false);
         $this->record('Feature Flags', true, 'payment_backoff_enforce = '.($enforcing ? 'on (enforcing)' : 'off (shadow, recording only)'));
+
+        // Gateway kill switches: reported, never asserted on. A disabled
+        // gateway during an incident is a deliberate operator action, and this
+        // suite must stay green while it is off (deploys happen mid-incident).
+        foreach (array_keys(FeatureFlag::GATEWAY_FLAGS) as $gateway) {
+            $accepting = FeatureFlag::gatewayEnabled($gateway);
+            $this->record('Feature Flags', true, "gateway_{$gateway} = ".($accepting ? 'accepting payments' : 'DISABLED (kill switch thrown)'));
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -1071,6 +1079,28 @@ class ValidatePaymentPlatformCommand extends Command
             } finally {
                 $this->setFlag('progressive_backoff', true);
                 $this->setFlag('payment_backoff_enforce', false);
+            }
+        });
+
+        $this->probe('Feature Flags', 'gateway kill switch → new money refused, in-flight money lands', function () {
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
+
+            // A payment already in flight when the switch flips...
+            $inFlight = $this->makeSessionFor($user, $order);
+
+            $this->setFlag('gateway_flutterwave', false);
+            try {
+                $this->ensure(! FeatureFlag::gatewayEnabled('flutterwave'), 'flag off but gateway reports enabled');
+                $this->ensure(FeatureFlag::gatewayEnabled('nowpayments'), 'disabling flutterwave leaked onto nowpayments');
+                $this->ensure(FeatureFlag::disabledGateways() === ['flutterwave'], 'disabledGateways() wrong');
+
+                // ...must still confirm. This is the safety rule: the switch
+                // gates new money only, money already moving always lands.
+                app(PaymentSessionService::class)->confirmSession($inFlight, ['transaction_id' => 'payval_kill_'.Str::random(6)]);
+                $this->ensure($inFlight->fresh()->status === 'confirmed', 'kill switch stranded an in-flight payment');
+            } finally {
+                $this->setFlag('gateway_flutterwave', true);
             }
         });
     }

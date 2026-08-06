@@ -3,6 +3,7 @@
 namespace App\Domain\Wallet\Services;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\GatewayFailure;
@@ -18,6 +19,7 @@ use App\Models\PaymentAttempt;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletFunding;
+use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -41,6 +43,13 @@ class WalletFundingService
      */
     public function initializeFunding(User $user, Wallet $wallet, float $amount, Currency $currency, ?string $displayCurrency = null): array
     {
+        // Gateway kill switch first: funding charges through Flutterwave, and
+        // a disabled gateway must refuse before any write, exactly like
+        // checkout. In-flight fundings and their webhooks are never gated.
+        if (! FeatureFlag::gatewayEnabled('flutterwave')) {
+            throw new GatewayDisabledException('flutterwave');
+        }
+
         // Rate limit before the first write, matching CheckoutService. This
         // path was already safe (everything below runs inside one transaction)
         // but the guard belongs at the entry point so the rule holds uniformly:

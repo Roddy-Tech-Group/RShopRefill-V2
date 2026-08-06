@@ -7,6 +7,7 @@ use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Fraud\Services\FraudDetectionService;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
@@ -194,6 +195,19 @@ class CheckoutController extends Controller
             if ($isGuestCheckout) {
                 $request->session()->push('guest_order_numbers', $order->order_number);
             }
+        } catch (GatewayDisabledException $e) {
+            // An admin has switched this gateway off. Nothing was written;
+            // surface the same "temporarily unavailable" message the greyed
+            // tiles show, and keep the cart so the customer can pick another
+            // method.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => $e->customerMessage(),
+                    'gateway_disabled' => true,
+                ], 503);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
         } catch (PaymentBackoffException $e) {
             // Rate limited before any write happened, so there is no order to
             // clean up. Surface the wait plainly and keep the cart intact.

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
@@ -52,6 +53,11 @@ class CheckoutApiController extends Controller
                 'order' => new OrderResource($order),
                 'payment_session' => $paymentSession ? new PaymentSessionResource($paymentSession) : null,
             ], 201);
+        } catch (GatewayDisabledException $e) {
+            return response()->json([
+                'message' => $e->customerMessage(),
+                'gateway_disabled' => true,
+            ], 503);
         } catch (PaymentBackoffException $e) {
             // 429 with the wait, not a generic 400. Nothing was written, so the
             // client is safe to retry once the window passes.
