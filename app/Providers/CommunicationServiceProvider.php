@@ -21,7 +21,7 @@ use App\Domain\Communication\Providers\MailProviderInterface;
 use App\Domain\Communication\Providers\ResendProvider;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Order\Events\FulfillmentSucceeded;
-use App\Domain\Order\Events\OrderPlaced;
+use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Rewards\Events\RcoinEarned;
 use App\Domain\Security\Events\AccountRecovered;
@@ -97,8 +97,12 @@ class CommunicationServiceProvider extends ServiceProvider
         // Register System Listeners
         Event::listen(Registered::class, WelcomeListener::class);
 
-        // Register Commerce Listeners
-        Event::listen(OrderPlaced::class, OrderConfirmationListener::class);
+        // Register Commerce Listeners. The confirmation email hangs on
+        // OrderConfirmed (money arrived), NOT OrderPlaced (checkout skeleton
+        // created): most checkouts are abandoned, so the old wiring emailed
+        // "your order has been received" to customers who never paid, then the
+        // sweeper cancelled the order behind the email's back.
+        Event::listen(OrderConfirmed::class, OrderConfirmationListener::class);
         Event::listen(FulfillmentSucceeded::class, FulfillmentNotificationListener::class);
         Event::listen(RefundIssued::class, RefundNotificationListener::class);
 

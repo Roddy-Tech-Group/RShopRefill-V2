@@ -5,6 +5,18 @@
 
     $status = $order->order_status;
 
+    // Honest-lifecycle flags. A pending order with no money in flight is a
+    // checkout awaiting payment, not a purchase, and must say so. Session
+    // status distinguishes "never engaged a payment method" from "bank
+    // transfer/crypto submitted, confirmation pending".
+    $heroAttempt = $order->paymentAttempts->sortByDesc('created_at')->first();
+    $heroSessionStatus = $heroAttempt?->paymentSession?->status->value ?? $heroAttempt?->paymentSession?->status;
+    $paymentValue = $order->payment_status->value ?? $order->payment_status;
+    $moneyInFlight = in_array($heroSessionStatus, ['awaiting_transfer', 'awaiting_confirmation', 'processing'], true);
+    $awaitingPayment = $status->value === 'pending' && $paymentValue === 'unpaid' && ! $moneyInFlight;
+    // Sweeper-cancelled, never paid: an expired checkout, not a cancelled order.
+    $expiredCheckout = $status->value === 'cancelled' && $paymentValue !== 'paid';
+
     // Status-driven hero copy + colour. The order is `pending` straight after
     // checkout while payment is verified, then moves through the fulfillment engine.
     $ui = match ($status->value) {
@@ -44,6 +56,22 @@
             'line'  => 'We are confirming your payment. Your redemption codes are emailed as soon as it clears.',
         ],
     };
+
+    // Overrides for the two states the match above cannot see: nothing has
+    // been paid yet, or nothing ever was.
+    if ($awaitingPayment) {
+        $ui = [
+            'tone' => 'amber', 'icon' => 'clock',
+            'title' => 'Complete your payment',
+            'line'  => 'Your items are reserved but not yet paid for. Finish your payment to receive them.',
+        ];
+    } elseif ($expiredCheckout) {
+        $ui = [
+            'tone' => 'zinc', 'icon' => 'cross',
+            'title' => 'This checkout expired',
+            'line'  => 'You were not charged. Your items are still available if you would like to try again.',
+        ];
+    }
 
     $tones = [
         'emerald' => ['bg' => 'bg-emerald-50', 'fg' => 'text-emerald-600', 'ring' => 'ring-emerald-100'],
@@ -414,6 +442,16 @@
 
         <h1 class="mt-5 text-2xl font-bold text-zinc-900">{{ $ui['title'] }}</h1>
         <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">{{ $ui['line'] }}</p>
+
+        {{-- The unpaid checkout's way back in. The cart survives until payment
+             confirms and checkout re-entry is idempotent, so this lands the
+             customer on the same live session rather than a duplicate order. --}}
+        @if ($awaitingPayment)
+            <a href="{{ $shopRoute('checkout') }}"
+                class="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
+                Complete payment
+            </a>
+        @endif
 
         <div class="mt-4 inline-flex items-center gap-2 rounded-[12px] bg-zinc-50 px-4 py-1.5 ring-1 ring-zinc-200">
             <span class="text-xs font-medium text-zinc-500">Order</span>
@@ -913,7 +951,7 @@
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-bold text-zinc-900">Order summary</h2>
             <span class="inline-flex items-center rounded-[12px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
-                {{ $status->label() }}
+                {{ $awaitingPayment ? 'Awaiting payment' : ($expiredCheckout ? 'Expired' : $status->label()) }}
             </span>
         </div>
 

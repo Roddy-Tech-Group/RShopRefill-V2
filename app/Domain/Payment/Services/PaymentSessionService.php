@@ -2,6 +2,7 @@
 
 namespace App\Domain\Payment\Services;
 
+use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
@@ -144,7 +145,12 @@ class PaymentSessionService
      */
     public function confirmSession(PaymentSession $session, ?array $payload = null): void
     {
-        DB::transaction(function () use ($session, $payload) {
+        // Set inside the transaction, dispatched after it commits: an event
+        // fired mid-transaction can email a customer about a confirmation
+        // that then rolls back.
+        $confirmedOrder = null;
+
+        DB::transaction(function () use ($session, $payload, &$confirmedOrder) {
             $session = PaymentSession::where('id', $session->id)->lockForUpdate()->firstOrFail();
 
             if ($session->status === 'confirmed') {
@@ -225,10 +231,23 @@ class PaymentSessionService
             // arrived. Safe to call for orders with no coupon at all.
             if ($order) {
                 app(CouponRedemptionService::class)->redeemForOrder($order);
+                $confirmedOrder = $order;
             }
 
             event(new PaymentSessionConfirmed($session));
         });
+
+        // This is the single choke point every payment route funnels through
+        // (card webhook, bank transfer, crypto, wallet, the sweeper's late
+        // rescue), which is what guarantees the customer-facing confirmation
+        // fires for every path and no path can fire it twice: the early
+        // return above leaves $confirmedOrder null on replay, and the
+        // communication layer's idempotency key dedupes a second session
+        // confirming the same order. Wallet funding has no order and sends
+        // its own receipt.
+        if ($confirmedOrder) {
+            OrderConfirmed::dispatch($confirmedOrder);
+        }
     }
 
     /**
