@@ -71,10 +71,18 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 default => 'unknown',
             };
 
+        // The status the customer actually reached, not the terminal one. By
+        // the time this job runs the session has already been driven to
+        // failed/expired/cancelled, and failSession routes through 'processing'
+        // on the way, so reading $session->status filed every single outcome as
+        // a processing-stage failure. Falls back to the live status for older
+        // sessions recorded before this was captured.
+        $statusAtFailure = $session->metadata['status_at_failure'] ?? $session->status;
+
         $classification = $classifier->classify(
             $session->provider ?? 'unknown',
             $reasonText,
-            $session->status,
+            $statusAtFailure,
             is_array($failureDetails) ? $failureDetails : null,
         );
 

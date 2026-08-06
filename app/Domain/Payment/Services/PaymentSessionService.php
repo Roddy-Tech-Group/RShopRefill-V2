@@ -243,6 +243,16 @@ class PaymentSessionService
                 return;
             }
 
+            // How far the customer actually got, captured BEFORE the state
+            // machine moves. Everything below routes through 'processing' on
+            // its way to 'failed', so by the time the outcome is recorded the
+            // session can no longer say whether the customer picked a payment
+            // method or abandoned at the very first screen. Every terminal
+            // outcome was consequently filed as a 'processing' failure, which
+            // made the stage column, and the dashboard panel built on it,
+            // report fiction.
+            $statusAtFailure = $session->status;
+
             if (in_array($session->status, ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action'])) {
                 $session->transitionTo('processing');
             }
@@ -258,6 +268,7 @@ class PaymentSessionService
                 'failure_reason' => $reason,
                 'failure_payload' => $payload,
                 'failure_details' => $payload['failure'] ?? null,
+                'status_at_failure' => $statusAtFailure,
             ]);
 
             // Customer-facing reason ALSO goes on payment_payload — that's the
@@ -307,6 +318,12 @@ class PaymentSessionService
             if (! in_array($session->status, ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action'])) {
                 return;
             }
+
+            // Same reason as failSession: record how far the customer got
+            // before the state machine erases it.
+            $session->metadata = array_merge($session->metadata ?? [], [
+                'status_at_failure' => $session->status,
+            ]);
 
             $session->transitionTo('expired');
 
@@ -360,7 +377,9 @@ class PaymentSessionService
     public function assertNotRateLimited(?User $user, string $productLine): void
     {
         // Kill switch: disabling progressive backoff removes the rate limit
-        // without touching outcome recording or recovery.
+        // without touching outcome recording or recovery. Note the manager is
+        // still consulted when only enforcement is off, because shadow mode's
+        // whole purpose is to keep measuring while letting customers through.
         if (FeatureFlag::off('progressive_backoff')) {
             return;
         }

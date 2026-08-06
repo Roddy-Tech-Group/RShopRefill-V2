@@ -120,6 +120,14 @@ class PaymentSessionController extends Controller
                     throw new \DomainException("Cannot cancel payment session that is already {$session->status}.");
                 }
 
+                // Capture how far the customer got before the transition wipes
+                // it, so the outcome records the real stage rather than the
+                // terminal one.
+                $session->metadata = array_merge($session->metadata ?? [], [
+                    'status_at_failure' => $session->status,
+                ]);
+                $session->save();
+
                 $session->transitionTo('cancelled');
 
                 // Cancel polymorphic payment attempt

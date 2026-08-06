@@ -25,6 +25,7 @@ use App\Models\PaymentAttempt;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CheckoutService
@@ -54,13 +55,61 @@ class CheckoutService
      *
      * @throws \Exception
      */
+    /**
+     * Session states a customer can still pay from. A checkout parked in one of
+     * these, and not yet past its expiry, is worth handing back rather than
+     * rebuilding from scratch.
+     */
+    private const REUSABLE_SESSION_STATUSES = [
+        'pending',
+        'awaiting_method',
+        'awaiting_payment',
+        'awaiting_transfer',
+        'awaiting_confirmation',
+        'awaiting_customer_action',
+    ];
+
+    /**
+     * How much runway a live session must have left before it is worth handing
+     * back instead of minting a fresh checkout.
+     */
+    private const MINIMUM_REUSABLE_MINUTES = 2;
+
     public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null): Order
     {
-        // 0. Rate limit BEFORE anything is written. A throttled checkout must
-        //    cost zero rows: this guard used to sit in createForOrder (step 6),
-        //    by which point the order, its items, the attempt, the coupon
-        //    reservation and OrderPlaced had all committed, so a throttled
-        //    customer got a 500 and an order stranded at Pending forever.
+        // 0. Idempotent re-entry. A customer who taps Pay again on an unchanged
+        //    cart while their previous checkout is still live gets that same
+        //    checkout back instead of a second order. Repeat taps are the single
+        //    biggest source of duplicate rows: each one used to write an order,
+        //    N order items, an attempt, a session and a coupon hold, then
+        //    immediately cancel the previous one.
+        //
+        //    Deliberately ahead of the rate limit. Handing back an existing
+        //    checkout writes nothing, so throttling it protects nothing and
+        //    merely keeps a customer away from a payment screen they already
+        //    have (and could reach directly through the pay endpoint anyway).
+        //
+        //    The fingerprint is what makes this safe: if the cart contents,
+        //    currency, coupon, Rcoin choice or payment method changed at all,
+        //    it does not match and we fall through to a fresh checkout. Two
+        //    carts that merely happen to total the same amount never collide.
+        $fingerprint = $this->checkoutFingerprint($cart, $paymentMethod, $selectedMethod, $displayCurrency, $applyRcoin, $couponCode);
+
+        if ($reusable = $this->findReusableCheckout($user, $cart, $fingerprint)) {
+            Log::info('checkout.reused_live_session', [
+                'order_number' => $reusable->order_number,
+                'cart_id' => $cart->id,
+            ]);
+
+            return $reusable->load(['paymentAttempts', 'paymentAttempts.paymentSession']);
+        }
+
+        // 0b. Rate limit BEFORE anything is written. A throttled checkout must
+        //     cost zero rows: this guard used to sit in createForOrder (step 6),
+        //     by which point the order, its items, the attempt, the coupon
+        //     reservation and OrderPlaced had all committed, so a throttled
+        //     customer was left with an order stranded at Pending forever that
+        //     no sweeper could see.
         $this->paymentSessionService->assertNotRateLimited($user, ProductLine::Checkout->value);
 
         // 1. Recalculate and validate cart items/prices (in raw USD)
@@ -101,7 +150,7 @@ class CheckoutService
         //    in step 5 throws (encryption key, bad currency, network), we want
         //    the cart to stay intact so the customer can retry without losing
         //    their items. Cart deletion now lives at the end, after init succeeds.
-        $order = DB::transaction(function () use ($user, $cart, $paymentMethod, $displayCurrency, $validatedTotals, $orderNumber, $deliveryEmail, $exchangeRate, $applyRcoin, $couponCode) {
+        $order = DB::transaction(function () use ($user, $cart, $paymentMethod, $displayCurrency, $validatedTotals, $orderNumber, $deliveryEmail, $exchangeRate, $applyRcoin, $couponCode, $fingerprint) {
 
             // Re-lock the cart to avoid race conditions
             $lockedCart = Cart::where('id', $cart->id)->lockForUpdate()->firstOrFail();
@@ -217,6 +266,9 @@ class CheckoutService
                     'coupon_code' => $couponCodeApplied,
                     'coupon_discount_usd' => $couponDiscountUsd,
                     'coupon_discount_clamped' => $couponDiscountClamped,
+                    // Identifies this exact checkout so a repeat Pay tap on an
+                    // unchanged cart reuses it rather than duplicating it.
+                    'checkout_fingerprint' => $fingerprint,
                 ],
             ]);
 
@@ -385,5 +437,90 @@ class CheckoutService
         }
 
         return $order->load(['paymentAttempts', 'paymentAttempts.paymentSession']);
+    }
+
+    /**
+     * A stable identity for "this exact checkout".
+     *
+     * Everything that would change what the customer pays, or what they
+     * receive, belongs in here. Deliberately includes each line's
+     * metadata_snapshot: swapping the recipient phone number on an airtime
+     * top-up leaves the price identical but is emphatically a different
+     * purchase, and reusing the previous checkout would send the money to the
+     * wrong number.
+     */
+    private function checkoutFingerprint(Cart $cart, string $paymentMethod, ?string $selectedMethod, string $displayCurrency, bool|string $applyRcoin, ?string $couponCode): string
+    {
+        $lines = $cart->items()
+            ->orderBy('product_variant_id')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($item) => implode(':', [
+                $item->product_variant_id,
+                $item->quantity,
+                (string) $item->subtotal_snapshot,
+                (string) $item->display_amount,
+                md5((string) json_encode($item->metadata_snapshot)),
+            ]))
+            ->implode('|');
+
+        return hash('sha256', implode('~', [
+            $cart->id,
+            $lines,
+            $paymentMethod,
+            $selectedMethod ?? '',
+            strtoupper($displayCurrency),
+            is_string($applyRcoin) ? $applyRcoin : ($applyRcoin ? '1' : '0'),
+            strtoupper($couponCode ?? ''),
+        ]));
+    }
+
+    /**
+     * The customer's own still-payable checkout for this exact cart, if one
+     * exists. Returns null the moment anything differs, so a changed cart or a
+     * lapsed session always produces a fresh order.
+     */
+    private function findReusableCheckout(User $user, Cart $cart, string $fingerprint): ?Order
+    {
+        $candidates = Order::where('cart_id', $cart->id)
+            // Scoped to the buyer, not just the cart. A guest cart is resolved
+            // from a cookie and each guest email mints its own shadow account,
+            // so one cart really can carry orders belonging to different users.
+            // Matching on cart alone would hand somebody else's order back.
+            ->where('user_id', $user->id)
+            ->where('order_status', OrderStatus::Pending)
+            ->where('payment_status', PaymentStatus::Unpaid)
+            ->with('paymentAttempts.paymentSession')
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            if (($candidate->metadata['checkout_fingerprint'] ?? null) !== $fingerprint) {
+                continue;
+            }
+
+            $session = $candidate->paymentAttempts
+                ->sortByDesc('created_at')
+                ->first()?->paymentSession;
+
+            if (! $session || ! in_array($session->status, self::REUSABLE_SESSION_STATUSES, true)) {
+                continue;
+            }
+
+            // An expired session cannot be paid from, and one about to expire is
+            // barely better: handing back forty seconds of runway means the
+            // customer starts entering card details into a screen that dies
+            // under them. Rapid repeat taps, which is what this exists to
+            // absorb, all land nowhere near this boundary. A customer who
+            // returns at the very end of the window genuinely wants a fresh
+            // checkout, so let them have one.
+            if (! $session->expires_at || $session->expires_at->lt(now()->addMinutes(self::MINIMUM_REUSABLE_MINUTES))) {
+                continue;
+            }
+
+            return $candidate;
+        }
+
+        return null;
     }
 }

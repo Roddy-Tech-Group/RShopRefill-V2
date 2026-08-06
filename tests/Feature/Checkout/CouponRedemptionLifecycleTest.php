@@ -178,12 +178,17 @@ class CouponRedemptionLifecycleTest extends TestCase
         $second = $this->checkout();
         $third = $this->checkout();
 
-        // Only the live checkout holds a slot. The superseded ones gave theirs
-        // back, so the coupon shows 1 use rather than the 3 the old code wrote.
+        // Idempotent re-entry means those taps are ONE checkout, not three that
+        // supersede each other, so only a single reservation is ever written.
+        // (Before re-entry landed this produced three rows, two of them
+        // released; the coupon count was right either way, but the taps still
+        // cost an order, its items, an attempt and a session apiece.)
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame($first->id, $third->id);
         $this->assertSame(1, $coupon->consumedCount());
-        $this->assertSame(3, CouponRedemption::count());
+        $this->assertSame(1, CouponRedemption::count());
         $this->assertSame(
-            2,
+            0,
             CouponRedemption::where('status', CouponRedemption::STATUS_RELEASED)->count()
         );
 
@@ -191,8 +196,6 @@ class CouponRedemptionLifecycleTest extends TestCase
 
         $this->assertSame(0, $coupon->consumedCount());
         $this->assertTrue($coupon->fresh()->isRedeemable());
-        $this->assertNotSame($first->id, $third->id);
-        $this->assertNotSame($second->id, $third->id);
     }
 
     public function test_a_live_reservation_still_blocks_a_second_customer(): void
