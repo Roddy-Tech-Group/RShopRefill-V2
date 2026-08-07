@@ -32,6 +32,10 @@ class FeatureFlag
         'esims' => 'esims',
         'mobile-airtime' => 'topups',
         'bill-payments' => 'bills',
+        // Coming-soon categories: no products behind them yet, but the flags
+        // gate the surfaces that advertise them (homepage cards, admin menu).
+        'flights' => 'flights',
+        'stays' => 'stays',
     ];
 
     /**
@@ -134,7 +138,7 @@ class FeatureFlag
 
     /**
      * Feature-flag key for a category slug, or null when the category has no gate
-     * (e.g. Flights/Stays, or a future category without a flag - treated as on).
+     * (a future category without a flag - treated as on).
      */
     public static function forCategory(?string $slug): ?string
     {

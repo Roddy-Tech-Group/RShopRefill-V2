@@ -5,14 +5,36 @@
       - card-flights.jpg  (plane wing above sky/ocean)
       - card-stays.jpg    (resort, palms, pool)
 --}}
-<section data-reveal aria-label="eSIMs, flights and stays">
+@php
+    // Flights and Stays are coming-soon teasers behind their own flags. The
+    // heading and the column count both follow whatever is actually on, so
+    // switching one off never leaves a dangling title or a gap in the grid.
+    $showFlights = \App\Support\FeatureFlag::on('flights', false);
+    $showStays = \App\Support\FeatureFlag::on('stays', false);
+
+    $cardCount = 1 + (int) $showFlights + (int) $showStays;
+    $gridCols = match ($cardCount) {
+        3 => 'sm:grid-cols-3',
+        2 => 'sm:grid-cols-2',
+        default => 'sm:grid-cols-1',
+    };
+
+    $heading = match (true) {
+        $showFlights && $showStays => 'eSIMs, flights & stays',
+        $showFlights => 'eSIMs & flights',
+        $showStays => 'eSIMs & stays',
+        default => 'eSIMs',
+    };
+@endphp
+
+<section data-reveal aria-label="{{ $heading }}">
 
     <div class="mb-4 min-w-0">
-        <h2 class="text-lg font-bold text-zinc-900 sm:text-xl">eSIMs, flights & stays</h2>
+        <h2 class="text-lg font-bold text-zinc-900 sm:text-xl">{{ $heading }}</h2>
         <p class="mt-0.5 text-base text-zinc-600">Connect, explore, and relax.</p>
     </div>
 
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-5 {{ $gridCols }}">
 
         {{-- eSIM (auto-fades between the two animated eSIM scenes every 4
              seconds, pauses on hover). Inline SVGs - no image fetch. --}}
@@ -49,6 +71,7 @@
         </article>
 
         {{-- Flights (auto-fades between travel.webp and flight2.webp every 4 seconds, pauses on hover) --}}
+        @if ($showFlights)
         <article
             x-data="{
                 images: ['{{ asset('assets/travel.webp') }}', '{{ asset('assets/flight2.webp') }}'],
@@ -83,8 +106,10 @@
                 <p class="mt-1 text-sm leading-snug text-white/90">Travel smarter with secure bookings, fast confirmations, and global access from anywhere in the world.</p>
             </div>
         </article>
+        @endif
 
         {{-- Stays (auto-fades between stay.webp and stay2.webp every 4 seconds, pauses on hover) --}}
+        @if ($showStays)
         <article
             x-data="{
                 images: ['{{ asset('assets/stay.webp') }}', '{{ asset('assets/stay2.webp') }}'],
@@ -119,6 +144,7 @@
                 <p class="mt-1 text-sm leading-snug text-white/90">Turn digital currency into real-world travel, comfort, and unforgettable experiences.</p>
             </div>
         </article>
+        @endif
 
     </div>
 </section>
