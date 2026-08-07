@@ -76,9 +76,16 @@ class AdminTransactionExportController extends Controller
                 $query->where('gateway', $gateway);
             }
             if ($search !== '') {
+                // Kept identical to the field set the transactions page and the
+                // header command bar match on - an export taken straight after a
+                // search must contain exactly the rows the admin was looking at.
                 $query->where(function ($q) use ($search) {
                     $q->where('gateway_reference', 'like', "%{$search}%")
-                        ->orWhere('idempotency_key', 'like', "%{$search}%");
+                        ->orWhere('idempotency_key', 'like', "%{$search}%")
+                        ->orWhere('purchase_id', 'like', "%{$search}%")
+                        ->orWhereHas('order', fn ($order) => $order->where('order_number', 'like', "%{$search}%"))
+                        ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%"));
                 });
             }
 

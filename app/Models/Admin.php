@@ -182,7 +182,14 @@ class Admin extends Authenticatable
             }
         }
 
-        $alwaysAllowed = ['logout', 'theme', 'account', 'account-activity', 'operations', 'revert-impersonation'];
+        // search-suggest backs the header command bar, which renders on every
+        // admin page. It has no section of its own - mapping it to one would
+        // pick an arbitrary winner - and unknown routes fall through to
+        // Super-Admin-only below, which 404'd the bar for every other admin.
+        // Safe to always allow: AdminGlobalSearchService gates each record type
+        // it searches against this same method, so the response only ever
+        // contains rows for pages the admin can already open.
+        $alwaysAllowed = ['logout', 'theme', 'account', 'account-activity', 'operations', 'revert-impersonation', 'search-suggest'];
         if (in_array($name, $alwaysAllowed, true)) {
             return true;
         }
