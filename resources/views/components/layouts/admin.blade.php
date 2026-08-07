@@ -387,8 +387,15 @@
                         <a href="{{ route('admin.products', ['category' => 'esims']) }}" wire:navigate class="{{ $subItemClass($isCategory('esims')) }}">eSIMs</a>
                         <a href="{{ route('admin.products', ['category' => 'mobile-airtime']) }}" wire:navigate class="{{ $subItemClass($isCategory('mobile-airtime')) }}">Mobile Top-ups</a>
                         <a href="{{ route('admin.products', ['category' => 'bill-payments']) }}" wire:navigate class="{{ $subItemClass($isCategory('bill-payments')) }}">Bill Payments</a>
-                        <a href="{{ route('admin.products', ['category' => 'flights']) }}" wire:navigate class="{{ $subItemClass($isCategory('flights')) }}">Flights</a>
-                        <a href="{{ route('admin.products', ['category' => 'stays']) }}" wire:navigate class="{{ $subItemClass($isCategory('stays')) }}">Stays</a>
+                        {{-- Coming-soon categories: no category row exists for either
+                             yet, so these land on an empty product list. Behind their
+                             flags so they can be hidden until there is stock to show. --}}
+                        @if (\App\Support\FeatureFlag::on('flights', false))
+                            <a href="{{ route('admin.products', ['category' => 'flights']) }}" wire:navigate class="{{ $subItemClass($isCategory('flights')) }}">Flights</a>
+                        @endif
+                        @if (\App\Support\FeatureFlag::on('stays', false))
+                            <a href="{{ route('admin.products', ['category' => 'stays']) }}" wire:navigate class="{{ $subItemClass($isCategory('stays')) }}">Stays</a>
+                        @endif
                     </div>
                 </div>
                 @endif
@@ -734,7 +741,7 @@
                     role="search"
                     method="GET"
                     action="{{ route('admin.products') }}"
-                    @submit.prevent="if (results.length) { window.location.href = results[0].url; }"
+                    @submit.prevent="openActive()"
                     @click="$refs.search.focus()"
                     :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-400 hover:border-zinc-500 dark:border-white/10 dark:hover:border-white/20'"
                     class="group flex items-center gap-3 cursor-text rounded-[12px] border-2 bg-white px-4 py-2 transition-all duration-200 dark:bg-[#162a4a]"
@@ -747,9 +754,11 @@
                         x-model="query"
                         @input="suggest()"
                         @focus="if (results.length > 0) open = true"
+                        @keydown.down.prevent="move(1)"
+                        @keydown.up.prevent="move(-1)"
                         name="q"
                         type="search"
-                        placeholder="Search products, orders, customers…"
+                        placeholder="Search orders, ICCID, transactions, customers…"
                         aria-label="Search admin"
                         autocomplete="off"
                         spellcheck="false"
@@ -769,16 +778,18 @@
                     </button>
                 </form>
 
-                {{-- Results dropdown — feeds off the existing admin product
-                     search-suggest endpoint. --}}
+                {{-- Results dropdown. Every row type shares one template: the
+                     endpoint normalises each hit to title / subtitle / meta /
+                     badge, so adding a searchable record type server-side needs
+                     no change here. Rows arrive pre-sorted and contiguous by
+                     group, so the headers are derived by walking the flat list. --}}
                 <div
                     x-show="open"
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
-                    style="display:none;"
                     class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-[12px] bg-white/65 ring-1 ring-white/60 backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-white/15"
-                    style="box-shadow: 0 24px 50px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.55);"
+                    style="display:none; box-shadow: 0 24px 50px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.55);"
                 >
                     <div x-show="loading" class="flex items-center gap-2 px-4 py-3 text-[12px] text-zinc-500 dark:text-zinc-400">
                         <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -788,96 +799,137 @@
                         Searching…
                     </div>
 
-                    <ul x-show="! loading && results.length > 0" class="max-h-80 overflow-y-auto p-1.5">
-                        <template x-for="row in results" :key="row.id">
-                            <li>
-                                <a
-                                    :href="row.url"
-                                    wire:navigate
-                                    class="block rounded-[12px] px-3 py-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-500/10"
-                                >
-                                    {{-- Customer hit — avatar + name + email, links straight to the customer page. --}}
-                                    <template x-if="row.type === 'customer'">
-                                        <span class="flex items-center gap-3">
-                                            <img :src="row.avatar" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100 dark:ring-blue-500/30" loading="lazy">
-                                            <span class="min-w-0 flex-1 leading-tight">
-                                                <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.name"></span>
-                                                <span class="block truncate text-[11px] text-zinc-500 dark:text-zinc-400" x-text="row.email"></span>
-                                            </span>
-                                            <span class="shrink-0 rounded-[12px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">Customer</span>
-                                        </span>
-                                    </template>
+                    <div x-show="! loading && results.length > 0" class="max-h-96 overflow-y-auto p-1.5">
+                        <template x-for="group in groups" :key="group.name">
+                            <div>
+                                <p class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400" x-text="group.name"></p>
+                                <ul>
+                                    <template x-for="row in group.rows" :key="row.id">
+                                        <li>
+                                            <a
+                                                :href="row.url"
+                                                wire:navigate
+                                                @mouseenter="activeIndex = results.indexOf(row)"
+                                                :class="results.indexOf(row) === activeIndex ? 'bg-blue-50 dark:bg-blue-500/10' : ''"
+                                                class="flex items-center gap-3 rounded-[12px] px-3 py-2 transition-colors"
+                                            >
+                                                <template x-if="row.avatar">
+                                                    <img :src="row.avatar" alt="" class="h-9 w-9 shrink-0 rounded-[12px] bg-white object-contain ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
+                                                </template>
+                                                <template x-if="! row.avatar">
+                                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-500/30" x-text="row.initials"></span>
+                                                </template>
 
-                                    {{-- Product hit — brand logo + name + meta + cost. --}}
-                                    <template x-if="row.type === 'product'">
-                                        <span class="flex items-center gap-3">
-                                            <template x-if="row.logo">
-                                                <img :src="row.logo" alt="" class="h-9 w-9 shrink-0 rounded-[12px] object-contain bg-white ring-1 ring-zinc-100 dark:ring-white/10" loading="lazy">
-                                            </template>
-                                            <template x-if="! row.logo">
-                                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-[11px] font-bold uppercase text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-200" x-text="(row.brand || row.name || row.sku || '').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase() || '—'"></span>
-                                            </template>
-                                            <span class="min-w-0 flex-1 leading-tight">
-                                                <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.brand || row.name || row.sku"></span>
-                                                <span class="block truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                                                    <span x-show="row.category" x-text="row.category"></span>
-                                                    <span x-show="row.country"> · <span x-text="row.country"></span></span>
-                                                    <span x-show="row.sku"> · <span class="font-mono" x-text="row.sku"></span></span>
+                                                <span class="min-w-0 flex-1 leading-tight">
+                                                    <span class="block truncate text-[13px] font-semibold text-zinc-900 dark:text-white" x-text="row.title"></span>
+                                                    <span class="block truncate text-[11px] text-zinc-500 dark:text-zinc-400" x-text="row.subtitle"></span>
                                                 </span>
-                                            </span>
-                                            <span class="shrink-0 text-right text-[11px] tabular-nums">
-                                                <span class="block text-zinc-500 dark:text-zinc-400">Cost</span>
-                                                <span class="block font-semibold text-zinc-900 dark:text-white" x-text="'USD ' + Number(row.cost).toFixed(2)"></span>
-                                            </span>
-                                        </span>
+
+                                                <span class="shrink-0 text-right leading-tight">
+                                                    <span class="block text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-200" x-text="row.badge"></span>
+                                                    <span x-show="row.meta" class="block text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400" x-text="row.meta"></span>
+                                                </span>
+                                            </a>
+                                        </li>
                                     </template>
-                                </a>
-                            </li>
+                                </ul>
+                            </div>
                         </template>
-                    </ul>
+                    </div>
 
                     <div x-show="! loading && results.length === 0 && query.length >= 2" class="px-4 py-6 text-center text-[12px] text-zinc-500 dark:text-zinc-400">
                         No matches for "<span class="font-semibold text-zinc-900 dark:text-white" x-text="query"></span>"
                     </div>
 
                     <div x-show="results.length > 0" class="border-t border-zinc-200/60 px-4 py-2 text-[11px] text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-                        Press <kbd class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-700 dark:bg-transparent dark:text-zinc-200">Enter</kbd> to open the top match
+                        <kbd class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-700 dark:bg-transparent dark:text-zinc-200">↑↓</kbd>
+                        to move,
+                        <kbd class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-700 dark:bg-transparent dark:text-zinc-200">Enter</kbd>
+                        to open
                     </div>
                 </div>
             </div>
 
             <script>
                 // Admin command-bar factory — shared shape with the storefront's
-                // navBrandSearch but pointed at the admin product search-suggest
-                // endpoint. Race-safe via an incrementing requestId.
+                // navBrandSearch but pointed at the global admin search endpoint.
+                // Race-safe via an incrementing requestId.
                 window.adminCommandBar = function () {
                     return {
                         query: '',
                         results: [],
                         loading: false,
                         open: false,
+                        activeIndex: 0,
                         _seq: 0,
-                        async suggest() {
+                        _timer: null,
+
+                        // The endpoint now fans one query across a dozen tables,
+                        // so firing on every keystroke would queue a burst of
+                        // multi-table searches the user has already typed past.
+                        // Wait for a pause; the request itself stays race-safe.
+                        suggest() {
+                            clearTimeout(this._timer);
                             const q = (this.query || '').trim();
-                            if (q.length < 2) { this.results = []; this.loading = false; this.open = false; return; }
-                            const mySeq = ++this._seq;
+                            if (q.length < 2) {
+                                this.results = [];
+                                this.loading = false;
+                                this.open = false;
+                                return;
+                            }
                             this.loading = true;
                             this.open = true;
+                            this._timer = setTimeout(() => this.fetchResults(q), 180);
+                        },
+
+                        async fetchResults(q) {
+                            const mySeq = ++this._seq;
                             try {
                                 const res = await fetch('{{ route('admin.search-suggest') }}?q=' + encodeURIComponent(q), {
                                     headers: { 'Accept': 'application/json' },
                                 });
                                 if (mySeq !== this._seq) { return; }
                                 this.results = await res.json();
+                                this.activeIndex = 0;
                             } catch (e) {
-                                this.results = [];
+                                if (mySeq === this._seq) { this.results = []; }
                             } finally {
                                 if (mySeq === this._seq) { this.loading = false; }
                             }
                         },
+
+                        // Rows arrive sorted and contiguous by group, so headers
+                        // come from walking the flat list rather than a second
+                        // grouping pass that could reorder relevance.
+                        get groups() {
+                            const out = [];
+                            for (const row of this.results) {
+                                const last = out[out.length - 1];
+                                if (last && last.name === row.group) {
+                                    last.rows.push(row);
+                                } else {
+                                    out.push({ name: row.group, rows: [row] });
+                                }
+                            }
+                            return out;
+                        },
+
+                        move(delta) {
+                            if (! this.results.length) { return; }
+                            const count = this.results.length;
+                            this.activeIndex = (this.activeIndex + delta + count) % count;
+                        },
+
+                        openActive() {
+                            const row = this.results[this.activeIndex] || this.results[0];
+                            if (row) { window.location.href = row.url; }
+                        },
+
                         clear() {
+                            clearTimeout(this._timer);
                             this.query = '';
                             this.results = [];
+                            this.activeIndex = 0;
                             this.open = false;
                             this.$refs.search?.focus();
                         },

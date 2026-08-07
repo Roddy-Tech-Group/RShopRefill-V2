@@ -3,12 +3,14 @@
 use App\Http\Controllers\Admin\AdminCatalogController;
 use App\Http\Controllers\Admin\AdminCommerceController;
 use App\Http\Controllers\Admin\AdminCustomerController;
+use App\Http\Controllers\Admin\AdminCustomerExportController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminFintechController;
 use App\Http\Controllers\Admin\AdminKycController;
 use App\Http\Controllers\Admin\AdminReportExportController;
 use App\Http\Controllers\Admin\AdminRewardAnalyticsController;
 use App\Http\Controllers\Admin\AdminRewardSettingsController;
+use App\Http\Controllers\Admin\AdminSearchController;
 use App\Http\Controllers\Admin\AdminSreController;
 use App\Http\Controllers\Admin\AdminTransactionExportController;
 use App\Http\Controllers\Admin\Auth\AdminLoginController;
@@ -118,71 +120,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         })->name('products.search-suggest');
 
         // Global command-bar search for the admin header. Unlike products/search-
-        // suggest (catalogue only), this powers the bar's "products, orders,
-        // customers" promise: it returns TYPED rows (customer + product), each
-        // with a ready-made `url`, so a customer hit links straight to that
-        // customer's page instead of dead-ending on the products list.
-        Route::get('search-suggest', function (Request $request) {
-            $q = trim((string) $request->query('q', ''));
-            if (mb_strlen($q) < 2) {
-                return response()->json([]);
-            }
-
-            // Customers by name or email - the most common admin lookup, shown first.
-            $customers = User::query()
-                ->where(function ($qq) use ($q) {
-                    $qq->where('name', 'like', "%{$q}%")
-                        ->orWhere('email', 'like', "%{$q}%");
-                })
-                ->orderByDesc('id')
-                ->limit(6)
-                ->get(['id', 'name', 'email', 'avatar_url'])
-                ->map(fn (User $user) => [
-                    'type' => 'customer',
-                    'id' => 'c'.$user->id, // prefixed so it never collides with a product id (Alpine :key)
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'avatar' => $user->avatar_url ?: $user->initialsAvatar(),
-                    'url' => route('admin.customer', $user),
-                ]);
-
-            // Products - same matching as products/search-suggest so the bar keeps
-            // its existing catalogue search alongside customers.
-            $products = ProductVariant::query()
-                ->select('product_variants.id', 'product_variants.product_id', 'product_variants.sku', 'product_variants.cost_price')
-                ->with(['product:id,name,brand_key,country_code,category_id,logo_url', 'product.category:id,name'])
-                ->join('products', 'products.id', '=', 'product_variants.product_id')
-                ->where(function ($qq) use ($q) {
-                    $qq->where('products.name', 'like', "%{$q}%")
-                        ->orWhere('products.brand_key', 'like', "%{$q}%")
-                        ->orWhere('products.country_code', 'like', strtoupper($q).'%')
-                        ->orWhere('product_variants.sku', 'like', "%{$q}%");
-                })
-                ->orderByDesc('product_variants.id')
-                ->limit(6)
-                ->get()
-                ->map(function ($variant) {
-                    $product = $variant->product;
-                    $brand = $product?->brand_key
-                        ? Product::brandDisplayName($product->brand_key)
-                        : ($product?->name ?? 'Unknown');
-
-                    return [
-                        'type' => 'product',
-                        'id' => 'p'.$variant->id,
-                        'name' => $product?->name,
-                        'brand' => $brand,
-                        'logo' => $product ? Product::brandLogoUrl($product->brand_key, $product->logo_url) : null,
-                        'country' => $product?->country_code,
-                        'category' => $product?->category?->name,
-                        'sku' => $variant->sku,
-                        'cost' => (float) $variant->cost_price,
-                        'url' => route('admin.products').'?q='.urlencode($product?->name ?? (string) $variant->sku),
-                    ];
-                });
-
-            return response()->json($customers->concat($products)->values());
-        })->name('search-suggest');
+        // suggest (catalogue only), this searches the whole back office -
+        // customers, orders, eSIMs by ICCID, transactions, wallet money,
+        // gift-card trades, catalogue, coupons, and the admin pages themselves -
+        // returning TYPED rows with a ready-made `url` so every hit links
+        // straight to the page that shows it. Every branch is permission-gated
+        // inside the service, so the bar can never surface a record the signed-in
+        // admin is blocked from opening.
+        Route::get('search-suggest', [AdminSearchController::class, 'suggest'])->name('search-suggest');
 
         // Gift Card Trading Routes
         Volt::route('gift-cards/trades', 'admin.gift-cards.trades.index')->name('gift-cards.trades.index');
@@ -198,6 +143,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ]);
         })->name('order');
         Route::view('customers', 'admin.customers')->name('customers');
+        // Registered BEFORE customers/{user}: routes match in order, so the
+        // wildcard would otherwise capture "export.csv" as a user key and
+        // 404 on the model binding.
+        Route::get('customers/export.csv', [AdminCustomerExportController::class, 'csv'])->name('customers.export');
         Route::get('customers/{user}', function (User $user) {
             $user->load([
                 'wallets',

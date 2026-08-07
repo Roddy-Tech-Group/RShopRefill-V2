@@ -12,6 +12,12 @@
         $statusFilter = 'all';
     }
 
+    // Free-text reference lookup. The header command bar sends wallet-funding
+    // attempts here (they have no order page of their own to land on), so this
+    // page has to be able to isolate a single reference - and an admin handed a
+    // gateway reference by a customer can now paste it straight in.
+    $search = trim((string) request()->query('q', ''));
+
     $statusMap = [
         'completed' => ['paid'],
         'pending'   => ['pending', 'processing', 'reserved', 'unpaid'],
@@ -50,6 +56,11 @@
         // both or neither - the admin sees a refund twice, or never at all.
         $rows = WalletTransaction::with('wallet.user')
             ->whereIn('transaction_category', ['refund', 'reversal'])
+            ->when($search !== '', fn ($query) => $query->where(function ($inner) use ($search) {
+                $inner->where('reference', 'like', "%{$search}%")
+                    ->orWhere('idempotency_key', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            }))
             ->latest()
             ->orderByDesc('id')
             ->paginate(50)
@@ -74,6 +85,18 @@
         $paymentsQuery = PaymentAttempt::with(['user', 'order'])->latest()->orderByDesc('id');
         if ($statusFilter !== 'all') {
             $paymentsQuery->whereIn('payment_status', $statusMap[$statusFilter]);
+        }
+        if ($search !== '') {
+            // Same field set the header command bar matches on, so a hit there
+            // always resolves to a visible row here rather than an empty page.
+            $paymentsQuery->where(function ($query) use ($search) {
+                $query->where('gateway_reference', 'like', "%{$search}%")
+                    ->orWhere('idempotency_key', 'like', "%{$search}%")
+                    ->orWhere('purchase_id', 'like', "%{$search}%")
+                    ->orWhereHas('order', fn ($order) => $order->where('order_number', 'like', "%{$search}%"))
+                    ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%"));
+            });
         }
         $rows = $paymentsQuery->paginate(50)->withQueryString()->through(function ($payment) use ($statusPillFor) {
             $statusValue = $payment->payment_status?->value ?? 'pending';
@@ -114,9 +137,12 @@
         ->first();
     $refundCount = WalletTransaction::whereIn('transaction_category', ['refund', 'reversal'])->count();
 
-    // Preserve other query params when toggling the status filter chips.
+    // Preserve other query params when toggling the status filter chips - an
+    // active reference search must survive a chip press, or the chips silently
+    // widen the result set back to the whole table.
     $filterUrl = fn (string $status) => route('admin.transactions', array_filter([
         'status' => $status === 'all' ? null : $status,
+        'q' => $search !== '' ? $search : null,
     ]));
 @endphp
 
@@ -138,7 +164,7 @@
         </div>
     </x-slot:heading>
     <x-slot:subheading>
-        {{ number_format($rowsTotal) }} {{ $rowsNoun }}{{ $statusFilter === 'all' ? ' total' : ' matching this filter' }}.
+        {{ number_format($rowsTotal) }} {{ $rowsNoun }}@if ($search !== '') matching "{{ $search }}"@else{{ $statusFilter === 'all' ? ' total' : ' matching this filter' }}@endif.
         @if ($rows->isNotEmpty())
             Showing {{ number_format($rows->firstItem()) }}-{{ number_format($rows->lastItem()) }}.
         @endif
@@ -181,6 +207,36 @@
                 ])
             >{{ $label }}</a>
         @endforeach
+
+        {{-- Reference search. A GET form so the result stays a shareable URL,
+             matching how the status chips already work. The active status rides
+             along in a hidden field so searching does not reset the filter. --}}
+        <form method="GET" action="{{ route('admin.transactions') }}" class="ms-auto flex items-center gap-1.5">
+            @if ($statusFilter !== 'all')
+                <input type="hidden" name="status" value="{{ $statusFilter }}">
+            @endif
+            <div class="flex items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 focus-within:border-blue-500 dark:border-zinc-700/60 dark:bg-[#1d3252]">
+                <svg class="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ $search }}"
+                    placeholder="Reference, order, customer…"
+                    aria-label="Search transactions"
+                    autocomplete="off"
+                    class="w-48 bg-transparent text-xs text-zinc-800 placeholder:text-zinc-500 outline-none dark:text-white dark:placeholder:text-zinc-400"
+                >
+            </div>
+            @if ($search !== '')
+                <a
+                    href="{{ route('admin.transactions', array_filter(['status' => $statusFilter === 'all' ? null : $statusFilter])) }}"
+                    wire:navigate
+                    class="rounded-[12px] px-3 py-1.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]"
+                >Clear</a>
+            @endif
+        </form>
     </div>
 
     {{-- Grid template shared between the header pill and every data row so
