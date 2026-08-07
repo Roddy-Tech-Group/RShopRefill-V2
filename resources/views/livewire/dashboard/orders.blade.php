@@ -62,7 +62,9 @@ class extends Component {
         'completed'           => ['Delivered',          'text-emerald-600 dark:text-emerald-400', 'check'],
         'partially_completed' => ['Partially complete', 'text-blue-600 dark:text-blue-300',       'check'],
         'processing'          => ['Processing',         'text-blue-600 dark:text-blue-300',       'clock'],
-        'pending'             => ['Pending',            'text-amber-600 dark:text-amber-400',     'clock'],
+        // A pending order is an unpaid checkout, and the row must say so
+        // rather than implying a purchase is in progress.
+        'pending'             => ['Awaiting payment',   'text-amber-600 dark:text-amber-400',     'clock'],
         'failed'              => ['Failed',             'text-red-600 dark:text-red-400',         'x'],
         'cancelled'           => ['Cancelled',          'text-zinc-500 dark:text-zinc-400',       'x'],
         'requires_attention'  => ['Needs review',       'text-amber-600 dark:text-amber-400',     'clock'],
@@ -138,6 +140,14 @@ class extends Component {
             @foreach ($orders as $order)
                 @php
                     [$lineLabel, $lineTone, $lineIcon] = $statusLine[$order->order_status->value] ?? ['Placed', 'text-amber-600 dark:text-amber-400', 'clock'];
+
+                    // A cancelled order nobody paid for is an expired checkout,
+                    // not a cancelled purchase; "Cancelled" reads like something
+                    // was taken away.
+                    $rowPayment = $order->payment_status->value ?? $order->payment_status;
+                    if ($order->order_status->value === 'cancelled' && $rowPayment !== 'paid') {
+                        [$lineLabel, $lineTone, $lineIcon] = ['Expired', 'text-zinc-500 dark:text-zinc-400', 'x'];
+                    }
                     // Rcoin is earned on the USD settlement total, never the
                     // display-currency figure (a XAF 1,561 order is ~$2.75,
                     // which earns ~3 Rcoin - not 1,561).

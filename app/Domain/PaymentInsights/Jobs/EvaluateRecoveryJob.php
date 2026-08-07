@@ -5,7 +5,9 @@ namespace App\Domain\PaymentInsights\Jobs;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Transactions\PaymentRecoveryMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Domain\PaymentInsights\Services\RecoveryEligibilityService;
+use App\Domain\PaymentInsights\Support\RecoveryCopy;
 use App\Models\PaymentOutcome;
 use App\Models\TransactionRecovery;
 use App\Models\User;
@@ -28,6 +30,9 @@ use Illuminate\Support\Str;
 class EvaluateRecoveryJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /** How long a recovery link stays usable. Must outlive the reminder. */
+    public const LINK_LIFETIME_HOURS = 48;
 
     public $tries = 3;
 
@@ -91,11 +96,17 @@ class EvaluateRecoveryJob implements ShouldQueue
 
         $recovery = TransactionRecovery::create([
             'payment_session_id' => $session->id,
+            'payment_outcome_id' => $outcome->id,
             'user_id' => $outcome->user_id,
             'customer_email' => $session->customer_email,
+            // Snapshotted so the email copy and later analytics agree even if
+            // the outcome is reclassified afterwards.
+            'failure_reason_code' => $outcome->failure_reason_code,
             'token' => Str::random(40),
-            'status' => 'pending',
-            'expires_at' => now()->addHours(24),
+            'status' => RecoveryStatus::Pending,
+            // 48h, not 24h: the reminder lands around the 20-hour mark and a
+            // link that dies before its own reminder arrives is a dead end.
+            'expires_at' => now()->addHours(self::LINK_LIFETIME_HOURS),
         ]);
 
         /** @var User $user */
@@ -103,11 +114,16 @@ class EvaluateRecoveryJob implements ShouldQueue
 
         // The email is redirected to the checkout email when it differs from
         // the account email (e.g. an order placed with an alternate address).
+        $copy = RecoveryCopy::for($recovery->failure_reason_code);
+
         $communications->send(
             recipient: $user,
             category: CommunicationCategory::PaymentRecovery,
-            title: 'Complete your Payment',
-            message: 'Your recent payment attempt was not completed. You can securely resume it from your email.',
+            // EmailChannel uses `title` as the subject line, so the subject
+            // must be passed here; a Mailable envelope subject is ignored on
+            // this path. The headline still opens the email body.
+            title: $copy['subject'],
+            message: $copy['guidance'],
             mailable: new PaymentRecoveryMail($recovery),
             correlationId: 'payment_recovery_'.$recovery->id,
             overrideEmail: strtolower($session->customer_email) !== strtolower((string) $user->email)
@@ -117,6 +133,7 @@ class EvaluateRecoveryJob implements ShouldQueue
                 'payment_session_id' => $session->id,
                 'recovery_id' => $recovery->id,
                 'payment_outcome_id' => $outcome->id,
+                'failure_reason_code' => $outcome->failure_reason_code,
                 'failure_reason' => $outcome->metadata['raw_reason'] ?? null,
             ]
         );

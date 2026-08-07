@@ -372,12 +372,44 @@
                         @error('delivery_email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
+                    {{-- Gateway outage notice. Server-rendered from the same
+                         flag map the tiles and guards read. Tiles stay visible
+                         but grey so this reads as a temporary issue, never as
+                         "we do not support cards". --}}
+                    @php
+                        $disabledGatewayRails = [
+                            'flutterwave' => 'Card and bank payments',
+                            'nowpayments' => 'Crypto payments',
+                            'wallet' => 'Wallet payments',
+                        ];
+                        $downRails = array_values(array_intersect_key($disabledGatewayRails, array_flip(\App\Support\FeatureFlag::disabledGateways())));
+                        $allGatewaysDown = count($downRails) === count($disabledGatewayRails);
+                    @endphp
+                    @if ($downRails !== [])
+                        <div class="mt-5 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.02 13.9A1.5 1.5 0 0 0 3.57 20h16.86a1.5 1.5 0 0 0 1.3-2.24l-8.02-13.9a1.5 1.5 0 0 0-2.6 0z"/>
+                            </svg>
+                            <p class="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                                @if ($allGatewaysDown)
+                                    Checkout is temporarily paused for maintenance. Your cart is saved, please check back shortly.
+                                @else
+                                    {{ implode(' and ', $downRails) }} {{ count($downRails) > 1 ? 'are' : 'is' }} temporarily unavailable. We are working on it, please use another payment method or check back shortly.
+                                @endif
+                            </p>
+                        </div>
+                    @endif
+
                     {{-- Method tabs --}}
                     <div class="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <template x-for="m in getFilteredMethods()" :key="m.key">
-                            <button type="button" @click="method = m.key"
-                                :class="method === m.key ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300'"
-                                class="flex items-start gap-2.5 rounded-[12px] border bg-white px-3 py-2.5 text-left transition duration-150 active:scale-[0.98]">
+                            <button type="button" @click="if (! isMethodDisabled(m.key)) method = m.key"
+                                :disabled="isMethodDisabled(m.key)"
+                                :aria-disabled="isMethodDisabled(m.key)"
+                                :class="isMethodDisabled(m.key)
+                                    ? 'border-zinc-200 opacity-45 grayscale cursor-not-allowed'
+                                    : (method === m.key ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300')"
+                                class="flex items-start gap-2.5 rounded-[12px] border bg-white px-3 py-2.5 text-left transition duration-150 active:scale-[0.98] disabled:active:scale-100">
                                 <span class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
                                     <template x-if="m.icon">
                                         {{-- Card + Apple Pay icons are monochrome glyphs: force them
@@ -1196,6 +1228,19 @@
                 // CheckoutService reads `apply_rcoin` and branches accordingly.
                 applyRcoin: '',
 
+                // Gateway kill switches, resolved server-side from the ONE
+                // canonical map in FeatureFlag so the greyed tiles and the
+                // server guard can never disagree. Tiles for a disabled
+                // gateway stay VISIBLE but grey: disappearing tiles read as
+                // "this store does not take cards", grey reads as what it is,
+                // a temporary outage.
+                disabledGateways: @js(\App\Support\FeatureFlag::disabledGateways()),
+                methodGateways: @js(\App\Support\FeatureFlag::METHOD_GATEWAYS),
+
+                isMethodDisabled(key) {
+                    return this.disabledGateways.includes(this.methodGateways[key] ?? '');
+                },
+
                 allMethods: [
                     { key: 'card',          label: 'Card',          desc: 'Visa, Mastercard',           icon: '/assets/credit%20card%20payment.webp' },
                     { key: 'mobile_money',  label: 'Mobile Money',  desc: 'MTN, Orange, Vodafone',      icon: '/assets/MOMO.svg' },
@@ -1299,9 +1344,17 @@
                     this.rcoinConfig = rcoinConfig;
                     this.resetCardDetails();
                     this.detectApplePay();
+
+                    // If the default method's gateway is switched off, land the
+                    // customer on the first live one instead of a grey tile.
+                    if (this.isMethodDisabled(this.method)) {
+                        const alive = this.getFilteredMethods().filter(m => ! this.isMethodDisabled(m.key));
+                        this.method = alive[0]?.key ?? null;
+                    }
                     
                     this.$watch('$store.cart.currency', (newVal) => {
-                        const methods = this.getFilteredMethods();
+                        // Never auto-select a greyed-out (disabled gateway) tile.
+                        const methods = this.getFilteredMethods().filter(m => ! this.isMethodDisabled(m.key));
                         const currentSupported = methods.some(m => m.key === this.method);
                         if (!currentSupported && methods.length > 0) {
                             this.method = methods[0].key;
@@ -1596,6 +1649,11 @@
 
                 canContinue() {
                     if (! this.$store.cart.hydrated || this.$store.cart.count === 0) {
+                        return false;
+                    }
+                    // Never submit toward a switched-off gateway; the server
+                    // guard would refuse it anyway, this just says so earlier.
+                    if (! this.method || this.isMethodDisabled(this.method)) {
                         return false;
                     }
                     if (this.method === 'crypto') {

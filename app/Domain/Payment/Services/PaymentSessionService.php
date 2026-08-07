@@ -2,11 +2,12 @@
 
 namespace App\Domain\Payment\Services;
 
+use App\Domain\Order\Events\OrderConfirmed;
+use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
-use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
@@ -32,8 +33,13 @@ class PaymentSessionService
      */
     public function createForOrder(Order $order, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
-        $this->enforceBackoff($order->user, ProductLine::Checkout->value);
-
+        // NO backoff check here. CheckoutService commits the order, its items,
+        // the attempt, the coupon reservation and the OrderPlaced event long
+        // before it reaches this call, so throwing at this point stranded the
+        // order at Pending with no session at all - and the stale-session
+        // sweeper keys off payment_sessions, so nothing could ever clean it up.
+        // The guard now runs pre-flight in CheckoutService::placeOrder, before
+        // the first durable write. See assertNotRateLimited().
         return DB::transaction(function () use ($order, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -89,8 +95,8 @@ class PaymentSessionService
      */
     public function createForWalletFunding(WalletFunding $funding, PaymentAttempt $attempt, array $providerInitData): PaymentSession
     {
-        $this->enforceBackoff($funding->user, ProductLine::WalletFunding->value);
-
+        // Guard runs pre-flight in WalletFundingService::initializeFunding, for
+        // the same reason as createForOrder above.
         return DB::transaction(function () use ($funding, $attempt, $providerInitData) {
             $expiresAt = $attempt->expires_at ?? now()->addMinutes(15);
 
@@ -139,7 +145,12 @@ class PaymentSessionService
      */
     public function confirmSession(PaymentSession $session, ?array $payload = null): void
     {
-        DB::transaction(function () use ($session, $payload) {
+        // Set inside the transaction, dispatched after it commits: an event
+        // fired mid-transaction can email a customer about a confirmation
+        // that then rolls back.
+        $confirmedOrder = null;
+
+        DB::transaction(function () use ($session, $payload, &$confirmedOrder) {
             $session = PaymentSession::where('id', $session->id)->lockForUpdate()->firstOrFail();
 
             if ($session->status === 'confirmed') {
@@ -216,8 +227,27 @@ class PaymentSessionService
                 }
             }
 
+            // The coupon slot is only truly consumed now that the money has
+            // arrived. Safe to call for orders with no coupon at all.
+            if ($order) {
+                app(CouponRedemptionService::class)->redeemForOrder($order);
+                $confirmedOrder = $order;
+            }
+
             event(new PaymentSessionConfirmed($session));
         });
+
+        // This is the single choke point every payment route funnels through
+        // (card webhook, bank transfer, crypto, wallet, the sweeper's late
+        // rescue), which is what guarantees the customer-facing confirmation
+        // fires for every path and no path can fire it twice: the early
+        // return above leaves $confirmedOrder null on replay, and the
+        // communication layer's idempotency key dedupes a second session
+        // confirming the same order. Wallet funding has no order and sends
+        // its own receipt.
+        if ($confirmedOrder) {
+            OrderConfirmed::dispatch($confirmedOrder);
+        }
     }
 
     /**
@@ -231,6 +261,16 @@ class PaymentSessionService
             if (in_array($session->status, ['confirmed', 'failed', 'expired', 'cancelled'])) {
                 return;
             }
+
+            // How far the customer actually got, captured BEFORE the state
+            // machine moves. Everything below routes through 'processing' on
+            // its way to 'failed', so by the time the outcome is recorded the
+            // session can no longer say whether the customer picked a payment
+            // method or abandoned at the very first screen. Every terminal
+            // outcome was consequently filed as a 'processing' failure, which
+            // made the stage column, and the dashboard panel built on it,
+            // report fiction.
+            $statusAtFailure = $session->status;
 
             if (in_array($session->status, ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action'])) {
                 $session->transitionTo('processing');
@@ -247,6 +287,7 @@ class PaymentSessionService
                 'failure_reason' => $reason,
                 'failure_payload' => $payload,
                 'failure_details' => $payload['failure'] ?? null,
+                'status_at_failure' => $statusAtFailure,
             ]);
 
             // Customer-facing reason ALSO goes on payment_payload — that's the
@@ -275,6 +316,12 @@ class PaymentSessionService
                 }
             }
 
+            // Hand the coupon slot back so the next customer can use it. A late
+            // confirm on this same session reclaims it (see redeemForOrder).
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, $reason);
+            }
+
             event(new PaymentSessionFailed($session, $reason));
         });
     }
@@ -291,6 +338,12 @@ class PaymentSessionService
                 return;
             }
 
+            // Same reason as failSession: record how far the customer got
+            // before the state machine erases it.
+            $session->metadata = array_merge($session->metadata ?? [], [
+                'status_at_failure' => $session->status,
+            ]);
+
             $session->transitionTo('expired');
 
             // Unlock RCOIN if it was locked during checkout. Recorded on the
@@ -305,6 +358,10 @@ class PaymentSessionService
                     $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
                     $order->save();
                 }
+            }
+
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, 'session_expired');
             }
 
             event(new PaymentSessionExpired($session));
@@ -324,10 +381,24 @@ class PaymentSessionService
         };
     }
 
-    private function enforceBackoff(?User $user, string $productLine): void
+    /**
+     * Refuse a payment attempt from a customer who is currently rate limited.
+     *
+     * MUST be called pre-flight, before the calling flow makes its first
+     * durable write. A backoff check placed after a commit cannot undo what it
+     * has already created, so it leaves an unpayable order (or funding) behind
+     * and manufactures exactly the orphan records the sweeper cannot see. That
+     * is not a tuning problem, it is a defect by construction, so the guard
+     * lives at the entry point of each flow and nowhere else.
+     *
+     * @throws PaymentBackoffException
+     */
+    public function assertNotRateLimited(?User $user, string $productLine): void
     {
         // Kill switch: disabling progressive backoff removes the rate limit
-        // without touching outcome recording or recovery.
+        // without touching outcome recording or recovery. Note the manager is
+        // still consulted when only enforcement is off, because shadow mode's
+        // whole purpose is to keep measuring while letting customers through.
         if (FeatureFlag::off('progressive_backoff')) {
             return;
         }

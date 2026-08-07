@@ -3,6 +3,7 @@
 namespace App\Domain\PaymentInsights\Services;
 
 use App\Domain\PaymentInsights\Enums\FailureCategory;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Models\PaymentOutcome;
 use App\Models\PaymentTelemetryEvent;
 use App\Models\RecoveryAttempt;
@@ -67,15 +68,20 @@ class PaymentInsightsMetrics
                 return $row;
             });
 
-        // Drill-down: the latest failures with the gateway's verbatim verdict,
-        // for support cases ("why did my payment fail?") answered from one
-        // screen instead of log spelunking. Admin eyes only.
-        $recentFailures = (clone $query)->where('outcome', 'failed')
+        // Drill-down: the latest unsuccessful outcomes with the gateway's
+        // verbatim verdict, for support cases ("why did my payment fail?")
+        // answered from one screen instead of log spelunking. Includes
+        // abandonment, not just hard declines: on this platform most lost
+        // payments are people walking away, and a table that hid them would
+        // show a handful of rows while the real leak stayed invisible.
+        $recentFailures = (clone $unsuccessful)
             ->orderByDesc('created_at')
             ->limit(15)
             ->get()
             ->map(fn (PaymentOutcome $outcome) => [
                 'at' => $outcome->created_at?->toDateTimeString(),
+                'outcome' => $outcome->outcome->value,
+                'stage' => $outcome->failure_stage?->value,
                 'provider' => $outcome->provider,
                 'payment_method' => $outcome->payment_method,
                 'code' => $outcome->failure_reason_code,
@@ -103,11 +109,31 @@ class PaymentInsightsMetrics
                 return $row;
             });
 
+        // Two rates, never one. The payments industry separates them because
+        // they are different problems with different owners:
+        //
+        //   Authorization rate = approved / actually submitted to a gateway.
+        //   Excludes people who never entered details, so it measures whether
+        //   PAYMENTS work. This is the number to compare against a provider.
+        //
+        //   Checkout conversion = approved / everyone who started checkout.
+        //   Includes abandonment, so it measures whether CHECKOUT works.
+        //
+        // Blending them produces a figure that is neither, and on a platform
+        // where most losses are abandonment it reads as a payments crisis
+        // when the payments are fine.
+        $submitted = $successful + $failed;
+
         return [
             'totalAttempts' => $totalAttempts,
             'successful' => $successful,
             'failed' => $failed,
             'abandoned' => $abandoned,
+            'submitted' => $submitted,
+            'authorizationRate' => $submitted > 0 ? round(($successful / $submitted) * 100, 1) : 0.0,
+            'checkoutConversionRate' => $totalAttempts > 0 ? round(($successful / $totalAttempts) * 100, 1) : 0.0,
+            // Retained: same definition as checkout conversion, kept so older
+            // readers of this array keep working.
             'successRate' => $totalAttempts > 0 ? round(($successful / $totalAttempts) * 100, 1) : 0.0,
             'failureRate' => $totalAttempts > 0 ? round(($failed / $totalAttempts) * 100, 1) : 0.0,
             'abandonRate' => $totalAttempts > 0 ? round(($abandoned / $totalAttempts) * 100, 1) : 0.0,
@@ -121,6 +147,143 @@ class PaymentInsightsMetrics
             'recentFailures' => $recentFailures,
             'providers' => $providers,
         ];
+    }
+
+    /**
+     * Where in the funnel payments die, aggregated.
+     *
+     * On a platform whose losses are mostly walk-aways, "which step were they
+     * on when they left" is the most valuable question on the page, and the
+     * classifier has been recording the answer on every outcome all along.
+     *
+     * @return array<int, array{stage: string, label: string, count: int, share: float}>
+     */
+    public function funnelStages(?CarbonInterface $since = null): array
+    {
+        $query = PaymentOutcome::query()->whereIn('outcome', ['failed', 'expired', 'cancelled']);
+        if ($since) {
+            $query->where('created_at', '>=', $since);
+        }
+
+        $counts = (clone $query)
+            ->select('failure_stage', DB::raw('count(*) as count'))
+            ->groupBy('failure_stage')
+            ->pluck('count', 'failure_stage');
+
+        $total = (int) $counts->sum();
+
+        // Fixed order: the funnel reads in the order a customer walks it, so
+        // a missing stage is visible as a gap rather than reordering the row.
+        $labels = [
+            'initialization' => 'Starting checkout',
+            'authentication' => 'Verifying (OTP / 3DS / PIN)',
+            'processing' => 'Charging',
+            'confirmation' => 'Awaiting confirmation',
+        ];
+
+        $stages = [];
+        foreach ($labels as $stage => $label) {
+            $count = (int) ($counts[$stage] ?? 0);
+            $stages[] = [
+                'stage' => $stage,
+                'label' => $label,
+                'count' => $count,
+                'share' => $total > 0 ? round(($count / $total) * 100, 1) : 0.0,
+            ];
+        }
+
+        return $stages;
+    }
+
+    /**
+     * Daily series so degradation is visible as a slope rather than
+     * discovered as a surprise. Gap-filled: a day with no payments is a fact
+     * worth seeing, not a day to skip.
+     *
+     * @return array<int, array{date: string, submitted: int, confirmed: int, failed: int, abandoned: int, authorizationRate: ?float}>
+     */
+    public function dailyTrend(int $days = 14): array
+    {
+        $days = max(1, min(90, $days));
+        $start = now()->subDays($days - 1)->startOfDay();
+
+        $rows = PaymentOutcome::query()
+            ->where('created_at', '>=', $start)
+            ->select(
+                DB::raw($this->dateSql('created_at').' as day'),
+                DB::raw("sum(case when outcome = 'confirmed' then 1 else 0 end) as confirmed"),
+                DB::raw("sum(case when outcome = 'failed' then 1 else 0 end) as failed"),
+                DB::raw("sum(case when outcome in ('expired','cancelled') then 1 else 0 end) as abandoned"),
+            )
+            ->groupBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $series = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $row = $rows[$date] ?? null;
+
+            $confirmed = (int) ($row->confirmed ?? 0);
+            $failed = (int) ($row->failed ?? 0);
+            $submitted = $confirmed + $failed;
+
+            $series[] = [
+                'date' => $date,
+                'submitted' => $submitted,
+                'confirmed' => $confirmed,
+                'failed' => $failed,
+                'abandoned' => (int) ($row->abandoned ?? 0),
+                // Null, not zero: a day with no submitted payments has no
+                // authorization rate, and plotting it as 0% invents a crisis.
+                'authorizationRate' => $submitted > 0 ? round(($confirmed / $submitted) * 100, 1) : null,
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * Authorization rate per payment method. Provider-level averaging hides
+     * the actionable version of this: "cards are struggling, bank transfer is
+     * fine" is a checkout decision, "Flutterwave is at 80%" is not.
+     *
+     * @return Collection<int, object>
+     */
+    public function byPaymentMethod(?CarbonInterface $since = null): Collection
+    {
+        $query = PaymentOutcome::query()->whereNotNull('payment_method');
+        if ($since) {
+            $query->where('created_at', '>=', $since);
+        }
+
+        return $query
+            ->select(
+                'payment_method',
+                DB::raw('count(*) as started'),
+                DB::raw("sum(case when outcome = 'confirmed' then 1 else 0 end) as confirmed"),
+                DB::raw("sum(case when outcome = 'failed' then 1 else 0 end) as failed"),
+                DB::raw("sum(case when outcome in ('expired','cancelled') then 1 else 0 end) as abandoned"),
+            )
+            ->groupBy('payment_method')
+            ->orderByDesc('started')
+            ->get()
+            ->map(function ($row) {
+                $submitted = (int) $row->confirmed + (int) $row->failed;
+                $row->submitted = $submitted;
+                $row->authorization_rate = $submitted > 0 ? round(($row->confirmed / $submitted) * 100, 1) : null;
+                $row->abandon_rate = $row->started > 0 ? round(($row->abandoned / $row->started) * 100, 1) : 0.0;
+
+                return $row;
+            });
+    }
+
+    /** Driver-aware day bucketing (MySQL DATE_FORMAT vs SQLite strftime). */
+    private function dateSql(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m-%d', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m-%d')";
     }
 
     /**
@@ -146,18 +309,27 @@ class PaymentInsightsMetrics
         }
 
         $sent = (clone $recoveries)->count();
-        $recovered = (clone $recoveries)->where('status', 'recovered')->count();
-        $cancelled = (clone $recoveries)->where('status', 'cancelled')->count();
-        $abandoned = (clone $recoveries)->where('status', 'abandoned')->count();
-        $feedbackReceived = (clone $recoveries)->where('status', 'feedback_received')->count();
+        // Recovered now means a payment actually confirmed and was attributed
+        // to this recovery, not that someone clicked a button.
+        $recovered = (clone $recoveries)->where('status', RecoveryStatus::Recovered->value)->count();
+        $cancelled = (clone $recoveries)->where('status', RecoveryStatus::Cancelled->value)->count();
+        $abandoned = (clone $recoveries)->where('status', RecoveryStatus::Abandoned->value)->count();
+        $feedbackReceived = (clone $recoveries)->where('status', RecoveryStatus::FeedbackReceived->value)->count();
+        $retrying = (clone $recoveries)->where('status', RecoveryStatus::Retrying->value)->count();
 
-        $clicked = (clone $recoveries)
-            ->whereIn('id', RecoveryAttempt::where('action', 'clicked_link')->select('transaction_recovery_id'))
+        // Engagement from the recovery's own timestamps rather than a join on
+        // the attempt log: one row per recovery, so a customer who opened the
+        // link five times counts once.
+        $clicked = (clone $recoveries)->whereNotNull('clicked_at')->count();
+        $reminded = (clone $recoveries)->whereNotNull('reminder_sent_at')->count();
+        $recoveredAfterReminder = (clone $recoveries)
+            ->where('status', RecoveryStatus::Recovered->value)
+            ->whereNotNull('reminder_sent_at')
             ->count();
 
         // Recovered value per currency — amounts live in the session currency,
         // so a blended single figure would be meaningless.
-        $recoveredValue = (clone $recoveries)->where('transaction_recoveries.status', 'recovered')
+        $recoveredValue = (clone $recoveries)->where('transaction_recoveries.status', RecoveryStatus::Recovered->value)
             ->join('payment_sessions', 'payment_sessions.id', '=', 'transaction_recoveries.payment_session_id')
             ->select('payment_sessions.currency', DB::raw('sum(payment_sessions.amount) as amount'))
             ->groupBy('payment_sessions.currency')
@@ -189,10 +361,13 @@ class PaymentInsightsMetrics
         return [
             'sent' => $sent,
             'clicked' => $clicked,
+            'retrying' => $retrying,
             'recovered' => $recovered,
             'cancelled' => $cancelled,
             'abandoned' => $abandoned,
             'feedbackReceived' => $feedbackReceived,
+            'reminded' => $reminded,
+            'recoveredAfterReminder' => $recoveredAfterReminder,
             'clickRate' => $sent > 0 ? round(($clicked / $sent) * 100, 1) : 0.0,
             'conversionRate' => $sent > 0 ? round(($recovered / $sent) * 100, 1) : 0.0,
             'recoveredValue' => $recoveredValue,

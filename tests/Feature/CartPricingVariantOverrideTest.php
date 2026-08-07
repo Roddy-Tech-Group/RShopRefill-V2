@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Domain\Cart\Services\CartPricingService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Models\Category;
 use App\Models\Coupon;
+use App\Models\CouponRedemption;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -123,14 +127,71 @@ class CartPricingVariantOverrideTest extends TestCase
         ]);
         $this->assertFalse($expired->isRedeemable());
 
-        $usedUp = Coupon::make([
+        // "Used up" is now measured from the redemptions table, not the
+        // used_count column. The column could never be handed back when a
+        // checkout was abandoned, so it counted intent rather than redemption.
+        $category = Category::create(['name' => 'Coupon Cat', 'slug' => 'coupon-cat']);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Coupon Product',
+            'slug' => 'coupon-product',
+            'provider_name' => 'test',
+            'country_code' => 'US',
+            'currency_code' => 'USD',
+            'is_active' => true,
+        ]);
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'provider_offer_id' => 'po-coupon-1',
+            'sku' => 'COUPON-SKU',
+            'currency' => 'USD',
+            'face_value' => 10.00,
+            'cost_price' => 3.00,
+            'retail_price' => 4.50,
+            'is_available' => true,
+        ]);
+        $user = User::factory()->create();
+        $order = Order::create([
+            'user_id' => $user->id,
+            'order_number' => 'RSR-USEDUP-1',
+            'payment_method' => 'wallet',
+            'payment_status' => PaymentStatus::Paid,
+        ]);
+
+        $usedUp = Coupon::create([
+            'product_variant_id' => $variant->id,
+            'code' => 'USEDUP',
             'discount_type' => 'percent',
             'discount_value' => 10,
             'is_active' => true,
-            'max_uses' => 5,
-            'used_count' => 5,
+            'max_uses' => 1,
+        ]);
+        CouponRedemption::create([
+            'coupon_id' => $usedUp->id,
+            'order_id' => $order->id,
+            'user_id' => $user->id,
+            'status' => CouponRedemption::STATUS_REDEEMED,
+            'redeemed_at' => now(),
         ]);
         $this->assertFalse($usedUp->isRedeemable());
+
+        // A reservation that lapsed unpaid gives its slot back on its own.
+        $lapsed = Coupon::create([
+            'product_variant_id' => $variant->id,
+            'code' => 'LAPSED',
+            'discount_type' => 'percent',
+            'discount_value' => 10,
+            'is_active' => true,
+            'max_uses' => 1,
+        ]);
+        CouponRedemption::create([
+            'coupon_id' => $lapsed->id,
+            'order_id' => $order->id,
+            'user_id' => $user->id,
+            'status' => CouponRedemption::STATUS_RESERVED,
+            'expires_at' => now()->subMinute(),
+        ]);
+        $this->assertTrue($lapsed->isRedeemable());
 
         $paused = Coupon::make([
             'discount_type' => 'percent',

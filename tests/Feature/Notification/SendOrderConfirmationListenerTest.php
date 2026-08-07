@@ -4,6 +4,7 @@ namespace Tests\Feature\Notification;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Jobs\DispatchCommunicationJob;
+use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Events\OrderPlaced;
 use App\Domain\Order\Events\RefundIssued;
 use App\Models\Order;
@@ -31,7 +32,27 @@ class SendOrderConfirmationListenerTest extends TestCase
         ]);
     }
 
-    public function test_order_placed_builds_confirmation_without_crashing(): void
+    public function test_order_confirmed_builds_confirmation_without_crashing(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $order = $this->orderFor($user, 6000.00, 'USD');
+
+        event(new OrderConfirmed($order));
+
+        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $job) use ($order) {
+            return $job->payload->category === CommunicationCategory::OrderPlaced
+                && str_contains($job->payload->message, $order->order_number);
+        });
+    }
+
+    /**
+     * The whole point of the OrderConfirmed rewire: creating a checkout must
+     * no longer email anyone. Most checkouts are abandoned, and the old wiring
+     * told all of those customers their order "has been received".
+     */
+    public function test_order_placed_no_longer_sends_the_confirmation(): void
     {
         Queue::fake();
 
@@ -40,10 +61,7 @@ class SendOrderConfirmationListenerTest extends TestCase
 
         event(new OrderPlaced($order));
 
-        Queue::assertPushed(DispatchCommunicationJob::class, function (DispatchCommunicationJob $job) use ($order) {
-            return $job->payload->category === CommunicationCategory::OrderPlaced
-                && str_contains($job->payload->message, $order->order_number);
-        });
+        Queue::assertNotPushed(DispatchCommunicationJob::class);
     }
 
     public function test_refund_message_builds_without_null_currency_crash(): void

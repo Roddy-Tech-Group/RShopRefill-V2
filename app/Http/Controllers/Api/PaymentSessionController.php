@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Order\Events\PaymentConfirmed;
+use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
@@ -21,6 +23,7 @@ use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
+use App\Support\FeatureFlag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -119,6 +122,14 @@ class PaymentSessionController extends Controller
                     throw new \DomainException("Cannot cancel payment session that is already {$session->status}.");
                 }
 
+                // Capture how far the customer got before the transition wipes
+                // it, so the outcome records the real stage rather than the
+                // terminal one.
+                $session->metadata = array_merge($session->metadata ?? [], [
+                    'status_at_failure' => $session->status,
+                ]);
+                $session->save();
+
                 $session->transitionTo('cancelled');
 
                 // Cancel polymorphic payment attempt
@@ -128,6 +139,13 @@ class PaymentSessionController extends Controller
                         'payment_status' => PaymentStatus::Failed,
                         'failed_at' => now(),
                     ]);
+                }
+
+                // Give the coupon slot back. This path bypasses failSession()
+                // and expireSession(), so without an explicit release a customer
+                // who cancels deliberately would hold the slot until it lapsed.
+                if ($order = $attempt?->order) {
+                    app(CouponRedemptionService::class)->releaseForOrder($order, 'customer_cancelled');
                 }
             });
 
@@ -249,6 +267,19 @@ class PaymentSessionController extends Controller
         $attempt = $session->paymentAttempt;
         if (! $attempt) {
             return response()->json(['message' => 'Associated payment attempt not found.'], 404);
+        }
+
+        // Gateway kill switch: refuse a FRESH charge on a disabled gateway.
+        // This catches the customer whose payment modal was already open when
+        // the switch flipped, since their tiles never got greyed out. Only
+        // new money is gated here; webhooks, verification and the sweeper
+        // still confirm anything already submitted.
+        $gateway = in_array($session->provider, ['crypto', 'nowpayments'], true) ? 'nowpayments' : $session->provider;
+        if (! FeatureFlag::gatewayEnabled($gateway)) {
+            return response()->json([
+                'message' => GatewayDisabledException::customerMessageFor($gateway),
+                'gateway_disabled' => true,
+            ], 503);
         }
 
         $method = $request->input('method');

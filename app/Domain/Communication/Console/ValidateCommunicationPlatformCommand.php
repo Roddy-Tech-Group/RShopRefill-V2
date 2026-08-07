@@ -28,7 +28,7 @@ use App\Domain\Communication\Services\PreferenceManager;
 use App\Domain\Communication\Services\SenderResolver;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Events\FulfillmentSucceeded;
-use App\Domain\Order\Events\OrderPlaced;
+use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Events\PaymentSessionFailed;
 use App\Domain\PaymentInsights\Listeners\RecordPaymentOutcomeListener;
@@ -116,7 +116,9 @@ class ValidateCommunicationPlatformCommand extends Command
         [TransactionPinLocked::class, PinEventListener::class, 'handlePinLocked'],
         [TransactionPinResetRequested::class, PinEventListener::class, 'handlePinReset'],
         [Registered::class, WelcomeListener::class, 'handle'],
-        [OrderPlaced::class, OrderConfirmationListener::class, 'handle'],
+        // OrderConfirmed, not OrderPlaced: the confirmation email must follow
+        // the money, not the creation of the checkout skeleton.
+        [OrderConfirmed::class, OrderConfirmationListener::class, 'handle'],
         [FulfillmentSucceeded::class, FulfillmentNotificationListener::class, 'handle'],
         [RefundIssued::class, RefundNotificationListener::class, 'handle'],
         [WalletCredited::class, WalletCreditListener::class, 'handle'],
@@ -380,8 +382,8 @@ class ValidateCommunicationPlatformCommand extends Command
             'fulfillment_status' => FulfillmentStatus::Fulfilled,
         ]);
 
-        $this->probe('Orders Mailbox', 'Order created (OrderPlaced event)', function () use ($order) {
-            event(new OrderPlaced($order));
+        $this->probe('Orders Mailbox', 'Order paid (OrderConfirmed event)', function () use ($order) {
+            event(new OrderConfirmed($order));
             $this->assertEmailLog(CommunicationCategory::OrderPlaced, MailDomain::Orders);
         });
 

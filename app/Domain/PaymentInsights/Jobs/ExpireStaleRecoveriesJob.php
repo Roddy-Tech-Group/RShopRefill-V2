@@ -2,6 +2,7 @@
 
 namespace App\Domain\PaymentInsights\Jobs;
 
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Models\TransactionRecovery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,9 +36,13 @@ class ExpireStaleRecoveriesJob implements ShouldQueue
 
     public function handle(): void
     {
-        $expired = TransactionRecovery::where('status', 'pending')
+        // Every open state, not just pending: a customer who clicked or
+        // started a retry and then never paid has abandoned it just as surely
+        // as one who ignored the email, and leaving those rows open would
+        // report dead links as live opportunities forever.
+        $expired = TransactionRecovery::whereIn('status', RecoveryStatus::openValues())
             ->where('expires_at', '<', now())
-            ->update(['status' => 'abandoned']);
+            ->update(['status' => RecoveryStatus::Abandoned->value]);
 
         if ($expired > 0) {
             Log::info("Expired {$expired} stale transaction recoveries to abandoned.");

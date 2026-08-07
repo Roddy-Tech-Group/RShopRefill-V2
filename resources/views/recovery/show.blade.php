@@ -1,26 +1,55 @@
-<x-layouts.app.header title="Payment Recovery">
+@php
+    $session = $recovery->paymentSession;
+    $order = $session?->order;
+    $items = $order?->items ?? collect();
+@endphp
+
+<x-layouts.app.header title="Complete your payment">
     <div class="flex min-h-screen items-center justify-center bg-zinc-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div class="w-full max-w-md space-y-8 bg-white p-8 rounded-2xl shadow-xl">
+        <div class="w-full max-w-md space-y-6 bg-white p-8 rounded-2xl shadow-xl">
             <div>
-                <h2 class="mt-6 text-center text-3xl font-extrabold text-zinc-900">
-                    Payment Recovery
-                </h2>
-                <p class="mt-2 text-center text-sm text-zinc-600">
-                    It looks like your payment for session <span class="font-bold">{{ $recovery->paymentSession->client_reference }}</span> was not completed.
-                </p>
+                <h2 class="text-center text-2xl font-extrabold text-zinc-900">{{ $copy['headline'] }}</h2>
+                <p class="mt-3 text-center text-sm leading-relaxed text-zinc-600">{{ $copy['guidance'] }}</p>
+                @if ($copy['hint'])
+                    <p class="mt-2 text-center text-sm leading-relaxed text-zinc-500">{{ $copy['hint'] }}</p>
+                @endif
             </div>
 
-            <div class="mt-8 space-y-6">
-                <!-- Action 1: Retry Payment -->
+            {{-- What is waiting: the decision to finish is made on the contents,
+                 not on the fact that a payment failed. --}}
+            @if ($order || $session)
+                <div class="rounded-xl bg-zinc-50 p-4">
+                    @if ($order)
+                        <p class="text-xs text-zinc-500">Order {{ $order->order_number }}</p>
+                    @endif
+                    @if ($items->isNotEmpty())
+                        <ul class="mt-1 space-y-0.5">
+                            @foreach ($items->take(3) as $item)
+                                <li class="text-sm font-semibold text-zinc-900">{{ $item->product_snapshot['name'] ?? 'Item' }}</li>
+                            @endforeach
+                            @if ($items->count() > 3)
+                                <li class="text-xs text-zinc-500">and {{ $items->count() - 3 }} more</li>
+                            @endif
+                        </ul>
+                    @endif
+                    @if ($session?->amount)
+                        <p class="mt-2 text-lg font-extrabold text-zinc-900">
+                            @moneyCode((float) $session->amount, $session->display_currency ?: $session->currency)
+                        </p>
+                    @endif
+                </div>
+            @endif
+
+            <div class="space-y-6">
                 <div>
                     <form method="POST" action="{{ route('recovery.retry', $recovery->token) }}">
                         @csrf
                         <button type="submit" class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-3 px-4 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            Continue Payment
+                            Complete your payment
                         </button>
                     </form>
                     <p class="mt-2 text-center text-xs text-zinc-500">
-                        Click this button to go back to the checkout page and try again.
+                        This takes you back to checkout. Nothing has been charged.
                     </p>
                 </div>
 

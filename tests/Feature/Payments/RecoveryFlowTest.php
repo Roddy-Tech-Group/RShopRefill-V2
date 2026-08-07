@@ -3,6 +3,7 @@
 namespace Tests\Feature\Payments;
 
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Models\Order;
@@ -88,7 +89,7 @@ class RecoveryFlowTest extends TestCase
         ])->assertRedirect(route('recovery.thanks'));
 
         $recovery->refresh();
-        $this->assertSame('feedback_received', $recovery->status);
+        $this->assertSame(RecoveryStatus::FeedbackReceived, $recovery->status);
 
         $attempt = RecoveryAttempt::where('transaction_recovery_id', $recovery->id)
             ->where('action', 'provided_feedback')->firstOrFail();
@@ -99,13 +100,17 @@ class RecoveryFlowTest extends TestCase
         $this->assertTrue($recovery->expires_at->equalTo($originalExpiry), 'expires_at changed on status update');
     }
 
-    public function test_retry_marks_recovered_resets_backoff_and_redirects_to_the_order(): void
+    public function test_retry_marks_retrying_resets_backoff_and_redirects_to_the_order(): void
     {
         [$user, $recovery] = $this->makeRecovery();
 
         $response = $this->post(route('recovery.retry', $recovery->token));
 
-        $this->assertSame('recovered', $recovery->fresh()->status);
+        // Retrying, not recovered: going back to checkout is intent, not
+        // money. Only a confirmed payment may claim a recovery.
+        $this->assertSame(RecoveryStatus::Retrying, $recovery->fresh()->status);
+        $this->assertNotNull($recovery->fresh()->retried_at);
+        $this->assertNull($recovery->fresh()->recovered_at);
         $this->assertTrue(
             RecoveryAttempt::where('transaction_recovery_id', $recovery->id)->where('action', 'retried_payment')->exists()
         );
@@ -127,13 +132,13 @@ class RecoveryFlowTest extends TestCase
             ->assertNotFound();
 
         [, $resolved] = $this->makeRecovery();
-        $resolved->update(['status' => 'recovered']);
+        $resolved->update(['status' => RecoveryStatus::Recovered]);
 
         $this->post(route('recovery.feedback', $resolved->token), ['reason' => 'declined'])
             ->assertNotFound();
 
         // A stray POST must never reopen a resolved recovery.
-        $this->assertSame('recovered', $resolved->fresh()->status);
+        $this->assertSame(RecoveryStatus::Recovered, $resolved->fresh()->status);
     }
 
     public function test_feedback_input_is_length_capped(): void
@@ -149,7 +154,7 @@ class RecoveryFlowTest extends TestCase
             'details' => str_repeat('a', 3000),
         ])->assertSessionHasErrors('details');
 
-        $this->assertSame('pending', $recovery->fresh()->status);
+        $this->assertSame(RecoveryStatus::Pending, $recovery->fresh()->status);
     }
 
     /**

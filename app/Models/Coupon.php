@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Coupon extends Model
 {
@@ -39,6 +40,25 @@ class Coupon extends Model
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
+    public function redemptions(): HasMany
+    {
+        return $this->hasMany(CouponRedemption::class);
+    }
+
+    /**
+     * Uses actually consumed: confirmed redemptions plus live reservations.
+     *
+     * This is the authoritative figure, NOT the `used_count` column. The column
+     * is a cache for admin listings and can only ever be as fresh as the last
+     * sync, whereas a reservation stops counting the moment it lapses. Reading
+     * the table is what makes an abandoned checkout free its slot even if no
+     * release ever ran for it.
+     */
+    public function consumedCount(): int
+    {
+        return $this->redemptions()->consuming()->count();
+    }
+
     public function isExpired(): bool
     {
         return $this->valid_until !== null && $this->valid_until->isPast();
@@ -51,7 +71,7 @@ class Coupon extends Model
 
     public function isUsedUp(): bool
     {
-        return $this->max_uses !== null && $this->used_count >= $this->max_uses;
+        return $this->max_uses !== null && $this->consumedCount() >= $this->max_uses;
     }
 
     /**

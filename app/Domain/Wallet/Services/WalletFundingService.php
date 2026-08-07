@@ -3,9 +3,11 @@
 namespace App\Domain\Wallet\Services;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -17,6 +19,7 @@ use App\Models\PaymentAttempt;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletFunding;
+use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -40,6 +43,19 @@ class WalletFundingService
      */
     public function initializeFunding(User $user, Wallet $wallet, float $amount, Currency $currency, ?string $displayCurrency = null): array
     {
+        // Gateway kill switch first: funding charges through Flutterwave, and
+        // a disabled gateway must refuse before any write, exactly like
+        // checkout. In-flight fundings and their webhooks are never gated.
+        if (! FeatureFlag::gatewayEnabled('flutterwave')) {
+            throw new GatewayDisabledException('flutterwave');
+        }
+
+        // Rate limit before the first write, matching CheckoutService. This
+        // path was already safe (everything below runs inside one transaction)
+        // but the guard belongs at the entry point so the rule holds uniformly:
+        // no backoff check ever runs after a flow has started writing.
+        $this->paymentSessionService->assertNotRateLimited($user, ProductLine::WalletFunding->value);
+
         if ($wallet->currency->value !== $currency->value) {
             throw new \InvalidArgumentException('Funding currency must match wallet currency.');
         }
@@ -150,8 +166,19 @@ class WalletFundingService
 
         // 3. Now execute database transaction to credit the wallet under pessimistic lock
         DB::transaction(function () use ($funding, $flwTransactionId, $rawPayload) {
-            // Re-lock funding row
-            $funding->lockForUpdate();
+            // A REAL row lock. The previous `$funding->lockForUpdate()` built a
+            // query builder and never executed it, locking nothing, so two
+            // concurrent webhooks both sailed past the stale Pending check
+            // above. The ledger's unique idempotency key still made a double
+            // credit impossible, but the loser crashed out on a constraint
+            // violation instead of exiting cleanly. Lock, re-read, re-check.
+            $funding = WalletFunding::query()->lockForUpdate()->findOrFail($funding->id);
+
+            if ($funding->status === FundingStatus::Completed) {
+                Log::info('Wallet funding already completed; concurrent webhook stood down.', ['tx_ref' => $funding->reference]);
+
+                return;
+            }
 
             // Retrieve associated polymorphic attempt and mark confirmed
             $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)
