@@ -92,6 +92,26 @@ enum CommunicationCategory: string
     case AdminDirectMessage = 'admin_direct_message';
 
     /**
+     * Whether this category's body carries a live secret the recipient is
+     * expected to type back (a one-time code).
+     *
+     * These deliver by email and nothing else. The whole point of the code is
+     * to prove the person controls the email inbox, so putting it in the bell
+     * feed or a push banner proves nothing: both reach anyone who merely holds
+     * a session, or a device whose push subscription was never revoked. A
+     * second factor delivered in-band on an already-authenticated channel is
+     * not a second factor.
+     *
+     * Password/PIN reset and email verification are deliberately NOT here -
+     * they carry a signed link rather than a typed code, and the link is
+     * useless without the inbox it was addressed to.
+     */
+    public function carriesOneTimeCode(): bool
+    {
+        return in_array($this, [self::Otp, self::TwoFactor], true);
+    }
+
+    /**
      * Resolve which MailDomain this category belongs to.
      */
     public function mailDomain(): MailDomain

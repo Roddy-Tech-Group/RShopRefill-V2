@@ -564,18 +564,22 @@ class ValidateCommunicationPlatformCommand extends Command
         Queue::fake();
 
         $expectations = [
-            [CommunicationCategory::Otp, 'comm-critical'],
-            [CommunicationCategory::WalletFunding, 'comm-transactional'],
-            [CommunicationCategory::ServiceNotice, 'comm-transactional'],
-            [CommunicationCategory::Newsletter, 'comm-marketing'],
+            // Otp carries a one-time code, so it resolves to the email channel
+            // and nothing else. Without a mailable there is no channel left to
+            // dispatch on and this probe would be measuring an empty send.
+            [CommunicationCategory::Otp, 'comm-critical', new EmailOtpMail('000000', 'login')],
+            [CommunicationCategory::WalletFunding, 'comm-transactional', null],
+            [CommunicationCategory::ServiceNotice, 'comm-transactional', null],
+            [CommunicationCategory::Newsletter, 'comm-marketing', null],
         ];
 
-        foreach ($expectations as $i => [$category, $expectedQueue]) {
+        foreach ($expectations as $i => [$category, $expectedQueue, $mailable]) {
             app(CommunicationManager::class)->send(
                 recipient: $this->probeUser,
                 category: $category,
                 title: 'Queue probe',
                 message: 'Queue probe',
+                mailable: $mailable,
                 correlationId: 'valsuite_queue_'.$category->value,
                 idempotencyKey: 'valsuite_queue_key_'.$i,
             );
