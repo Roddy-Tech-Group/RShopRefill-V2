@@ -114,6 +114,36 @@ class FeatureFlag
     }
 
     /**
+     * Categories that DISAPPEAR when switched off, rather than greying out.
+     *
+     * The grey-out treatment says "we sell this, it is briefly unavailable" -
+     * right for Gift Cards or eSIMs during an outage. Flights and Stays have no
+     * category row, no products and no fulfillment path: they are unbuilt, not
+     * unavailable. Greying them out advertises a service that does not exist,
+     * so switching them off removes them from the nav, the pickers, the
+     * sitemap, the marketing copy and their own routes entirely.
+     *
+     * @var list<string>
+     */
+    public const HIDDEN_WHEN_OFF = ['flights', 'stays'];
+
+    /**
+     * Should this category appear on the storefront at all?
+     *
+     * Only the unbuilt categories can answer false. Everything else stays
+     * visible whatever its flag says and relies on categoryEnabled() to grey
+     * itself out, which is the behaviour those surfaces already assume.
+     */
+    public static function categoryVisible(?string $slug): bool
+    {
+        if ($slug === null || ! in_array($slug, self::HIDDEN_WHEN_OFF, true)) {
+            return true;
+        }
+
+        return self::categoryEnabled($slug);
+    }
+
+    /**
      * Feature-flag key for a category slug, or null when the category has no gate
      * (a future category without a flag - treated as on).
      */

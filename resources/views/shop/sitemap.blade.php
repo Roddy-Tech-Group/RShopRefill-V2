@@ -10,8 +10,8 @@
             ['eSIMs', route('shop.esims')],
             ['Mobile top up', route('shop.topups')],
             ['Bill payments', route('shop.bills')],
-            ['Flights', route('shop.flights')],
-            ['Stays', route('shop.stays')],
+            \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('shop.flights')] : null,
+            \App\Support\FeatureFlag::categoryVisible('stays') ? ['Stays', route('shop.stays')] : null,
             ['Cart', route('shop.cart')],
         ])),
         'Your account' => [
