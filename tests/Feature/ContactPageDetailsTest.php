@@ -152,28 +152,61 @@ class ContactPageDetailsTest extends TestCase
     //  Sender mailbox reference
     // ────────────────────────────────────────────────────────────
 
-    public function test_every_platform_mailbox_is_listed_with_its_description(): void
+    public function test_only_support_and_compliance_are_published(): void
     {
+        $this->set('contact.email_support', 'support@rshoprefill.com');
+
         $response = $this->get(route('shop.contact'))->assertOk();
 
         $response->assertSee('Emails you receive from us');
+        $response->assertSee('support@rshoprefill.com');
+        $response->assertSee(MailDomain::Compliance->senderAddress());
+        $response->assertSee(MailDomain::Compliance->customerDescription());
+    }
 
-        foreach (MailDomain::cases() as $mailbox) {
-            $response->assertSee($mailbox->senderAddress());
-            $response->assertSee($mailbox->customerDescription());
+    /**
+     * Listing all eight senders made the page a wall of addresses and pointed
+     * customers at boxes nobody reads. The other six must stay unpublished.
+     */
+    public function test_the_remaining_sender_mailboxes_are_not_published(): void
+    {
+        $response = $this->get(route('shop.contact'))->assertOk();
+
+        $hidden = array_filter(
+            MailDomain::cases(),
+            fn (MailDomain $mailbox) => $mailbox !== MailDomain::Compliance,
+        );
+
+        foreach ($hidden as $mailbox) {
+            $response->assertDontSee($mailbox->senderAddress());
         }
     }
 
     /**
-     * The list is a phishing reference, not a set of inboxes to write to, so it
-     * must say where replies actually land and must not promise we would ever
-     * ask for a credential by email.
+     * The department tiles (partnerships, suppliers, press, legal, abuse) all
+     * resolved to the same info@ address and were removed with the trim.
      */
-    public function test_the_mailbox_list_states_that_replies_reach_support(): void
+    public function test_the_department_tiles_are_gone(): void
+    {
+        $this->set('contact.email_partnerships', 'partners@example.test');
+        $this->set('contact.email_press', 'press@example.test');
+
+        $response = $this->get(route('shop.contact'))->assertOk();
+
+        $response->assertDontSee('Reach out');
+        $response->assertDontSee('partners@example.test');
+        $response->assertDontSee('press@example.test');
+    }
+
+    /**
+     * The section is a phishing reference, so it must still say where replies
+     * land and must never promise we would ask for a credential by email.
+     */
+    public function test_the_section_states_where_replies_land(): void
     {
         $this->get(route('shop.contact'))
             ->assertOk()
-            ->assertSee('send-only mailboxes')
+            ->assertSee('reaches our support team')
             ->assertSee('never ask for your password', escape: false);
     }
 }

@@ -32,9 +32,13 @@
 
     $supportHours = trim((string) \App\Models\SiteSetting::get('contact.support_hours', '')) ?: '24/7';
 
-    // Every mailbox the platform sends from, straight off the MailDomain enum
-    // so this list cannot drift from what actually lands in an inbox.
-    $senderMailboxes = \App\Domain\Communication\Enums\MailDomain::cases();
+    // Publishing all eight sender mailboxes made the page read as a wall of
+    // addresses. Only the two a customer ever needs are listed: compliance,
+    // which is the one mailbox with its own obligations and its own inbox, and
+    // support, which every other mailbox replies to anyway
+    // (MailDomain::replyTo). The rest still send mail; they are simply not
+    // advertised as somewhere to look or write.
+    $complianceMailbox = \App\Domain\Communication\Enums\MailDomain::Compliance;
     $tp = config('services.trustpilot');
     $field ='w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
 
@@ -370,83 +374,15 @@
         </div>
     </section>
 
-    {{-- ── Reach out ─────────────────────────────────────────────
-         Department contact tiles. Each tile reads from a contact.*
-         SiteSetting; an empty value hides that tile (so the section can
-         start with 1-2 cards and grow as the team scales). --}}
-    @php
-        $departments = array_values(array_filter([
-            [
-                'label' => 'Partnerships',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_partnerships', '')),
-                'form'  => trim((string) \App\Models\SiteSetting::get('contact.url_partnerships_form', '')),
-                'form_label' => 'Partnerships inquiry form',
-            ],
-            [
-                'label' => 'Suppliers',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_suppliers', '')),
-                'form'  => trim((string) \App\Models\SiteSetting::get('contact.url_suppliers_form', '')),
-                'form_label' => 'Supplier inquiry form',
-            ],
-            [
-                'label' => 'Press & media',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_press', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-            [
-                'label' => 'Legal',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_legal', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-            [
-                'label' => 'Abuse / Fraud',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_abuse', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-        ], fn ($d) => $d['email'] !== ''));
-    @endphp
-
-    @if (count($departments) > 0)
-        <section class="mx-auto w-full max-w-[1140px] px-4 pb-16 sm:px-6 sm:pb-20">
-            <div class="border-t border-zinc-100 pt-12">
-                <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Reach out</h2>
-                <p class="mt-1 text-sm text-zinc-600">Explore collaboration possibilities</p>
-
-                <div class="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 lg:grid-cols-3">
-                    @foreach ($departments as $dept)
-                        <div>
-                            <p class="text-sm font-bold text-zinc-900">{{ $dept['label'] }}</p>
-                            <a href="mailto:{{ $dept['email'] }}" class="mt-2 flex items-center gap-2 text-sm text-zinc-700 transition-colors hover:text-blue-700">
-                                <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
-                                </svg>
-                                <span class="break-all">{{ $dept['email'] }}</span>
-                            </a>
-                            @if ($dept['form'])
-                                <a href="{{ $dept['form'] }}" target="_blank" rel="noopener noreferrer" class="mt-1.5 flex items-center gap-2 text-sm text-blue-700 underline underline-offset-4 transition-colors hover:text-blue-800">
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-                                    </svg>
-                                    {{ $dept['form_label'] }}
-                                </a>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        </section>
-    @endif
-
     {{-- ── Emails you receive from us ────────────────────────────
-         Anti-phishing reference, not a set of inboxes to write to.
-         Every mailbox is read off the MailDomain enum, which is the same
-         source the mailer builds its From header from, so this list cannot
-         drift from what actually arrives. Replies to any of them route to
-         support (MailDomain::replyTo), which is why none is presented as a
-         separate contact address. --}}
+         Two addresses only: support, which every other mailbox replies to,
+         and compliance, the one with its own obligations and its own inbox.
+         Listing all eight senders turned the page into a wall of addresses
+         and invited mail into boxes nobody reads.
+
+         Both are read off MailDomain / the contact settings rather than typed
+         here, so neither can drift from the From header the mailer actually
+         builds. --}}
     <section class="mx-auto w-full max-w-[1140px] px-4 pb-16 sm:px-6 sm:pb-20">
         <div class="border-t border-zinc-100 pt-12">
             <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Emails you receive from us</h2>
@@ -457,27 +393,38 @@
                 <a href="mailto:{{ $supportEmail }}" class="font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-800">report it to {{ $supportEmail }}</a>.
             </p>
 
-            <div class="mt-8 grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($senderMailboxes as $mailbox)
-                    <div class="flex items-start gap-3">
-                        <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
-                            </svg>
-                        </span>
-                        <div class="min-w-0">
-                            <p class="break-all text-sm font-bold text-zinc-900">{{ $mailbox->senderAddress() }}</p>
-                            <p class="mt-0.5 text-sm leading-relaxed text-zinc-600">{{ $mailbox->customerDescription() }}</p>
-                        </div>
+            <div class="mt-8 grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <a href="mailto:{{ $supportEmail }}" class="break-all text-sm font-bold text-blue-700 hover:underline">{{ $supportEmail }}</a>
+                        <p class="mt-0.5 text-sm leading-relaxed text-zinc-600">Orders, wallet, payments and anything else. Replies to any email we send reach this inbox.</p>
                     </div>
-                @endforeach
+                </div>
+
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="break-all text-sm font-bold text-zinc-900">{{ $complianceMailbox->senderAddress() }}</p>
+                        <p class="mt-0.5 text-sm leading-relaxed text-zinc-600">{{ $complianceMailbox->customerDescription() }}</p>
+                    </div>
+                </div>
             </div>
 
             <p class="mt-8 rounded-[12px] bg-zinc-50 px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100">
-                These are send-only mailboxes. Replying to any of them reaches our support team at
-                <a href="mailto:{{ $supportEmail }}" class="font-semibold text-blue-700 hover:underline">{{ $supportEmail }}</a>,
-                so you can always just hit reply. We will never ask for your password, your
-                transaction PIN or a one-time code by email.
+                We send some emails from other addresses on this domain, and replying to any of them
+                reaches our support team at
+                <a href="mailto:{{ $supportEmail }}" class="font-semibold text-blue-700 hover:underline">{{ $supportEmail }}</a>.
+                Anything claiming to be us from a different domain is not.
+                We will never ask for your password, your transaction PIN or a one-time code by email.
             </p>
         </div>
     </section>
