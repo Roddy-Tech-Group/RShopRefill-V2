@@ -31,6 +31,7 @@ use App\Models\Coupon;
 use App\Models\CurrencyRate;
 use App\Models\PressArticle;
 use App\Models\Product;
+use App\Support\FeatureFlag;
 use App\Support\TaggedCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -347,8 +348,12 @@ Route::redirect('en', '/', 301);
 
 // Flights & Stays - branded "coming soon" pages until the booking catalog ships.
 // One shared view, the `service` data flag drives the per-service copy + art.
-Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('shop.flights');
-Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])->name('shop.stays');
+// Gated: switching the flag off has to close the page too, otherwise the link
+// disappears from the nav while the URL stays live and indexable.
+Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])
+    ->middleware('feature:flights')->name('shop.flights');
+Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
+    ->middleware('feature:stays')->name('shop.stays');
 
 // Sell Gift Cards & GoMarket - branded "coming soon" pages until each flow ships.
 // Same shared view + service flag as Flights/Stays; ungated like them.
@@ -489,7 +494,19 @@ Route::get('sitemap.xml', function () {
             'shop.refund-policy' => '0.3', 'shop.compliance' => '0.3', 'shop.accessibility' => '0.3',
             'shop.sitemap' => '0.3',
         ];
+        // Routes that 404 behind a feature flag must not be advertised here:
+        // submitting a sitemap full of 404s is a live SEO penalty, and these
+        // two close the moment their flag is switched off.
+        $gatedNames = [
+            'shop.flights' => 'flights',
+            'shop.stays' => 'stays',
+        ];
+
         foreach ($staticNames as $name => $priority) {
+            if (isset($gatedNames[$name]) && FeatureFlag::off($gatedNames[$name], false)) {
+                continue;
+            }
+
             if (Route::has($name)) {
                 $push(route($name), $priority);
             }
@@ -863,8 +880,10 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
         Route::view('bills', 'shop.bills')->name('bills');
         Route::get('bills/{brandSlug}', $resolveBillBrand)->name('bill');
 
-        Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])->name('flights');
-        Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])->name('stays');
+        Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])
+            ->middleware('feature:flights')->name('flights');
+        Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
+            ->middleware('feature:stays')->name('stays');
 
         Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])->name('sell-gift-cards');
         Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('gomarket');

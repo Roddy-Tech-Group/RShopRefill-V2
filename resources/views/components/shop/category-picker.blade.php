@@ -27,14 +27,18 @@
     ];
 
     // Coming-soon categories stay hidden until their feature flag is switched
-    // on (admin > Settings > features). Their pages remain reachable by URL.
+    // on (admin > Settings > features). Flights and Stays join them via
+    // FeatureFlag::categoryVisible(): unlike the live categories they are
+    // removed rather than greyed, because there is no catalogue behind either.
+    // Their routes 404 in the same state, so link and page vanish together.
     $hiddenWhenOff = ['sell-gift-cards' => 'sell_gift_cards', 'gomarket' => 'gomarket'];
     $categories = array_values(array_filter(
         $categories,
-        fn ($c) => ! isset($hiddenWhenOff[$c['slug']]) || \App\Support\FeatureFlag::on($hiddenWhenOff[$c['slug']], false),
+        fn ($c) => (! isset($hiddenWhenOff[$c['slug']]) || \App\Support\FeatureFlag::on($hiddenWhenOff[$c['slug']], false))
+            && \App\Support\FeatureFlag::categoryVisible($c['slug']),
     ));
 
-    $current = collect($categories)->firstWhere('slug', $active) ?? $categories[0];
+    $current = collect($categories)->firstWhere('slug', $active) ?? ($categories[0] ?? null);
 @endphp
 
 {{-- Mobile category picker. Dark navy pill that mirrors the country picker

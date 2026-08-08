@@ -64,7 +64,7 @@
                             <span class="text-blue-300">all in one place.</span>
                         </h1>
                         <p class="mt-4 max-w-md text-base leading-relaxed text-blue-100/85">
-                            Buy gift cards, eSIMs, top-ups, flights and more. Instantly and securely, at the best rates.
+                            Buy gift cards, eSIMs, top-ups{{ \App\Support\FeatureFlag::categoryVisible('flights') ? ', flights' : '' }} and more. Instantly and securely, at the best rates.
                         </p>
 
                         {{-- Feature bullets --}}

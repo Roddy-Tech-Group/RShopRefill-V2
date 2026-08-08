@@ -18,6 +18,19 @@
         ],
     );
     $productsRounded = number_format(max(1000, intdiv($catalogStats['variants'], 1000) * 1000));
+
+    // The copy names what we actually sell, so Flights and Stays drop out of
+    // the sentence when their flag is off. Leaving them in would promise a
+    // service with no catalogue, no page and no nav entry behind it.
+    $offerings = array_values(array_filter([
+        'gift cards',
+        'eSIMs',
+        \App\Support\FeatureFlag::categoryVisible('flights') ? 'flights' : null,
+        \App\Support\FeatureFlag::categoryVisible('stays') ? 'stays' : null,
+        'mobile top-ups',
+    ]));
+    $offeringsAnd = \Illuminate\Support\Arr::join($offerings, ', ', ' and ');
+    $offeringsList = implode(', ', $offerings);
 @endphp
 
 <section data-reveal aria-label="How it works">
@@ -36,7 +49,7 @@
             <div class="bg-zinc-100 dark:bg-[#1d3252] p-5">
                 <h3 class="text-base font-semibold text-zinc-900">1. Pick a product or service</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">
-                    Choose from {{ $productsRounded }}+ gift cards, eSIMs, flights, stays and mobile top-ups made ready for you to simplify your shopping experience.
+                    Choose from {{ $productsRounded }}+ {{ $offeringsAnd }} made ready for you to simplify your shopping experience.
                 </p>
             </div>
         </article>
@@ -49,7 +62,7 @@
             <div class="bg-zinc-100 dark:bg-[#1d3252] p-5">
                 <h3 class="text-base font-semibold text-zinc-900">2. Pay with Cards, Crypto, Mobile Money, Bank Transfers etc</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">
-                    Access {{ $productsRounded }}+ digital products including gift cards, eSIMs, flights, hotel stays, mobile top-ups, and more, all in one seamless platform.
+                    Access {{ $productsRounded }}+ digital products including {{ $offeringsList }}, and more, all in one seamless platform.
                 </p>
             </div>
         </article>

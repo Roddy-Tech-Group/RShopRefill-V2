@@ -72,7 +72,19 @@
                 What Rshop has to offer you
             </h2>
             <p class="mt-4 text-base leading-relaxed text-zinc-200 sm:text-lg">
-                Access <span class="font-semibold text-blue-400">23+ digital services</span> in one powerful ecosystem including gift cards, eSIMs, mobile top-ups, bill payments, flights, and global stays.
+                @php
+                    // Flights and Stays leave the sentence with their flag, so
+                    // the copy never advertises a service that has no page.
+                    $promoOfferings = array_values(array_filter([
+                        'gift cards',
+                        'eSIMs',
+                        'mobile top-ups',
+                        'bill payments',
+                        \App\Support\FeatureFlag::categoryVisible('flights') ? 'flights' : null,
+                        \App\Support\FeatureFlag::categoryVisible('stays') ? 'global stays' : null,
+                    ]));
+                @endphp
+                Access <span class="font-semibold text-blue-400">23+ digital services</span> in one powerful ecosystem including {{ \Illuminate\Support\Arr::join($promoOfferings, ', ', ', and ') }}.
             </p>
             <p class="mt-3 text-base leading-relaxed text-zinc-300 sm:text-lg">
                 {{ $siteName }} brings everything together under one roof, making international shopping, connectivity, travel, and everyday digital payments fast, seamless, and stress-free.

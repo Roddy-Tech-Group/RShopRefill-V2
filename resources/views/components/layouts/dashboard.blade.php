@@ -388,8 +388,8 @@
                                 \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null] : null,
                                 \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
                                 ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
-                                ['Flights',         route('dashboard.shop.flights'),         null],
-                                ['Stays',           route('dashboard.shop.stays'),           null],
+                                \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('dashboard.shop.flights'), null] : null,
+                                \App\Support\FeatureFlag::categoryVisible('stays') ? ['Stays', route('dashboard.shop.stays'), null] : null,
                                 ['Topups & Bills',  route('dashboard.shop.topups'),          'topups'],
                             ]));
                         @endphp
