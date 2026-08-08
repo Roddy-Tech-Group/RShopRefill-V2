@@ -46,12 +46,17 @@
         </div>
 
         {{-- ── Hero ───────────────────────────────────────────────────────────
-             Three eSIM adverts. Illustrations are fixed inline SVGs (two travel
-             scenes + a World Cup scene); the heading + copy are admin-editable on
-             the System Settings page (group "esim"), defaults below mirror the
-             seeded rows. Mobile = swipeable carousel; desktop = 3 cards. The
-             section itself inherits the page background (no photo / bubbles). --}}
+             Three eSIM adverts. Illustrations are fixed inline SVGs; every
+             heading and line of copy is admin-editable on the System Settings
+             page (group "esim"), so a seasonal push never needs a deploy. The
+             third card used to run a World Cup stadium scene, which expired
+             with the tournament - it is a globe now, and its copy carries no
+             date. Mobile = swipeable carousel; desktop = 3 cards. The section
+             itself inherits the page background (no photo / bubbles). --}}
         @php
+            // Fallbacks are last-resort only: the seeded rows carry the live
+            // wording, so an empty database still renders a usable hero rather
+            // than three blank cards.
             $esimSlides = [
                 [
                     'illo'    => 'illos.esim-travelers',
@@ -64,9 +69,9 @@
                     'text'    => \App\Models\SiteSetting::get('esim.promo2_text', 'From the airport gate to the boardroom, travellers, freelancers and remote teams get instant data in 190+ countries. No roaming bills, no SIM swaps.'),
                 ],
                 [
-                    'illo'    => 'illos.esim-worldcup',
-                    'heading' => \App\Models\SiteSetting::get('esim.promo3_heading', 'Heading to the World Cup? Travel data sorted'),
-                    'text'    => \App\Models\SiteSetting::get('esim.promo3_text', 'Follow every match across the host cities without hunting for WiFi. Activate a travel eSIM before you fly and stay online from kickoff to the final whistle.'),
+                    'illo'    => 'illos.esim-globe',
+                    'heading' => \App\Models\SiteSetting::get('esim.promo3_heading', 'Set up in minutes, before you even pack'),
+                    'text'    => \App\Models\SiteSetting::get('esim.promo3_text', 'Buy your data plan, scan the QR code and you are ready to go. No shop queues, no plastic SIM to lose, and your usual number keeps working for calls and messages.'),
                 ],
             ];
         @endphp

@@ -1,8 +1,17 @@
 {{-- First-visit eSIM nudge. A one-per-session modal that greets visitors landing
      on the eSIM page with a "where are you going?" travel hook, using the same
-     World Cup illustration as the eSIM hero adverts. Self-gating via
+     globe illustration as the third eSIM hero advert. Self-gating via
      sessionStorage so it greets the visitor once and never reappears in the same
-     browser session once dismissed. --}}
+     browser session once dismissed.
+
+     Copy is admin-editable (System Settings, group "esim"). It used to be
+     written straight into this file, so retiring the World Cup line needed a
+     deploy - the next seasonal push is an edit instead. --}}
+@php
+    $tipHeading = \App\Models\SiteSetting::get('esim.tip_heading', 'Where are you going?');
+    $tipText = \App\Models\SiteSetting::get('esim.tip_text', 'Travelling soon? Get online the moment you land.');
+    $tipBody = \App\Models\SiteSetting::get('esim.tip_body', 'Get an eSIM and stay connected with your family and loved ones, anywhere you go - instant data in 190+ countries, no SIM swap.');
+@endphp
 <div
     x-data="{
         show: false,
@@ -50,16 +59,16 @@
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
-            {{-- World Cup advert banner: same illustration as the eSIM hero. --}}
+            {{-- Advert banner: same illustration as the third eSIM hero card. --}}
             <div class="overflow-hidden rounded-[14px] bg-[#0c1a36] p-4 text-white">
-                <x-illos.esim-worldcup class="h-auto w-full rounded-[12px]" aria-hidden="true" />
-                <h2 id="esim-tip-title" class="mt-4 text-lg font-bold tracking-tight">Where are you going?</h2>
-                <p class="mt-1 text-sm text-zinc-300">Heading to the World Cup, or travelling soon?</p>
+                <x-illos.esim-globe class="h-auto w-full rounded-[12px]" aria-hidden="true" />
+                <h2 id="esim-tip-title" class="mt-4 text-lg font-bold tracking-tight">{{ $tipHeading }}</h2>
+                <p class="mt-1 text-sm text-zinc-300">{{ $tipText }}</p>
             </div>
 
             {{-- Message --}}
             <p class="mt-4 text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
-                Get an eSIM and stay connected with your family and loved ones, anywhere you go - instant data in 190+ countries, no SIM swap.
+                {{ $tipBody }}
             </p>
 
             {{-- Action --}}
