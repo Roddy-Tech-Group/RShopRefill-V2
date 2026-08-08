@@ -8,22 +8,25 @@ use App\Domain\Fraud\Services\FraudDetectionService;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
-use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
+use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
+use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Resources\PaymentSessionResource;
 use App\Models\Order;
 use App\Models\PaymentSession;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
@@ -392,17 +395,52 @@ class CheckoutController extends Controller
 
         $reportedStatus = strtolower((string) $request->query('status'));
 
-        if (in_array($reportedStatus, ['successful', 'completed'], true)) {
-            /** @var FlutterwavePaymentProvider $flw */
-            $flw = app(PaymentGatewayFactory::class)->getProvider('flutterwave');
+        // Flutterwave reports an explicit status in the query string; the
+        // backup gateways (Paystack) send only the transaction reference, so
+        // for them the verification call itself is the only trustworthy
+        // signal, and a cancelled payment simply fails to verify.
+        $shouldVerify = $attempt->gateway === 'flutterwave'
+            ? in_array($reportedStatus, ['successful', 'completed'], true)
+            : true;
 
-            // Verify against Flutterwave instead of trusting the query string.
+        if ($shouldVerify) {
+            $provider = app(PaymentGatewayFactory::class)->getProvider($attempt->gateway);
+
+            // Verify against the gateway instead of trusting the query string.
             // If verification succeeds the provider marks the attempt Paid and
             // the webhook handler will complete the order fulfilment chain.
-            $verified = $flw->verifyPayment($attempt);
+            $verified = $provider->verifyPayment($attempt);
 
             if ($verified && $attempt->order) {
                 return redirect($this->shopRoute($request, 'order', $attempt->order->order_number));
+            }
+
+            // Wallet fundings arrive here too when a backup gateway's hosted
+            // page redirects back. Credit synchronously (idempotent, locked;
+            // the webhook doing it again stands down cleanly) so the balance
+            // is already right when the wallet page loads.
+            if ($verified && $attempt->payable_type === WalletFunding::class) {
+                $funding = $attempt->payable;
+
+                if ($funding && $funding->status !== FundingStatus::Completed) {
+                    try {
+                        app(WalletFundingService::class)->processSuccessfulFunding(
+                            $funding->reference,
+                            $attempt->gateway_reference ?: 'RETURN-'.uniqid(),
+                            $attempt->verification_payload ?: []
+                        );
+                    } catch (Throwable $e) {
+                        // The webhook remains the settlement authority; the
+                        // return leg is only the happy-path nudge.
+                        Log::warning('hostedReturn: funding settlement deferred to webhook', [
+                            'reference' => $funding->reference,
+                            'message' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                return redirect()->route('dashboard.wallet')
+                    ->with('wallet_status', 'Your wallet top-up was received and is being credited.');
             }
         }
 

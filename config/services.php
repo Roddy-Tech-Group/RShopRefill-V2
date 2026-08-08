@@ -82,6 +82,25 @@ return [
         'webhook_hash' => env('FLW_WEBHOOK_HASH'),
     ],
 
+    'korapay' => [
+        'public_key' => env('KORAPAY_PUBLIC_KEY'),
+        // Also the webhook signing key: Kora signs json_encode of the
+        // webhook's `data` object (NOT the raw body) with HMAC-SHA256.
+        'secret_key' => env('KORAPAY_SECRET_KEY'),
+        'encryption_key' => env('KORAPAY_ENCRYPTION_KEY'),
+    ],
+
+    'paystack' => [
+        'public_key' => env('PAYSTACK_PUBLIC_KEY'),
+        // Also the webhook signing key: Paystack signs the raw body with
+        // HMAC-SHA512 using the secret key, there is no separate webhook hash.
+        'secret_key' => env('PAYSTACK_SECRET_KEY'),
+        // Currencies the merchant account can charge for card / Apple Pay.
+        // NGN by default; add USD here once Paystack approves international
+        // USD collection (requires the domiciliary settlement account).
+        'charge_currencies' => array_filter(array_map('trim', explode(',', (string) env('PAYSTACK_CHARGE_CURRENCIES', 'NGN')))),
+    ],
+
     'nowpayments' => [
         'api_key' => env('NOWPAYMENTS_API_KEY'),
         'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),

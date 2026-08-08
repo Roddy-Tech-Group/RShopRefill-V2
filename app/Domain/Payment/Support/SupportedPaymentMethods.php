@@ -59,6 +59,16 @@ final class SupportedPaymentMethods
     }
 
     /**
+     * Every currency with an explicit method list.
+     *
+     * @return list<string>
+     */
+    public static function knownCurrencies(): array
+    {
+        return array_keys(self::BY_CURRENCY);
+    }
+
+    /**
      * Every method key accepted by at least one currency.
      *
      * Used to prove the storefront's "Pay your way" strip only advertises rails

@@ -377,13 +377,21 @@
                          but grey so this reads as a temporary issue, never as
                          "we do not support cards". --}}
                     @php
-                        $disabledGatewayRails = [
-                            'flutterwave' => 'Card and bank payments',
-                            'nowpayments' => 'Crypto payments',
-                            'wallet' => 'Wallet payments',
-                        ];
-                        $downRails = array_values(array_intersect_key($disabledGatewayRails, array_flip(\App\Support\FeatureFlag::disabledGateways())));
-                        $allGatewaysDown = count($downRails) === count($disabledGatewayRails);
+                        // The fiat rail counts as down only when NO fiat
+                        // gateway (primary or backup) is enabled; a live
+                        // backup keeps the rail open even with Flutterwave
+                        // off, which is the whole point of the failover.
+                        $downRails = [];
+                        if (! \App\Domain\Payment\Support\FiatGatewayRouter::anyFiatGatewayEnabled()) {
+                            $downRails[] = 'Card and bank payments';
+                        }
+                        if (! \App\Support\FeatureFlag::gatewayEnabled('nowpayments')) {
+                            $downRails[] = 'Crypto payments';
+                        }
+                        if (! \App\Support\FeatureFlag::gatewayEnabled('wallet')) {
+                            $downRails[] = 'Wallet payments';
+                        }
+                        $allGatewaysDown = count($downRails) === 3;
                     @endphp
                     @if ($downRails !== [])
                         <div class="mt-5 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30">
@@ -1228,16 +1236,30 @@
                 // CheckoutService reads `apply_rcoin` and branches accordingly.
                 applyRcoin: '',
 
-                // Gateway kill switches, resolved server-side from the ONE
-                // canonical map in FeatureFlag so the greyed tiles and the
-                // server guard can never disagree. Tiles for a disabled
-                // gateway stay VISIBLE but grey: disappearing tiles read as
-                // "this store does not take cards", grey reads as what it is,
-                // a temporary outage.
+                // Gateway kill switches, resolved server-side so the greyed
+                // tiles and the server guard can never disagree. Tiles for a
+                // disabled gateway stay VISIBLE but grey: disappearing tiles
+                // read as "this store does not take cards", grey reads as
+                // what it is, a temporary outage.
+                //
+                // Fiat methods come pre-resolved per currency by
+                // FiatGatewayRouter (Flutterwave first, then any enabled
+                // backup), so a tile only greys when NO gateway can charge
+                // that method in the selected currency. Crypto and wallet
+                // keep the simple one-flag check.
                 disabledGateways: @js(\App\Support\FeatureFlag::disabledGateways()),
                 methodGateways: @js(\App\Support\FeatureFlag::METHOD_GATEWAYS),
+                fiatMethods: @js(array_keys(\App\Domain\Payment\Support\FiatGatewayRouter::METHOD_PRIORITY)),
+                fiatUnavailableByCurrency: @js(\App\Domain\Payment\Support\FiatGatewayRouter::unavailableFiatMethodsByCurrency()),
 
                 isMethodDisabled(key) {
+                    if (this.fiatMethods.includes(key)) {
+                        const currency = this.$store.cart.currency;
+                        const unavailable = this.fiatUnavailableByCurrency[currency]
+                            ?? this.fiatUnavailableByCurrency['__fallback']
+                            ?? [];
+                        return unavailable.includes(key);
+                    }
                     return this.disabledGateways.includes(this.methodGateways[key] ?? '');
                 },
 

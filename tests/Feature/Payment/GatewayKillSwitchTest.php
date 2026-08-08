@@ -5,6 +5,7 @@ namespace Tests\Feature\Payment;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\WalletFundingService;
@@ -117,7 +118,9 @@ class GatewayKillSwitchTest extends TestCase
     /**
      * The drift guard. Every method key checkout can offer must resolve to a
      * gateway that has a kill switch; a new method added without a mapping
-     * would silently bypass every guard in this file.
+     * would silently bypass every guard in this file. Fiat methods must
+     * additionally carry a router priority chain whose every entry is
+     * switchable, or failover would route money to an ungoverned gateway.
      */
     public function test_every_checkout_method_resolves_to_a_switchable_gateway(): void
     {
@@ -126,6 +129,16 @@ class GatewayKillSwitchTest extends TestCase
 
             $this->assertNotNull($gateway, "method '{$method}' has no gateway mapping");
             $this->assertArrayHasKey($gateway, FeatureFlag::GATEWAY_FLAGS, "gateway '{$gateway}' has no kill switch");
+
+            if ($gateway === 'flutterwave') {
+                $chain = FiatGatewayRouter::METHOD_PRIORITY[$method] ?? null;
+                $this->assertNotNull($chain, "fiat method '{$method}' has no router priority chain");
+                $this->assertSame('flutterwave', $chain[0], "fiat method '{$method}' must prefer the primary");
+
+                foreach ($chain as $candidate) {
+                    $this->assertArrayHasKey($candidate, FeatureFlag::GATEWAY_FLAGS, "router candidate '{$candidate}' has no kill switch");
+                }
+            }
         }
     }
 
@@ -133,8 +146,57 @@ class GatewayKillSwitchTest extends TestCase
     {
         $this->assertTrue(FeatureFlag::gatewayEnabled('flutterwave'));
         $this->assertTrue(FeatureFlag::gatewayEnabled('nowpayments'));
-        $this->assertTrue(FeatureFlag::gatewayEnabled('korapay'), 'a future gateway without a flag row must default on');
-        $this->assertSame([], FeatureFlag::disabledGateways());
+        $this->assertTrue(FeatureFlag::gatewayEnabled('cryptomus'), 'a future gateway without a flag row must default on');
+    }
+
+    /**
+     * The backup gateways ship dark: flags seeded OFF, and even when flipped
+     * on early they stay inert until their provider classes exist, because
+     * the router skips unimplemented gateways. Nothing may route away from
+     * Flutterwave while it is enabled.
+     */
+    public function test_backup_gateways_seed_off_and_never_receive_traffic_while_the_primary_is_on(): void
+    {
+        $this->assertFalse(FeatureFlag::gatewayEnabled('paystack'), 'gateway_paystack must seed OFF');
+        $this->assertFalse(FeatureFlag::gatewayEnabled('korapay'), 'gateway_korapay must seed OFF');
+
+        $this->setGateway('paystack', true);
+        $this->setGateway('korapay', true);
+
+        foreach (array_keys(FiatGatewayRouter::METHOD_PRIORITY) as $method) {
+            foreach (['USD', 'NGN', 'XAF', 'GHS', 'EUR'] as $currency) {
+                $resolved = FiatGatewayRouter::resolve($method, $currency);
+                $this->assertContains(
+                    $resolved,
+                    ['flutterwave', null],
+                    "'{$method}' in {$currency} resolved to '{$resolved}' while the primary is on",
+                );
+            }
+        }
+    }
+
+    /**
+     * A FULL fiat outage (primary off, backups still dark in their seeded
+     * OFF state) refuses checkout cleanly before any write. This is also the
+     * posture a future gateway flag would create if flipped on before its
+     * provider ships: FiatGatewayRouter skips gateways the factory cannot
+     * build, so the refusal path is the worst case, never a crash.
+     */
+    public function test_a_full_fiat_outage_refuses_checkout_before_any_write(): void
+    {
+        $this->setGateway('flutterwave', false);
+
+        $this->assertNull(FiatGatewayRouter::resolve('card', 'NGN'));
+        $this->assertFalse(FiatGatewayRouter::anyFiatGatewayEnabled());
+
+        try {
+            $this->checkout();
+            $this->fail('checkout succeeded with no live fiat gateway');
+        } catch (GatewayDisabledException) {
+            // Refused pre-write, exactly like a plain outage.
+        }
+
+        $this->assertSame(0, Order::count(), 'a refused checkout must cost zero rows');
     }
 
     // ------------------------------------------------------- new money gated

@@ -10,6 +10,7 @@ use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
@@ -274,8 +275,12 @@ class PaymentSessionController extends Controller
         // the switch flipped, since their tiles never got greyed out. Only
         // new money is gated here; webhooks, verification and the sweeper
         // still confirm anything already submitted.
+        //
+        // Fiat sessions are NOT refused here: their gateway is re-resolved
+        // per method below (FiatGatewayRouter), so a session stamped for
+        // Flutterwave can still pay through a live backup.
         $gateway = in_array($session->provider, ['crypto', 'nowpayments'], true) ? 'nowpayments' : $session->provider;
-        if (! FeatureFlag::gatewayEnabled($gateway)) {
+        if (! in_array($gateway, FiatGatewayRouter::FIAT_GATEWAYS, true) && ! FeatureFlag::gatewayEnabled($gateway)) {
             return response()->json([
                 'message' => GatewayDisabledException::customerMessageFor($gateway),
                 'gateway_disabled' => true,
@@ -315,11 +320,64 @@ class PaymentSessionController extends Controller
 
         $gatewayFactory = app(PaymentGatewayFactory::class);
 
+        // Per-method fiat routing. The gateway stamped at order placement was
+        // only the router's default; the customer has now committed to a
+        // method, which is the first moment the real gateway is knowable
+        // (mirrors the crypto re-stamp below). Re-routing is allowed ONLY
+        // while the session is pre-charge ('awaiting_method'): once any
+        // gateway has minted provider-side state (virtual account, inline
+        // popup, redirect link), the payment finishes where it started or
+        // not at all, so a late flag flip refuses rather than re-routes and
+        // the customer restarts through checkout reuse.
+        $fiatGateway = null;
+        if (array_key_exists($method, FiatGatewayRouter::METHOD_PRIORITY)) {
+            $fiatGateway = FiatGatewayRouter::resolve($method, $currency);
+
+            if ($fiatGateway === null) {
+                return response()->json([
+                    'message' => GatewayDisabledException::customerMessageFor('fiat'),
+                    'gateway_disabled' => true,
+                ], 503);
+            }
+
+            if ($fiatGateway !== $attempt->gateway) {
+                if ($session->status !== 'awaiting_method') {
+                    return response()->json([
+                        'message' => GatewayDisabledException::customerMessageFor($attempt->gateway),
+                        'gateway_disabled' => true,
+                    ], 503);
+                }
+
+                $attempt->gateway = $fiatGateway;
+                $attempt->save();
+
+                $session->provider = $fiatGateway;
+                $session->save();
+
+                // Wallet fundings carry their own gateway stamp, which the
+                // webhook router and FundingVerificationService both consult;
+                // leaving it behind would verify against the wrong provider
+                // (the same trap the crypto switch below already guards).
+                if ($attempt->payable_type === WalletFunding::class && $attempt->payable) {
+                    $attempt->payable->update(['gateway' => $fiatGateway]);
+                }
+            }
+        }
+
         try {
             $result = null;
 
-            if ($method === 'card') {
-                $flwProvider = $gatewayFactory->getProvider('flutterwave');
+            if ($fiatGateway !== null && $fiatGateway !== 'flutterwave') {
+                // Backup gateways (Paystack today, Kora next) run EVERY fiat
+                // method through their hosted checkout: one channel-restricted
+                // redirect out, verification on return. No inline card entry,
+                // no per-method API surface, so a backup cannot half-support
+                // a method the router said it covers.
+                $backupProvider = $gatewayFactory->getProvider($fiatGateway);
+                $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
+                $result = $backupProvider->chargeHosted($attempt, $method, $returnUrl);
+            } elseif ($method === 'card') {
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
 
                 if (config('services.flutterwave.direct_charge_enabled', false)) {
                     if ($otp = $request->input('otp')) {
@@ -352,17 +410,17 @@ class PaymentSessionController extends Controller
                     return new PaymentSessionResource($session->fresh());
                 }
             } elseif ($method === 'bank_transfer') {
-                $flwProvider = $gatewayFactory->getProvider('flutterwave');
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $result = $flwProvider->chargeBankTransfer($attempt);
             } elseif ($method === 'apple_pay') {
-                $flwProvider = $gatewayFactory->getProvider('flutterwave');
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $result = $flwProvider->chargeApplePay($attempt, $details);
             } elseif ($method === 'mobile_money') {
                 $request->validate([
                     'details.phone_number' => 'required|string',
                     'details.network' => 'required|string',
                 ]);
-                $flwProvider = $gatewayFactory->getProvider('flutterwave');
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $result = $flwProvider->chargeMobileMoney($attempt, $details['phone_number'], $details['network']);
             } elseif ($method === 'crypto') {
                 $request->validate([
@@ -407,7 +465,7 @@ class PaymentSessionController extends Controller
                 // `payment_options` value so the hosted page renders only that
                 // method, then redirect the customer there. They return to
                 // /checkout/return where we verify and finalise.
-                $flwProvider = $gatewayFactory->getProvider('flutterwave');
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
                 $result = $flwProvider->chargeHosted($attempt, $method, $returnUrl);
             } elseif ($method === 'wallet') {

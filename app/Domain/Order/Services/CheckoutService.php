@@ -11,6 +11,7 @@ use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\PaymentMethodNormaliser;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Rewards\Services\RewardEngine;
@@ -358,11 +359,18 @@ class CheckoutService
             return $order;
         });
 
-        // 4. Create the PaymentAttempt
+        // 4. Create the PaymentAttempt. For the fiat rail the stamped gateway
+        //    is the router's current first choice (Flutterwave in normal
+        //    operation, a backup during an outage); pay() re-resolves per
+        //    method at commitment while the session is still pre-charge.
+        $gateway = $paymentMethod === 'flutterwave'
+            ? (FiatGatewayRouter::defaultGateway() ?? throw new GatewayDisabledException('fiat'))
+            : $paymentMethod;
+
         $attempt = PaymentAttempt::create([
             'order_id' => $order->id,
             'user_id' => $user->id,
-            'gateway' => $paymentMethod,
+            'gateway' => $gateway,
             // Null when Flutterwave was chosen without a specific method — the
             // session's pay() call records it the moment the customer commits.
             'payment_method' => PaymentMethodNormaliser::normalise($selectedMethod ?? $paymentMethod),
@@ -381,7 +389,7 @@ class CheckoutService
         //    customer's cart is preserved (see step 3 comment) so they can fix
         //    the .env / pick another method and try again without re-adding items.
         try {
-            $provider = $this->paymentGatewayFactory->getProvider($paymentMethod);
+            $provider = $this->paymentGatewayFactory->getProvider($gateway);
             $initResult = $provider->initializePayment($attempt);
         } catch (\Throwable $e) {
             DB::transaction(function () use ($order, $attempt, $user) {
@@ -460,6 +468,18 @@ class CheckoutService
      */
     private function assertGatewayEnabled(string $paymentMethod): void
     {
+        // 'flutterwave' is the checkout page's vocabulary for "the fiat rail",
+        // kept for API compatibility. The rail is open while ANY fiat gateway
+        // (primary or backup) is on; the concrete gateway cannot be picked
+        // until the customer commits to a method in the payment wizard.
+        if ($paymentMethod === 'flutterwave') {
+            if (! FiatGatewayRouter::anyFiatGatewayEnabled()) {
+                throw new GatewayDisabledException('fiat');
+            }
+
+            return;
+        }
+
         $gateway = $paymentMethod === 'crypto' ? 'nowpayments' : $paymentMethod;
 
         if (! FeatureFlag::gatewayEnabled($gateway)) {

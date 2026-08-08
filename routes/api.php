@@ -20,7 +20,9 @@ use App\Http\Controllers\Api\Wallet\TransactionPinController;
 use App\Http\Controllers\Api\Webhooks\NowPaymentsWebhookController;
 use App\Http\Controllers\Webhooks\AiraloWebhookController;
 use App\Http\Controllers\Webhooks\FlutterwaveWebhookController;
+use App\Http\Controllers\Webhooks\KorapayWebhookController;
 use App\Http\Controllers\Webhooks\MapleradWebhookController;
+use App\Http\Controllers\Webhooks\PaystackWebhookController;
 use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\VerifyWebhookSignature;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +42,14 @@ use Illuminate\Support\Facades\Route;
 Route::post('webhooks/flutterwave', [FlutterwaveWebhookController::class, 'handle'])
     ->middleware(VerifyWebhookSignature::class.':flutterwave')
     ->name('api.webhooks.flutterwave');
+
+Route::post('webhooks/paystack', [PaystackWebhookController::class, 'handle'])
+    ->middleware(VerifyWebhookSignature::class.':paystack')
+    ->name('api.webhooks.paystack');
+
+Route::post('webhooks/korapay', [KorapayWebhookController::class, 'handle'])
+    ->middleware(VerifyWebhookSignature::class.':korapay')
+    ->name('api.webhooks.korapay');
 
 Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handle'])
     ->middleware(VerifyWebhookSignature::class.':nowpayments')

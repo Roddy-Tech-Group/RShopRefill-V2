@@ -101,6 +101,36 @@ class VerifyWebhookSignature
 
                 return false;
 
+            case 'paystack':
+                // Paystack signs the RAW request body with HMAC-SHA512 using
+                // the merchant secret key; the digest arrives hex-encoded in
+                // x-paystack-signature. No separate webhook secret exists.
+                $paystackSecret = config('services.paystack.secret_key');
+                $paystackSignature = $request->header('x-paystack-signature');
+
+                if (! is_string($paystackSecret) || $paystackSecret === '' || ! is_string($paystackSignature)) {
+                    return false;
+                }
+
+                return hash_equals(hash_hmac('sha512', $payload, $paystackSecret), $paystackSignature);
+
+            case 'korapay':
+                // Kora's quirk: the HMAC-SHA256 covers json_encode of the
+                // webhook's `data` OBJECT ONLY, keyed with the merchant
+                // secret key. Hashing the raw body rejects every event.
+                $korapaySecret = config('services.korapay.secret_key');
+                $korapaySignature = $request->header('x-korapay-signature');
+                $korapayData = $request->json('data');
+
+                if (! is_string($korapaySecret) || $korapaySecret === '' || ! is_string($korapaySignature) || ! is_array($korapayData)) {
+                    return false;
+                }
+
+                return hash_equals(
+                    hash_hmac('sha256', (string) json_encode($korapayData), $korapaySecret),
+                    $korapaySignature
+                );
+
             case 'nowpayments':
                 // NOWPayments signs key-sorted JSON, not the raw body — hashing
                 // the raw payload rejects every notification whose JSON isn't
@@ -152,6 +182,28 @@ class VerifyWebhookSignature
                 return $data['data']['id'] ?? null;
             case 'maplerad':
                 return $request->header('svix-id') ?? ($data['id'] ?? null);
+            case 'paystack':
+                // Paystack retries undelivered events for 72 hours; only
+                // byte-identical redeliveries should dedupe, so key on the
+                // charge reference plus a body hash (the NOWPayments lesson:
+                // reference alone drops every later status change).
+                $reference = $data['data']['reference'] ?? null;
+
+                return $reference !== null
+                    ? $reference.':'.hash('sha256', $request->getContent())
+                    : null;
+
+            case 'korapay':
+                // Same 72-hour retry model as Paystack: dedupe byte-identical
+                // redeliveries only, keyed on reference + body hash.
+                $korapayReference = $data['data']['payment_reference']
+                    ?? $data['data']['reference']
+                    ?? null;
+
+                return $korapayReference !== null
+                    ? $korapayReference.':'.hash('sha256', $request->getContent())
+                    : null;
+
             case 'nowpayments':
                 // NOWPayments sends one IPN per status change, all sharing the
                 // same payment_id — keying on payment_id alone drops every

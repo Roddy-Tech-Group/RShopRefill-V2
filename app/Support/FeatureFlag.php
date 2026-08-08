@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Models\SiteSetting;
 
 /**
@@ -50,13 +51,19 @@ class FeatureFlag
         'flutterwave' => 'gateway_flutterwave',
         'nowpayments' => 'gateway_nowpayments',
         'wallet' => 'gateway_wallet',
-        // Future backups plug in here (korapay, cryptomus) - their
-        // integrations seed the flag OFF and add the row.
+        // Fiat backups. Seeded OFF; they receive traffic only while the
+        // Flutterwave flag is off, and only for the method/currency pairs
+        // FiatGatewayRouter says they cover.
+        'paystack' => 'gateway_paystack',
+        'korapay' => 'gateway_korapay',
     ];
 
     /**
-     * Checkout method key => the gateway that fronts it. Flutterwave fronts
-     * every fiat rail, so one outage greys them together.
+     * Checkout method key => the gateway FAMILY it belongs to. For the fiat
+     * methods this names the primary only; actual routing (including failover
+     * to Paystack / Kora when Flutterwave is off) lives in FiatGatewayRouter.
+     * Kept for telemetry and for surfaces that need the family, never for
+     * availability decisions - those go through methodEnabled().
      *
      * @var array<string, string>
      */
@@ -86,11 +93,27 @@ class FeatureFlag
     }
 
     /**
-     * Is the checkout method key payable right now? Resolves the method to
-     * its fronting gateway and asks gatewayEnabled().
+     * Is the checkout method key payable right now? Fiat methods route
+     * through FiatGatewayRouter so a live backup keeps them payable while
+     * Flutterwave is off; pass the checkout currency for the exact answer
+     * (without it, "some currency could pay this" is enough to say yes).
      */
-    public static function methodEnabled(string $method): bool
+    public static function methodEnabled(string $method, ?string $currency = null): bool
     {
+        if (array_key_exists($method, FiatGatewayRouter::METHOD_PRIORITY)) {
+            if ($currency !== null) {
+                return FiatGatewayRouter::resolve($method, $currency) !== null;
+            }
+
+            foreach (FiatGatewayRouter::METHOD_PRIORITY[$method] as $gateway) {
+                if (self::gatewayEnabled($gateway)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $gateway = self::METHOD_GATEWAYS[$method] ?? null;
 
         return $gateway === null ? true : self::gatewayEnabled($gateway);

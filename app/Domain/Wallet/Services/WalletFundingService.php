@@ -6,6 +6,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Shared\Enums\Currency;
@@ -19,7 +20,6 @@ use App\Models\PaymentAttempt;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletFunding;
-use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -43,11 +43,15 @@ class WalletFundingService
      */
     public function initializeFunding(User $user, Wallet $wallet, float $amount, Currency $currency, ?string $displayCurrency = null): array
     {
-        // Gateway kill switch first: funding charges through Flutterwave, and
-        // a disabled gateway must refuse before any write, exactly like
-        // checkout. In-flight fundings and their webhooks are never gated.
-        if (! FeatureFlag::gatewayEnabled('flutterwave')) {
-            throw new GatewayDisabledException('flutterwave');
+        // Gateway kill switch first: a funding charge needs a live fiat
+        // gateway before any write, exactly like checkout. The router hands
+        // back Flutterwave in normal operation and a backup (Paystack, Kora)
+        // during an outage; with every fiat gateway dark, funding refuses
+        // pre-write. In-flight fundings and their webhooks are never gated.
+        $gateway = FiatGatewayRouter::defaultGateway();
+
+        if ($gateway === null) {
+            throw new GatewayDisabledException('fiat');
         }
 
         // Rate limit before the first write, matching CheckoutService. This
@@ -84,7 +88,7 @@ class WalletFundingService
         $reference = $this->transactionService->generateReference('FUND', $currency);
         $idempotencyKey = 'fund_init_'.Str::random(16);
 
-        return DB::transaction(function () use ($user, $wallet, $amount, $currency, $displayCurrency, $rate, $requestedAmount, $settledAmountUsd, $reference, $idempotencyKey) {
+        return DB::transaction(function () use ($user, $wallet, $amount, $currency, $displayCurrency, $rate, $requestedAmount, $settledAmountUsd, $reference, $idempotencyKey, $gateway) {
 
             // 2. Create immutable funding attempt
             $funding = WalletFunding::create([
@@ -97,7 +101,7 @@ class WalletFundingService
                 'requested_amount' => $requestedAmount,
                 'settled_amount_usd' => $settledAmountUsd,
                 'exchange_rate_snapshot' => $rate,
-                'gateway' => 'flutterwave',
+                'gateway' => $gateway,
                 'status' => FundingStatus::Pending,
                 'idempotency_key' => $idempotencyKey,
             ]);
@@ -107,7 +111,7 @@ class WalletFundingService
                 'user_id' => $user->id,
                 'payable_type' => WalletFunding::class,
                 'payable_id' => $funding->id,
-                'gateway' => 'flutterwave',
+                'gateway' => $gateway,
                 'idempotency_key' => $reference, // Use Reference for unique mapping on provider calls
                 'currency' => $displayCurrency,
                 'amount' => $requestedAmount,
@@ -116,7 +120,7 @@ class WalletFundingService
             ]);
 
             // 4. Resolve provider and initialize payment
-            $provider = $this->paymentGatewayFactory->getProvider('flutterwave');
+            $provider = $this->paymentGatewayFactory->getProvider($gateway);
             $initData = $provider->initializePayment($attempt);
 
             // 5. Create PaymentSession
@@ -245,12 +249,17 @@ class WalletFundingService
      */
     public function failFunding(WalletFunding $funding, string $reason, array $payload = []): void
     {
-        // Callers on the webhook path hand us the raw Flutterwave payload;
+        // Callers on the webhook path hand us the raw gateway payload;
         // derive the structured failure block from it when none was supplied,
         // so the outcome classifier sees the gateway's verdict (e.g. the
-        // issuer's processor_response) instead of our summary sentence.
+        // issuer's processor_response) instead of our summary sentence. The
+        // mapper follows whichever gateway this funding was stamped with.
         if (! isset($payload['failure']) && $payload !== []) {
-            $payload['failure'] = GatewayFailure::fromFlutterwave($payload);
+            $payload['failure'] = match ($funding->gateway) {
+                'paystack' => GatewayFailure::fromPaystack($payload),
+                'korapay' => GatewayFailure::fromKorapay($payload),
+                default => GatewayFailure::fromFlutterwave($payload),
+            };
         }
 
         DB::transaction(function () use ($funding, $reason, $payload) {
