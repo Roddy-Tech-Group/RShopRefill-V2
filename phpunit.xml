@@ -25,6 +25,13 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>
+        <!--
+            The undeliverable-domain suppression list is blanked because the
+            whole suite (and Faker) addresses mail to @example.com. Tests that
+            exercise suppression set communication.undeliverable_domains
+            themselves.
+        -->
+        <env name="MAIL_UNDELIVERABLE_DOMAINS" value=""/>
         <env name="RESEND_KEY" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
