@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Risk\Exceptions\RiskDeniedException;
+use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Resources\WalletResource;
 use App\Domain\Wallet\Services\WalletFundingService;
@@ -23,7 +26,7 @@ class UserWalletController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('wallets');
-        
+
         $wallets = $user->wallets; // Assumes relation exists
 
         return WalletResource::collection($wallets);
@@ -54,17 +57,6 @@ class UserWalletController extends Controller
         $displayCurrency = $validated['display_currency'] ?? null;
 
         try {
-            $fraudService = app(\App\Domain\Fraud\Services\FraudDetectionService::class);
-            $usdRate = app(\App\Domain\Wallet\Services\CurrencyRateService::class)->resolveRate($currency->value, 'USD');
-            $usdAmount = (float) $validated['amount'] * $usdRate;
-
-            if ($fraudService->isSuspiciousCheckout($request->user(), $usdAmount, $request->ip())) {
-                $msg = $request->user()->isKycVerified()
-                    ? 'Your funding attempt was flagged by our security systems. Please contact support.'
-                    : 'Your funding attempt was flagged by our security systems. Please complete KYC verification to proceed.';
-                return response()->json(['message' => $msg], 403);
-            }
-
             $result = $this->fundingService->initializeFunding(
                 user: $request->user(),
                 wallet: $wallet,
@@ -82,6 +74,16 @@ class UserWalletController extends Controller
                 'display_currency' => $result['funding']->display_currency,
                 'exchange_rate' => $result['funding']->exchange_rate_snapshot,
             ]);
+        } catch (KycStepUpRequiredException $e) {
+            // Crossed the identity-verification threshold; hand back the Smile
+            // session so the client can launch verification, then retry.
+            return response()->json($e->toResponse(), 422);
+        } catch (RiskReviewRequiredException $e) {
+            // Held for manual review; neutral message, nothing written.
+            return response()->json($e->toResponse(), 422);
+        } catch (RiskDeniedException $e) {
+            // Refused by the risk engine; customer-safe message, no reason codes.
+            return response()->json($e->toResponse(), 403);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }

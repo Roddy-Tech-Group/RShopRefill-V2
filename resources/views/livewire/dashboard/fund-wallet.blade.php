@@ -163,6 +163,22 @@ new class extends Component
             );
         } catch (\App\Domain\PaymentInsights\Exceptions\PaymentBackoffException $e) {
             $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds);
+        } catch (\App\Domain\Auth\Exceptions\EmailVerificationRequiredException $e) {
+            // Same verify-email notice checkout shows: amber envelope, message,
+            // Resend with the escalating countdown, Got it.
+            $this->dispatch('email-verification-required',
+                message: $e->customerMessage(),
+                retryAfter: $e->retryAfter,
+            );
+        } catch (\App\Domain\Kyc\Exceptions\KycStepUpRequiredException $e) {
+            // Identity verification required. Hand the Smile session to the
+            // frontend, which shows a Verify button that launches the flow and
+            // retries this funding once the customer is verified.
+            $this->dispatch('kyc-step-up-required', payload: $e->toResponse());
+        } catch (\App\Domain\Risk\Exceptions\RiskReviewRequiredException $e) {
+            $this->dispatch('risk-hold', message: $e->customerMessage());
+        } catch (\App\Domain\Risk\Exceptions\RiskDeniedException $e) {
+            $this->dispatch('risk-hold', message: $e->customerMessage());
         } catch (\Throwable $e) {
             $this->addError('amount', $e->getMessage());
         }
@@ -202,6 +218,20 @@ new class extends Component
         pollInterval: null,
         verifying: false,
         applePayAvailable: false,
+
+        // Risk/KYC overlay: identity step-up (Verify -> Smile), a neutral
+        // review/declined hold, or the verify-email notice, driven by events
+        // the Livewire fund() dispatches.
+        riskOverlay: false,
+        riskKind: null, // 'kyc' | 'hold' | 'email'
+        kycMessage: '',
+        kycSmile: null,
+        holdMessage: '',
+        emailMessage: '',
+        resendRemaining: 0,
+        resendTimerId: null,
+        resendBusy: false,
+        resendFlash: '',
 
         init() {
             if (!document.getElementById('flutterwave-v3')) {
@@ -647,11 +677,117 @@ new class extends Component
             if (this.pollInterval) {
                 clearInterval(this.pollInterval);
             }
+        },
+
+        // Identity step-up: close the fund modal and show the Verify overlay.
+        onKycStepUp(payload) {
+            this.kycMessage = payload?.message || 'To continue with this request, please complete a quick identity verification.';
+            this.kycSmile = payload?.smile || null;
+            this.open = false;
+            this.riskKind = 'kyc';
+            this.riskOverlay = true;
+        },
+
+        // Open Smile; on success, retry the funding via Livewire. The overlay
+        // (z-110) must be hidden BEFORE launching: the KYC modal would otherwise
+        // risk opening underneath it. Failures are loud, never a silent no-op.
+        verifyIdentity() {
+            if (! window.rshopKyc || ! this.kycSmile) {
+                this.holdMessage = 'The verification tool could not load. Please refresh the page and try again.';
+                this.riskKind = 'hold';
+                return;
+            }
+            const smile = this.kycSmile;
+            const self = this;
+            this.riskOverlay = false;
+            window.rshopKyc.launch(smile, () => {
+                self.$wire.fund();
+            });
+        },
+
+        // A held (review) or declined action: show the neutral notice.
+        onRiskHold(message) {
+            this.holdMessage = message || 'Your request is being reviewed by our team and will be processed shortly.';
+            this.open = false;
+            this.riskKind = 'hold';
+            this.riskOverlay = true;
+        },
+
+        // Email not verified: the same calm notice + escalating Resend that
+        // checkout shows. The server just auto-sent (or told us the cooldown).
+        onEmailNotice(detail) {
+            this.emailMessage = detail?.message || 'Please verify your email to continue.';
+            this.resendFlash = '';
+            this.startResendCountdown(detail?.retryAfter || 30);
+            this.open = false;
+            this.riskKind = 'email';
+            this.riskOverlay = true;
+        },
+
+        startResendCountdown(seconds) {
+            if (this.resendTimerId) {
+                clearInterval(this.resendTimerId);
+            }
+            this.resendRemaining = Math.max(0, Math.ceil(seconds));
+            this.resendTimerId = setInterval(() => {
+                if (this.resendRemaining > 0) {
+                    this.resendRemaining--;
+                } else {
+                    clearInterval(this.resendTimerId);
+                    this.resendTimerId = null;
+                }
+            }, 1000);
+        },
+
+        resendLabel(s) {
+            if (s < 60) return s + 's';
+            const m = Math.floor(s / 60), r = s % 60;
+            return r ? (m + 'm ' + r + 's') : (m + 'm');
+        },
+
+        async resendVerification() {
+            if (this.resendRemaining > 0 || this.resendBusy) return;
+            this.resendBusy = true;
+            this.resendFlash = '';
+            try {
+                const res = await fetch('{{ route('verification.send') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                const data = await res.json();
+                if (data.verified) {
+                    this.closeRiskOverlay();
+                    return;
+                }
+                this.resendFlash = res.ok
+                    ? (data.message || 'Verification link sent.')
+                    : (data.message || 'Please wait before requesting another link.');
+                this.startResendCountdown(data.retry_after || 30);
+            } catch (e) {
+                this.resendFlash = 'Network error. Please try again.';
+            } finally {
+                this.resendBusy = false;
+            }
+        },
+
+        closeRiskOverlay() {
+            this.riskOverlay = false;
+            this.riskKind = null;
+            if (this.resendTimerId) {
+                clearInterval(this.resendTimerId);
+                this.resendTimerId = null;
+            }
         }
     }"
     @payment-session-initialized.window="initPayment($event.detail.session)"
     @open-fund-wallet.window="if (($event.detail?.code || '').toUpperCase() === '{{ strtoupper($this->currency) }}') open = true"
     @payment-backoff-triggered.window="if (open) { startBackoff($event.detail.seconds); errorMessage = 'Too many failed payment attempts. Please wait.' }"
+    @kyc-step-up-required.window="if (open) onKycStepUp($event.detail.payload)"
+    @risk-hold.window="if (open) onRiskHold($event.detail.message)"
+    @email-verification-required.window="if (open) onEmailNotice($event.detail)"
     class="shrink-0"
 >
     {{-- Trigger. `full` = desktop wallet-card button; `compact` = mobile hero "Top Up". --}}
@@ -1212,6 +1348,80 @@ new class extends Component
 
                     <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                         Try Another Method
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </template>
+
+    {{-- Risk / KYC overlay: identity step-up (Verify -> Smile) or a neutral
+         review/declined hold. Sits above the fund modal (which we close first). --}}
+    <template x-teleport="body">
+    <div
+        x-show="riskOverlay"
+        x-cloak
+        x-on:keydown.escape.window="riskOverlay && closeRiskOverlay()"
+        x-effect="riskOverlay ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
+        class="fixed inset-0 z-[110] flex items-center justify-center p-4"
+    >
+        <div x-transition.opacity @click="closeRiskOverlay()" class="absolute inset-0 bg-zinc-900/45" aria-hidden="true"></div>
+
+        <div x-transition class="relative w-full max-w-md rounded-[12px] bg-white p-6 text-center shadow-2xl shadow-zinc-900/25" role="dialog" aria-modal="true">
+            {{-- Identity step-up --}}
+            <div x-show="riskKind === 'kyc'" class="flex flex-col items-center py-2">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                    <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
+                    </svg>
+                </div>
+                <h3 class="mt-4 text-sm font-bold text-zinc-900">Quick verification needed</h3>
+                <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="kycMessage"></p>
+                <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                    Verify
+                </button>
+                <button type="button" @click="closeRiskOverlay()" class="mt-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-700">
+                    Not now
+                </button>
+            </div>
+
+            {{-- Review / declined hold --}}
+            <div x-show="riskKind === 'hold'" class="flex flex-col items-center py-2">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+                    <svg class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.5M12 16h.01M10.3 4.3 2.5 18a1.5 1.5 0 0 0 1.3 2.2h16.4a1.5 1.5 0 0 0 1.3-2.2L13.7 4.3a1.5 1.5 0 0 0-2.6 0z"/>
+                    </svg>
+                </div>
+                <h3 class="mt-4 text-sm font-bold text-zinc-900">One moment</h3>
+                <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="holdMessage"></p>
+                <button type="button" @click="closeRiskOverlay()" class="mt-6 rounded-[12px] bg-zinc-100 px-6 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                    Got it
+                </button>
+            </div>
+
+            {{-- Email not verified: same calm notice + escalating Resend as checkout. --}}
+            <div x-show="riskKind === 'email'" class="flex flex-col items-center py-2">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+                    <svg class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+                    </svg>
+                </div>
+                <h3 class="mt-4 text-sm font-bold text-zinc-900">Verify your email to continue</h3>
+                <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="emailMessage"></p>
+
+                <p x-show="resendFlash" x-cloak class="mt-3 rounded-[10px] bg-emerald-50 px-3 py-2 text-xs text-emerald-700" x-text="resendFlash"></p>
+
+                <div class="mt-6 flex items-center justify-center gap-2.5">
+                    <button
+                        type="button"
+                        @click="resendVerification()"
+                        :disabled="resendRemaining > 0 || resendBusy"
+                        class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        x-text="resendBusy ? 'Sending...' : (resendRemaining > 0 ? 'Resend ' + resendLabel(resendRemaining) : 'Resend email')"
+                    ></button>
+                    <button type="button" @click="closeRiskOverlay()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                        Got it
                     </button>
                 </div>
             </div>

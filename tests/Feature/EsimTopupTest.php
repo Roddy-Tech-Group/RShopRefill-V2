@@ -12,10 +12,13 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\RiskLabel;
+use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -142,6 +145,78 @@ class EsimTopupTest extends TestCase
         $response->assertRedirect(route('dashboard.esim.topup', $item));
         $response->assertSessionHasErrors('package_id');
         $this->assertNotSame(422, $response->status());
+    }
+
+    private function riskFlags(bool $master, bool $enforce): void
+    {
+        SiteSetting::put('features.risk_engine_enabled', $master ? 'on' : 'off', 'features');
+        SiteSetting::put('features.risk_engine_enforce_enabled', $enforce ? 'on' : 'off', 'features');
+        Cache::flush();
+    }
+
+    public function test_a_risk_denied_customer_cannot_drain_the_wallet_through_topups(): void
+    {
+        Queue::fake();
+        $this->riskFlags(master: true, enforce: true);
+        CurrencyRate::create(['code' => 'USD', 'name' => 'US Dollar', 'type' => 'fiat', 'rate_per_usd' => 1.0, 'is_active' => true]);
+
+        $user = $this->pinnedUser();
+        $wallet = Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 50.0, 'is_active' => true]);
+        $item = $this->fulfilledEsimItem($user);
+
+        // Confirmed fraud forces a deny through the override map.
+        RiskLabel::create([
+            'user_id' => $user->id,
+            'label' => RiskLabel::LABEL_CONFIRMED_FRAUD,
+            'source' => 'admin',
+        ]);
+
+        $this->mock(AiraloFulfillmentProvider::class)
+            ->shouldReceive('listTopupsForIccid')
+            ->andReturn([['id' => 'topup_1gb', 'net_price' => 5.0]]);
+
+        $response = $this->actingAs($user)->post(
+            route('dashboard.esim.topup.purchase', $item),
+            ['package_id' => 'topup_1gb', 'net_price' => 5.0, 'wallet_pin' => '1234'],
+        );
+
+        // Refused with a friendly message; no order written, nothing debited.
+        $response->assertRedirect(route('dashboard.esim.topup', $item));
+        $response->assertSessionHasErrors('package_id');
+        $this->assertNull(
+            Order::where('user_id', $user->id)->where('order_number', '!=', 'RSR-PARENT-ESIM-1')->first(),
+        );
+        $this->assertSame(50.0, (float) $wallet->fresh()->balance);
+    }
+
+    public function test_shadow_mode_records_an_assessment_and_lets_the_topup_through(): void
+    {
+        Queue::fake();
+        $this->riskFlags(master: true, enforce: false);
+        CurrencyRate::create(['code' => 'USD', 'name' => 'US Dollar', 'type' => 'fiat', 'rate_per_usd' => 1.0, 'is_active' => true]);
+
+        $user = $this->pinnedUser();
+        Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 50.0, 'is_active' => true]);
+        $item = $this->fulfilledEsimItem($user);
+
+        $this->mock(AiraloFulfillmentProvider::class)
+            ->shouldReceive('listTopupsForIccid')
+            ->andReturn([['id' => 'topup_1gb', 'net_price' => 5.0]]);
+
+        $response = $this->actingAs($user)->post(
+            route('dashboard.esim.topup.purchase', $item),
+            ['package_id' => 'topup_1gb', 'net_price' => 5.0, 'wallet_pin' => '1234'],
+        );
+
+        $response->assertSessionHasNoErrors();
+
+        // The top-up now leaves the same audit trail as a checkout.
+        $this->assertDatabaseHas('risk_assessments', [
+            'user_id' => $user->id,
+            'context' => 'order',
+            'subject_type' => 'order_item',
+            'subject_id' => (string) $item->id,
+        ]);
     }
 
     public function test_topup_is_priced_off_airalo_retail_price_not_the_wholesale_net_price(): void

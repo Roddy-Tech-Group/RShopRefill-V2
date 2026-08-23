@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Fraud\Services\FraudDetectionService;
+use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
+use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
+use App\Domain\Risk\Exceptions\RiskDeniedException;
+use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
@@ -14,7 +18,6 @@ use App\Http\Resources\OrderResource;
 use App\Http\Resources\PaymentSessionResource;
 use App\Models\Cart;
 use App\Models\Order;
-use App\Models\Setting;
 use App\Support\FeatureFlag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -28,20 +31,16 @@ class CheckoutApiController extends Controller
 
     public function placeOrder(Request $request)
     {
-        // Same gate set as CheckoutController::process. This controller used
-        // to skip all three, so the admin checkout kill switch, the
-        // email-verification requirement and the fraud guard were enforced on
-        // the web form and silently absent on the API route to the same
-        // service. Guards must live wherever placeOrder is reachable, and the
-        // kill switch answers before validation: "checkout is off" must not
-        // depend on the caller supplying a valid cart first.
+        // Same gate set as CheckoutController::process. This controller used to
+        // skip these, so the admin checkout kill switch and the fraud guard were
+        // enforced on the web form and silently absent on the API route to the
+        // same service. (Email verification is now enforced for both by the
+        // EnsureEmailVerified route middleware, before this method runs.) Guards
+        // must live wherever placeOrder is reachable, and the kill switch answers
+        // before validation: "checkout is off" must not depend on a valid cart.
         abort_if(! FeatureFlag::on('checkout'), 503, 'Checkout is temporarily unavailable.');
 
         $user = $request->user();
-
-        if (Setting::get('require_email_verified_for_checkout', false) && ! $user->hasVerifiedEmail()) {
-            return response()->json(['message' => 'Please verify your email address before checking out.'], 403);
-        }
 
         $validated = $request->validate([
             'cart_id' => ['required', 'uuid', 'exists:carts,id'],
@@ -52,17 +51,6 @@ class CheckoutApiController extends Controller
 
         $cart = Cart::with(['items.product', 'items.variant'])->findOrFail($validated['cart_id']);
 
-        $fraudService = app(FraudDetectionService::class);
-        $cartAmount = (float) $cart->items->sum('subtotal_snapshot');
-
-        if ($fraudService->isSuspiciousCheckout($user, $cartAmount, $request->ip())) {
-            return response()->json([
-                'message' => $user->isKycVerified()
-                    ? 'Your checkout attempt was flagged by our security systems. Please contact support.'
-                    : 'Your checkout attempt was flagged by our security systems. Please complete KYC verification to proceed.',
-            ], 403);
-        }
-
         try {
             $order = $this->checkoutService->placeOrder(
                 user: $user,
@@ -72,8 +60,6 @@ class CheckoutApiController extends Controller
                 deliveryEmail: $validated['delivery_email'] ?? null,
                 applyRcoin: $request->boolean('apply_rcoin')
             );
-
-            $fraudService->recordCheckout($user, $request->ip());
 
             $order->load(['items', 'paymentAttempts', 'paymentAttempts.paymentSession']);
             $latestAttempt = $order->paymentAttempts->sortByDesc('created_at')->first();
@@ -89,6 +75,13 @@ class CheckoutApiController extends Controller
                 'message' => $e->customerMessage(),
                 'gateway_disabled' => true,
             ], 503);
+        } catch (PaymentCategoryIneligibleException $e) {
+            // A cart category is not approved on the resolved gateway. The gate
+            // runs before any write, so there is nothing to clean up.
+            return response()->json([
+                'message' => $e->customerMessage(),
+                'category_ineligible' => true,
+            ], 422);
         } catch (PaymentBackoffException $e) {
             // 429 with the wait, not a generic 400. Nothing was written, so the
             // client is safe to retry once the window passes.
@@ -101,6 +94,20 @@ class CheckoutApiController extends Controller
             // Friendly wallet errors carry a customer-ready message — return
             // it verbatim instead of prefixing "Checkout failed:".
             return response()->json(['message' => $e->getMessage()], 400);
+        } catch (KycStepUpRequiredException $e) {
+            // Crossed the identity-verification threshold; hand back the Smile
+            // session so the client can launch verification, then retry.
+            return response()->json($e->toResponse(), 422);
+        } catch (SpendingLimitExceededException $e) {
+            // Rolling spending cap reached; the message nudges unverified
+            // customers toward KYC, which raises the cap.
+            return response()->json($e->toResponse(), 422);
+        } catch (RiskReviewRequiredException $e) {
+            // Held for manual review; neutral message, nothing written.
+            return response()->json($e->toResponse(), 422);
+        } catch (RiskDeniedException $e) {
+            // Refused by the risk engine; customer-safe message, no reason codes.
+            return response()->json($e->toResponse(), 403);
         } catch (\Exception $e) {
             Log::error('SILENT CHECKOUT ERROR: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 

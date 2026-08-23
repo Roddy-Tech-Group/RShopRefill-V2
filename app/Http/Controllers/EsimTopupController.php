@@ -6,8 +6,14 @@ use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Catalog\Services\AiraloTopupCatalogService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Providers\AiraloFulfillmentProvider;
+use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Risk\DTOs\RiskContext;
+use App\Domain\Risk\Exceptions\RiskDeniedException;
+use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
+use App\Domain\Risk\Services\RiskGate;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
@@ -46,6 +52,7 @@ class EsimTopupController extends Controller
         private readonly CartPricingService $pricingService,
         private readonly CurrencyRateService $currencyRateService,
         private readonly AiraloTopupCatalogService $topupCatalog,
+        private readonly RiskGate $riskGate,
     ) {}
 
     /**
@@ -159,6 +166,24 @@ class EsimTopupController extends Controller
             : $this->fallbackRetail($orderItem->product, $package);
 
         $user = $request->user();
+
+        // A top-up spends wallet balance and creates a Paid order, so it must
+        // pass the same risk/KYC/spending-limit seam as checkout - otherwise
+        // this is the one unguarded exit for draining a funded wallet. Runs
+        // before the PIN check and before anything is written.
+        try {
+            $this->riskGate->guard(RiskContext::capture(
+                user: $user,
+                context: 'order',
+                amountUsd: $retail,
+                currency: 'USD',
+                categories: array_values(array_filter([$orderItem->product?->category?->slug])),
+                subjectType: 'order_item',
+                subjectId: (string) $orderItem->id,
+            ));
+        } catch (KycStepUpRequiredException|SpendingLimitExceededException|RiskReviewRequiredException|RiskDeniedException $e) {
+            return $this->topupError($orderItem, $e->customerMessage());
+        }
 
         if (! $user->hasTransactionPin()) {
             return $this->topupError($orderItem, 'Set up a Wallet Transaction PIN in your profile settings before topping up with your wallet.');

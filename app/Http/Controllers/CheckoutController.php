@@ -3,23 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Cart\Services\CartManager;
-use App\Domain\Cart\Services\CartPricingService;
-use App\Domain\Fraud\Services\FraudDetectionService;
+use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
-use App\Domain\Payment\Services\PaymentGatewayFactory;
+use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
-use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Risk\Exceptions\RiskDeniedException;
+use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
-use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Resources\PaymentSessionResource;
+use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentSession;
-use App\Models\Setting;
 use App\Models\User;
 use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
@@ -96,20 +97,6 @@ class CheckoutController extends Controller
             $isGuestCheckout = true;
         }
 
-        // Optional hard-gate: when the compliance toggle is ON, the buyer must
-        // have a verified email address before they can pay. Soft by default
-        // so the storefront stays browseable without verification friction.
-        // Guest shadow accounts are exempt: their inbox is proven later by the
-        // claim link, and the fulfilled email goes to that same inbox anyway.
-        if (! $isGuestCheckout && Setting::get('require_email_verified_for_checkout', false) && ! $user->hasVerifiedEmail()) {
-            $msg = 'Please verify your email address before completing checkout. Check your inbox for the verification link.';
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['message' => $msg, 'redirect' => route('verification.notice')], 403);
-            }
-
-            return redirect()->route('verification.notice')->with('checkout_status', $msg);
-        }
-
         // Guests keep their cart under the guest_token cookie; the shadow user
         // was only just created, so resolving by user id would mint an empty cart.
         $guestToken = $request->cookie('guest_token') ?? $request->header('X-Guest-Token');
@@ -122,10 +109,6 @@ class CheckoutController extends Controller
             return redirect($this->shopRoute($request, 'checkout'))
                 ->with('checkout_status', 'Your cart is empty.');
         }
-
-        $fraudService = app(FraudDetectionService::class);
-        $cartTotals = app(CartPricingService::class)->calculateCartTotals($cart->items);
-        $amount = $cartTotals['total'];
 
         // Display currency comes from the customer's locale (hidden field on the
         // checkout form). Settlement is always USD; this is presentation only.
@@ -156,18 +139,6 @@ class CheckoutController extends Controller
             default => 'flutterwave',
         };
 
-        if ($fraudService->isSuspiciousCheckout($user, $amount, $request->ip())) {
-            $msg = $user->isKycVerified()
-                ? 'Your checkout attempt was flagged by our security systems. Please contact support.'
-                : 'Your checkout attempt was flagged by our security systems. Please complete KYC verification to proceed.';
-
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['message' => $msg], 403);
-            }
-
-            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
-        }
-
         try {
             $order = $this->checkoutService->placeOrder(
                 user: $user,
@@ -186,8 +157,6 @@ class CheckoutController extends Controller
                 // this is the only place the real choice is still visible.
                 selectedMethod: $data['payment_method'],
             );
-
-            $fraudService->recordCheckout($user, $request->ip());
 
             // Order placed - the cart is converted, so drop the ephemeral
             // "Buy now" tag too (its item ids are now stale).
@@ -208,6 +177,19 @@ class CheckoutController extends Controller
                     'message' => $e->customerMessage(),
                     'gateway_disabled' => true,
                 ], 503);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (PaymentCategoryIneligibleException $e) {
+            // A product category in the cart is not approved on the resolved
+            // gateway. The gate runs before any write, so nothing needs cleanup;
+            // surface the customer-safe message and keep the cart so the buyer
+            // can remove the item or come back later.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => $e->customerMessage(),
+                    'category_ineligible' => true,
+                ], 422);
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
@@ -248,6 +230,38 @@ class CheckoutController extends Controller
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $message);
+        } catch (KycStepUpRequiredException $e) {
+            // The transaction crossed the identity-verification threshold. Nothing
+            // was written; hand the customer the Smile session so the frontend can
+            // launch verification, then retry once verified.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (SpendingLimitExceededException $e) {
+            // Rolling spending cap reached. Nothing was written; the message
+            // nudges unverified customers toward KYC (which raises the cap).
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (RiskReviewRequiredException $e) {
+            // Held for manual review. Nothing was written; the attempt is queued
+            // for an admin and the customer sees a neutral "under review" message.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (RiskDeniedException $e) {
+            // Refused by the risk engine. Customer-safe message, no reason codes.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 403);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
         } catch (Throwable $e) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
@@ -404,41 +418,39 @@ class CheckoutController extends Controller
             : true;
 
         if ($shouldVerify) {
-            $provider = app(PaymentGatewayFactory::class)->getProvider($attempt->gateway);
+            // Verify against the gateway AND run the full settlement chain in
+            // one synchronous pass (VerifyPaymentJob: gateway verify, order ->
+            // Paid, session confirmed, cart cleared, confirmation email,
+            // fulfillment dispatched; for fundings it credits the wallet).
+            // The old code called verifyPayment() bare, which stamped the
+            // attempt Paid and then relied on the webhook - but the webhook
+            // path stands down when it finds the attempt already Paid, so the
+            // browser winning the race stranded the order in Pending forever.
+            try {
+                dispatch_sync(new VerifyPaymentJob($attempt));
+            } catch (Throwable $e) {
+                // Inline settlement failed (gateway hiccup, lock contention).
+                // Queue the same job so its retries finish the chain; the
+                // webhook remains a second settlement authority.
+                Log::warning('hostedReturn: inline settlement failed, queued for retry', [
+                    'attempt_id' => $attempt->id,
+                    'message' => $e->getMessage(),
+                ]);
+                VerifyPaymentJob::dispatch($attempt);
+            }
 
-            // Verify against the gateway instead of trusting the query string.
-            // If verification succeeds the provider marks the attempt Paid and
-            // the webhook handler will complete the order fulfilment chain.
-            $verified = $provider->verifyPayment($attempt);
+            $attempt->refresh();
+            $verified = $attempt->payment_status === PaymentStatus::Paid;
 
             if ($verified && $attempt->order) {
                 return redirect($this->shopRoute($request, 'order', $attempt->order->order_number));
             }
 
             // Wallet fundings arrive here too when a backup gateway's hosted
-            // page redirects back. Credit synchronously (idempotent, locked;
-            // the webhook doing it again stands down cleanly) so the balance
-            // is already right when the wallet page loads.
+            // page redirects back. VerifyPaymentJob has already credited the
+            // balance (idempotent, locked; the webhook doing it again stands
+            // down cleanly), so the wallet page loads correct.
             if ($verified && $attempt->payable_type === WalletFunding::class) {
-                $funding = $attempt->payable;
-
-                if ($funding && $funding->status !== FundingStatus::Completed) {
-                    try {
-                        app(WalletFundingService::class)->processSuccessfulFunding(
-                            $funding->reference,
-                            $attempt->gateway_reference ?: 'RETURN-'.uniqid(),
-                            $attempt->verification_payload ?: []
-                        );
-                    } catch (Throwable $e) {
-                        // The webhook remains the settlement authority; the
-                        // return leg is only the happy-path nudge.
-                        Log::warning('hostedReturn: funding settlement deferred to webhook', [
-                            'reference' => $funding->reference,
-                            'message' => $e->getMessage(),
-                        ]);
-                    }
-                }
-
                 return redirect()->route('dashboard.wallet')
                     ->with('wallet_status', 'Your wallet top-up was received and is being credited.');
             }
