@@ -7,6 +7,7 @@ use App\Domain\Communication\DTOs\DeliveryResult;
 use App\Domain\Communication\Enums\CommunicationChannel;
 use App\Domain\Communication\Enums\DeliveryStatus;
 use App\Domain\Communication\Providers\MailProviderInterface;
+use App\Domain\Communication\Services\UndeliverableDomains;
 
 /**
  * Orchestrates email delivery via the injected MailProvider.
@@ -18,18 +19,6 @@ class EmailChannel implements ChannelInterface
         private readonly MailProviderInterface $provider,
     ) {}
 
-    /**
-     * RFC 2606 reserved domains and other well-known undeliverable suffixes.
-     * Resend rejects these with a 422 which, without this guard, retries
-     * three times, fills the failed_jobs table, and fires a Sentry alert —
-     * all for an address that can never receive mail.
-     */
-    private const UNDELIVERABLE_DOMAINS = [
-        'example.com', 'example.org', 'example.net',
-        'test.com', 'test.org', 'test.net',
-        'invalid', 'localhost',
-    ];
-
     public function send(CommunicationPayload $payload): DeliveryResult
     {
         if (! $payload->mailable) {
@@ -40,13 +29,14 @@ class EmailChannel implements ChannelInterface
             );
         }
 
-        // Pre-flight: suppress sends to domains that can never receive mail.
-        $recipientDomain = strtolower(substr(strrchr($payload->emailRecipient(), '@'), 1));
-        if (in_array($recipientDomain, self::UNDELIVERABLE_DOMAINS, true)) {
+        // Pre-flight: suppress sends to domains that can never receive mail
+        // (RFC 2606 reserved names; Resend 422s them, which would retry, fill
+        // failed_jobs and page Sentry for nothing).
+        if (UndeliverableDomains::blocks($payload->emailRecipient())) {
             return new DeliveryResult(
                 channel: CommunicationChannel::Email,
                 status: DeliveryStatus::Suppressed,
-                errorMessage: "Suppressed: undeliverable domain '{$recipientDomain}'.",
+                errorMessage: "Suppressed: undeliverable recipient domain on '{$payload->emailRecipient()}'.",
             );
         }
 

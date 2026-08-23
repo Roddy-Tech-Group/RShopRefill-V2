@@ -3,6 +3,7 @@
 namespace App\Domain\Communication\Services;
 
 use App\Models\NewsletterSubscriber;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Manages newsletter subscription state for the marketing mailbox.
@@ -12,17 +13,18 @@ class NewsletterService
     /**
      * Subscribe an email address to the newsletter.
      *
-     * @throws \InvalidArgumentException if the domain is reserved / undeliverable.
+     * @throws ValidationException when the domain is reserved / undeliverable,
+     *                             so HTTP callers render a 422, never a 500.
      */
     public function subscribeNewsletter(string $email, ?string $source = null): NewsletterSubscriber
     {
         // Block RFC 2606 reserved domains and other known-undeliverable addresses.
         // These pass format validation but Resend rejects them with a 422, creating
         // noise in the failed_jobs table and Sentry on every broadcast.
-        $domain = strtolower(substr(strrchr($email, '@'), 1));
-        $blocked = ['example.com', 'example.org', 'example.net', 'test.com', 'test.org', 'test.net', 'invalid', 'localhost'];
-        if (in_array($domain, $blocked, true)) {
-            throw new \InvalidArgumentException("Newsletter subscriptions from '{$domain}' are not allowed.");
+        if (UndeliverableDomains::blocks($email)) {
+            throw ValidationException::withMessages([
+                'email' => 'This email address cannot receive mail. Please use a different address.',
+            ]);
         }
 
         $subscriber = NewsletterSubscriber::firstOrNew(['email' => $email]);
