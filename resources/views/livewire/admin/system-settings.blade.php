@@ -72,7 +72,6 @@ class extends Component {
             'features.flights_enabled',
             'features.stays_enabled',
             'features.zendit_esims_enabled',
-            'features.sell_gift_cards_enabled',
             'features.gomarket_enabled',
         ],
         'Content & Marketing' => [

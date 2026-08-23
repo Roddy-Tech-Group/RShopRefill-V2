@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Webhooks;
 
-use App\Domain\GiftCardTrading\Services\PayoutOrchestrator;
 use App\Domain\Payment\Exceptions\InvalidWebhookException;
 use App\Domain\Payment\Services\FlutterwaveService;
 use App\Domain\Wallet\Jobs\ProcessFundingWebhookJob;
@@ -66,23 +65,27 @@ class FlutterwaveWebhookController extends Controller
             return response()->json(['message' => 'Unauthorized signature'], 401);
         }
 
-        // 2b. Transfer (payout) webhooks carry no PaymentAttempt - they reconcile a
-        // gift-card trade Payout by its reference. Route them to the payout
-        // orchestrator (which is idempotent on already-terminal payouts) and stop.
+        // 2b. Transfer (payout) webhooks belonged to gift-card trading, which is
+        // removed (it never processed a trade in production, so no payout can
+        // legitimately reference one). Acknowledge with a 200 so Flutterwave
+        // stops retrying, and log in case one ever arrives unexpectedly.
         $transferReference = $data['reference'] ?? null;
         if ($eventType === 'transfer.completed'
             || (is_string($transferReference) && str_starts_with($transferReference, 'FW-PAYOUT-'))) {
-            app(PayoutOrchestrator::class)->handleWebhook($payload);
+            Log::info('Ignoring transfer webhook: gift-card trading payouts are removed.', [
+                'webhook_id' => $webhook->id,
+                'reference' => $transferReference,
+            ]);
 
             $webhook->update([
                 'processed' => true,
-                'processing_status' => 'processed',
+                'processing_status' => 'ignored',
                 'reference' => $transferReference ?? $txRef,
             ]);
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Transfer webhook processed',
+                'message' => 'Transfer webhook acknowledged',
                 'webhook_id' => $webhook->id,
             ], 200);
         }

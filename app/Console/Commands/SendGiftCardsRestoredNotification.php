@@ -50,7 +50,7 @@ class SendGiftCardsRestoredNotification extends Command
                         mailable: new GiftCardsRestoredMail($user),
                         correlationId: 'giftcards_restored_2026_07_'.$user->id,
                         metadata: [
-                            'url' => config('app.url').'/dashboard/gift-cards',
+                            'url' => config('app.url').'/dashboard/shop/gift-cards',
                             'campaign_id' => 'giftcards_restored_2026_07',
                         ]
                     );

@@ -135,7 +135,6 @@ Route::get('api/search/brands', function (Request $request) {
     $pages = collect([
         ['name' => 'Buy gift cards', 'url' => route('shop.gift-cards')],
         // Hidden-when-off features must not resurface through search.
-        FeatureFlag::on('sell_gift_cards', false) ? ['name' => 'Sell gift cards', 'url' => route('shop.sell-gift-cards')] : null,
         FeatureFlag::on('gomarket', false) ? ['name' => 'GoMarket', 'url' => route('shop.gomarket')] : null,
         ['name' => 'eSIMs', 'url' => route('shop.esims')],
         ['name' => 'Mobile top-ups', 'url' => route('shop.topups')],
@@ -358,11 +357,7 @@ Route::view('flights', 'shop.coming-soon', ['service' => 'flights'])
 Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
     ->middleware('feature:stays')->name('shop.stays');
 
-// Sell Gift Cards & GoMarket - branded "coming soon" pages until each flow ships.
-// Sell Gift Cards is gated like Flights/Stays: with trading switched off there
-// must be no reachable page advertising it. GoMarket stays ungated for now.
-Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])
-    ->middleware('feature:sell_gift_cards')->name('shop.sell-gift-cards');
+// GoMarket - branded "coming soon" page until the flow ships.
 Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('shop.gomarket');
 
 // Help Center - static FAQ, topic filters and support contact details.
@@ -490,7 +485,7 @@ Route::get('sitemap.xml', function () {
 
         $staticNames = [
             'shop.gift-cards' => '0.9', 'shop.esims' => '0.9', 'shop.topups' => '0.9', 'shop.bills' => '0.9',
-            'shop.sell-gift-cards' => '0.6', 'shop.gomarket' => '0.6',
+            'shop.gomarket' => '0.6',
             'shop.flights' => '0.6', 'shop.stays' => '0.6', 'shop.reviews' => '0.6', 'shop.blog' => '0.6',
             'shop.how-it-works' => '0.5', 'shop.help' => '0.5', 'shop.faq' => '0.5', 'shop.contact' => '0.5',
             'shop.about' => '0.5', 'shop.mobile-app' => '0.5', 'shop.earn-points' => '0.5',
@@ -505,7 +500,6 @@ Route::get('sitemap.xml', function () {
         $gatedNames = [
             'shop.flights' => 'flights',
             'shop.stays' => 'stays',
-            'shop.sell-gift-cards' => 'sell_gift_cards',
         ];
 
         foreach ($staticNames as $name => $priority) {
@@ -824,15 +818,6 @@ Route::middleware(['auth'])->group(function () {
 
     Volt::route('dashboard/notifications', 'dashboard.notifications')->name('dashboard.notifications');
 
-    // Gift Card Trading Routes. Submission closes with the flag (404, same as
-    // the storefront page); history and existing trade pages stay reachable so
-    // a customer with money already in a trade can still follow it.
-    Volt::route('dashboard/gift-cards/submit', 'user.gift-cards.submit')
-        ->middleware('feature:sell_gift_cards')->name('dashboard.gift-cards.submit');
-    Volt::route('dashboard/gift-cards/history', 'user.gift-cards.history')->name('dashboard.gift-cards.history');
-    Volt::route('dashboard/gift-cards/trades/{trade}', 'user.gift-cards.trades.show')->name('dashboard.gift-cards.trades.show');
-    Volt::route('dashboard/gift-cards/trades/{trade}/receipt', 'user.gift-cards.trades.receipt')->name('dashboard.gift-cards.trades.receipt');
-
     // Saved Cards hidden until the card-vault / gateway tokenisation backend ships.
     // The view is only an empty-state shell today; the nav links are also commented
     // out in components/layouts/dashboard.blade.php. Uncomment both to re-enable.
@@ -895,8 +880,6 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
         Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
             ->middleware('feature:stays')->name('stays');
 
-        Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])
-            ->middleware('feature:sell_gift_cards')->name('sell-gift-cards');
         Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('gomarket');
 
         // Transactional flow mirrored under the dashboard so the cart -> checkout

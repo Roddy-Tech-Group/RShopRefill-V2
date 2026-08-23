@@ -381,11 +381,10 @@
                             All Categories
                         </a>
                         @php
-                            // Sell Gift Cards + GoMarket are hidden entirely (not
-                            // greyed) until their feature flag is switched on.
+                            // GoMarket is hidden entirely (not greyed) until its
+                            // feature flag is switched on.
                             $shopSubItems = array_values(array_filter([
                                 ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
-                                \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null] : null,
                                 \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
                                 ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
                                 \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('dashboard.shop.flights'), null] : null,
@@ -440,21 +439,6 @@
                         Transactions
                     </span>
                 </a>
-
-                {{-- Gift card trading is hidden entirely (not greyed) while its
-                     flag is off - same contract as the storefront surfaces. --}}
-                @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
-                @php $active = $isCurrent('dashboard.gift-cards*'); @endphp
-                <a href="{{ route('dashboard.gift-cards.history') }}" wire:navigate.hover data-tip="Trade Gift Cards" class="{{ $navItem($active) }}">
-                    <span class="flex items-center gap-3">
-                        <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="2" y1="10" x2="22" y2="10"/>
-                        </svg>
-                        Trade Gift Cards
-                    </span>
-                </a>
-                @endif
 
                 {{-- Profile intentionally omitted from the desktop sidebar — it's
                      reachable via the avatar dropdown (and the mobile menu). --}}
@@ -1560,7 +1544,6 @@
                 ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
                 // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
                 // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
-                \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['label' => 'Trade Card', 'href' => route('dashboard.gift-cards.history'), 'icon' => 'gift cards.svg', 'tone' => 'bg-orange-500', 'nav' => true] : null,
                 // The rewards page is the Rcoin programme (cashback, referrals,
                 // withdrawals, conversion) - the tile carries the Rcoin name,
                 // not the old "Referrals" alias that hid it.

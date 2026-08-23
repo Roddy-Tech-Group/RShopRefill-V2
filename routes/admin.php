@@ -126,19 +126,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Global command-bar search for the admin header. Unlike products/search-
         // suggest (catalogue only), this searches the whole back office -
         // customers, orders, eSIMs by ICCID, transactions, wallet money,
-        // gift-card trades, catalogue, coupons, and the admin pages themselves -
+        // catalogue, coupons, and the admin pages themselves -
         // returning TYPED rows with a ready-made `url` so every hit links
         // straight to the page that shows it. Every branch is permission-gated
         // inside the service, so the bar can never surface a record the signed-in
         // admin is blocked from opening.
         Route::get('search-suggest', [AdminSearchController::class, 'suggest'])->name('search-suggest');
-
-        // Gift Card Trading Routes
-        Volt::route('gift-cards/trades', 'admin.gift-cards.trades.index')->name('gift-cards.trades.index');
-        Volt::route('gift-cards/trades/{trade}', 'admin.gift-cards.trades.show')->name('gift-cards.trades.show');
-        Volt::route('gift-cards/trades/{trade}/receipt', 'admin.gift-cards.trades.receipt')->name('gift-cards.trades.receipt');
-        Volt::route('gift-cards/brands', 'admin.gift-cards.brands')->name('gift-cards.brands');
-        Volt::route('gift-cards/rates', 'admin.gift-cards.rates')->name('gift-cards.rates');
 
         Route::view('orders', 'admin.orders')->name('orders');
         // Order report: preview page first (view + Download/Share), PDF behind

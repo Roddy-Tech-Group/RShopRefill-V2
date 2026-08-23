@@ -18,7 +18,6 @@
     // without a live page render as disabled "Soon" entries until one ships.
     $categories = [
         ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',       'url' => $r('gift-cards')],
-        ['slug' => 'sell-gift-cards', 'label' => 'Sell Gift Cards',      'url' => $r('sell-gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',             'url' => $r('gomarket')],
         ['slug' => 'mobile-airtime',  'label' => 'Mobile top up & data', 'url' => $r('topups')],
         ['slug' => 'esims',           'label' => 'eSIMs',                'url' => $r('esims')],
@@ -32,7 +31,7 @@
     // FeatureFlag::categoryVisible(): unlike the live categories they are
     // removed rather than greyed, because there is no catalogue behind either.
     // Their routes 404 in the same state, so link and page vanish together.
-    $hiddenWhenOff = ['sell-gift-cards' => 'sell_gift_cards', 'gomarket' => 'gomarket'];
+    $hiddenWhenOff = ['gomarket' => 'gomarket'];
     $categories = array_values(array_filter(
         $categories,
         fn ($c) => (! isset($hiddenWhenOff[$c['slug']]) || \App\Support\FeatureFlag::on($hiddenWhenOff[$c['slug']], false))

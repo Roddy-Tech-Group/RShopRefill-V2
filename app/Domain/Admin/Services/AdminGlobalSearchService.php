@@ -4,7 +4,6 @@ namespace App\Domain\Admin\Services;
 
 use App\Models\Admin;
 use App\Models\Coupon;
-use App\Models\GiftCardTrade;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
@@ -19,7 +18,7 @@ use Illuminate\Support\Str;
 /**
  * Backs the admin header command bar. One query string is fanned out across
  * every admin-reachable record type (customers, orders, eSIMs, transactions,
- * wallet money, gift-card trades, catalogue, coupons) plus a static index of
+ * wallet money, catalogue, coupons) plus a static index of
  * admin pages, so the bar is a real "search the whole back office" surface
  * rather than the customers-and-products lookup it started as.
  *
@@ -73,10 +72,6 @@ class AdminGlobalSearchService
         ['label' => 'Transactions', 'route' => 'admin.transactions', 'group' => 'Commerce', 'keywords' => 'payments attempts gateway charges'],
         ['label' => 'Wallets', 'route' => 'admin.wallets', 'group' => 'Commerce', 'keywords' => 'balances funding topup ledger'],
         ['label' => 'Payment Insights', 'route' => 'admin.payment-insights', 'group' => 'Commerce', 'keywords' => 'failures conversion gateway analytics'],
-
-        ['label' => 'Gift Card Trades Queue', 'route' => 'admin.gift-cards.trades.index', 'group' => 'Gift Cards', 'keywords' => 'trades queue redemption sell'],
-        ['label' => 'Gift Card Brands', 'route' => 'admin.gift-cards.brands', 'group' => 'Gift Cards', 'keywords' => 'brands amazon steam itunes'],
-        ['label' => 'Gift Card Rates', 'route' => 'admin.gift-cards.rates', 'group' => 'Gift Cards', 'keywords' => 'rates payout percentage'],
 
         ['label' => 'Monitoring', 'route' => 'admin.management.monitoring', 'group' => 'Management', 'keywords' => 'health uptime queues horizon providers'],
         ['label' => 'Finances', 'route' => 'admin.management.finances', 'group' => 'Management', 'keywords' => 'profit revenue margin accounting'],
@@ -132,7 +127,6 @@ class AdminGlobalSearchService
             $this->esims($q, $admin),
             $this->transactions($q, $admin),
             $this->walletMoney($q, $admin),
-            $this->trades($q, $admin),
             $this->products($q, $admin),
             $this->coupons($q, $admin),
             $this->pages($q, $admin),
@@ -441,46 +435,6 @@ class AdminGlobalSearchService
             ->all();
 
         return array_merge($fundings, $movements);
-    }
-
-    /**
-     * Gift-card trades by UUID, WhatsApp number, or the trader's name / email.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function trades(string $q, Admin $admin): array
-    {
-        if (! $admin->canAccessAdminRoute('admin.gift-cards.trades.show')) {
-            return [];
-        }
-
-        return GiftCardTrade::query()
-            ->with('user:id,name,email')
-            ->where(function ($builder) use ($q) {
-                $builder->where('uuid', 'like', "{$q}%")
-                    ->orWhere('whatsapp_number', 'like', "%{$q}%")
-                    ->orWhereHas('user', function ($userQuery) use ($q) {
-                        $userQuery->where('name', 'like', "%{$q}%")
-                            ->orWhere('email', 'like', "%{$q}%");
-                    });
-            })
-            ->orderByDesc('created_at')
-            ->limit(self::PER_GROUP_LIMIT)
-            ->get()
-            ->map(fn (GiftCardTrade $trade) => [
-                'type' => 'trade',
-                'group' => 'Gift Card Trades',
-                'id' => 'g'.$trade->id,
-                'title' => 'Trade #'.$trade->id,
-                'subtitle' => trim(($trade->user?->name ?? 'Unknown trader').' · '.str_replace('_', ' ', (string) ($trade->status?->value ?? ''))),
-                'meta' => $trade->payout_currency.' '.number_format((float) $trade->calculated_payout, 2),
-                'badge' => 'Trade',
-                'avatar' => null,
-                'initials' => 'GC',
-                'url' => route('admin.gift-cards.trades.show', $trade),
-                'score' => $this->score($q, [$trade->uuid, $trade->whatsapp_number, $trade->user?->name, $trade->user?->email], 15),
-            ])
-            ->all();
     }
 
     /**

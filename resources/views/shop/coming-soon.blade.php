@@ -4,19 +4,6 @@
     $service = $service ?? 'flights';
 
     $m = match ($service) {
-        'sell-gift-cards' => [
-            'name'     => 'Sell Gift Cards',
-            'tagline'  => 'Turn your gift cards into instant cash.',
-            'blurb'    => "Soon you'll trade your gift cards on ".$siteName." and get paid straight to your wallet. Snap the card, see a live rate, and cash out in minutes. We're putting the finishing touches on it now.",
-            'image'    => 'hero gift.webp',
-            'icon'     => 'gift cards.svg',
-            'accent'   => 'bg-emerald-500',
-            'features' => [
-                ['Instant quotes', 'See a live payout rate before you sell.'],
-                ['Paid to your wallet', 'Cash out to your balance, card or crypto.'],
-                ['Safe and tracked', 'Every trade is checked and logged in your dashboard.'],
-            ],
-        ],
         'gomarket' => [
             'name'     => 'GoMarket',
             'tagline'  => 'One marketplace for everything you need.',

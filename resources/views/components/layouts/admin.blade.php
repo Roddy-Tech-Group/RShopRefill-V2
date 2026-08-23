@@ -450,52 +450,6 @@
                 </a>
                 @endif
 
-                {{-- Gift Card Trading --}}
-                @if ($can('admin.orders'))
-                @php
-                    $gcActive = $isCurrent('admin.gift-cards.trades*', 'admin.gift-cards.brands*', 'admin.gift-cards.rates*');
-                @endphp
-                <div
-                    x-data="{
-                        open: {{ $gcActive ? 'true' : 'false' }},
-                        active() { return window.location.pathname.includes('/admin/gift-cards'); },
-                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
-                    }"
-                    x-effect="sync()"
-                    x-on:livewire:navigated.window="sync()"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
-                    class="nav-group flex flex-col gap-1"
-                >
-                    <button
-                        type="button"
-                        @click.stop="open = ! open"
-                        :aria-expanded="open.toString()"
-                        class="{{ $navItemClass($gcActive) }} w-full justify-between"
-                    >
-                        <span class="flex items-center gap-3">
-                            <svg class="{{ $iconClass($gcActive) }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
-                                <line x1="2" y1="10" x2="22" y2="10"/>
-                            </svg>
-                            Gift Card Trading
-                        </span>
-                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $gcActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    @php
-                        $subItemClass = fn (bool $active) => $active
-                            ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
-                    @endphp
-                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
-                        <a href="{{ route('admin.gift-cards.trades.index') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.trades*')) }}">Trades Queue</a>
-                        <a href="{{ route('admin.gift-cards.brands') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.brands*')) }}">Brands</a>
-                        <a href="{{ route('admin.gift-cards.rates') }}" wire:navigate class="{{ $subItemClass($isCurrent('admin.gift-cards.rates*')) }}">Rates</a>
-                    </div>
-                </div>
-                @endif
 
                 {{-- Wallets --}}
                 @if ($can('admin.wallets'))
@@ -1091,9 +1045,6 @@
             $adminMenuItems = collect([
                 ['label' => 'Home',          'route' => 'admin.dashboard',               'icon' => 'Home.svg',                    'tone' => 'bg-blue-500'],
                 ['label' => 'Products',      'route' => 'admin.products',                'icon' => 'Shop.svg',                    'tone' => 'bg-pink-500'],
-                ['label' => 'Trades Queue',  'route' => 'admin.gift-cards.trades.index', 'icon' => 'gift cards.svg',              'tone' => 'bg-lime-600'],
-                ['label' => 'Trade Brands',  'route' => 'admin.gift-cards.brands',       'icon' => 'wide selection.svg',          'tone' => 'bg-green-600'],
-                ['label' => 'Trade Rates',   'route' => 'admin.gift-cards.rates',        'icon' => 'best prices.svg',             'tone' => 'bg-emerald-600'],
                 ['label' => 'Orders',        'route' => 'admin.orders',                  'icon' => 'order.svg',                   'tone' => 'bg-sky-500'],
                 ['label' => 'Customers',     'route' => 'admin.customers',               'icon' => 'customer.svg',                'tone' => 'bg-emerald-500'],
                 ['label' => 'Transactions',  'route' => 'admin.transactions',            'icon' => 'transactions.svg',            'tone' => 'bg-teal-500'],
