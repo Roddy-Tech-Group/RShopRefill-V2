@@ -60,47 +60,6 @@ class VerifyWebhookSignature
 
                 return is_string($signature) && is_string($secret) && hash_equals($secret, $signature);
 
-            case 'maplerad':
-                // Maplerad now uses Svix for webhooks
-                $msgId = $request->header('svix-id');
-                $timestamp = $request->header('svix-timestamp');
-                $signatures = $request->header('svix-signature');
-
-                if (! $msgId || ! $timestamp || ! $signatures) {
-                    // Fallback to legacy HMAC SHA512 signature if Svix headers are missing
-                    $legacySignature = $request->header('x-maplerad-signature');
-                    $legacySecret = config('services.maplerad.secret_key');
-                    if (! is_string($legacySecret) || ! is_string($legacySignature)) {
-                        return false;
-                    }
-                    $expected = hash_hmac('sha512', $payload, $legacySecret);
-
-                    return hash_equals($expected, $legacySignature);
-                }
-
-                $secret = config('services.maplerad.webhook_secret');
-                if (! is_string($secret)) {
-                    return false;
-                }
-
-                // Remove the 'whsec_' prefix if present
-                $secretBytes = base64_decode(str_replace('whsec_', '', $secret));
-
-                $signedContent = $msgId.'.'.$timestamp.'.'.$payload;
-                $expectedSig = base64_encode(hash_hmac('sha256', $signedContent, $secretBytes, true));
-
-                $passedSigs = explode(' ', (string) $signatures);
-                foreach ($passedSigs as $versionedSig) {
-                    $parts = explode(',', $versionedSig);
-                    if (count($parts) === 2 && $parts[0] === 'v1') {
-                        if (hash_equals($expectedSig, $parts[1])) {
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-
             case 'paystack':
                 // Paystack signs the RAW request body with HMAC-SHA512 using
                 // the merchant secret key; the digest arrives hex-encoded in
@@ -180,8 +139,6 @@ class VerifyWebhookSignature
         switch ($provider) {
             case 'flutterwave':
                 return $data['data']['id'] ?? null;
-            case 'maplerad':
-                return $request->header('svix-id') ?? ($data['id'] ?? null);
             case 'paystack':
                 // Paystack retries undelivered events for 72 hours; only
                 // byte-identical redeliveries should dedupe, so key on the

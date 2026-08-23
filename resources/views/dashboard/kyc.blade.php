@@ -2,47 +2,38 @@
     Identity Verification (KYC) page — /dashboard/kyc.
 
     Reads real customer state from users.kyc_status + users.email_verified_at.
-    Form submissions POST to KycController::store which creates a KycSubmission
-    row; admins review at /admin/kyc/... and flip the user's kyc_status.
+    Verification is automated through Smile ID: "Verify now" mints a session at
+    POST /api/kyc/start and launches the shared window.rshopKyc modal (the same
+    hosted flow the checkout/funding step-up uses); the provider verdict lands
+    on the Smile webhook and flips users.kyc_status.
 
     Verification model:
       - Not verified         → "Basic" badge          → standard limits
       - Email verified       → "Email Verified" badge → standard limits, unlocks Platinum tier
       - ID (KYC) verified    → "Verified" badge       → raised limits, unlocks Diamond tier
 
-    Transaction-limit ENFORCEMENT against $limits below is not wired yet —
-    the table is display copy until the limit middleware ships.
+    The limits table below renders from SpendingLimitService::sets() — the SAME
+    settings-backed values the checkout gate enforces (shadow until
+    features.spending_limits_enforce_enabled is on) — so what the customer is
+    shown and what the gate enforces can never disagree.
 --}}
 @php
     $user = auth()->user();
 
     $emailVerified = (bool) $user?->email_verified_at;
 
-    // Backend hook: $user->kyc_status. Column not shipped yet, so this resolves to null
-    // and falls back to 'unsubmitted'.
     $kycStatus = $user?->kyc_status ?? 'unsubmitted';
     $kycVerified = $kycStatus === 'verified';
 
     // Verification level the user has reached.
     $level = $kycVerified ? 'Verified' : ($emailVerified ? 'Email Verified' : 'Basic');
 
-    // Daily / weekly / monthly transaction caps (USD). KYC unlocks the higher set.
+    // Daily / weekly / monthly transaction caps (USD), from the single
+    // settings-backed source the checkout gate enforces.
+    $limitSets = app(\App\Domain\Kyc\Services\SpendingLimitService::class)->sets();
     $limits = [
-        'standard' => ['day' => 2000,  'week' => 5000,  'month' => 10000],
-        'kyc'      => ['day' => 5000,  'week' => 10000, 'month' => 15000],
-    ];
-    $activeLimits = $kycVerified ? $limits['kyc'] : $limits['standard'];
-
-    $icon = 'filter: brightness(0) saturate(100%);';
-
-    // Options for the modern KYC form dropdowns (consumed by the kycSelect Alpine component).
-    $countryOptions = collect(array_keys(config('countries.codes', [])))
-        ->map(fn ($c) => ['value' => $c, 'label' => $c])
-        ->values();
-    $documentTypes = [
-        ['value' => 'passport',        'label' => 'Passport'],
-        ['value' => 'national_id',     'label' => 'National ID card'],
-        ['value' => 'drivers_license', 'label' => "Driver's license"],
+        'standard' => $limitSets['standard'],
+        'kyc' => $limitSets['verified'],
     ];
 @endphp
 
@@ -148,299 +139,120 @@
                         </svg>
                     </span>
                     <div>
-                        <p class="text-sm font-bold text-black">Your documents are under review</p>
-                        <p class="mt-0.5 text-sm text-zinc-600">Verification usually takes up to 48 hours. We will notify you once it is complete.</p>
+                        <p class="text-sm font-bold text-black">Your verification is in review</p>
+                        <p class="mt-0.5 text-sm text-zinc-600">Automated checks usually complete within a few minutes; occasionally a manual review can take up to 48 hours. Refresh this page to see your updated status.</p>
                     </div>
                 </div>
 
             @else
-                {{-- 'unsubmitted' or 'rejected' — show the submission form. --}}
+                {{-- 'unsubmitted' or 'rejected' — self-serve Smile ID verification. --}}
                 @if ($kycStatus === 'rejected')
                     <div class="mt-3 flex items-start gap-3 rounded-[12px] bg-red-50 px-4 py-3">
                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                         </svg>
-                        <p class="text-sm text-red-700">Your last submission could not be verified. Please check your documents and submit again.</p>
+                        <p class="text-sm text-red-700">We could not verify your identity last time. Make sure your ID is valid and your face is clearly visible, then try again.</p>
                     </div>
                 @endif
 
-                <form
-                    method="POST"
-                    action="{{ route('kyc.submit') }}"
-                    enctype="multipart/form-data"
+                <div
+                    x-data="{
+                        starting: false,
+                        error: '',
+                        async start() {
+                            this.error = '';
+                            this.starting = true;
+                            try {
+                                const res = await fetch('{{ route('api.kyc.start') }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                                    },
+                                });
+                                const data = await res.json();
+                                if (! res.ok) {
+                                    this.error = data.message || 'Could not start verification. Please try again.';
+                                    return;
+                                }
+                                if (window.rshopKyc) {
+                                    window.rshopKyc.launch(data.smile, () => window.location.reload());
+                                } else {
+                                    this.error = 'The verification tool could not load. Please refresh the page and try again.';
+                                }
+                            } catch (e) {
+                                this.error = 'Network error. Please check your connection and try again.';
+                            } finally {
+                                this.starting = false;
+                            }
+                        }
+                    }"
                     class="mt-3 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6"
                 >
-                    @csrf
-
-                    @if ($errors->any())
-                        <div class="mb-4 rounded-[12px] bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
-                            <p class="font-semibold">Please fix the following:</p>
-                            <ul class="mt-1 list-disc pl-5 text-xs">
-                                @foreach ($errors->all() as $err)
-                                    <li>{{ $err }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {{-- Full legal name --}}
+                    <div class="flex items-start gap-4">
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-blue-50">
+                            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
+                            </svg>
+                        </span>
                         <div>
-                            <label for="kyc_full_name" class="text-xs font-semibold text-zinc-900">Full legal name</label>
-                            <input
-                                id="kyc_full_name"
-                                name="kyc_full_name"
-                                type="text"
-                                value="{{ $user?->name }}"
-                                placeholder="As shown on your ID"
-                                class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                            >
-                        </div>
-
-                        {{-- Date of birth — calendar date picker --}}
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-900">Date of birth</label>
-                            <div
-                                x-data="kycDatePicker()"
-                                @click.outside="open = false"
-                                @keydown.escape="open = false"
-                                class="relative mt-1.5"
-                            >
-                                <input type="hidden" name="kyc_dob" :value="value">
-                                <button
-                                    type="button"
-                                    @click="open = !open"
-                                    :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
-                                >
-                                    <span :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="displayValue || 'Select your date of birth'"></span>
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-cloak
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-[300px] rounded-[12px] bg-[#eff6ff] p-3 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
-                                >
-                                    {{-- Month / year stepper --}}
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex gap-0.5">
-                                            <button type="button" @click="shiftYear(-1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous year">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5M11.25 19.5l-7.5-7.5 7.5-7.5"/></svg>
-                                            </button>
-                                            <button type="button" @click="shiftMonth(-1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Previous month">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
-                                            </button>
-                                        </div>
-                                        <span class="text-sm font-bold text-zinc-900" x-text="monthLabel"></span>
-                                        <div class="flex gap-0.5">
-                                            <button type="button" @click="shiftMonth(1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next month">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
-                                            </button>
-                                            <button type="button" @click="shiftYear(1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100" aria-label="Next year">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 4.5l7.5 7.5-7.5 7.5M12.75 4.5l7.5 7.5-7.5 7.5"/></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {{-- Weekday labels --}}
-                                    <div class="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-400">
-                                        <template x-for="w in weekdays" :key="w"><span x-text="w"></span></template>
-                                    </div>
-
-                                    {{-- Day grid --}}
-                                    <div class="mt-1 grid grid-cols-7 gap-1">
-                                        <template x-for="(cell, idx) in cells" :key="idx">
-                                            <button
-                                                type="button"
-                                                @click="pick(cell)"
-                                                :disabled="!cell || isFuture(cell)"
-                                                :class="{
-                                                    'invisible': !cell,
-                                                    'bg-blue-600 font-bold text-white': cell && isSelected(cell),
-                                                    'cursor-not-allowed text-zinc-300': cell && isFuture(cell),
-                                                    'text-zinc-700 hover:bg-zinc-100': cell && !isSelected(cell) && !isFuture(cell),
-                                                }"
-                                                class="flex h-8 w-8 items-center justify-center rounded-[12px] text-sm transition-colors"
-                                                x-text="cell"
-                                            ></button>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Country of residence — searchable dropdown --}}
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-900">Country of residence</label>
-                            <div
-                                x-data="kycSelect(@js($countryOptions), '', true)"
-                                @click.outside="open = false"
-                                @keydown.escape="open = false"
-                                class="relative mt-1.5"
-                            >
-                                <input type="hidden" name="kyc_country" :value="value">
-                                <button
-                                    type="button"
-                                    @click="toggle()"
-                                    :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
-                                >
-                                    <span :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="selectedLabel || 'Select a country'"></span>
-                                    <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-cloak
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    {{-- No `overflow-hidden`: on iOS Safari an overflow-hidden + rounded parent traps touch-scrolling of the list inside. The ring/shadow/bg still carry the radius, and the children are transparent + inset, so the corners stay clean. --}}
-                                    class="absolute left-0 z-30 mt-1 w-full rounded-[12px] bg-[#eff6ff] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
-                                >
-                                    <div class="border-b border-zinc-100 p-2">
-                                        <input
-                                            x-ref="search"
-                                            x-model="query"
-                                            type="text"
-                                            placeholder="Search countries"
-                                            class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                                        >
-                                    </div>
-                                    <ul class="max-h-52 overflow-y-auto overscroll-contain p-1 [touch-action:pan-y] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                        <template x-for="opt in filtered" :key="opt.value">
-                                            <li>
-                                                <button
-                                                    type="button"
-                                                    @click="pick(opt.value)"
-                                                    :class="opt.value === value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
-                                                >
-                                                    <span x-text="opt.label"></span>
-                                                    <svg x-show="opt.value === value" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                                    </svg>
-                                                </button>
-                                            </li>
-                                        </template>
-                                        <li x-show="filtered.length === 0" class="px-3 py-3 text-center text-sm text-zinc-500">No matches</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Document type — dropdown --}}
-                        <div>
-                            <label class="text-xs font-semibold text-zinc-900">Document type</label>
-                            <div
-                                x-data="kycSelect(@js($documentTypes), 'passport', false)"
-                                @click.outside="open = false"
-                                @keydown.escape="open = false"
-                                class="relative mt-1.5"
-                            >
-                                <input type="hidden" name="kyc_document_type" :value="value">
-                                <button
-                                    type="button"
-                                    @click="toggle()"
-                                    :class="open && 'border-blue-500 ring-2 ring-blue-500/15'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm transition-colors"
-                                >
-                                    <span class="text-zinc-900" x-text="selectedLabel"></span>
-                                    <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-cloak
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="absolute left-0 z-30 mt-1 w-full overflow-hidden rounded-[12px] bg-[#eff6ff] p-1 shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200"
-                                >
-                                    <template x-for="opt in options" :key="opt.value">
-                                        <button
-                                            type="button"
-                                            @click="pick(opt.value)"
-                                            :class="opt.value === value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                            class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors"
-                                        >
-                                            <span x-text="opt.label"></span>
-                                            <svg x-show="opt.value === value" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                            </svg>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Document number --}}
-                        <div class="sm:col-span-2">
-                            <label for="kyc_document_number" class="text-xs font-semibold text-zinc-900">Document number</label>
-                            <input
-                                id="kyc_document_number"
-                                name="kyc_document_number"
-                                type="text"
-                                placeholder="The number printed on your document"
-                                class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                            >
+                            <p class="text-base font-bold text-black">Verify your identity</p>
+                            <p class="mt-0.5 text-sm text-zinc-600">Complete verification to unlock your raised transaction limits.</p>
                         </div>
                     </div>
 
-                    {{-- Document uploads --}}
-                    <p class="mt-5 text-xs font-semibold text-zinc-900">Upload your documents</p>
-                    <p class="mt-0.5 text-xs text-zinc-600">Clear photos or scans, JPG or PNG, under 8 MB each.</p>
-
-                    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        @foreach ([
-                            ['kyc_document_front', 'Document front'],
-                            ['kyc_document_back',  'Document back'],
-                            ['kyc_selfie',         'Selfie with document'],
-                        ] as [$field, $label])
-                            <div x-data="{ fileName: '' }">
-                                <label
-                                    for="{{ $field }}"
-                                    class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-zinc-200 bg-zinc-50 px-3 py-5 text-center transition-colors hover:border-blue-400 hover:bg-blue-50"
-                                >
-                                    <svg class="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-                                    </svg>
-                                    <span class="text-xs font-semibold text-zinc-900">{{ $label }}</span>
-                                    <span class="text-[11px] text-zinc-500" x-text="fileName || 'Tap to upload'"></span>
-                                </label>
-                                <input
-                                    id="{{ $field }}"
-                                    name="{{ $field }}"
-                                    type="file"
-                                    accept="image/png,image/jpeg"
-                                    class="hidden"
-                                    @change="fileName = $event.target.files[0]?.name || ''"
-                                >
-                            </div>
-                        @endforeach
+                    {{-- What you'll need --}}
+                    <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                            <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 9.75h4.5M6 12.75h3"/>
+                            </svg>
+                            <span class="text-xs font-semibold text-zinc-700">A government-issued ID <span class="block font-normal text-zinc-500">Passport, national ID, or driver&rsquo;s license</span></span>
+                        </div>
+                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                            <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
+                            </svg>
+                            <span class="text-xs font-semibold text-zinc-700">A quick selfie <span class="block font-normal text-zinc-500">Using your device&rsquo;s camera</span></span>
+                        </div>
+                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                            <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-xs font-semibold text-zinc-700">About 2 minutes <span class="block font-normal text-zinc-500">Most checks complete instantly</span></span>
+                        </div>
                     </div>
 
-                    <div class="mt-5 flex items-start gap-2 rounded-[12px] bg-zinc-50 px-3 py-2.5">
+                    {{-- Country selection happens inside Smile's hosted widget,
+                         which lists every country with search. All customers get
+                         the worldwide Document Verification flow (see
+                         services.smileid.biometric_countries). --}}
+                    <p x-show="error" x-cloak class="mt-4 rounded-[12px] bg-red-50 px-3 py-2.5 text-sm text-red-700" x-text="error"></p>
+
+                    <button
+                        type="button"
+                        @click="start()"
+                        :disabled="starting"
+                        class="mt-5 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                    >
+                        <svg x-show="starting" x-cloak class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span x-text="starting ? 'Starting...' : '{{ $kycStatus === 'rejected' ? 'Try again' : 'Verify now' }}'"></span>
+                    </button>
+
+                    <div class="mt-4 flex items-start gap-2 rounded-[12px] bg-zinc-50 px-3 py-2.5">
                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
                         </svg>
-                        <p class="text-xs text-zinc-600">Your documents are used only to verify your identity and are stored securely.</p>
+                        <p class="text-xs text-zinc-600">Your information is encrypted and used only to verify your identity.</p>
                     </div>
+                </div>
 
-                    <button type="submit" class="mt-4 w-full rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
-                        {{ $kycStatus === 'rejected' ? 'Resubmit for verification' : 'Submit for verification' }}
-                    </button>
-                </form>
             @endif
         </section>
 
