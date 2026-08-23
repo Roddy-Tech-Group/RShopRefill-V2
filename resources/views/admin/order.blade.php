@@ -35,12 +35,25 @@
     <div class="flex flex-1 flex-col gap-6">
 
         {{-- Back link --}}
-        <a href="{{ route('admin.orders') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
-            </svg>
-            All orders
-        </a>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <a href="{{ route('admin.orders') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+                </svg>
+                All orders
+            </a>
+
+            {{-- Evidence report: PDF bundle of the order's complete record
+                 (customer verification, payment trail, risk decisions,
+                 communications, audit trail). Generation is audit-logged. --}}
+            <a href="{{ route('admin.order.report', $order) }}"
+                class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12v3.75m0 0l-3-3m3 3l3-3M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                </svg>
+                Generate Report
+            </a>
+        </div>
 
         {{-- Status overview --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
