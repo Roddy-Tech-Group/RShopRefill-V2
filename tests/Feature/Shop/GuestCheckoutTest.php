@@ -5,33 +5,26 @@ namespace Tests\Feature\Shop;
 use App\Domain\Communication\Mail\Orders\GuestAccountClaimMail;
 use App\Domain\Communication\Providers\MailProviderInterface;
 use App\Domain\Order\Events\FulfillmentSucceeded;
-use App\Models\Cart;
-use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\CommunicationLog;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
 use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Guest checkout (features.guest_checkout_enabled, default ON). Guests order
- * under a shadow account keyed by their delivery email; after fulfillment
- * they receive a claim link to set a password + transaction PIN, and every
- * order they placed as a guest is already on the account. Wallet/Rcoin stay
- * signed-in-only, and guest attempts are rate limited per IP and per email.
+ * Guest purchase is REMOVED: checkout is signed-in-only and no shadow
+ * account is ever minted. What survives is the legacy tail: shadow accounts
+ * that already exist from the old flow keep their claim path (the signed
+ * link that sets a password + transaction PIN and converts the account), and
+ * any still-fulfilling legacy guest order still triggers its claim email.
  */
 class GuestCheckoutTest extends TestCase
 {
@@ -56,157 +49,41 @@ class GuestCheckoutTest extends TestCase
         });
     }
 
-    /** Build an active cart with one gift-card item under a guest token. */
-    private function seedGuestCart(string $guestToken): Cart
-    {
-        $category = Category::create(['name' => 'Gift Cards', 'slug' => 'gift-cards', 'type' => 'digital']);
-        $subcategory = Subcategory::create(['category_id' => $category->id, 'name' => 'Gaming', 'slug' => 'gaming']);
-        $product = Product::create([
-            'category_id' => $category->id,
-            'subcategory_id' => $subcategory->id,
-            'provider_name' => 'zendit',
-            'country_code' => 'US',
-            'currency_code' => 'USD',
-            'name' => 'Steam Gift Card',
-            'slug' => 'steam-gift-card',
-        ]);
-        $variant = ProductVariant::create([
-            'product_id' => $product->id,
-            'provider_offer_id' => 'steam-offer-10',
-            'sku' => 'STEAM10-GUEST',
-            'currency' => 'USD',
-            'face_value' => 10.00,
-            'cost_price' => 9.50,
-            'retail_price' => 10.50,
-            'is_available' => true,
-        ]);
-        PricingRule::firstOrCreate(['markup_type' => 'fixed', 'markup_value' => 1.00, 'is_active' => true]);
+    // ── Guest purchase is refused outright ──────────────────────
 
-        $cart = Cart::create([
-            'guest_token' => $guestToken,
-            'status' => 'active',
-            'last_activity_at' => now(),
-        ]);
-
-        CartItem::create([
-            'cart_id' => $cart->id,
-            'product_id' => $product->id,
-            'product_variant_id' => $variant->id,
-            'quantity' => 1,
-            'display_currency' => 'USD',
-            'display_amount' => 11.00,
-            'provider_cost_usd' => 9.50,
-            'markup_amount' => 1.00,
-            'unit_price_snapshot' => 11.00,
-            'subtotal_snapshot' => 11.00,
-        ]);
-
-        return $cart;
-    }
-
-    // ── Feature flag + guards ───────────────────────────────────
-
-    public function test_guest_checkout_is_blocked_when_the_flag_is_off(): void
-    {
-        SiteSetting::put('features.guest_checkout_enabled', 'off', 'features');
-
-        $this->post(route('checkout.process'), [
-            'delivery_email' => 'guest@example.com',
-            'payment_method' => 'card',
-            'currency' => 'USD',
-        ])->assertForbidden();
-    }
-
-    public function test_guests_cannot_pay_with_wallet_or_rcoin(): void
+    public function test_an_unauthenticated_checkout_is_refused_and_mints_no_shadow_account(): void
     {
         $response = $this->post(route('checkout.process'), [
             'delivery_email' => 'guest@example.com',
-            'payment_method' => 'wallet',
+            'payment_method' => 'card',
             'currency' => 'USD',
         ]);
 
         $response->assertRedirect();
-        $response->assertSessionHas('checkout_status', 'Sign in to pay with your wallet or Rcoin.');
+        $response->assertSessionHas('checkout_status', 'Please sign in to complete checkout.');
         $this->assertDatabaseMissing('users', ['email' => 'guest@example.com']);
     }
 
-    public function test_guest_checkout_is_rate_limited_per_email(): void
+    public function test_an_unauthenticated_json_checkout_gets_a_401(): void
     {
-        // Per-email cap is 4 attempts per 10 minutes; the 5th gets a 429.
-        for ($i = 0; $i < 4; $i++) {
-            $this->post(route('checkout.process'), [
-                'delivery_email' => 'hammer@example.com',
-                'payment_method' => 'card',
-                'currency' => 'USD',
-            ])->assertRedirect(); // empty cart bounce, but the attempt counts
-        }
-
-        $this->post(route('checkout.process'), [
-            'delivery_email' => 'hammer@example.com',
-            'payment_method' => 'card',
-            'currency' => 'USD',
-        ])->assertStatus(429);
-    }
-
-    // ── Placing a guest order ───────────────────────────────────
-
-    public function test_guest_order_is_placed_under_a_shadow_account(): void
-    {
-        Http::fake(['*' => Http::response(['status' => 'success', 'data' => ['link' => 'https://checkout.test/pay', 'id' => 1]], 200)]);
-
-        $token = Str::uuid()->toString();
-        $this->seedGuestCart($token);
-
-        $response = $this->withHeader('X-Guest-Token', $token)->post(route('checkout.process'), [
+        $this->postJson(route('checkout.process'), [
             'delivery_email' => 'guest@example.com',
             'payment_method' => 'card',
             'currency' => 'USD',
-        ]);
+        ])->assertUnauthorized();
 
-        $response->assertSessionMissing('checkout_status');
-
-        $guest = User::where('email', 'guest@example.com')->first();
-        $this->assertNotNull($guest);
-        $this->assertTrue($guest->is_guest);
-
-        $order = Order::where('user_id', $guest->id)->first();
-        $this->assertNotNull($order);
-
-        // Checkout granted this browser session access to its own order...
-        $response->assertSessionHas('guest_order_numbers', [$order->order_number]);
-
-        // ...which the confirmation page honours (the array session driver in
-        // tests does not persist between requests, so the grant is re-seeded)...
-        $this->withoutVite()
-            ->withSession(['guest_order_numbers' => [$order->order_number]])
-            ->get(route('shop.order', $order->order_number))
-            ->assertOk();
-
-        // ...while a fresh session (another visitor) cannot enumerate it.
-        $this->flushSession();
-        $this->get(route('shop.order', $order->order_number))->assertNotFound();
+        $this->assertDatabaseMissing('users', ['email' => 'guest@example.com']);
     }
 
-    public function test_guest_order_with_a_registered_email_attaches_to_that_account(): void
+    public function test_an_unauthenticated_visitor_cannot_view_any_order_page(): void
     {
-        Http::fake(['*' => Http::response(['status' => 'success', 'data' => ['link' => 'https://checkout.test/pay', 'id' => 1]], 200)]);
+        $owner = User::factory()->create();
+        $item = $this->makeFulfilledItem($owner);
 
-        $existing = User::factory()->create(['email' => 'customer@example.com']);
-        $token = Str::uuid()->toString();
-        $this->seedGuestCart($token);
-
-        $this->withHeader('X-Guest-Token', $token)->post(route('checkout.process'), [
-            'delivery_email' => 'customer@example.com',
-            'payment_method' => 'card',
-            'currency' => 'USD',
-        ])->assertSessionMissing('checkout_status');
-
-        $this->assertSame(1, User::where('email', 'customer@example.com')->count());
-        $this->assertFalse($existing->refresh()->is_guest);
-        $this->assertSame(1, Order::where('user_id', $existing->id)->count());
+        $this->get(route('shop.order', $item->order->order_number))->assertNotFound();
     }
 
-    // ── Claim email on fulfillment ──────────────────────────────
+    // ── Claim email on fulfillment (legacy guest orders) ────────
 
     public function test_fulfillment_sends_the_claim_email_to_guests_once(): void
     {

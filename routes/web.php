@@ -725,11 +725,10 @@ Route::post('coupon/preview', function (Request $request, CartManager $cartManag
 })->middleware(['not-suspended', 'maintenance-guard', 'throttle:20,1'])->name('coupon.preview');
 
 // Checkout submission - creates the Order + OrderItems + a pending Payment from the
-// cart. Auth is enforced inside the controller instead of here: guests are
-// allowed through when features.guest_checkout_enabled is on (they order under
-// a shadow account keyed by their delivery email, with per-IP/per-email rate
-// limits on top of this route throttle), and get a 403 asking them to sign in
-// when it is off. The dashboard mirror route keeps its auth middleware.
+// cart. Signed-in-only (guest purchase is removed); auth is enforced inside
+// the controller so an unauthenticated POST gets a friendly "please sign in"
+// instead of a raw middleware bounce. The dashboard mirror route keeps its
+// auth middleware.
 Route::post('checkout', [CheckoutController::class, 'process'])
     ->middleware(['not-suspended', 'verified-email', 'maintenance-guard', 'throttle:10,1'])
     ->name('checkout.process');

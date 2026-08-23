@@ -37,7 +37,6 @@ class SystemSettingsSectionsTest extends TestCase
             ->assertSee('features.risk_engine_enforce_enabled')
             ->assertSee('features.kyc_enforce_enabled')
             ->assertSee('features.kyc_tier2_threshold_usd')
-            ->assertSee('features.guest_checkout_enabled')
             ->assertSee('features.gomarket_enabled')
             ->assertSee('features.newsletter_signup_enabled')
             ->assertDontSee('>Other<', false);

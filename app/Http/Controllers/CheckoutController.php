@@ -21,15 +21,11 @@ use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentSession;
-use App\Models\User;
 use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -70,39 +66,21 @@ class CheckoutController extends Controller
         ]);
 
         $user = $request->user();
-        $isGuestCheckout = false;
 
-        // Guest checkout (features.guest_checkout_enabled, default ON): the
-        // order runs through the exact same pipeline under a shadow account
-        // keyed by the delivery email. The guest claims the account later via
-        // the emailed link (password + transaction PIN).
+        // Guest purchase is removed: checkout is signed-in-only. Guests keep
+        // their cart (it merges into the account at sign-in, and the checkout
+        // page returns them here to pay); this guard is the server-side
+        // backstop for a hand-crafted POST.
         if (! $user) {
-            abort_unless(FeatureFlag::on('guest_checkout'), 403, 'Please sign in to complete checkout.');
-
-            $this->ensureGuestCheckoutRateLimits($request, $data['delivery_email']);
-
-            // Wallet and Rcoin belong to signed-in accounts: a guest keying in
-            // a registered customer's email must never spend that account's
-            // balance or points.
-            if ($data['payment_method'] === 'wallet' || $request->boolean('apply_rcoin') || $request->input('apply_rcoin') === 'full') {
-                $msg = 'Sign in to pay with your wallet or Rcoin.';
-                if ($request->expectsJson() || $request->ajax()) {
-                    return response()->json(['message' => $msg], 422);
-                }
-
-                return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
+            $msg = 'Please sign in to complete checkout.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $msg], 401);
             }
 
-            $user = $this->resolveGuestUser($data['delivery_email']);
-            $isGuestCheckout = true;
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
         }
 
-        // Guests keep their cart under the guest_token cookie; the shadow user
-        // was only just created, so resolving by user id would mint an empty cart.
-        $guestToken = $request->cookie('guest_token') ?? $request->header('X-Guest-Token');
-        $cart = $isGuestCheckout && $guestToken
-            ? $this->cartManager->resolveCart(null, $guestToken)
-            : ($isGuestCheckout ? null : $this->cartManager->resolveCart($user->id));
+        $cart = $this->cartManager->resolveCart($user->id);
         $cart?->load('items.product', 'items.variant');
 
         if (! $cart || $cart->items->isEmpty()) {
@@ -161,12 +139,6 @@ class CheckoutController extends Controller
             // Order placed - the cart is converted, so drop the ephemeral
             // "Buy now" tag too (its item ids are now stale).
             $request->session()->forget('cart.buy_now_items');
-
-            // The confirmation page is user-scoped; grant this browser session
-            // access to its own guest orders (the guest has no login yet).
-            if ($isGuestCheckout) {
-                $request->session()->push('guest_order_numbers', $order->order_number);
-            }
         } catch (GatewayDisabledException $e) {
             // An admin has switched this gateway off. Nothing was written;
             // surface the same "temporarily unavailable" message the greyed
@@ -287,68 +259,17 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Scope an order lookup to its rightful viewer: the owning user when
-     * signed in, or - for guest checkout - an order number this browser
-     * session placed. Order numbers can never be enumerated by others.
+     * Scope an order lookup to its rightful viewer: the owning, signed-in
+     * user. Order numbers can never be enumerated by others. (Legacy guest
+     * orders are reached by claiming the account, never by session.)
      */
     private function orderScopedToViewer(Request $request, string $orderNumber)
     {
-        $query = Order::query()->where('order_number', $orderNumber);
+        abort_unless($request->user(), 404);
 
-        if ($request->user()) {
-            return $query->where('user_id', $request->user()->id);
-        }
-
-        abort_unless(
-            in_array($orderNumber, $request->session()->get('guest_order_numbers', []), true),
-            404,
-        );
-
-        return $query;
-    }
-
-    /**
-     * Find or create the shadow account a guest order is placed under. An
-     * email that already belongs to a registered customer attaches the order
-     * to that account (the fulfilled email goes to the same inbox either
-     * way); a fresh email gets an unclaimed guest account with a random
-     * password, converted to a real account via the emailed claim link.
-     */
-    private function resolveGuestUser(string $email): User
-    {
-        $existing = User::where('email', $email)->first();
-        if ($existing) {
-            return $existing;
-        }
-
-        return User::create([
-            'name' => Str::ucfirst(Str::before($email, '@')) ?: 'Guest',
-            'email' => $email,
-            'password' => Hash::make(Str::random(40)),
-            'is_guest' => true,
-        ]);
-    }
-
-    /**
-     * Guest checkout abuse guard: per-IP and per-email attempt caps (the
-     * route's throttle:10,1 still applies on top). Signed-in checkout is
-     * untouched - it already has fraud detection keyed to the account.
-     */
-    private function ensureGuestCheckoutRateLimits(Request $request, string $email): void
-    {
-        $limits = [
-            'guest-checkout:ip:'.$request->ip() => 8,
-            'guest-checkout:email:'.strtolower($email) => 4,
-        ];
-
-        foreach ($limits as $key => $maxAttempts) {
-            abort_if(
-                RateLimiter::tooManyAttempts($key, $maxAttempts),
-                429,
-                'Too many checkout attempts. Please try again in a few minutes.',
-            );
-            RateLimiter::hit($key, 600); // 10-minute window
-        }
+        return Order::query()
+            ->where('order_number', $orderNumber)
+            ->where('user_id', $request->user()->id);
     }
 
     /**
@@ -397,15 +318,12 @@ class CheckoutController extends Controller
         }
 
         // payment_sessions has no user_id of its own - ownership lives on the
-        // underlying PaymentAttempt. Guard there so a logged-in customer can't
-        // hand-craft a URL pointing at someone else's session. Guests must
-        // have the order number in their session.
-        if ($request->user()) {
-            abort_unless($attempt->user_id === $request->user()->id, 403);
-        } else {
-            $guestOrders = $request->session()->get('guest_order_numbers', []);
-            abort_unless($attempt->order && in_array($attempt->order->order_number, $guestOrders, true), 403);
-        }
+        // underlying PaymentAttempt. Guard there so a customer can't
+        // hand-craft a URL pointing at someone else's session. Signed-in
+        // only: guest purchase is removed, so an unauthenticated return leg
+        // has no business here (the webhook still settles the payment).
+        abort_unless($request->user(), 403);
+        abort_unless($attempt->user_id === $request->user()->id, 403);
 
         $reportedStatus = strtolower((string) $request->query('status'));
 

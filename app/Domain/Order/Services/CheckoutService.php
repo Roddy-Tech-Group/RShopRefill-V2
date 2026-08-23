@@ -608,10 +608,10 @@ class CheckoutService
     private function findReusableCheckout(User $user, Cart $cart, string $fingerprint): ?Order
     {
         $candidates = Order::where('cart_id', $cart->id)
-            // Scoped to the buyer, not just the cart. A guest cart is resolved
-            // from a cookie and each guest email mints its own shadow account,
-            // so one cart really can carry orders belonging to different users.
-            // Matching on cart alone would hand somebody else's order back.
+            // Scoped to the buyer, not just the cart: one cart row can carry
+            // orders belonging to different users (a shared device switching
+            // accounts, or legacy guest-era carts), so matching on cart alone
+            // would hand somebody else's order back.
             ->where('user_id', $user->id)
             ->where('order_status', OrderStatus::Pending)
             ->where('payment_status', PaymentStatus::Unpaid)

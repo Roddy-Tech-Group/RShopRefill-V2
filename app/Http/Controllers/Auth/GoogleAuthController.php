@@ -84,6 +84,8 @@ class GoogleAuthController extends Controller
 
             if (! Auth::check() || Auth::id() !== $user->id) {
                 session()->regenerate();
+                // Fires the Login event, so MergeGuestCartOnLogin folds any
+                // guest cookie cart into the account here too.
                 Auth::login($user, remember: true);
             }
 

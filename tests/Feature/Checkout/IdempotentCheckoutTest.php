@@ -219,10 +219,9 @@ class IdempotentCheckoutTest extends TestCase
     }
 
     /**
-     * A guest cart is resolved from a cookie and every guest email mints its
-     * own shadow account, so one cart genuinely can carry orders belonging to
-     * different users. Matching on the cart alone would hand one buyer another
-     * buyer's order.
+     * One cart row can carry orders belonging to different users (a shared
+     * device switching accounts, or legacy guest-era carts). Matching on the
+     * cart alone would hand one buyer another buyer's order.
      */
     public function test_another_customers_order_on_the_same_cart_is_never_handed_back(): void
     {

@@ -58,7 +58,6 @@ class extends Component {
         'Users & Auth' => [
             'features.signup_enabled',
             'features.guest_cart_enabled',
-            'features.guest_checkout_enabled',
             'features.device_management_enabled',
             'features.admin_inactivity_timeout_enabled',
             'features.admin_inactivity_timeout_minutes',

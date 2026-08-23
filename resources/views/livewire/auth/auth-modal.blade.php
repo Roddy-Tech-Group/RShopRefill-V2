@@ -62,6 +62,14 @@ new class extends Component {
     public ?string $turnstileToken = null;
 
     /**
+     * Local path to return to after a successful login, set by the surface
+     * that opened the modal (checkout's "Sign in to pay"). Client-mutable
+     * like any Livewire property, so it is re-validated as a same-site path
+     * before ever being redirected to.
+     */
+    public ?string $returnTo = null;
+
+    /**
      * Prefill the referral code from the ?ref cookie so a customer who arrived
      * through a friend's invite link sees it filled in (still editable).
      */
@@ -91,7 +99,31 @@ new class extends Component {
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        // The guest's cookie cart has already folded into the account
+        // (MergeGuestCartOnLogin listens on the Login event Auth::attempt
+        // fired). The surface that opened the modal may want the customer
+        // back where they were (checkout) instead of the dashboard.
+        if (($target = $this->safeReturnTo()) !== null) {
+            $this->redirect($target, navigate: true);
+
+            return;
+        }
+
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
+    }
+
+    /**
+     * The requested return path, or null unless it is a safe same-site path
+     * (leading single slash; protocol-relative and absolute URLs refused).
+     */
+    private function safeReturnTo(): ?string
+    {
+        $path = trim((string) $this->returnTo);
+
+        return str_starts_with($path, '/') && ! str_starts_with($path, '//')
+            ? $path
+            : null;
     }
 
     public function register(): void
@@ -194,6 +226,8 @@ new class extends Component {
         // Instead swap the modal to its success panel telling them to verify
         // their email. Email verification is enforced only at the money actions
         // (checkout, wallet funding), so browsing while unverified is fine.
+        // Auth::login fires the Login event, so a guest who registered
+        // mid-checkout keeps their cart via MergeGuestCartOnLogin.
         Auth::login($user);
 
         $this->dispatch('registration-success', email: $user->email);
@@ -396,7 +430,7 @@ new class extends Component {
             }
         },
     }"
-    @open-auth-modal.window="showOpen($event.detail?.mode)"
+    @open-auth-modal.window="showOpen($event.detail?.mode); if ($event.detail?.returnTo) { $wire.set('returnTo', $event.detail.returnTo, false); window.rshopAuthReturnTo = $event.detail.returnTo }"
     @close-auth-modal.window="close()"
     @registration-error.window="step = $event.detail.step"
     @registration-success.window="mode = 'success'; registeredEmail = $event.detail.email; step = 1;"

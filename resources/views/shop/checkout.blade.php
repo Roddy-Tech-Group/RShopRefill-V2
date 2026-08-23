@@ -767,13 +767,11 @@
                     </div>
 
 
-                    {{-- Continue. Guests may pay too while the admin's
-                         features.guest_checkout_enabled toggle is on: the
-                         order runs under a shadow account keyed by the
-                         delivery email, claimed later via the emailed link.
-                         Wallet/Rcoin stay signed-in-only (server-enforced). --}}
-                    @php $guestCheckoutOn = \App\Support\FeatureFlag::on('guest_checkout'); @endphp
-                    @if (auth()->check() || $guestCheckoutOn)
+                    {{-- Continue is signed-in-only: guest purchase is removed.
+                         A guest hits the sign-in wall instead; their cart
+                         merges into the account at sign-in and the modal
+                         returns them right here to pay. --}}
+                    @auth
                         <button type="submit" :disabled="!canContinue() || submitting || backoffRemaining > 0"
                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
                             <template x-if="backoffRemaining > 0">
@@ -794,15 +792,12 @@
                                 </span>
                             </template>
                         </button>
-                        @guest
-                            <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">Checking out as a guest. We will email your order and a link to set up your account.</p>
-                        @endguest
                     @else
-                        <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login' })" class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700">
+                        <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login', returnTo: window.location.pathname + window.location.search })" class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700">
                             Sign in to pay
                         </button>
-                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">You need an account to complete a purchase.</p>
-                    @endif
+                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">You need an account to complete a purchase. Your cart is saved and comes with you.</p>
+                    @endauth
 
                     <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
                         <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

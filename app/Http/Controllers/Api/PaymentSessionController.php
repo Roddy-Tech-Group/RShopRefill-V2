@@ -35,7 +35,9 @@ use Illuminate\Support\Facades\Log;
 class PaymentSessionController extends Controller
 {
     /**
-     * Authorize access to the payment session for the current user or guest.
+     * Authorize access to the payment session: signed-in owner only (guest
+     * purchase is removed, so an unauthenticated caller has no session to
+     * reach).
      */
     private function authorizeSessionAccess(PaymentSession $session): void
     {
@@ -44,21 +46,8 @@ class PaymentSessionController extends Controller
             abort(403, 'Unauthorized access to payment session.');
         }
 
-        if (auth()->check()) {
-            $userId = auth()->id();
-            if ($attempt->user_id !== $userId) {
-                abort(403, 'Unauthorized access to payment session.');
-            }
-        } else {
-            $order = $attempt->order;
-            if (! $order) {
-                abort(403, 'Unauthorized access to payment session.');
-            }
-
-            $guestOrders = session('guest_order_numbers', []);
-            if (! in_array($order->order_number, $guestOrders)) {
-                abort(403, 'Unauthorized access to payment session.');
-            }
+        if (! auth()->check() || $attempt->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized access to payment session.');
         }
     }
 
