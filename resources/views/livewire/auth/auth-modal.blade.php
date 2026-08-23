@@ -21,6 +21,7 @@ use App\Http\Middleware\CaptureReferralCookie;
 use App\Models\NewsletterSubscriber;
 use App\Models\Referral;
 use App\Models\User;
+use App\Support\PhoneCountries;
 use App\Support\TaggedCache;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Registered;
@@ -30,10 +31,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 new class extends Component {
     // Login form fields
@@ -46,6 +50,8 @@ new class extends Component {
     // Register form fields
     public string $regName = '';
     public string $regEmail = '';
+    public string $regCountry = PhoneCountries::DEFAULT_ISO;
+    public string $regPhone = '';
     public string $regPassword = '';
     public string $regPasswordConfirmation = '';
     public string $regGender = '';
@@ -105,6 +111,11 @@ new class extends Component {
             $validated = $this->validate([
                 'regName' => ['required', 'string', 'max:255'],
                 'regEmail' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class.',email'],
+                'regCountry' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
+                // Validate the national number against the chosen country's
+                // numbering plan (libphonenumber). The trunk 0 a customer may
+                // type is tolerated here and stripped when we store E.164.
+                'regPhone' => ['required', 'string', 'max:32', (new Phone)->countryField('regCountry')],
                 'regPassword' => ['required', 'string', 'confirmed:regPasswordConfirmation', Rules\Password::defaults()],
                 'regGender' => ['required', 'in:male,female,other'],
                 'regAcceptedTerms' => ['accepted'],
@@ -115,12 +126,29 @@ new class extends Component {
             throw $e;
         }
 
+        // Canonicalise the phone to E.164 (+2348031234567) - the one format that
+        // is unambiguous across every gateway and SMS provider - and enforce
+        // uniqueness on it. A national-number "unique" rule could not see that
+        // 0803... and +234803... are the same line, so the check runs here on
+        // the normalised value. One verified line, one account.
+        $phoneE164 = (new PhoneNumber($validated['regPhone'], [$validated['regCountry']]))->formatE164();
+
+        if (User::where('phone', $phoneE164)->exists()) {
+            $this->dispatch('registration-error', step: 1);
+
+            throw ValidationException::withMessages([
+                'regPhone' => 'This phone number is already registered. Try logging in instead.',
+            ]);
+        }
+
         // Gender drives the default avatar (resources/views/livewire/settings/profile.blade.php
         // matches on this field to pick male/female PNG). Collecting it at
         // signup gives every new user the correct default until they upload.
         $user = User::create([
             'name' => $validated['regName'],
             'email' => $validated['regEmail'],
+            'country' => $validated['regCountry'],
+            'phone' => $phoneE164,
             'password' => Hash::make($validated['regPassword']),
             'gender' => $validated['regGender'],
         ]);
@@ -162,8 +190,41 @@ new class extends Component {
         Referral::attribute($user, $referralCode);
         Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
 
+        // Log them in so they can browse, but do NOT redirect to the dashboard.
+        // Instead swap the modal to its success panel telling them to verify
+        // their email. Email verification is enforced only at the money actions
+        // (checkout, wallet funding), so browsing while unverified is fine.
         Auth::login($user);
-        $this->redirect(route('dashboard', absolute: false), navigate: true);
+
+        $this->dispatch('registration-success', email: $user->email);
+    }
+
+    /**
+     * Resend the verification link from the success panel. The freshly
+     * registered user is authenticated, so this targets them; the shared
+     * 'verification.send' throttle (6/min) caps abuse.
+     */
+    public function resendVerification(): void
+    {
+        $user = Auth::user();
+
+        if (! $user || $user->hasVerifiedEmail()) {
+            return;
+        }
+
+        // Shares the verify-resend budget with EnsureEmailVerified (5 per 10min)
+        // so the manual button and the checkout-time auto-resend cannot together
+        // become an email-spam vector.
+        if (RateLimiter::tooManyAttempts('verify-resend|'.$user->id, 5)) {
+            $this->dispatch('verification-resent', ok: false);
+
+            return;
+        }
+
+        RateLimiter::hit('verify-resend|'.$user->id, 600);
+        $user->sendEmailVerificationNotification();
+
+        $this->dispatch('verification-resent', ok: true);
     }
 
     /**
@@ -177,7 +238,7 @@ new class extends Component {
         $step = 3;
 
         foreach ($fields as $field) {
-            if (in_array($field, ['regName', 'regEmail'], true)) {
+            if (in_array($field, ['regName', 'regEmail', 'regCountry', 'regPhone'], true)) {
                 $step = min($step, 1);
             } elseif (in_array($field, ['regPassword', 'regPasswordConfirmation', 'regGender'], true)) {
                 $step = min($step, 2);
@@ -240,6 +301,8 @@ new class extends Component {
         open: false,
         mode: 'login',
         step: 1,
+        registeredEmail: '',
+        resent: null,
         turnstileWidgets: { login: null, register: null },
         showOpen(mode) {
             this.mode = (mode === 'register') ? 'register' : 'login';
@@ -249,6 +312,13 @@ new class extends Component {
             this.$nextTick(() => this.renderTurnstile(this.mode));
         },
         close() {
+            // After a successful registration the customer is logged in but the
+            // page chrome still shows the guest nav; a reload swaps it to the
+            // authenticated view instead of leaving a stale 'Log in' button.
+            if (this.mode === 'success') {
+                window.location.reload();
+                return;
+            }
             this.open = false;
             window.rshopScrollLock?.unlock();
             this.resetTurnstile();
@@ -329,7 +399,9 @@ new class extends Component {
     @open-auth-modal.window="showOpen($event.detail?.mode)"
     @close-auth-modal.window="close()"
     @registration-error.window="step = $event.detail.step"
-    @keydown.escape.window="open && close()"
+    @registration-success.window="mode = 'success'; registeredEmail = $event.detail.email; step = 1;"
+    @verification-resent.window="resent = $event.detail.ok"
+    @keydown.escape.window="open && mode !== 'success' && close()"
     x-cloak
 >
     {{-- Backdrop. NOT click-dismissable - a half-finished registration is too
@@ -368,7 +440,7 @@ new class extends Component {
         {{-- Header --}}
         <div class="flex shrink-0 items-start justify-between gap-3 px-5 py-4 sm:px-7">
             <div class="leading-none">
-                <h2 class="text-lg font-bold leading-none text-white sm:text-xl" x-text="mode === 'login' ? 'Log in' : 'Register'">Log in</h2>
+                <h2 class="text-lg font-bold leading-none text-white sm:text-xl" x-text="mode === 'login' ? 'Log in' : (mode === 'success' ? 'Welcome aboard' : 'Register')">Log in</h2>
                 <p
                     x-show="mode === 'register'"
                     x-cloak
@@ -539,6 +611,108 @@ new class extends Component {
                         >
                         @error('regEmail') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
+
+                    {{-- Country dial-code + phone. The left segment is a searchable
+                         flag/+code picker (sets regCountry); the right segment is the
+                         national number (regPhone). libphonenumber validates the pair
+                         server-side and we store it as E.164, so the customer can type
+                         the number with or without the trunk 0. --}}
+                    <div
+                        x-data="{
+                            countries: @js(App\Support\PhoneCountries::all()),
+                            selected: @js($regCountry),
+                            search: '',
+                            open: false,
+                            get current() { return this.countries.find(c => c.iso === this.selected) || this.countries[0]; },
+                            get matches() {
+                                const q = this.search.trim().toLowerCase();
+                                if (! q) return this.countries;
+                                return this.countries.filter(c =>
+                                    c.name.toLowerCase().includes(q) || c.iso.toLowerCase().includes(q) || ('+' + c.dial).includes(q)
+                                );
+                            },
+                            choose(iso) {
+                                this.selected = iso;
+                                $wire.regCountry = iso;
+                                this.open = false;
+                                this.search = '';
+                                this.$nextTick(() => this.$refs.phoneInput?.focus());
+                            },
+                        }"
+                        @click.outside="open = false"
+                    >
+                        <label for="regPhone" class="mb-1.5 block text-sm font-medium text-white/85">Phone number</label>
+                        <div class="relative flex items-stretch rounded-[12px] border border-white/15 bg-white/5 transition-colors focus-within:border-blue-400 focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-blue-500/20">
+                            {{-- Country selector --}}
+                            <button
+                                type="button"
+                                @click="open = ! open"
+                                :aria-expanded="open"
+                                aria-label="Select country dialing code"
+                                class="flex shrink-0 items-center gap-1.5 rounded-l-[12px] border-r border-white/15 px-3 text-sm text-white outline-none hover:bg-white/5"
+                            >
+                                <span class="text-base leading-none" x-text="current.flag"></span>
+                                <span class="font-medium" x-text="'+' + current.dial"></span>
+                                <svg class="h-4 w-4 text-white/50" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                            </button>
+
+                            {{-- National number --}}
+                            <input
+                                wire:model="regPhone"
+                                x-ref="phoneInput"
+                                id="regPhone"
+                                type="tel"
+                                inputmode="numeric"
+                                autocomplete="tel-national"
+                                required
+                                :placeholder="current.example"
+                                class="w-full min-w-0 rounded-r-[12px] bg-transparent px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none"
+                            >
+                        </div>
+
+                        {{-- Country list. Rendered IN FLOW (not absolute) so it is
+                             never clipped by the wizard's overflow-hidden nor painted
+                             over by the Continue button: the sliding wizard sets a CSS
+                             transform, which forms a stacking context an absolute
+                             child could not escape. Opening it expands the modal body,
+                             which scrolls; the inner list caps its own height. --}}
+                        <div
+                            x-show="open"
+                            x-collapse
+                            x-cloak
+                            @keydown.escape.stop="open = false"
+                            class="mt-2 overflow-hidden rounded-[12px] border border-white/15 bg-[#0c1a36] shadow-2xl"
+                        >
+                            <div class="border-b border-white/10 p-2">
+                                <input
+                                    x-model="search"
+                                    type="text"
+                                    placeholder="Search country or code"
+                                    class="w-full rounded-[8px] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-blue-400"
+                                    @keydown.enter.prevent="if (matches.length) choose(matches[0].iso)"
+                                >
+                            </div>
+                            <ul class="max-h-52 overflow-y-auto overscroll-contain py-1" role="listbox">
+                                <template x-for="c in matches" :key="c.iso">
+                                    <li>
+                                        <button
+                                            type="button"
+                                            @click="choose(c.iso)"
+                                            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+                                            :class="c.iso === selected && 'bg-white/5'"
+                                        >
+                                            <span class="text-base leading-none" x-text="c.flag"></span>
+                                            <span class="flex-1 truncate" x-text="c.name"></span>
+                                            <span class="text-white/50" x-text="'+' + c.dial"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                                <li x-show="! matches.length" class="px-3 py-3 text-center text-sm text-white/50">No match</li>
+                            </ul>
+                        </div>
+                        @error('regCountry') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
+                        @error('regPhone') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
+                    </div>
                             </div>
 
                             {{-- STEP 2 — Security --}}
@@ -665,6 +839,46 @@ new class extends Component {
                     Already have an account?
                     <button type="button" @click="switchTo('login')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">Log in</button>
                 </p>
+            </div>
+
+            {{-- ── SUCCESS VIEW ─────────────────────────────────────────── --}}
+            <div x-show="mode === 'success'" x-cloak class="py-4 text-center sm:py-6">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30">
+                    <svg class="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                    </svg>
+                </div>
+
+                <h3 class="mt-5 text-xl font-bold tracking-tight text-white sm:text-2xl">Account created</h3>
+                <p class="mx-auto mt-2 max-w-sm text-sm text-white/70">
+                    We sent a verification link to
+                    <span class="font-semibold text-white" x-text="registeredEmail"></span>.
+                    Verify your email to start ordering. You can browse in the meantime.
+                </p>
+
+                {{-- Resend --}}
+                <div class="mt-5 text-sm">
+                    <span class="text-white/60">Didn't get the email?</span>
+                    <button
+                        type="button"
+                        wire:click="resendVerification"
+                        wire:loading.attr="disabled"
+                        wire:target="resendVerification"
+                        class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="resendVerification">Resend it</span>
+                        <span wire:loading wire:target="resendVerification">Sending...</span>
+                    </button>
+                    <p x-show="resent === true" x-cloak class="mt-2 text-emerald-400">A fresh verification link is on its way.</p>
+                    <p x-show="resent === false" x-cloak class="mt-2 text-amber-400">Please wait a moment before requesting another link.</p>
+                </div>
+
+                <a
+                    href="{{ route('dashboard') }}"
+                    class="mt-6 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
+                >
+                    Continue to my account
+                </a>
             </div>
 
         </div>

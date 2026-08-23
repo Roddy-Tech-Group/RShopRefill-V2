@@ -38,6 +38,7 @@ use App\Models\CommunicationLog;
 use App\Models\CommunicationPreference;
 use App\Models\EmailSuppression;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -94,8 +95,12 @@ class CommunicationServiceProvider extends ServiceProvider
         Event::listen(TransactionPinLocked::class, [PinEventListener::class, 'handlePinLocked']);
         Event::listen(TransactionPinResetRequested::class, [PinEventListener::class, 'handlePinReset']);
 
-        // Register System Listeners
+        // Register System Listeners. The welcome email waits for a PROVEN
+        // address: Verified fires it for normal signups (after the link click),
+        // while Registered covers only accounts created pre-verified (Google).
+        // The listener itself decides which case applies and dedupes for life.
         Event::listen(Registered::class, WelcomeListener::class);
+        Event::listen(Verified::class, WelcomeListener::class);
 
         // Register Commerce Listeners. The confirmation email hangs on
         // OrderConfirmed (money arrived), NOT OrderPlaced (checkout skeleton

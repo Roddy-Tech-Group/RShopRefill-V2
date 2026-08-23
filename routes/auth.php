@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Auth\ResendVerificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,13 @@ Route::middleware('auth')->group(function () {
     Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
         ->middleware(['signed', 'throttle:6,1'])
         ->name('verification.verify');
+
+    // On-demand resend (checkout notice's Resend button). Escalating cooldown +
+    // the flat budget are both enforced inside; this throttle is just the
+    // request-level ceiling.
+    Route::post('email/verification-notification', ResendVerificationController::class)
+        ->middleware('throttle:12,1')
+        ->name('verification.send');
 
     Volt::route('confirm-password', 'auth.confirm-password')
         ->name('password.confirm');
