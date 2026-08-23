@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\FulfillmentSucceeded;
@@ -17,6 +18,7 @@ use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminCommerceController extends Controller
@@ -53,6 +55,12 @@ class AdminCommerceController extends Controller
      */
     public function exportOrders(Request $request): StreamedResponse
     {
+        // Bulk order + customer data leaving the system is always attributable.
+        app(AuditLogService::class)->log(
+            action: 'report.orders_exported',
+            metadata: ['status' => $request->input('status', 'all')],
+        );
+
         $query = Order::with('user')->withCount('items');
 
         if ($request->filled('status')) {
@@ -139,37 +147,110 @@ class AdminCommerceController extends Controller
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $order = Order::findOrFail($orderId);
-        $amount = (float) $validated['amount'];
-
-        if ($amount > $order->total_amount) {
-            return response()->json(['message' => 'Refund amount cannot exceed the order total amount.'], 400);
-        }
-
-        // Get successful or active payment attempt
-        $attempt = $order->paymentAttempts()
-            ->whereIn('payment_status', [PaymentStatus::Paid, PaymentStatus::Reserved])
-            ->first();
-
-        if (! $attempt) {
-            return response()->json(['message' => 'No successful payment attempt found for this order.'], 400);
-        }
+        Order::findOrFail($orderId);
+        $amount = round((float) $validated['amount'], 2);
 
         try {
-            $factory = app(PaymentGatewayFactory::class);
-            $provider = $factory->getProvider($attempt->gateway);
+            [$status, $message] = DB::transaction(function () use ($orderId, $amount, $validated) {
+                // The order row lock is held across cap-check -> gateway call
+                // -> record, so two concurrent refunds serialize and the
+                // second one sees the first one's total. Without it, both
+                // read "0 refunded", both pass the cap, both pay out.
+                $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
+                $orderService = app(OrderService::class);
 
-            // Trigger refund in gateway
-            $provider->refundPayment($attempt, $amount);
+                // Cumulative cap: every refund already issued against this
+                // order counts, including the AUTOMATIC fulfillment-failure
+                // reversals, so no combination of refunds can hand back more
+                // than the customer ever paid.
+                $alreadyRefunded = $orderService->refundedTotalFor($order);
+                $remaining = round((float) $order->total_amount - $alreadyRefunded, 2);
 
-            // Mark order status
-            $order->order_status = OrderStatus::Refunded;
-            $order->payment_status = PaymentStatus::Refunded;
-            $order->save();
+                if ($amount > $remaining) {
+                    return [400, 'Refund amount cannot exceed the amount still refundable ('.number_format($remaining, 2).').'];
+                }
 
-            RefundIssued::dispatch($order, $amount, $validated['reason']);
+                // Get the attempt that carried the money. Refunded stays in
+                // the list because the providers stamp the attempt Refunded
+                // even on a partial refund; the cumulative cap above is what
+                // prevents over-refunding. Reserved is deliberately EXCLUDED:
+                // a reserved wallet attempt has the funds locked, not
+                // debited, so "refunding" it would credit money that was
+                // never taken. Those are cancelled/released, never refunded.
+                $attempt = $order->paymentAttempts()
+                    ->whereIn('payment_status', [PaymentStatus::Paid, PaymentStatus::Refunded, PaymentStatus::PartiallyRefunded])
+                    ->first();
 
-            return response()->json(['message' => 'Refund processed successfully.']);
+                if (! $attempt) {
+                    $hasReserved = $order->paymentAttempts()
+                        ->where('payment_status', PaymentStatus::Reserved)
+                        ->exists();
+
+                    return [400, $hasReserved
+                        ? 'This payment was never captured (funds are only reserved). Cancel the order to release the hold instead of refunding.'
+                        : 'No successful payment attempt found for this order.'];
+                }
+
+                $provider = app(PaymentGatewayFactory::class)->getProvider($attempt->gateway);
+
+                // The gateway's answer decides everything downstream.
+                // Stamping Refunded and emailing the customer on a declined
+                // (or, for crypto, nonexistent) refund promises money that
+                // never moves.
+                $tag = 'admin-'.Str::uuid();
+                $refunded = $provider->refundPayment($attempt, $amount, $tag);
+
+                if (! $refunded) {
+                    app(AuditLogService::class)->log(
+                        action: 'admin.order_refund_failed',
+                        model: $order,
+                        metadata: [
+                            'amount' => $amount,
+                            'gateway' => $attempt->gateway,
+                            'reason' => $validated['reason'],
+                        ],
+                    );
+
+                    $hint = $attempt->gateway === 'nowpayments'
+                        ? ' Crypto payments have no refund API; send the funds back manually, then record it here.'
+                        : ' The gateway declined the refund; nothing was recorded and the customer was not notified.';
+
+                    return [400, 'The gateway did not process this refund.'.$hint];
+                }
+
+                $orderService->applyRefundRecord($order, $amount, $tag);
+                $refundedTotal = $orderService->refundedTotalFor($order);
+                $isFullyRefunded = $refundedTotal >= round((float) $order->total_amount, 2);
+
+                $order->payment_status = $isFullyRefunded ? PaymentStatus::Refunded : PaymentStatus::PartiallyRefunded;
+                if ($isFullyRefunded) {
+                    $order->order_status = OrderStatus::Refunded;
+                }
+                $order->save();
+
+                // Money returned by an admin's hand is always audited: who,
+                // how much, through which gateway, and the stated reason.
+                app(AuditLogService::class)->log(
+                    action: 'admin.order_refunded',
+                    model: $order,
+                    metadata: [
+                        'amount' => $amount,
+                        'refunded_total' => $refundedTotal,
+                        'gateway' => $attempt->gateway,
+                        'reason' => $validated['reason'],
+                    ],
+                );
+
+                // The customer email rides the commit: a rollback after the
+                // gateway said yes must not un-send "your refund is on its
+                // way". The tag keys the email's idempotency, so a second
+                // admin refund of the SAME amount still emails the customer.
+                DB::afterCommit(fn () => RefundIssued::dispatch($order, $amount, $validated['reason'], $tag));
+
+                return [200, 'Refund processed successfully.'];
+            });
+
+            return response()->json(['message' => $message], $status);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Refund operation failed: '.$e->getMessage()], 400);
         }

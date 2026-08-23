@@ -853,7 +853,7 @@
                     <x-close-button @click="closeModal()" class="absolute right-4 top-4" />
 
                     <!-- Active Payment Session Details & Wizard -->
-                    <div x-show="session || paymentState === 'error'" class="mt-2">
+                    <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice'" class="mt-2">
                         <!-- Countdown timer banner -->
                         <div x-show="['awaiting_transfer', 'awaiting_confirmation', 'action_pin', 'action_otp', 'action_3ds'].includes(paymentState)" 
                              class="mb-5 flex items-center justify-between rounded-[12px] bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
@@ -1144,9 +1144,58 @@
                             <x-error-cross />
                             <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Payment Failed</h3>
                             <p class="mt-1.5 text-xs text-red-600 px-4" x-html="errorMessage"></p>
-                            
+
                             <button type="button" @click="closeModal()" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                                 Close &amp; Modify Details
+                            </button>
+                        </div>
+
+                        {{-- Email not verified: a pre-payment requirement, shown as
+                             a calm notice (amber envelope), never the red failure
+                             state. Nothing was written; the link was already re-sent. --}}
+                        <div x-show="paymentState === 'email_notice'" x-cloak class="flex flex-col items-center py-6 text-center">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-500/15">
+                                <svg class="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+                                </svg>
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Verify your email to continue</h3>
+                            <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="errorMessage"></p>
+
+                            <p x-show="resendFlash" x-cloak class="mt-3 rounded-[10px] bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" x-text="resendFlash"></p>
+
+                            <div class="mt-6 flex items-center justify-center gap-2.5">
+                                <button
+                                    type="button"
+                                    @click="resendVerification()"
+                                    :disabled="resendRemaining > 0 || resendBusy"
+                                    class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5"
+                                    x-text="resendBusy ? 'Sending...' : (resendRemaining > 0 ? 'Resend ' + resendLabel(resendRemaining) : 'Resend email')"
+                                ></button>
+                                <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- KYC step-up: the risk/KYC gate asked for identity
+                             verification. The customer taps Verify to open Smile ID;
+                             the checkout resubmits automatically once verified. --}}
+                        <div x-show="paymentState === 'kyc_required'" x-cloak class="flex flex-col items-center py-6 text-center">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/15">
+                                <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
+                                </svg>
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Quick verification needed</h3>
+                            <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="kycMessage"></p>
+
+                            <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                Verify
+                            </button>
+                            <button type="button" @click="closeModal()" class="mt-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+                                Not now
                             </button>
                         </div>
                     </div>
@@ -1252,9 +1301,24 @@
                 fiatMethods: @js(array_keys(\App\Domain\Payment\Support\FiatGatewayRouter::METHOD_PRIORITY)),
                 fiatUnavailableByCurrency: @js(\App\Domain\Payment\Support\FiatGatewayRouter::unavailableFiatMethodsByCurrency()),
 
+                // Methods this cart's compliance categories make ineligible, per
+                // currency. Resolved server-side by the payment eligibility gate
+                // and empty while it runs in shadow mode, so the tiles only change
+                // once enforcement is switched on. Greys a tile whose only serving
+                // gateways are not approved to charge what is in the cart.
+                complianceIneligibleByCurrency: @js($complianceIneligibleByCurrency ?? []),
+
                 isMethodDisabled(key) {
+                    const currency = this.$store.cart.currency;
+
+                    const ineligible = this.complianceIneligibleByCurrency[currency]
+                        ?? this.complianceIneligibleByCurrency['__fallback']
+                        ?? [];
+                    if (ineligible.includes(key)) {
+                        return true;
+                    }
+
                     if (this.fiatMethods.includes(key)) {
-                        const currency = this.$store.cart.currency;
                         const unavailable = this.fiatUnavailableByCurrency[currency]
                             ?? this.fiatUnavailableByCurrency['__fallback']
                             ?? [];
@@ -1342,6 +1406,17 @@
                 paymentState: 'idle',
                 errorMessage: '',
                 actionMessage: '',
+                // KYC step-up: the Smile session + the form to resubmit once the
+                // customer taps Verify and finishes identity verification.
+                kycMessage: '',
+                kycSmile: null,
+                pendingForm: null,
+                // Email-verification notice: server-driven resend countdown
+                // (escalating 30s -> 1m -> 2m -> 5m -> 10m; UI mirrors it).
+                resendRemaining: 0,
+                resendTimerId: null,
+                resendBusy: false,
+                resendFlash: '',
                 bankDetails: null,
                 pollInterval: null,
                 verifying: false,
@@ -1725,6 +1800,44 @@
                         }
 
                         const resData = await response.json();
+
+                        // KYC step-up: identity verification is required to
+                        // continue. Show the message with a Verify button that the
+                        // customer taps to open the Smile flow; the same submission
+                        // is retried once they finish. (No auto-launch: an explicit
+                        // tap is clearer and more trustworthy than a camera modal
+                        // opening unprompted.)
+                        if (response.status === 422 && resData.kyc_required) {
+                            this.submitting = false;
+                            this.kycMessage = resData.message || 'To continue with this purchase, please complete a quick identity verification.';
+                            if (window.rshopKyc) {
+                                this.kycSmile = resData.smile;
+                                this.pendingForm = e.target;
+                                this.paymentState = 'kyc_required';
+                            } else {
+                                this.errorMessage = this.kycMessage;
+                                this.paymentState = 'error';
+                            }
+                            this.open = true;
+                            return;
+                        }
+
+                        // Email not verified yet: a pre-payment requirement, not a
+                        // failure. Nothing was written; the server already re-sent
+                        // the verification link. Show a calm notice, never the red
+                        // "Payment Failed" state.
+                        if (response.status === 403 && resData.email_unverified) {
+                            this.submitting = false;
+                            this.errorMessage = resData.message || 'Please verify your email to continue.';
+                            this.resendFlash = '';
+                            // The server just auto-sent; its schedule says when a
+                            // resend becomes available.
+                            this.startResendCountdown(resData.resend_retry_after || 30);
+                            this.paymentState = 'email_notice';
+                            this.open = true;
+                            return;
+                        }
+
                         if (!response.ok) {
                             this.submitting = false;
                             if (response.status === 429 && resData.is_rate_limited) {
@@ -2190,9 +2303,83 @@
                     if (this.timerInterval) {
                         clearInterval(this.timerInterval);
                     }
+                    if (this.resendTimerId) {
+                        clearInterval(this.resendTimerId);
+                        this.resendTimerId = null;
+                    }
+                },
+
+                // --- Verification-email resend (escalating server cooldown) ---
+                startResendCountdown(seconds) {
+                    if (this.resendTimerId) {
+                        clearInterval(this.resendTimerId);
+                    }
+                    this.resendRemaining = Math.max(0, Math.ceil(seconds));
+                    this.resendTimerId = setInterval(() => {
+                        if (this.resendRemaining > 0) {
+                            this.resendRemaining--;
+                        } else {
+                            clearInterval(this.resendTimerId);
+                            this.resendTimerId = null;
+                        }
+                    }, 1000);
+                },
+
+                // "30s", "1m", "1m 30s" — compact human countdown.
+                resendLabel(s) {
+                    if (s < 60) return s + 's';
+                    const m = Math.floor(s / 60), r = s % 60;
+                    return r ? (m + 'm ' + r + 's') : (m + 'm');
+                },
+
+                async resendVerification() {
+                    if (this.resendRemaining > 0 || this.resendBusy) return;
+                    this.resendBusy = true;
+                    this.resendFlash = '';
+                    try {
+                        const res = await fetch('{{ route('verification.send') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                        });
+                        const data = await res.json();
+                        if (data.verified) {
+                            // Already verified in another tab: just retry checkout.
+                            this.closeModal();
+                            return;
+                        }
+                        this.resendFlash = res.ok
+                            ? (data.message || 'Verification link sent.')
+                            : (data.message || 'Please wait before requesting another link.');
+                        this.startResendCountdown(data.retry_after || 30);
+                    } catch (e) {
+                        this.resendFlash = 'Network error. Please try again.';
+                    } finally {
+                        this.resendBusy = false;
+                    }
+                },
+
+                // Open the Smile ID verification flow. On success, resubmit the
+                // exact same checkout so the now-verified customer proceeds.
+                verifyIdentity() {
+                    if (! window.rshopKyc || ! this.kycSmile) {
+                        this.errorMessage = this.kycMessage;
+                        this.paymentState = 'error';
+                        return;
+                    }
+                    const form = this.pendingForm;
+                    window.rshopKyc.launch(this.kycSmile, () => {
+                        if (form) {
+                            form.requestSubmit();
+                        }
+                    });
                 }
             };
         };
     </script>
+
+    @include('partials.kyc-verification-modal')
 
 </x-shop.layout>

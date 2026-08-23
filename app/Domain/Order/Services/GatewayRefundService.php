@@ -2,6 +2,7 @@
 
 namespace App\Domain\Order\Services;
 
+use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -9,6 +10,7 @@ use App\Domain\Transaction\Exceptions\DuplicateTransactionException;
 use App\Domain\Wallet\Services\WalletService;
 use App\Models\Order;
 use App\Models\OrderItem;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -74,9 +76,25 @@ class GatewayRefundService
                 'amount' => $share,
                 'currency' => $currency->value,
             ]);
+
+            // The customer hears about money that moved, once the move is
+            // durable. The duplicate branch below deliberately does NOT
+            // dispatch: that refund's email already went out the first time.
+            DB::afterCommit(fn () => RefundIssued::dispatch(
+                $order,
+                $share,
+                'An item on your order could not be delivered, so we refunded it to your wallet.',
+                "item-{$item->id}",
+            ));
         } catch (DuplicateTransactionException) {
             // Already refunded by an earlier attempt - safe no-op.
         }
+
+        // On the order's shared refund ledger either way (the record is
+        // tag-idempotent, so the duplicate branch above records nothing new):
+        // the admin refund cap must see automatic reversals or it will
+        // happily pay the same money back a second time.
+        app(OrderService::class)->recordRefundedAmount($order, $share, "item-{$item->id}");
     }
 
     /**
@@ -91,8 +109,13 @@ class GatewayRefundService
      * independently, so the slices of a multi-item order telescope back to
      * exactly the captured amount - per-item rounding can never accumulate
      * into a refund that exceeds the charge.
+     *
+     * Public because the WALLET reversal paths (FulfillOrderItemJob,
+     * PollPendingFulfillmentJob, OrderService's partial settle) need the same
+     * discount-aware apportioning; they used to refund raw item subtotals and
+     * over-refunded every RCOIN/coupon-discounted order.
      */
-    private function capturedShareForItem(Order $order, OrderItem $item, float $captured): float
+    public function capturedShareForItem(Order $order, OrderItem $item, float $captured): float
     {
         $captured = round($captured, 2);
 

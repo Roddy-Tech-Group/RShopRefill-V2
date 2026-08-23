@@ -144,8 +144,19 @@ class NowPaymentsProvider implements PaymentProviderInterface
 
             // Sandbox-only outcome simulator. Ignored by production, and only ever
             // sent when the sandbox flag is on so it can't leak into live traffic.
+            // Whitelisted: the sandbox 400s the WHOLE payment on an unknown case
+            // (e.g. the near-miss "fail" instead of "failed"), which surfaced to
+            // customers as "could not start this crypto payment". A bad value is
+            // now dropped with a warning instead of breaking every payment.
             if (config('services.nowpayments.sandbox') && ($case = config('services.nowpayments.sandbox_case'))) {
-                $payload['case'] = $case;
+                if (in_array($case, ['common', 'success', 'failed', 'partially_paid'], true)) {
+                    $payload['case'] = $case;
+                } else {
+                    Log::warning('NOWPayments sandbox_case ignored - not a valid case.', [
+                        'configured' => $case,
+                        'allowed' => ['common', 'success', 'failed', 'partially_paid'],
+                    ]);
+                }
             }
 
             $response = Http::withHeaders([
@@ -826,7 +837,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
      * Returning false is the honest answer: the caller must escalate rather than
      * record a refund that did not happen.
      */
-    public function refundPayment(PaymentAttempt $attempt, float $amount): bool
+    public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
         Log::critical('NowPayments refund requested but no refund API exists — manual action required', [
             'attempt_id' => $attempt->id,

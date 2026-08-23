@@ -89,11 +89,26 @@ class TransactionPinService
     }
 
     /**
-     * Consume (invalidate) an authorization token so it can only be used once.
+     * Atomically claim (validate + consume) an authorization token: exactly
+     * one caller can ever win a given token. The old validate-then-forget
+     * pair had a race where two concurrent payments both passed validation
+     * before either consumed, double-authorizing one PIN entry; Cache::add is
+     * a set-if-absent, so of two simultaneous claims exactly one takes the
+     * claimed marker and the other is refused.
      */
-    public function consumeAuthToken(User $user, string $token): void
+    public function claimAuthToken(User $user, string $token): bool
     {
+        if (! Cache::has("pin_auth_{$user->id}_{$token}")) {
+            return false;
+        }
+
+        if (! Cache::add("pin_auth_claimed_{$user->id}_{$token}", true, now()->addMinutes(10))) {
+            return false;
+        }
+
         Cache::forget("pin_auth_{$user->id}_{$token}");
+
+        return true;
     }
 
     /**

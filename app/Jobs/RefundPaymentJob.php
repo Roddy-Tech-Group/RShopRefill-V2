@@ -33,7 +33,10 @@ class RefundPaymentJob implements ShouldQueue
         $provider = $gatewayFactory->getProvider($this->attempt->gateway);
 
         try {
-            $success = $provider->refundPayment($this->attempt, (float) $this->attempt->amount);
+            // Stable reference: a retried job replays the same idempotent
+            // refund instead of throwing DuplicateTransaction and burning its
+            // remaining attempts without ever reaching a terminal state.
+            $success = $provider->refundPayment($this->attempt, (float) $this->attempt->amount, 'duplicate-payment');
 
             if ($success) {
                 Log::info("RefundPaymentJob: Successfully refunded attempt {$this->attempt->id}");

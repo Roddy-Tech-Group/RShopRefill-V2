@@ -45,12 +45,28 @@ class VerifyPaymentJob implements ShouldQueue
         DB::transaction(function () use ($gatewayFactory, $orderService) {
             $attempt = PaymentAttempt::where('id', $this->attempt->id)->lockForUpdate()->first();
 
-            if (! $attempt || in_array($attempt->payment_status, [PaymentStatus::Paid, PaymentStatus::Failed])) {
+            if (! $attempt || $attempt->payment_status === PaymentStatus::Failed) {
                 return;
             }
 
-            $provider = $gatewayFactory->getProvider($attempt->gateway);
-            $isPaid = $provider->verifyPayment($attempt);
+            // A Paid attempt does NOT always mean the settlement chain ran.
+            // The hosted return leg verifies with the gateway (which stamps
+            // the attempt Paid) and a crash between that stamp and the order
+            // confirmation leaves a paid attempt whose order is still Pending
+            // - previously this early-returned on Paid and the order stayed
+            // stranded forever, invisible to every sweeper. Only skip when
+            // the money has actually landed downstream.
+            $alreadyPaid = $attempt->payment_status === PaymentStatus::Paid;
+
+            if ($alreadyPaid && $this->settlementLanded($attempt)) {
+                return;
+            }
+
+            // Already-Paid attempts were verified by whoever stamped them
+            // (gateway verify or webhook signature); re-enter the chain
+            // without a second gateway round-trip.
+            $isPaid = $alreadyPaid
+                || $gatewayFactory->getProvider($attempt->gateway)->verifyPayment($attempt);
 
             if ($isPaid) {
                 // If this is a WalletFunding attempt, process it via WalletFundingService
@@ -76,7 +92,10 @@ class VerifyPaymentJob implements ShouldQueue
                     $attempt->payment_status = PaymentStatus::Paid;
                     $attempt->save();
 
-                    RefundPaymentJob::dispatch($attempt);
+                    // Queued only once the surrounding transaction commits: a
+                    // rollback must not leave a refund in flight for an
+                    // attempt whose Paid stamp just evaporated.
+                    DB::afterCommit(fn () => RefundPaymentJob::dispatch($attempt));
 
                     return;
                 }
@@ -98,15 +117,21 @@ class VerifyPaymentJob implements ShouldQueue
                     ]);
                 }
 
-                // 3. Refresh Order to verify paid status
+                // 3 + 4. Confirmation event and fulfillment, deferred to
+                // commit. The queue connections run after_commit=false, so a
+                // bare dispatch here leaves Redis with fulfillment jobs for
+                // an order whose Paid transition can still roll back - a
+                // worker could be buying vouchers for an unpaid order. Same
+                // pattern confirmSession already uses for its events.
                 $order = Order::find($attempt->order_id);
                 if ($order) {
-                    PaymentConfirmed::dispatch($order, $attempt);
+                    DB::afterCommit(function () use ($order, $attempt) {
+                        PaymentConfirmed::dispatch($order, $attempt);
 
-                    // 4. Dispatch fulfillment jobs for each order item
-                    foreach ($order->items as $item) {
-                        FulfillOrderItemJob::dispatch($item);
-                    }
+                        foreach ($order->items as $item) {
+                            FulfillOrderItemJob::dispatch($item);
+                        }
+                    });
                 }
 
                 // 5. Update any pending webhooks related to this attempt
@@ -123,5 +148,28 @@ class VerifyPaymentJob implements ShouldQueue
                 Log::warning("VerifyPaymentJob: payment verification returned unpaid/pending for attempt {$attempt->id}");
             }
         });
+    }
+
+    /**
+     * Has the money this attempt collected actually reached its destination?
+     * For a wallet funding that means the funding completed; for an order it
+     * means the order itself records the payment. A Paid attempt failing this
+     * check is a stranded settlement the chain above must finish.
+     */
+    private function settlementLanded(PaymentAttempt $attempt): bool
+    {
+        if ($attempt->payable_type === WalletFunding::class) {
+            return $attempt->payable?->status === FundingStatus::Completed;
+        }
+
+        if ($attempt->order) {
+            return in_array($attempt->order->payment_status, [
+                PaymentStatus::Paid,
+                PaymentStatus::Refunded,
+                PaymentStatus::PartiallyRefunded,
+            ], true);
+        }
+
+        return true;
     }
 }

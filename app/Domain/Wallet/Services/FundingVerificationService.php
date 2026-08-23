@@ -61,10 +61,16 @@ class FundingVerificationService
                 return false;
             }
 
-            // 2. Tamper Prevention: Amount check
-            $expectedAmount = (float) $funding->amount;
+            // 2 + 3. Tamper prevention: amount and currency checks, against what
+            // Flutterwave was actually ASKED TO CHARGE. The gateway charges the
+            // display-currency figure (requested_amount / display_currency); the
+            // wallet-currency figures on the funding are what gets credited, not
+            // what was charged. Comparing against the wallet figures made every
+            // funding whose display currency differed from the wallet currency a
+            // false TAMPER: card charged, funding failed, wallet never credited.
+            $expectedAmount = (float) ($funding->requested_amount ?: $funding->amount);
             if ($flwAmount < $expectedAmount) {
-                Log::error('TAMPER DETECTED: Flutterwave verified amount is lower than requested', [
+                Log::error('TAMPER DETECTED: Flutterwave verified amount is lower than charged', [
                     'reference' => $funding->reference,
                     'expected' => $expectedAmount,
                     'received' => $flwAmount,
@@ -73,8 +79,7 @@ class FundingVerificationService
                 return false;
             }
 
-            // 3. Tamper Prevention: Currency check
-            $expectedCurrency = strtoupper($funding->currency->value);
+            $expectedCurrency = strtoupper($funding->display_currency ?: $funding->currency->value);
             if ($expectedCurrency !== $flwCurrency) {
                 Log::error('TAMPER DETECTED: Flutterwave verified currency mismatch', [
                     'reference' => $funding->reference,

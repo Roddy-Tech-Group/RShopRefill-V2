@@ -7,11 +7,14 @@ use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
+use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
+use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
+use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
@@ -119,7 +122,7 @@ class PaymentSessionController extends Controller
         try {
             DB::transaction(function () use ($session) {
                 // Check if session can be cancelled
-                if (! in_array($session->status, ['pending', 'awaiting_method', 'awaiting_payment', 'awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action'])) {
+                if (! in_array($session->status, ['pending', 'awaiting_method', 'awaiting_payment', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'awaiting_customer_action'])) {
                     throw new \DomainException("Cannot cancel payment session that is already {$session->status}.");
                 }
 
@@ -318,6 +321,15 @@ class PaymentSessionController extends Controller
         // to see when deciding whether a method is broken.
         $attempt->recordPaymentMethod($method);
 
+        // The cart's compliance categories, resolved once: they drive both the
+        // category-aware gateway pick below and the authoritative gate before the
+        // charge. From the order's snapshot, or Wallet for a funding attempt.
+        $eligibilityCategories = $attempt->order
+            ? $attempt->order->loadMissing('items')->items->map(fn ($item) => $item->compliance_category)
+            : [ComplianceCategory::Wallet];
+
+        $eligibility = app(PaymentEligibilityService::class);
+
         $gatewayFactory = app(PaymentGatewayFactory::class);
 
         // Per-method fiat routing. The gateway stamped at order placement was
@@ -331,13 +343,32 @@ class PaymentSessionController extends Controller
         // the customer restarts through checkout reuse.
         $fiatGateway = null;
         if (array_key_exists($method, FiatGatewayRouter::METHOD_PRIORITY)) {
-            $fiatGateway = FiatGatewayRouter::resolve($method, $currency);
+            // Category-aware: the first live gateway that both serves this
+            // method/currency AND is approved for the cart, so a category one
+            // gateway does not approve still routes to a backup that does instead
+            // of being denied. Falls back to plain capability order in shadow mode.
+            $fiatGateway = $eligibility->routeGateway($method, $currency, $eligibilityCategories);
 
             if ($fiatGateway === null) {
+                // No live gateway both serves this method/currency AND is
+                // approved for the cart. Distinguish a plain outage (nothing
+                // capable) from a category refusal (capable, but none approved),
+                // so the customer sees the right message.
+                $candidates = FiatGatewayRouter::candidates($method, $currency);
+
+                if ($candidates === []) {
+                    return response()->json([
+                        'message' => GatewayDisabledException::customerMessageFor('fiat'),
+                        'gateway_disabled' => true,
+                    ], 503);
+                }
+
                 return response()->json([
-                    'message' => GatewayDisabledException::customerMessageFor('fiat'),
-                    'gateway_disabled' => true,
-                ], 503);
+                    'message' => PaymentCategoryIneligibleException::messageFor(
+                        $eligibility->deniedFor($eligibilityCategories, $candidates[0], $currency),
+                    ),
+                    'category_ineligible' => true,
+                ], 422);
             }
 
             if ($fiatGateway !== $attempt->gateway) {
@@ -362,6 +393,31 @@ class PaymentSessionController extends Controller
                     $attempt->payable->update(['gateway' => $fiatGateway]);
                 }
             }
+        }
+
+        // Authoritative eligibility gate. The final gateway is now known and
+        // this is the last point before money moves, so it is the un-bypassable
+        // check: it catches a crafted request to this public endpoint and a
+        // matrix change made mid-session, both of which the checkout-time gate
+        // cannot see. The effective gateway mirrors the charge routing below
+        // (fiat -> resolved backup/primary, crypto -> nowpayments, wallet ->
+        // wallet); the categories come from the order's snapshot, or Wallet for
+        // a funding attempt. Shadow mode logs the denial and lets it through.
+        $effectiveGateway = $fiatGateway
+            ?? ($method === 'crypto' ? 'nowpayments' : ($method === 'wallet' ? 'wallet' : $attempt->gateway));
+
+        $eligibilityBlockers = $eligibility->blockers(
+            $eligibilityCategories,
+            $effectiveGateway,
+            $currency,
+            ['stage' => 'pay', 'session' => $session->id],
+        );
+
+        if ($eligibilityBlockers !== []) {
+            return response()->json([
+                'message' => PaymentCategoryIneligibleException::messageFor($eligibilityBlockers),
+                'category_ineligible' => true,
+            ], 422);
         }
 
         try {
@@ -427,6 +483,18 @@ class PaymentSessionController extends Controller
                     'details.pay_currency' => 'required|string',
                 ]);
 
+                // Kill switch for the crypto rail. The early session-provider
+                // check above never sees this case: a checkout/funding session
+                // is stamped with a FIAT default and only re-stamps to
+                // nowpayments right here, so without this guard a greyed-out
+                // crypto tile could still be charged server-side.
+                if (! FeatureFlag::gatewayEnabled('nowpayments')) {
+                    return response()->json([
+                        'message' => GatewayDisabledException::customerMessageFor('nowpayments'),
+                        'gateway_disabled' => true,
+                    ], 503);
+                }
+
                 // Reject a coin the gateway cannot accept for this order value BEFORE
                 // creating anything. Minimums differ by more than two orders of
                 // magnitude across our coins and float with network conditions, so
@@ -472,6 +540,17 @@ class PaymentSessionController extends Controller
                 $request->validate([
                     'details.auth_token' => 'required|string',
                 ]);
+
+                // Kill switch for the wallet rail, for the same reason as the
+                // crypto guard above: an order session stamped with a fiat
+                // default reaches this branch without ever passing the early
+                // session-provider check.
+                if (! FeatureFlag::gatewayEnabled('wallet')) {
+                    return response()->json([
+                        'message' => GatewayDisabledException::customerMessageFor('wallet'),
+                        'gateway_disabled' => true,
+                    ], 503);
+                }
 
                 $walletProvider = $gatewayFactory->getProvider('wallet');
 
@@ -612,6 +691,28 @@ class PaymentSessionController extends Controller
 
         if (! $provider instanceof NowPaymentsProvider) {
             return response()->json(['message' => 'Top-up is not available for this payment method.'], 422);
+        }
+
+        // Eligibility gate. A top-up is a fresh crypto charge for the shortfall,
+        // so it is re-checked like pay(): if the category lost approval on
+        // nowpayments between the first payment and now, the balance charge is
+        // refused. Shadow mode logs and allows.
+        $topUpCategories = $attempt->order
+            ? $attempt->order->loadMissing('items')->items->map(fn ($item) => $item->compliance_category)
+            : [ComplianceCategory::Wallet];
+
+        $topUpBlockers = app(PaymentEligibilityService::class)->blockers(
+            $topUpCategories,
+            'nowpayments',
+            $attempt->currency,
+            ['stage' => 'top_up', 'session' => $session->id],
+        );
+
+        if ($topUpBlockers !== []) {
+            return response()->json([
+                'message' => PaymentCategoryIneligibleException::messageFor($topUpBlockers),
+                'category_ineligible' => true,
+            ], 422);
         }
 
         $result = $provider->createTopUpPayment($attempt);

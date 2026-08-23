@@ -244,7 +244,7 @@ class PaystackPaymentProvider implements PaymentProviderInterface
         }
     }
 
-    public function refundPayment(PaymentAttempt $attempt, float $amount): bool
+    public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
         if (str_contains($this->secretKey, 'MOCK')) {
             $attempt->payment_status = PaymentStatus::Refunded;
