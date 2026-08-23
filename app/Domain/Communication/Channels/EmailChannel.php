@@ -18,6 +18,18 @@ class EmailChannel implements ChannelInterface
         private readonly MailProviderInterface $provider,
     ) {}
 
+    /**
+     * RFC 2606 reserved domains and other well-known undeliverable suffixes.
+     * Resend rejects these with a 422 which, without this guard, retries
+     * three times, fills the failed_jobs table, and fires a Sentry alert —
+     * all for an address that can never receive mail.
+     */
+    private const UNDELIVERABLE_DOMAINS = [
+        'example.com', 'example.org', 'example.net',
+        'test.com', 'test.org', 'test.net',
+        'invalid', 'localhost',
+    ];
+
     public function send(CommunicationPayload $payload): DeliveryResult
     {
         if (! $payload->mailable) {
@@ -25,6 +37,16 @@ class EmailChannel implements ChannelInterface
                 channel: CommunicationChannel::Email,
                 status: DeliveryStatus::Failed,
                 errorMessage: 'No mailable provided for email channel.',
+            );
+        }
+
+        // Pre-flight: suppress sends to domains that can never receive mail.
+        $recipientDomain = strtolower(substr(strrchr($payload->emailRecipient(), '@'), 1));
+        if (in_array($recipientDomain, self::UNDELIVERABLE_DOMAINS, true)) {
+            return new DeliveryResult(
+                channel: CommunicationChannel::Email,
+                status: DeliveryStatus::Suppressed,
+                errorMessage: "Suppressed: undeliverable domain '{$recipientDomain}'.",
             );
         }
 

@@ -73,7 +73,9 @@ class CheckoutApiController extends Controller
                 applyRcoin: $request->boolean('apply_rcoin')
             );
 
-            $fraudService->recordCheckout($user, $request->ip());
+            if ($order->wasRecentlyCreated) {
+                $fraudService->recordCheckout($user, $request->ip());
+            }
 
             $order->load(['items', 'paymentAttempts', 'paymentAttempts.paymentSession']);
             $latestAttempt = $order->paymentAttempts->sortByDesc('created_at')->first();

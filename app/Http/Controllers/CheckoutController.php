@@ -184,7 +184,9 @@ class CheckoutController extends Controller
                 selectedMethod: $data['payment_method'],
             );
 
-            $fraudService->recordCheckout($user, $request->ip());
+            if ($order->wasRecentlyCreated) {
+                $fraudService->recordCheckout($user, $request->ip());
+            }
 
             // Order placed - the cart is converted, so drop the ephemeral
             // "Buy now" tag too (its item ids are now stale).

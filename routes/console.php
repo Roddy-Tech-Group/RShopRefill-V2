@@ -39,7 +39,7 @@ Schedule::job(new ReconcilePendingFundingsJob)->hourly()->sentryMonitor('reconci
 // a slow sync from doubling up; runInBackground so cron isn't blocked while
 // the API call is paginating. Logs go to storage/logs/laravel.log.
 Schedule::command('airalo:sync-esims')
-    ->hourly()
+    ->hourlyAt(17)
     ->withoutOverlapping(60)
     ->runInBackground()
     ->name('airalo:sync-esims-hourly');
