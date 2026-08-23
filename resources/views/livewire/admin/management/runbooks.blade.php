@@ -31,16 +31,31 @@ class extends Component {
     {
         $this->runbook = $runbook;
 
-        if ($this->runbook !== null && ! array_key_exists($this->runbook, $this->library())) {
+        if ($this->runbook === null) {
+            return;
+        }
+
+        $entry = $this->library()[$this->runbook] ?? null;
+
+        if ($entry === null) {
             abort(404);
+        }
+
+        // HTML reference docs are served as authored, not rendered through the
+        // markdown prose - send a direct visit over to the doc route.
+        if ($entry['type'] === 'doc') {
+            $this->redirectRoute('admin.management.runbooks.doc', $this->runbook);
         }
     }
 
     /**
-     * Every runbook on disk, keyed by slug. The slug whitelist doubles as the
-     * path-traversal guard: only files actually inside docs/runbooks render.
+     * Everything on disk, keyed by slug: markdown runbooks (type 'runbook',
+     * rendered in-page) and self-contained HTML reference docs like the Fraud
+     * & Risk Engine handbook (type 'doc', opened as authored). The slug
+     * whitelist doubles as the path-traversal guard: only files actually
+     * inside docs/runbooks are reachable.
      *
-     * @return array<string, array{slug: string, title: string, summary: string}>
+     * @return array<string, array{slug: string, title: string, summary: string, type: string}>
      */
     public function library(): array
     {
@@ -51,11 +66,25 @@ class extends Component {
         }
 
         $files = collect(File::files(base_path('docs/runbooks')))
-            ->filter(fn ($file) => strtolower($file->getExtension()) === 'md');
+            ->filter(fn ($file) => in_array(strtolower($file->getExtension()), ['md', 'html'], true));
 
         $entries = [];
         foreach ($files as $file) {
             $slug = $file->getFilenameWithoutExtension();
+
+            if (strtolower($file->getExtension()) === 'html') {
+                $head = (string) File::get($file->getPathname());
+                $title = preg_match('/<title>(.*?)<\/title>/is', $head, $m)
+                    ? trim(html_entity_decode($m[1]))
+                    : $slug;
+                // Drop a leading site-name prefix ("RShopRefill — ...").
+                $title = Str::of($title)->afterLast('— ')->trim()->toString();
+
+                $entries[$slug] = ['slug' => $slug, 'title' => $title, 'summary' => 'Reference handbook, opens as its own document.', 'type' => 'doc'];
+
+                continue;
+            }
+
             $firstLines = array_slice(preg_split('/\r?\n/', (string) File::get($file->getPathname())), 0, 10);
 
             $title = Str::of(collect($firstLines)->first(fn ($line) => str_starts_with($line, '# ')) ?? $slug)
@@ -66,7 +95,7 @@ class extends Component {
                 ? trim(strip_tags(Str::of($severityLine)->after(':')->replace('**', '')->toString()))
                 : '';
 
-            $entries[$slug] = ['slug' => $slug, 'title' => $title, 'summary' => $summary];
+            $entries[$slug] = ['slug' => $slug, 'title' => $title, 'summary' => $summary, 'type' => 'runbook'];
         }
 
         // Curated order first, anything new appended alphabetically.
@@ -84,8 +113,10 @@ class extends Component {
 
     public function with(): array
     {
+        $library = $this->library();
+
         $html = null;
-        if ($this->runbook !== null) {
+        if ($this->runbook !== null && ($library[$this->runbook]['type'] ?? null) === 'runbook') {
             $html = Str::markdown(
                 (string) File::get(base_path("docs/runbooks/{$this->runbook}.md")),
                 ['html_input' => 'strip', 'allow_unsafe_links' => false],
@@ -93,7 +124,7 @@ class extends Component {
         }
 
         return [
-            'library' => $this->library(),
+            'library' => $library,
             'html' => $html,
         ];
     }
@@ -144,15 +175,27 @@ class extends Component {
         </p>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach ($library as $entry)
-                <a href="{{ route('admin.management.runbooks', $entry['slug']) }}" wire:navigate class="{{ $card }} group block p-5 transition-shadow hover:shadow-md">
-                    <div class="flex items-start justify-between gap-3">
-                        <h2 class="text-sm font-bold text-zinc-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">{{ $entry['title'] }}</h2>
-                        <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-300 transition-colors group-hover:text-blue-500 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </div>
-                    @if ($entry['summary'] !== '')
-                        <p class="mt-2 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">{{ Str::limit($entry['summary'], 120) }}</p>
-                    @endif
-                </a>
+                @if ($entry['type'] === 'doc')
+                    <a href="{{ route('admin.management.runbooks.doc', $entry['slug']) }}" target="_blank" rel="noopener" class="{{ $card }} group block p-5 transition-shadow hover:shadow-md">
+                        <div class="flex items-start justify-between gap-3">
+                            <h2 class="text-sm font-bold text-zinc-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">{{ $entry['title'] }}</h2>
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-300 transition-colors group-hover:text-blue-500 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H18v4.5M18 6l-7.5 7.5M18 13.5V18H6V6h4.5"/></svg>
+                        </div>
+                        @if ($entry['summary'] !== '')
+                            <p class="mt-2 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">{{ Str::limit($entry['summary'], 120) }}</p>
+                        @endif
+                    </a>
+                @else
+                    <a href="{{ route('admin.management.runbooks', $entry['slug']) }}" wire:navigate class="{{ $card }} group block p-5 transition-shadow hover:shadow-md">
+                        <div class="flex items-start justify-between gap-3">
+                            <h2 class="text-sm font-bold text-zinc-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">{{ $entry['title'] }}</h2>
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-300 transition-colors group-hover:text-blue-500 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </div>
+                        @if ($entry['summary'] !== '')
+                            <p class="mt-2 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">{{ Str::limit($entry['summary'], 120) }}</p>
+                        @endif
+                    </a>
+                @endif
             @endforeach
         </div>
     @else
