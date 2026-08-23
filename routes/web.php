@@ -4,6 +4,7 @@ use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\Order\Services\CouponApplicationService;
+use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\GuestClaimController;
@@ -133,14 +134,16 @@ Route::get('api/search/brands', function (Request $request) {
     // Key pages, matched by title - so a global search also surfaces sections.
     $pages = collect([
         ['name' => 'Buy gift cards', 'url' => route('shop.gift-cards')],
-        ['name' => 'Sell gift cards', 'url' => route('shop.sell-gift-cards')],
-        ['name' => 'GoMarket', 'url' => route('shop.gomarket')],
+        // Hidden-when-off features must not resurface through search.
+        FeatureFlag::on('sell_gift_cards', false) ? ['name' => 'Sell gift cards', 'url' => route('shop.sell-gift-cards')] : null,
+        FeatureFlag::on('gomarket', false) ? ['name' => 'GoMarket', 'url' => route('shop.gomarket')] : null,
         ['name' => 'eSIMs', 'url' => route('shop.esims')],
         ['name' => 'Mobile top-ups', 'url' => route('shop.topups')],
         ['name' => 'Bill payments', 'url' => route('shop.bills')],
         ['name' => 'Help center', 'url' => route('shop.help')],
         ['name' => 'FAQ', 'url' => route('shop.faq')],
-    ])->filter(fn ($pg) => str_contains(strtolower($pg['name']), strtolower($q)))
+    ])->filter()
+        ->filter(fn ($pg) => str_contains(strtolower($pg['name']), strtolower($q)))
         ->map(fn ($pg) => ['type' => 'Page', 'name' => $pg['name'], 'logo' => null, 'url' => $pg['url'], 'slug' => null, 'country' => null])
         ->take(4)
         ->values();
@@ -356,8 +359,10 @@ Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
     ->middleware('feature:stays')->name('shop.stays');
 
 // Sell Gift Cards & GoMarket - branded "coming soon" pages until each flow ships.
-// Same shared view + service flag as Flights/Stays; ungated like them.
-Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])->name('shop.sell-gift-cards');
+// Sell Gift Cards is gated like Flights/Stays: with trading switched off there
+// must be no reachable page advertising it. GoMarket stays ungated for now.
+Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])
+    ->middleware('feature:sell_gift_cards')->name('shop.sell-gift-cards');
 Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('shop.gomarket');
 
 // Help Center - static FAQ, topic filters and support contact details.
@@ -500,6 +505,7 @@ Route::get('sitemap.xml', function () {
         $gatedNames = [
             'shop.flights' => 'flights',
             'shop.stays' => 'stays',
+            'shop.sell-gift-cards' => 'sell_gift_cards',
         ];
 
         foreach ($staticNames as $name => $priority) {
@@ -624,7 +630,7 @@ $renderCheckout = function (CartManager $cartManager, CartPricingService $pricin
     if ($userId || $guestToken) {
         try {
             $cart = $cartManager->resolveCart($userId, $guestToken);
-            $cart->load('items.product', 'items.variant');
+            $cart->load('items.product.category', 'items.variant');
             $totals = $pricing->calculateCartTotals($cart->items);
         } catch (Throwable $e) {
             $cart = null;
@@ -636,7 +642,22 @@ $renderCheckout = function (CartManager $cartManager, CartPricingService $pricin
     // with this rate; falls back to USD when absent.
     $rate = CurrencyRate::resolve(request('currency'));
 
-    return view('shop.checkout', ['cart' => $cart, 'totals' => $totals, 'rate' => $rate]);
+    // Payment methods this cart's compliance categories make ineligible, per
+    // currency, so the checkout can grey them the same way it greys a disabled
+    // gateway. Empty in shadow mode (enforcement off), so tiles are unchanged
+    // until enforcement is switched on. The server-side gate is authoritative
+    // regardless; this only keeps the UI honest.
+    $complianceIneligibleByCurrency = app(PaymentEligibilityService::class)
+        ->ineligibleMethodsByCurrency(
+            $cart ? $cart->items->map(fn ($item) => $item->product->complianceCategory()) : [],
+        );
+
+    return view('shop.checkout', [
+        'cart' => $cart,
+        'totals' => $totals,
+        'rate' => $rate,
+        'complianceIneligibleByCurrency' => $complianceIneligibleByCurrency,
+    ]);
 };
 Route::get('checkout', $renderCheckout)->name('shop.checkout');
 
@@ -716,7 +737,7 @@ Route::post('coupon/preview', function (Request $request, CartManager $cartManag
 // limits on top of this route throttle), and get a 403 asking them to sign in
 // when it is off. The dashboard mirror route keeps its auth middleware.
 Route::post('checkout', [CheckoutController::class, 'process'])
-    ->middleware(['not-suspended', 'maintenance-guard', 'throttle:10,1'])
+    ->middleware(['not-suspended', 'verified-email', 'maintenance-guard', 'throttle:10,1'])
     ->name('checkout.process');
 
 // Guest account claim. The signed link (7 days) arrives by email after a
@@ -803,8 +824,11 @@ Route::middleware(['auth'])->group(function () {
 
     Volt::route('dashboard/notifications', 'dashboard.notifications')->name('dashboard.notifications');
 
-    // Gift Card Trading Routes
-    Volt::route('dashboard/gift-cards/submit', 'user.gift-cards.submit')->name('dashboard.gift-cards.submit');
+    // Gift Card Trading Routes. Submission closes with the flag (404, same as
+    // the storefront page); history and existing trade pages stay reachable so
+    // a customer with money already in a trade can still follow it.
+    Volt::route('dashboard/gift-cards/submit', 'user.gift-cards.submit')
+        ->middleware('feature:sell_gift_cards')->name('dashboard.gift-cards.submit');
     Volt::route('dashboard/gift-cards/history', 'user.gift-cards.history')->name('dashboard.gift-cards.history');
     Volt::route('dashboard/gift-cards/trades/{trade}', 'user.gift-cards.trades.show')->name('dashboard.gift-cards.trades.show');
     Volt::route('dashboard/gift-cards/trades/{trade}/receipt', 'user.gift-cards.trades.receipt')->name('dashboard.gift-cards.trades.receipt');
@@ -815,20 +839,6 @@ Route::middleware(['auth'])->group(function () {
     // Route::view('dashboard/saved-cards', 'dashboard.saved-cards')->name('dashboard.saved-cards');
 
     Route::view('dashboard/wallet', 'dashboard.wallet')->name('dashboard.wallet');
-
-    // Financial features still under construction (ledger, P2P, withdrawals, FX).
-    // The dashboard nav already hides these behind the same ef_* flags in
-    // components/layouts/dashboard.blade.php; the gate is repeated here so a
-    // typed URL cannot reach a half-built page while the backing services and
-    // their migrations are unfinished. Every flag defaults off.
-    Volt::route('dashboard/virtual-cards', 'dashboard.virtual-cards.index')
-        ->middleware('feature:ef_virtual_cards')->name('dashboard.virtual-cards');
-    Volt::route('dashboard/transfers', 'dashboard.transfers.index')
-        ->middleware('feature:ef_transfers')->name('dashboard.transfers');
-    Volt::route('dashboard/withdrawals', 'dashboard.withdrawals.index')
-        ->middleware('feature:ef_fiat_withdrawals')->name('dashboard.withdrawals');
-    Volt::route('dashboard/exchange', 'dashboard.exchange.index')
-        ->middleware('feature:ef_exchange')->name('dashboard.exchange');
 
     Volt::route('dashboard/profile', 'settings.profile')->name('dashboard.profile');
     Volt::route('dashboard/security', 'settings.security')->name('dashboard.security');
@@ -885,7 +895,8 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
         Route::view('stays', 'shop.coming-soon', ['service' => 'stays'])
             ->middleware('feature:stays')->name('stays');
 
-        Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])->name('sell-gift-cards');
+        Route::view('sell-gift-cards', 'shop.coming-soon', ['service' => 'sell-gift-cards'])
+            ->middleware('feature:sell_gift_cards')->name('sell-gift-cards');
         Route::view('gomarket', 'shop.coming-soon', ['service' => 'gomarket'])->name('gomarket');
 
         // Transactional flow mirrored under the dashboard so the cart -> checkout
@@ -895,7 +906,7 @@ Route::middleware(['auth'])->prefix('dashboard/shop')->name('dashboard.shop.')
         Route::get('cart', [CartWebController::class, 'page'])->name('cart');
         Route::get('checkout', $renderCheckout)->name('checkout');
         Route::post('checkout', [CheckoutController::class, 'process'])
-            ->middleware(['not-suspended', 'maintenance-guard', 'throttle:10,1'])
+            ->middleware(['not-suspended', 'verified-email', 'maintenance-guard', 'throttle:10,1'])
             ->name('checkout.process');
         Route::get('checkout/return/{session}', [CheckoutController::class, 'hostedReturn'])->name('checkout.return');
         Route::get('order/{orderNumber}', [CheckoutController::class, 'order'])->name('order');

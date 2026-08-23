@@ -40,7 +40,7 @@ class AdminMobileMenuTest extends TestCase
             'Campaigns', 'Pricing Rules',
             'Hero Sections', 'Hero Cards', 'Blog Posts', 'Press', 'Reviews', 'FAQs',
             'Rcoin Rewards', 'Rcoin Analytics', 'Rcoin Payouts',
-            'API Settings', 'Activity',
+            'API Settings', 'Audit Log',
         ] as $label) {
             $this->assertStringContainsString($label, $html, "Mobile menu is missing the {$label} tile.");
         }

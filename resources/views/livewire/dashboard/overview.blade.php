@@ -239,14 +239,25 @@ new #[Lazy] class extends Component
                 </a>
             </div>
             <div class="mt-4 grid grid-cols-4 gap-3">
+                {{-- A hidden travel tile is REPLACED, not removed: the grid is
+                     sized 2x4, and a 6-tile render leaves a visible hole. Fund
+                     Wallet takes the Flights slot; Electronics steps in next to
+                     Gaming (before More) when Stays is hidden. --}}
                 @foreach (array_values(array_filter([
                     ['Gift Cards', 'gift cards.svg',   'bg-pink-500',    route('dashboard.shop.gift-cards')],
                     ['eSIMs',      'esim.svg',         'bg-sky-500',     route('dashboard.shop.esims')],
-                    \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', 'flight 2.svg', 'bg-indigo-500', route('dashboard.shop.flights')] : null,
-                    \App\Support\FeatureFlag::categoryVisible('stays') ? ['Stays', 'stay 2.svg', 'bg-orange-500', route('dashboard.shop.stays')] : null,
+                    \App\Support\FeatureFlag::categoryVisible('flights')
+                        ? ['Flights', 'flight 2.svg', 'bg-indigo-500', route('dashboard.shop.flights')]
+                        : ['Fund Wallet', 'Wallet.svg', 'bg-indigo-500', route('dashboard.wallet')],
+                    \App\Support\FeatureFlag::categoryVisible('stays')
+                        ? ['Stays', 'stay 2.svg', 'bg-orange-500', route('dashboard.shop.stays')]
+                        : null,
                     ['Topups',     'topup1.svg',       'bg-emerald-500', route('dashboard.shop.topups')],
                     ['Bills',      'bill payment.svg', 'bg-teal-500',    route('dashboard.shop.bills')],
                     ['Gaming',     'Gaming.svg',       'bg-fuchsia-500', route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment'])],
+                    \App\Support\FeatureFlag::categoryVisible('stays')
+                        ? null
+                        : ['Electronics', 'mobile.svg', 'bg-orange-500', route('dashboard.shop.gift-cards', ['subcategory' => 'electronics'])],
                     ['More',       'More.svg',         'bg-blue-500',    route('dashboard.shop.gift-cards')],
                 ])) as [$label, $icon, $bg, $href])
                     <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
@@ -892,14 +903,25 @@ new #[Lazy] class extends Component
                         </div>
 
                         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
+                            {{-- Same backfill rule as the mobile grid: Fund Wallet
+                                 takes the Flights slot, Electronics slots in next
+                                 to Gaming when Stays is hidden, so the single
+                                 sm:grid-cols-8 row never shows a gap. --}}
                             @foreach (array_values(array_filter([
                                 ['Gift Cards', 'gift cards.svg',   'bg-pink-500',     null,             route('dashboard.shop.gift-cards')],
                                 ['eSIMs',      'esim.svg',         'bg-sky-500',      null,             route('dashboard.shop.esims')],
-                                \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', 'flight 2.svg', 'bg-indigo-500', 'flight.svg', route('dashboard.shop.flights')] : null,
-                                \App\Support\FeatureFlag::categoryVisible('stays') ? ['Stays', 'stay 2.svg', 'bg-orange-500', 'stay.svg', route('dashboard.shop.stays')] : null,
+                                \App\Support\FeatureFlag::categoryVisible('flights')
+                                    ? ['Flights', 'flight 2.svg', 'bg-indigo-500', 'flight.svg', route('dashboard.shop.flights')]
+                                    : ['Fund Wallet', 'Wallet.svg', 'bg-indigo-500', null, route('dashboard.wallet')],
+                                \App\Support\FeatureFlag::categoryVisible('stays')
+                                    ? ['Stays', 'stay 2.svg', 'bg-orange-500', 'stay.svg', route('dashboard.shop.stays')]
+                                    : null,
                                 ['Topups',     'topup1.svg',       'bg-emerald-500',  null,             route('dashboard.shop.topups')],
                                 ['Bills',      'bill payment.svg', 'bg-teal-500',     'Bills 2.svg',    route('dashboard.shop.bills')],
                                 ['Gaming',     'Gaming.svg',       'bg-fuchsia-500',  'gaming two.svg', route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment'])],
+                                \App\Support\FeatureFlag::categoryVisible('stays')
+                                    ? null
+                                    : ['Electronics', 'mobile.svg', 'bg-orange-500', null, route('dashboard.shop.gift-cards', ['subcategory' => 'electronics'])],
                                 ['More',       'More.svg',         'bg-blue-500',     'more two.svg',   route('dashboard.shop.gift-cards')],
                             ])) as [$label, $icon, $bg, $hoverIcon, $href])
                                 <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">

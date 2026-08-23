@@ -387,8 +387,15 @@
                         <a href="{{ route('admin.products', ['category' => 'esims']) }}" wire:navigate class="{{ $subItemClass($isCategory('esims')) }}">eSIMs</a>
                         <a href="{{ route('admin.products', ['category' => 'mobile-airtime']) }}" wire:navigate class="{{ $subItemClass($isCategory('mobile-airtime')) }}">Mobile Top-ups</a>
                         <a href="{{ route('admin.products', ['category' => 'bill-payments']) }}" wire:navigate class="{{ $subItemClass($isCategory('bill-payments')) }}">Bill Payments</a>
-                        <a href="{{ route('admin.products', ['category' => 'flights']) }}" wire:navigate class="{{ $subItemClass($isCategory('flights')) }}">Flights</a>
-                        <a href="{{ route('admin.products', ['category' => 'stays']) }}" wire:navigate class="{{ $subItemClass($isCategory('stays')) }}">Stays</a>
+                        {{-- Coming-soon categories: no category row exists for either
+                             yet, so these land on an empty product list. Behind their
+                             flags so they can be hidden until there is stock to show. --}}
+                        @if (\App\Support\FeatureFlag::on('flights', false))
+                            <a href="{{ route('admin.products', ['category' => 'flights']) }}" wire:navigate class="{{ $subItemClass($isCategory('flights')) }}">Flights</a>
+                        @endif
+                        @if (\App\Support\FeatureFlag::on('stays', false))
+                            <a href="{{ route('admin.products', ['category' => 'stays']) }}" wire:navigate class="{{ $subItemClass($isCategory('stays')) }}">Stays</a>
+                        @endif
                     </div>
                 </div>
                 @endif
@@ -408,6 +415,29 @@
                 <a href="{{ route('admin.customers') }}" wire:navigate data-tip="Customers" class="{{ $navItemClass($active) }}">
                     <img src="{{ asset('assets/' . rawurlencode('customer.svg')) }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
                     Customers
+                </a>
+                @endif
+
+                {{-- Risk (fraud/risk engine: metrics + review queue) --}}
+                @if ($can('admin.risk.dashboard'))
+                @php $active = $isCurrent('admin.risk*'); @endphp
+                <a href="{{ route('admin.risk.dashboard') }}" wire:navigate data-tip="Risk" class="{{ $navItemClass($active) }}">
+                    <svg class="{{ $imgIconClass($active) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
+                    </svg>
+                    Risk
+                    @php
+                        // Never let the badge (a count on every admin page) take the
+                        // panel down - a missing table pre-migration, or any DB hiccup,
+                        // falls back to no badge.
+                        $pendingReviews = \Illuminate\Support\Facades\Schema::hasTable('risk_reviews')
+                            ? rescue(fn () => \App\Models\RiskReview::where('status', 'pending')->count(), 0, false)
+                            : 0;
+                    @endphp
+                    @if ($pendingReviews > 0)
+                        <span class="ml-auto inline-flex items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{{ $pendingReviews }}</span>
+                    @endif
                 </a>
                 @endif
 
@@ -619,13 +649,13 @@
                 </div>
                 @endif
 
-                {{-- Account Activity --}}
+                {{-- Audit Log --}}
                 @php $active = $isCurrent('admin.account-activity*'); @endphp
-                <a href="{{ route('admin.account-activity') }}" wire:navigate data-tip="Account Activity" class="{{ $navItemClass($active) }}">
+                <a href="{{ route('admin.account-activity') }}" wire:navigate data-tip="Audit Log" class="{{ $navItemClass($active) }}">
                     <svg class="{{ $iconClass($active) }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
                     </svg>
-                    Account Activity
+                    Audit Log
                 </a>
 
                 {{-- Support Tickets --}}
@@ -948,7 +978,7 @@
                         </a>
                         <a href="{{ route('admin.account-activity') }}" wire:navigate class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('account avtivities 3.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                            Account activity
+                            Audit log
                         </a>
                         <a href="{{ route('admin.notifications') }}" wire:navigate class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
                             <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
@@ -1041,7 +1071,7 @@
                 ['label' => 'Rates',         'route' => 'admin.rates',                   'icon' => 'transactions.svg',            'tone' => 'bg-orange-500'],
                 ['label' => 'API Settings',  'route' => 'admin.api-settings',            'icon' => 'Network Svg.svg',             'tone' => 'bg-slate-600'],
                 ['label' => 'Settings',      'route' => 'admin.settings',                'icon' => 'system setting.svg',          'tone' => 'bg-cyan-500'],
-                ['label' => 'Activity',      'route' => 'admin.account-activity',        'icon' => 'account avtivities 3.svg',    'tone' => 'bg-zinc-500'],
+                ['label' => 'Audit Log',     'route' => 'admin.account-activity',        'icon' => 'account avtivities 3.svg',    'tone' => 'bg-zinc-500'],
             ])
                 ->filter(fn ($item) => $can($item['route']))
                 ->map(fn ($item) => $item + ['href' => route($item['route'])])

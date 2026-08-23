@@ -33,11 +33,15 @@ class extends Component {
             <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Trade History</h1>
             <p class="mt-1 text-sm text-zinc-500">View the status of your gift card trades.</p>
         </div>
+        {{-- New submissions close with the trading flag; the history itself
+             stays reachable so existing trades can still be followed. --}}
+        @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
         <div>
             <flux:button href="{{ route('dashboard.gift-cards.submit') }}" wire:navigate variant="primary">
                 Trade New Card
             </flux:button>
         </div>
+        @endif
     </div>
 
     <div class="w-full overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-700 dark:shadow-none">
@@ -48,11 +52,13 @@ class extends Component {
                 </div>
                 <h3 class="mt-4 text-sm font-semibold text-zinc-900 dark:text-white">No trades yet</h3>
                 <p class="mt-1 max-w-sm text-xs text-zinc-500">You haven't submitted any gift cards for trading. Trade your first card to get started.</p>
+                @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
                 <div class="mt-6">
                     <flux:button href="{{ route('dashboard.gift-cards.submit') }}" wire:navigate variant="primary">
                         Start a Trade
                     </flux:button>
                 </div>
+                @endif
             </div>
         @else
             <div class="w-full overflow-x-auto">

@@ -207,8 +207,8 @@ class Admin extends Authenticatable
         return match (true) {
             str_starts_with($name, 'dashboard') || str_starts_with($name, 'api.dashboard.') => 'dashboard',
             str_starts_with($name, 'products') || str_starts_with($name, 'api.catalog.') => 'products',
-            str_starts_with($name, 'orders') || $name === 'order' || str_starts_with($name, 'api.commerce.') => 'orders',
-            str_starts_with($name, 'customers') || $name === 'customer' || str_starts_with($name, 'customer.') || str_starts_with($name, 'kyc.') => 'customers',
+            str_starts_with($name, 'orders') || $name === 'order' || str_starts_with($name, 'order.') || str_starts_with($name, 'api.commerce.') => 'orders',
+            str_starts_with($name, 'customers') || $name === 'customer' || str_starts_with($name, 'customer.') || str_starts_with($name, 'kyc.') || str_starts_with($name, 'risk') => 'customers',
             str_starts_with($name, 'transactions') => 'transactions',
             str_starts_with($name, 'wallets') || str_starts_with($name, 'api.monitoring.') => 'wallets',
             str_starts_with($name, 'reports') || str_starts_with($name, 'api.sre.') => 'reports',

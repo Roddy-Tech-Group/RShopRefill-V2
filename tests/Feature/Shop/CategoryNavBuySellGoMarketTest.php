@@ -13,7 +13,10 @@ use Tests\TestCase;
  *
  * Both categories are hidden storefront-wide while their feature flags
  * (features.sell_gift_cards_enabled / features.gomarket_enabled) are off,
- * which is how they are seeded. The coming-soon pages stay reachable by URL.
+ * which is how they are seeded. The GoMarket coming-soon page stays reachable
+ * by URL; the Sell Gift Cards page is gated by its flag (the no-trace rule:
+ * while trading is off there must be no mention of it anywhere, so its own
+ * page 404s rather than advertising the feature).
  */
 class CategoryNavBuySellGoMarketTest extends TestCase
 {
@@ -22,6 +25,9 @@ class CategoryNavBuySellGoMarketTest extends TestCase
     public function test_sell_gift_cards_coming_soon_page_renders_its_own_copy(): void
     {
         $this->withoutVite();
+
+        // The page only exists while trading is switched on.
+        SiteSetting::put('features.sell_gift_cards_enabled', 'on', 'features');
 
         $this->get(route('shop.sell-gift-cards'))
             ->assertOk()
@@ -83,12 +89,18 @@ class CategoryNavBuySellGoMarketTest extends TestCase
         $this->assertLessThan($market, $sell);
     }
 
-    public function test_the_two_new_pages_are_ungated_and_public(): void
+    public function test_gomarket_is_public_while_sell_gift_cards_follows_its_flag(): void
     {
         $this->withoutVite();
 
-        // Guests (no auth) can reach both, like Flights/Stays.
-        $this->get('/sell-gift-cards')->assertOk();
+        // GoMarket is a public teaser regardless of auth.
         $this->get('/gomarket')->assertOk();
+
+        // Sell Gift Cards leaves no trace while trading is off...
+        $this->get('/sell-gift-cards')->assertNotFound();
+
+        // ...and comes back the moment the flag is flipped.
+        SiteSetting::put('features.sell_gift_cards_enabled', 'on', 'features');
+        $this->get('/sell-gift-cards')->assertOk();
     }
 }

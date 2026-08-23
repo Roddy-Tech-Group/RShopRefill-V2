@@ -11,6 +11,7 @@ use App\Models\GiftCardRate;
 use App\Models\GiftCardTrade;
 use App\Models\TradeAuditLog;
 use App\Models\User;
+use App\Support\FeatureFlag;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +24,8 @@ class TradeSubmissionService
 
     /**
      * Submit a new gift card trade.
+     *
+     * @throws \DomainException when gift card trading is switched off
      */
     public function submitTrade(
         int $userId,
@@ -34,6 +37,14 @@ class TradeSubmissionService
         ?string $whatsappNumber,
         array $images // array of ['file' => UploadedFile, 'type' => 'front'|'back'|'receipt']
     ): GiftCardTrade {
+        // Kill switch at the ONE seam every submission funnels through. The
+        // flag previously only hid storefront links while this dashboard flow
+        // stayed fully open, so trades kept arriving with trading "off".
+        // Fails closed (missing row = off), matching the feature: middleware.
+        if (! FeatureFlag::on('sell_gift_cards', false)) {
+            throw new \DomainException('Gift card trading is not available right now.');
+        }
+
         return DB::transaction(function () use ($userId, $rate, $declaredValue, $payoutMethod, $bankAccountId, $codePin, $whatsappNumber, $images) {
 
             $calculatedPayout = $this->rateEngine->calculatePayout($rate, $declaredValue);

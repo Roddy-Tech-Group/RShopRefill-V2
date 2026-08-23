@@ -63,7 +63,7 @@
                 </div>
             </div>
 
-            <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-4">
+            <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-5">
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Phone</dt>
                     <dd class="mt-1 font-medium text-zinc-700">{{ $user->phone ?: '-' }}</dd>
@@ -71,6 +71,10 @@
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Gender</dt>
                     <dd class="mt-1 font-medium capitalize text-zinc-700">{{ $user->gender ?: '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Country</dt>
+                    <dd class="mt-1 font-medium text-zinc-700">{{ $user->country ?: '-' }}</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sign-in</dt>
@@ -741,8 +745,67 @@
                 <x-admin.badge :tone="$kycTone">{{ $user->kyc_status }}</x-admin.badge>
             </div>
 
-            @if ($kyc)
+            {{-- Provider-era attempts (Smile ID). Verdicts arrive via webhook;
+                 "Check with provider" reconciles a pending attempt whose
+                 callback has not landed. --}}
+            @if ($kycVerifications->isNotEmpty())
                 <div class="px-5 py-4">
+                    <div class="space-y-3">
+                        @foreach ($kycVerifications as $verification)
+                            @php
+                                $attemptTone = match ($verification->status) {
+                                    'approved' => 'emerald',
+                                    'rejected' => 'red',
+                                    default    => 'amber',
+                                };
+                            @endphp
+                            <div class="rounded-[12px] border border-zinc-100 bg-zinc-50/60 px-4 py-3">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-xs font-semibold text-zinc-900">{{ $verification->productLabel() }}</span>
+                                        <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 ring-1 ring-zinc-200">Smile ID</span>
+                                        <x-admin.badge :tone="$attemptTone">{{ $verification->status }}</x-admin.badge>
+                                    </div>
+                                    @if ($verification->isPending())
+                                        <form method="POST" action="{{ route('admin.kyc.sync', $verification) }}">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center gap-1.5 rounded-[12px] bg-zinc-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-zinc-700">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                                                Check with provider
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                                <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-4">
+                                    <div>
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Reference</dt>
+                                        <dd class="mt-0.5 break-all font-mono text-[11px] text-zinc-700">{{ $verification->reference }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Started</dt>
+                                        <dd class="mt-0.5 font-medium text-zinc-700">{{ $fmtDate($verification->created_at) }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Decided</dt>
+                                        <dd class="mt-0.5 font-medium text-zinc-700">{{ $verification->decided_at ? $fmtDate($verification->decided_at) : '-' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Result code</dt>
+                                        <dd class="mt-0.5 font-medium text-zinc-700">{{ $verification->result_code ?: '-' }}</dd>
+                                    </div>
+                                </dl>
+                                @if ($verification->status === 'rejected' && $verification->result_text)
+                                    <p class="mt-2 text-xs font-medium text-red-600">{{ $verification->result_text }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if ($kyc)
+                <div class="{{ $kycVerifications->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-5 py-4">
+                    <p class="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Manual submission (legacy)</p>
                     <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3">
                         <div>
                             <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Full name</dt>
@@ -820,8 +883,10 @@
                         </div>
                     @endif
                 </div>
-            @else
-                <div class="px-5 py-10 text-center text-sm text-zinc-600">This customer has not submitted KYC documents.</div>
+            @endif
+
+            @if ($kycVerifications->isEmpty() && ! $kyc)
+                <div class="px-5 py-10 text-center text-sm text-zinc-600">No verification attempts yet. The customer starts verification from their dashboard.</div>
             @endif
         </div>
 

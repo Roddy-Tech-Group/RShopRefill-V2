@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\FeatureFlag;
+use Illuminate\Database\Seeder;
 
 class FeatureFlagsSeeder extends Seeder
 {
@@ -15,17 +14,9 @@ class FeatureFlagsSeeder extends Seeder
     {
         $flags = [
             'wallet.enabled',
-            'wallet.withdrawals',
-            'wallet.transfers',
-            'wallet.fx',
-            'wallet.virtual_cards',
-            'wallet.physical_cards',
             'wallet.crypto',
-            'wallet.bank_accounts',
             'wallet.cashback',
             'wallet.rewards',
-            'wallet.loans',
-            'wallet.investments',
             'travel.enabled',
             'travel.flights',
             'travel.hotels',
