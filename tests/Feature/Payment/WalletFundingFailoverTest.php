@@ -5,6 +5,7 @@ namespace Tests\Feature\Payment;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Wallet\Exceptions\WalletFundingException;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
@@ -107,9 +108,48 @@ class WalletFundingFailoverTest extends TestCase
         $this->assertSame('flutterwave', $result['funding']->gateway, 'backups must never take funding traffic while the primary is on');
     }
 
+    /**
+     * The kill switch must refuse on the SERVER, not just hide the button:
+     * with the flag off, a replayed API call used to open a funding anyway.
+     */
+    public function test_the_wallet_funding_kill_switch_refuses_new_fundings_server_side(): void
+    {
+        SiteSetting::put('features.wallet_funding_enabled', 'off', 'features');
+
+        $this->expectException(WalletFundingException::class);
+
+        try {
+            $this->startFunding();
+        } finally {
+            $this->assertSame(0, WalletFunding::count(), 'a refused funding must cost zero rows');
+        }
+    }
+
+    /**
+     * Under enforcement, "fiat is alive but none of it is approved to fund
+     * wallets" must fall back to crypto exactly like a fiat outage does when
+     * crypto IS approved. The fallback used to catch only the outage
+     * exception, so this combination wrongly refused funding outright.
+     */
+    public function test_funding_falls_to_crypto_when_fiat_is_live_but_not_approved_for_wallets(): void
+    {
+        // Enforcement on, and the ONLY approved wallet cell is crypto's.
+        // Flutterwave stays live but unapproved for the wallet category.
+        SiteSetting::put('features.payment_eligibility_enforce_enabled', 'on', 'features');
+        SiteSetting::put('features.eligibility_nowpayments_wallet_enabled', 'on', 'features');
+
+        $result = $this->startFunding();
+
+        $this->assertSame('nowpayments', $result['funding']->gateway, 'crypto must carry the funding when it is the only approved rail');
+    }
+
     public function test_a_full_fiat_outage_refuses_funding_before_any_write(): void
     {
+        // A TRUE full outage: fiat dark AND crypto dark. With crypto alive,
+        // funding deliberately survives on the nowpayments rail (pinned in
+        // GatewayKillSwitchTest), so the refusal case must kill both.
         $this->setGateway('flutterwave', false);
+        $this->setGateway('nowpayments', false);
 
         $this->expectException(GatewayDisabledException::class);
 

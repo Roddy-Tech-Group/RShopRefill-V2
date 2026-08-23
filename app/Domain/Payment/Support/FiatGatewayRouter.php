@@ -89,22 +89,33 @@ final class FiatGatewayRouter
     /**
      * The gateway that will charge this method in this currency right now,
      * or null when no enabled gateway covers the pair.
+     *
+     * This is capability + availability only; it does NOT consider the product's
+     * compliance category. Category-aware selection composes on top of
+     * candidates() in PaymentEligibilityService::routeGateway, which filters this
+     * ordered list down to the gateways approved for the cart.
      */
     public static function resolve(string $method, string $currency): ?string
     {
+        return self::candidates($method, $currency)[0] ?? null;
+    }
+
+    /**
+     * Every live gateway that can charge this method in this currency, in
+     * failover order. The eligibility service walks this list to pick the first
+     * gateway also approved for the cart's categories, so a category no gateway
+     * approves greys/refuses while a category one backup approves still routes.
+     *
+     * @return list<string>
+     */
+    public static function candidates(string $method, string $currency): array
+    {
         $currency = strtoupper(trim($currency));
 
-        foreach (self::METHOD_PRIORITY[$method] ?? [] as $gateway) {
-            if (! self::isLive($gateway)) {
-                continue;
-            }
-
-            if (self::supports($gateway, $method, $currency)) {
-                return $gateway;
-            }
-        }
-
-        return null;
+        return array_values(array_filter(
+            self::METHOD_PRIORITY[$method] ?? [],
+            fn (string $gateway): bool => self::isLive($gateway) && self::supports($gateway, $method, $currency),
+        ));
     }
 
     /**
@@ -141,16 +152,26 @@ final class FiatGatewayRouter
      * The gateway stamped onto a fresh fiat checkout before a method is
      * chosen. The pay endpoint re-resolves per method at commitment and
      * re-stamps while the session is still pre-charge ('awaiting_method').
+     *
+     * Capability + availability only; category-aware selection composes on top
+     * of liveFiatGateways() in PaymentEligibilityService::defaultGatewayFor.
      */
     public static function defaultGateway(): ?string
     {
-        foreach (self::FIAT_GATEWAYS as $gateway) {
-            if (self::isLive($gateway)) {
-                return $gateway;
-            }
-        }
+        return self::liveFiatGateways()[0] ?? null;
+    }
 
-        return null;
+    /**
+     * Every live fiat gateway, in preference order.
+     *
+     * @return list<string>
+     */
+    public static function liveFiatGateways(): array
+    {
+        return array_values(array_filter(
+            self::FIAT_GATEWAYS,
+            fn (string $gateway): bool => self::isLive($gateway),
+        ));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Enums\PricingBasis;
 use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -218,6 +219,7 @@ class Product extends Model
     protected $fillable = [
         'category_id',
         'subcategory_id',
+        'compliance_category',
         'provider_name',
         'provider_reference',
         'brand_key',
@@ -243,12 +245,26 @@ class Product extends Model
     {
         return [
             'pricing_basis' => PricingBasis::class,
+            'compliance_category' => ComplianceCategory::class,
             'is_featured' => 'boolean',
             'is_popular' => 'boolean',
             'is_active' => 'boolean',
             'is_out_of_stock' => 'boolean',
             'metadata' => 'array',
         ];
+    }
+
+    /**
+     * The compliance category the payment eligibility gate reads. Prefers the
+     * stored column; when it is somehow unset (a product created before this
+     * field, or without an explicit value) it falls back to deriving from the
+     * storefront category slug, so the gate never silently treats an untagged
+     * gift card as an ordinary digital good.
+     */
+    public function complianceCategory(): ComplianceCategory
+    {
+        return $this->compliance_category
+            ?? ComplianceCategory::fromCategorySlug($this->category?->slug);
     }
 
     /**

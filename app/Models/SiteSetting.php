@@ -55,6 +55,11 @@ class SiteSetting extends Model
 
     public static function put(string $key, mixed $value, string $group = 'general', ?string $description = null): self
     {
+        // CREATING a setting is not FLIPPING a setting: side effects below
+        // (outage broadcasts, SEV-2 gateway alerts) must only fire on a real
+        // state change. Without this, seeding a backup gateway 'off' on a
+        // fresh deploy paged the on-call with a false "gateway DISABLED".
+        $existedBefore = self::query()->where('key', $key)->exists();
         $oldValue = self::get($key);
 
         $setting = self::updateOrCreate(
@@ -64,7 +69,7 @@ class SiteSetting extends Model
 
         Cache::forget(self::cacheKey($key));
 
-        if ($key === 'features.gift_cards_enabled') {
+        if ($existedBefore && $key === 'features.gift_cards_enabled') {
             $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
             $wasOn = $isTruthy($oldValue ?? 'on');
             $isOn = $isTruthy($value);
@@ -80,7 +85,7 @@ class SiteSetting extends Model
         // must never be invisible history: whoever is on call sees WHO turned
         // WHAT off, the moment it happens, next to the provider-health alerts
         // it usually accompanies.
-        if (str_starts_with($key, 'features.gateway_') && str_ends_with($key, '_enabled')) {
+        if ($existedBefore && str_starts_with($key, 'features.gateway_') && str_ends_with($key, '_enabled')) {
             $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
             $wasOn = $isTruthy($oldValue ?? 'on');
             $isOn = $isTruthy($value);
@@ -104,6 +109,31 @@ class SiteSetting extends Model
                     // Alerting must never block the toggle itself: flipping the
                     // switch during an incident is the one moment it has to work.
                     Log::error('Gateway flag alert failed', ['key' => $key, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        // Category-eligibility enforcement changes what EVERY customer can
+        // buy; flipping it is never routine, so it gets the same on-call
+        // visibility as the gateway kill switches.
+        if ($existedBefore && $key === 'features.payment_eligibility_enforce_enabled') {
+            $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
+            $wasOn = $isTruthy($oldValue ?? 'off');
+            $isOn = $isTruthy($value);
+
+            if ($wasOn !== $isOn) {
+                try {
+                    app(OperationalAlerter::class)->send(
+                        AlertSeverity::Sev2,
+                        'eligibility_enforce.'.($isOn ? 'enabled' : 'disabled'),
+                        'Payment eligibility enforcement '.($isOn ? 'ENABLED' : 'DISABLED'),
+                        $isOn
+                            ? 'The category x gateway eligibility matrix is now ENFORCED: carts are refused on any gateway without an approved cell. Verify the approved cells match real provider approvals.'
+                            : 'Payment eligibility enforcement is back in shadow mode: denials are logged but nothing is refused.',
+                        ['flag' => $key, 'actor' => auth()->user()?->email ?? 'system'],
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('Eligibility enforce alert failed', ['key' => $key, 'error' => $e->getMessage()]);
                 }
             }
         }

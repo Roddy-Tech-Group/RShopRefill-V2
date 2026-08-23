@@ -245,7 +245,10 @@ class GatewayKillSwitchTest extends TestCase
             'is_active' => true,
         ]);
 
+        // A TRUE full outage: fiat dark AND crypto dark. With crypto alive,
+        // funding deliberately survives on the nowpayments rail instead.
         $this->setGateway('flutterwave', false);
+        $this->setGateway('nowpayments', false);
 
         $this->expectException(GatewayDisabledException::class);
 
@@ -254,6 +257,26 @@ class GatewayKillSwitchTest extends TestCase
         } finally {
             $this->assertSame(0, WalletFunding::count(), 'a refused funding must cost zero rows');
         }
+    }
+
+    public function test_wallet_funding_survives_a_fiat_outage_on_the_crypto_rail(): void
+    {
+        $wallet = Wallet::create([
+            'user_id' => $this->user->id,
+            'currency' => Currency::USD,
+            'balance' => 0.00,
+            'locked_balance' => 0.00,
+            'is_active' => true,
+        ]);
+
+        // Every fiat gateway dark, crypto alive: the one rail that is
+        // definitionally independent of a fiat outage must not be held
+        // hostage by it.
+        $this->setGateway('flutterwave', false);
+
+        $result = app(WalletFundingService::class)->initializeFunding($this->user, $wallet, 50.0, Currency::USD);
+
+        $this->assertSame('nowpayments', $result['funding']->gateway, 'crypto funding must survive a fiat outage');
     }
 
     public function test_pay_endpoint_refuses_a_fresh_charge_on_a_disabled_gateway(): void
@@ -265,6 +288,44 @@ class GatewayKillSwitchTest extends TestCase
 
         $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
             'method' => 'card',
+        ]);
+
+        $response->assertStatus(503)
+            ->assertJson(['gateway_disabled' => true]);
+    }
+
+    /**
+     * The bypass this pins closed: a checkout session is stamped with a FIAT
+     * default and only re-stamps to nowpayments inside the crypto branch, so
+     * the early session-provider check never fires for it. The branch itself
+     * must refuse when the crypto rail is off.
+     */
+    public function test_pay_endpoint_refuses_crypto_when_the_crypto_rail_is_disabled(): void
+    {
+        $order = $this->checkout();
+        $session = $order->paymentAttempts->first()->paymentSession;
+
+        $this->setGateway('nowpayments', false);
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'crypto',
+            'details' => ['pay_currency' => 'btc'],
+        ]);
+
+        $response->assertStatus(503)
+            ->assertJson(['gateway_disabled' => true]);
+    }
+
+    public function test_pay_endpoint_refuses_wallet_when_the_wallet_rail_is_disabled(): void
+    {
+        $order = $this->checkout();
+        $session = $order->paymentAttempts->first()->paymentSession;
+
+        $this->setGateway('wallet', false);
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'wallet',
+            'details' => ['auth_token' => 'irrelevant-the-flag-refuses-first'],
         ]);
 
         $response->assertStatus(503)
