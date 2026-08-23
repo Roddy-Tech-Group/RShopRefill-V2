@@ -175,6 +175,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->dontReport([
             BreakException::class,
+            \Livewire\Exceptions\MethodNotFoundException::class,
+            \Livewire\Exceptions\PublicPropertyNotFoundException::class,
+            \Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException::class,
         ]);
 
         $exceptions->dontFlash([

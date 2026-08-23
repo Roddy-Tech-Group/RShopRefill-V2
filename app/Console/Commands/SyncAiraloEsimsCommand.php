@@ -35,6 +35,11 @@ class SyncAiraloEsimsCommand extends Command
             $totalProcessed += $result['processed'];
             $this->line("  page {$page}: {$result['processed']} offers");
             $page++;
+
+            // Be respectful to Airalo's rate limits
+            if ($result['has_more']) {
+                usleep(250000); // 250ms delay between pages
+            }
         } while ($result['has_more']);
 
         $this->info("Done. Processed {$totalProcessed} total Airalo offers.");

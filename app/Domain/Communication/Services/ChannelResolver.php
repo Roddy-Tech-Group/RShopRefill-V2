@@ -30,6 +30,18 @@ class ChannelResolver
     ): array {
         $channels = [];
 
+        // One-time codes are email-only, decided here rather than at each call
+        // site so no future caller can widen it back. The bell feed and a push
+        // banner both render the message body verbatim, which means the code
+        // reaches anyone already holding a session or a stale push
+        // subscription - neither of which proves control of the inbox the code
+        // exists to verify.
+        if ($category->carriesOneTimeCode()) {
+            return $hasMailable && $this->isEmailAllowed($recipient, $category, $hasOverrideEmail, $preferenceManager)
+                ? [CommunicationChannel::Email]
+                : [];
+        }
+
         // In-App writes to the customer bell feed (notifications.user_id is an
         // FK to users), so only real User recipients get it. An Admin or
         // NewsletterSubscriber id here would land the message on whichever

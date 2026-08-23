@@ -268,7 +268,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
         $expiresAt = $body['expiration_estimate_date'] ?? $body['time_limit'] ?? null;
 
         $attempt->gateway_reference = $gatewayRef;
-        $attempt->expires_at = $expiresAt ? Carbon::parse($expiresAt) : null;
+        $attempt->expires_at = $this->parseGatewayTimestamp($expiresAt);
 
         // Queryable projection. The JSON below stays as the raw record; these are
         // what reconciliation, reporting and the overpayment sweep actually read.
@@ -1034,5 +1034,28 @@ class NowPaymentsProvider implements PaymentProviderInterface
             'ltc' => 'LVKw7y21M3tA9JtFh69N2y3Y6L5w6M3Kfd',
             default => '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
         };
+    }
+
+    /**
+     * Safely parse a timestamp returned by the NowPayments API.
+     *
+     * NowPayments returns ISO-8601 strings in UTC (e.g. "2026-08-20T02:51:18.671Z").
+     * A naive Carbon::parse() in an app whose timezone is not UTC will strip the
+     * trailing "Z" and interpret the value as local time, silently shifting it by
+     * the UTC offset. For Africa/Douala (UTC+1) this meant every session was born
+     * ~60 minutes expired.
+     *
+     * This helper always interprets the incoming string as UTC first, then converts
+     * to the application timezone so that Eloquent's date serialisation and all
+     * downstream comparisons (e.g. isPast(), ExpireStalePaymentSessionsJob) work
+     * against a consistent clock.
+     */
+    private function parseGatewayTimestamp(?string $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Carbon::parse($value, 'UTC')->setTimezone(config('app.timezone'));
     }
 }

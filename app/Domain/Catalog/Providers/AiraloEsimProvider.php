@@ -55,6 +55,10 @@ class AiraloEsimProvider implements ProviderInterface
             ->withToken($token)
             ->acceptJson()
             ->timeout(20)
+            ->retry(3, 5000, function ($exception, $request) {
+                return $exception instanceof \Illuminate\Http\Client\ConnectionException ||
+                       ($exception instanceof \Illuminate\Http\Client\RequestException && $exception->response->status() === 429);
+            })
             ->get("{$this->baseUrl}/packages", [
                 'limit' => $limit,
                 'page' => $page,

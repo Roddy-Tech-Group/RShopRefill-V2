@@ -1,11 +1,44 @@
 @php
-    $supportEmail = 'support@rshoprefill.com';
-    // Admin-editable on the System Settings page (group "contact"). Display +
-    // dialable (tel:/sms:) come from contact.phone_primary; the wa.me digits
-    // come from contact.whatsapp_number.
+    // Everything on this page is admin-editable from System Settings (group
+    // "contact"). The support address used to be a literal here, which quietly
+    // diverged from contact.email_support - editing the setting changed
+    // nothing. It reads the setting now, falling back to the one address the
+    // mail platform guarantees exists (every outgoing email replies to it).
+    $supportEmail = trim((string) \App\Models\SiteSetting::get('contact.email_support', ''))
+        ?: \App\Domain\Communication\Enums\MailDomain::replyTo();
+
+    // Display + dialable (tel:/sms:) come from contact.phone_primary; the
+    // wa.me digits come from contact.whatsapp_number.
     $supportPhone = \App\Models\SiteSetting::get('contact.phone_primary', '+1 (940) 238-6229');
     $supportPhoneDial = preg_replace('/[^0-9+]/', '', $supportPhone);
     $supportPhoneWa = preg_replace('/[^0-9]/', '', \App\Models\SiteSetting::get('contact.whatsapp_number', '19402386229'));
+
+    // Optional second line. Empty (the default) renders nothing at all rather
+    // than an empty row.
+    $altPhone = trim((string) \App\Models\SiteSetting::get('contact.phone_secondary', ''));
+    $altPhoneDial = $altPhone !== '' ? preg_replace('/[^0-9+]/', '', $altPhone) : '';
+    $altPhoneLabel = trim((string) \App\Models\SiteSetting::get('contact.phone_secondary_label', '')) ?: 'Alternate line';
+
+    // Physical address. Stored as free text so an admin can lay it out over
+    // several lines; each non-empty line renders as its own row.
+    $addressLines = collect(preg_split('/\r\n|\r|\n/', (string) \App\Models\SiteSetting::get('contact.address', '')))
+        ->map(fn ($line) => trim($line))
+        ->filter()
+        ->values();
+    $addressMapsUrl = trim((string) \App\Models\SiteSetting::get('contact.address_maps_url', ''));
+    // The registered entity heads the address card - "Roddy Technologies LTD"
+    // is what a courier or a regulator needs on the envelope, not the brand.
+    $legalName = trim((string) \App\Models\SiteSetting::get('site.legal_name', ''));
+
+    $supportHours = trim((string) \App\Models\SiteSetting::get('contact.support_hours', '')) ?: '24/7';
+
+    // Publishing all eight sender mailboxes made the page read as a wall of
+    // addresses. Only the two a customer ever needs are listed: compliance,
+    // which is the one mailbox with its own obligations and its own inbox, and
+    // support, which every other mailbox replies to anyway
+    // (MailDomain::replyTo). The rest still send mail; they are simply not
+    // advertised as somewhere to look or write.
+    $complianceMailbox = \App\Domain\Communication\Enums\MailDomain::Compliance;
     $tp = config('services.trustpilot');
     $field ='w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
 
@@ -48,7 +81,7 @@
 
     $channels = [
         ['label' => 'Email us',      'value' => $supportEmail,        'href' => 'mailto:'.$supportEmail, 'path' => 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75'],
-        ['label' => 'Live chat',     'value' => 'Available 24/7',      'href' => null,                    'path' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
+        ['label' => 'Live chat',     'value' => 'Available '.$supportHours, 'href' => null,               'path' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z'],
         ['label' => 'Email response','value' => 'Within 24 hours',     'href' => null,                    'path' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'],
     ];
 @endphp
@@ -185,6 +218,42 @@
                     @endif
                 </div>
 
+                {{-- Registered office. Sits directly under the form fields, as
+                     the postal counterpart to the digital channels opposite.
+                     Renders only when contact.address is filled in, so the
+                     column simply closes up when it is not set. --}}
+                @if ($addressLines->isNotEmpty())
+                    <div class="mt-6 rounded-[12px] bg-white p-5 ring-1 ring-zinc-100">
+                        <div class="flex items-start gap-4">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>
+                                </svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-zinc-900">Our address</p>
+                                @if ($legalName)
+                                    <p class="mt-0.5 text-sm font-semibold text-zinc-700">{{ $legalName }}</p>
+                                @endif
+                                <address class="mt-1 not-italic text-sm leading-relaxed text-zinc-600">
+                                    @foreach ($addressLines as $line)
+                                        <span class="block">{{ $line }}</span>
+                                    @endforeach
+                                </address>
+                                @if ($addressMapsUrl !== '')
+                                    <a href="{{ $addressMapsUrl }}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 rounded-[12px] bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"/>
+                                        </svg>
+                                        View on map
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Trustpilot review collector - sits under the message form. --}}
                 <div class="mt-6 flex justify-center">
                     <div class="inline-flex overflow-hidden rounded-[12px] border border-zinc-200 bg-white shadow-md shadow-zinc-900/20 dark:border-white/10">
@@ -242,6 +311,16 @@
                                     WhatsApp
                                 </a>
                             </div>
+
+                            {{-- Second line, when one is configured. Sits inside
+                                 the same card so the two numbers read as one
+                                 support contact rather than competing channels. --}}
+                            @if ($altPhone !== '')
+                                <div class="mt-4 border-t border-zinc-100 pt-3">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $altPhoneLabel }}</p>
+                                    <a href="tel:{{ $altPhoneDial }}" class="mt-0.5 block break-words text-sm font-medium text-blue-600 hover:underline">{{ $altPhone }}</a>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -295,74 +374,59 @@
         </div>
     </section>
 
-    {{-- ── Reach out ─────────────────────────────────────────────
-         Department contact tiles. Each tile reads from a contact.*
-         SiteSetting; an empty value hides that tile (so the section can
-         start with 1-2 cards and grow as the team scales). --}}
-    @php
-        $departments = array_values(array_filter([
-            [
-                'label' => 'Partnerships',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_partnerships', '')),
-                'form'  => trim((string) \App\Models\SiteSetting::get('contact.url_partnerships_form', '')),
-                'form_label' => 'Partnerships inquiry form',
-            ],
-            [
-                'label' => 'Suppliers',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_suppliers', '')),
-                'form'  => trim((string) \App\Models\SiteSetting::get('contact.url_suppliers_form', '')),
-                'form_label' => 'Supplier inquiry form',
-            ],
-            [
-                'label' => 'Press & media',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_press', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-            [
-                'label' => 'Legal',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_legal', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-            [
-                'label' => 'Abuse / Fraud',
-                'email' => trim((string) \App\Models\SiteSetting::get('contact.email_abuse', '')),
-                'form'  => '',
-                'form_label' => null,
-            ],
-        ], fn ($d) => $d['email'] !== ''));
-    @endphp
+    {{-- ── Emails you receive from us ────────────────────────────
+         Two addresses only: support, which every other mailbox replies to,
+         and compliance, the one with its own obligations and its own inbox.
+         Listing all eight senders turned the page into a wall of addresses
+         and invited mail into boxes nobody reads.
 
-    @if (count($departments) > 0)
-        <section class="mx-auto w-full max-w-[1140px] px-4 pb-16 sm:px-6 sm:pb-20">
-            <div class="border-t border-zinc-100 pt-12">
-                <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Reach out</h2>
-                <p class="mt-1 text-sm text-zinc-600">Explore collaboration possibilities</p>
+         Both are read off MailDomain / the contact settings rather than typed
+         here, so neither can drift from the From header the mailer actually
+         builds. --}}
+    <section class="mx-auto w-full max-w-[1140px] px-4 pb-16 sm:px-6 sm:pb-20">
+        <div class="border-t border-zinc-100 pt-12">
+            <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Emails you receive from us</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-600">
+                We only ever email you from the addresses below. If you receive a message about your
+                account, your wallet or a payment from anywhere else, it did not come from us. Do not
+                click its links, and
+                <a href="mailto:{{ $supportEmail }}" class="font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-800">report it to {{ $supportEmail }}</a>.
+            </p>
 
-                <div class="mt-8 grid grid-cols-2 gap-x-10 gap-y-8 lg:grid-cols-3">
-                    @foreach ($departments as $dept)
-                        <div>
-                            <p class="text-sm font-bold text-zinc-900">{{ $dept['label'] }}</p>
-                            <a href="mailto:{{ $dept['email'] }}" class="mt-2 flex items-center gap-2 text-sm text-zinc-700 transition-colors hover:text-blue-700">
-                                <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
-                                </svg>
-                                <span class="break-all">{{ $dept['email'] }}</span>
-                            </a>
-                            @if ($dept['form'])
-                                <a href="{{ $dept['form'] }}" target="_blank" rel="noopener noreferrer" class="mt-1.5 flex items-center gap-2 text-sm text-blue-700 underline underline-offset-4 transition-colors hover:text-blue-800">
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
-                                    </svg>
-                                    {{ $dept['form_label'] }}
-                                </a>
-                            @endif
-                        </div>
-                    @endforeach
+            <div class="mt-8 grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <a href="mailto:{{ $supportEmail }}" class="break-all text-sm font-bold text-blue-700 hover:underline">{{ $supportEmail }}</a>
+                        <p class="mt-0.5 text-sm leading-relaxed text-zinc-600">Orders, wallet, payments and anything else. Replies to any email we send reach this inbox.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="break-all text-sm font-bold text-zinc-900">{{ $complianceMailbox->senderAddress() }}</p>
+                        <p class="mt-0.5 text-sm leading-relaxed text-zinc-600">{{ $complianceMailbox->customerDescription() }}</p>
+                    </div>
                 </div>
             </div>
-        </section>
-    @endif
+
+            <p class="mt-8 rounded-[12px] bg-zinc-50 px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100">
+                We send some emails from other addresses on this domain, and replying to any of them
+                reaches our support team at
+                <a href="mailto:{{ $supportEmail }}" class="font-semibold text-blue-700 hover:underline">{{ $supportEmail }}</a>.
+                Anything claiming to be us from a different domain is not.
+                We will never ask for your password, your transaction PIN or a one-time code by email.
+            </p>
+        </div>
+    </section>
 
 </x-layouts.app.header>

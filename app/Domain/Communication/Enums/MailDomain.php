@@ -60,6 +60,25 @@ enum MailDomain: string
     }
 
     /**
+     * What a customer receives from this mailbox, in their words. Published on
+     * the Contact page so someone can check a suspicious email against the
+     * real list rather than guessing which senders are genuinely ours.
+     */
+    public function customerDescription(): string
+    {
+        return match ($this) {
+            self::Verify => 'Email confirmation and account verification links',
+            self::Security => 'Login alerts, one-time codes and new device notices',
+            self::Wallet => 'Wallet funding, withdrawals, transfers and Rcoin',
+            self::Orders => 'Order confirmations, delivery and fulfillment updates',
+            self::Transactions => 'Payment receipts, failures and abandoned checkout reminders',
+            self::Notifications => 'Service notices, maintenance and product updates',
+            self::Marketing => 'Newsletters and promotions, only if you opted in',
+            self::Compliance => 'KYC decisions and regulatory or policy changes',
+        };
+    }
+
+    /**
      * The Reply-To address — always routes to support.
      */
     public static function replyTo(): string
