@@ -4,7 +4,7 @@
     // coloured accents (text-red-600 / text-blue-700) read in both themes.
     // Terms / legal contact is a formal channel - kept on the info@ inbox.
     $supportEmail = 'info@rshoprefill.com';
-    $lastUpdated = 'May 23, 2026';
+    $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Terms of Service | '.$siteName">
@@ -50,6 +50,11 @@
         <section id="acceptance" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">1. Acceptance of these Terms</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
+                {{ $siteName }} is operated by Roddy Technologies LTD, registered in Nigeria (RC 9385422), with its registered
+                office at 5 Tetlow Road, Owerri, Imo State, Nigeria. When these Terms say "we", "us" or "our", they mean
+                Roddy Technologies LTD.
+            </p>
+            <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
                 By accessing or using {{ $siteName }}, you confirm that you have read, understood and agree to be bound by these
                 Terms and by our <a href="{{ route('shop.privacy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Privacy Policy</a>,
                 <a href="{{ route('shop.refund-policy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Refund and Cancellation Policy</a>
@@ -81,10 +86,10 @@
         <section id="services" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">3. Our products and services</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                {{ $siteName }} offers digital products and services, including gift cards, eSIMs, mobile top-ups, bill payments,
-                and travel such as flights and stays, alongside an in-app wallet. Many products are fulfilled by third-party
-                suppliers and networks. Product availability, pricing and features can vary by country and region, and may
-                change or be withdrawn at any time.
+                {{ $siteName }} offers digital products and services, including gift cards, eSIMs, mobile top-ups and bill
+                payments, alongside an in-app wallet. Many products are fulfilled by third-party suppliers and networks.
+                Product availability, pricing and features can vary by country and region, and may change or be withdrawn at
+                any time.
             </p>
         </section>
 
@@ -93,10 +98,14 @@
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">4. Wallet, pricing and payments</h2>
             <ul class="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500 sm:text-base">
                 <li>Your in-app wallet lets you hold balance and pay for services. Wallet credit is not a bank deposit and does not earn interest.</li>
+                <li>Wallet balance is redeemable only against purchases on {{ $siteName }}. It cannot be withdrawn as cash or transferred to another account.</li>
+                <li>If you close your account, contact support about any remaining balance; we will work with you to spend or resolve it, subject to verification and applicable law.</li>
                 <li>You can pay by card, bank transfer, mobile money, crypto or wallet balance, depending on your currency and region.</li>
                 <li>Prices are shown before you confirm. Where you pay in a different currency, conversion uses the rate shown at checkout.</li>
+                <li>Crypto payments settle at the USD value captured when your payment is confirmed. Exchange-rate movements after that point do not change what you paid or what you are owed, and refunds of crypto payments are issued as wallet credit, not returned on-chain.</li>
                 <li>You are responsible for any taxes, fees or charges that apply to your purchase under local law.</li>
                 <li>We use automated systems to detect and prevent fraud, and we may decline or hold transactions that appear high-risk.</li>
+                <li>If you believe a charge is wrong, contact our support team first; most issues are resolved faster than a bank dispute. If you raise a chargeback on a payment we can show was delivered, we may suspend the account and recover the disputed amount from your wallet balance, and we respond to every dispute with delivery evidence.</li>
             </ul>
         </section>
 
@@ -196,7 +205,7 @@
         <section id="law" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">11. Governing law and disputes</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                These Terms are governed by the laws that apply in our principal place of business, without affecting any
+                These Terms are governed by the laws of the Federal Republic of Nigeria, without affecting any
                 mandatory consumer-protection rights you have in your home country. We encourage you to contact us first so we
                 can try to resolve any issue quickly and fairly before taking any formal action.
             </p>

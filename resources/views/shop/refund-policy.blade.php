@@ -6,7 +6,7 @@
     // The written-record / disputes channel intentionally routes to the
     // info@ inbox, which keeps the formal audit trail for high-value cases.
     $disputesEmail = 'info@rshoprefill.com';
-    $lastUpdated = 'May 23, 2026';
+    $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Refund and Cancellation Policy | '.$siteName">
@@ -71,7 +71,7 @@
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 19.5h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Refunds are instant to your wallet</p>
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">Approved refunds land in your wallet right away. You can spend that credit immediately on any service we offer, including gift cards, airtime, data, bills, eSIMs and travel.</p>
+                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">Approved refunds land in your wallet right away. You can spend that credit immediately on any service we offer, including gift cards, airtime, data, bills and eSIMs.</p>
                 </div>
             </div>
 
@@ -80,7 +80,22 @@
                 A reversal back to your original payment method, such as a credit card, mobile money account or bank transfer,
                 is only granted in exceptional circumstances and is at the absolute discretion of management. Where a reversal
                 is approved, any third-party processing fees charged by the payment provider may be deducted from the amount
-                returned.
+                returned, and the money typically arrives within 2 to 10 business days, depending on your bank or payment
+                provider.
+            </p>
+
+            <h3 class="mt-6 text-base font-bold text-zinc-900">Crypto payments</h3>
+            <p class="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
+                Refunds of crypto payments are issued as wallet credit at the USD value captured when the payment confirmed.
+                We do not send cryptocurrency back on-chain. If a crypto payment arrives short of the required amount, our
+                team contacts you to resolve the difference.
+            </p>
+
+            <h3 class="mt-6 text-base font-bold text-zinc-900">Before you dispute a charge with your bank</h3>
+            <p class="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
+                Contact us first: refunds to your wallet are instant and most issues resolve within hours, while a bank
+                dispute can freeze the amount for weeks. Chargebacks raised on payments we can show were delivered may lead
+                to account suspension and recovery of the amount, and we respond to every dispute with delivery evidence.
             </p>
 
             {{-- Warning callout --}}
@@ -117,14 +132,6 @@
                         <tr>
                             <td class="px-4 py-3 font-medium text-zinc-900">eSIMs</td>
                             <td class="px-4 py-3 text-zinc-600">Wallet refund only if not yet installed or activated.</td>
-                        </tr>
-                        <tr>
-                            <td class="px-4 py-3 font-medium text-zinc-900">Flights and hotel stays</td>
-                            <td class="px-4 py-3 text-zinc-600">Subject to the airline or hotel terms. Flat processing fee applies.</td>
-                        </tr>
-                        <tr>
-                            <td class="px-4 py-3 font-medium text-zinc-900">Digital real estate</td>
-                            <td class="px-4 py-3 text-zinc-600">Non-refundable once finalized, subject to local cooling-off laws.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -170,45 +177,14 @@
                 </div>
             </div>
 
-            {{-- Flights & stays --}}
-            <h3 class="mt-8 text-base font-bold text-zinc-900">Flights and hotel stays</h3>
-            <p class="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                Travel bookings follow a pass-through policy. Cancellations, changes and refunds are strictly subject to the
-                terms of the specific airline or hotel for your booking. We can only return what the airline or hotel allows
-                under their own rules.
-            </p>
-
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
-                <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
-                <div>
-                    <p class="text-sm font-bold text-blue-700">A flat processing fee applies</p>
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">To manage a travel cancellation or change on your behalf, we charge a flat processing fee of $25 (or the equivalent in your local currency). This fee is separate from any charge the airline or hotel applies.</p>
-                </div>
-            </div>
-
-            {{-- Digital real estate --}}
-            <h3 class="mt-8 text-base font-bold text-zinc-900">Digital real estate</h3>
-            <p class="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                Digital real estate purchases are completely non-refundable once the allocation, transaction or fractional
-                contract is finalized. The only exception is where a regional law requires a mandatory cooling-off period, in
-                which case that legal right applies.
-            </p>
-
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
-                <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
-                <div>
-                    <p class="text-sm font-bold text-red-600">Non-refundable once finalized</p>
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">After your allocation or fractional contract is confirmed, the purchase cannot be refunded, except where a cooling-off period is required by the laws of your region.</p>
-                </div>
-            </div>
         </section>
 
         {{-- ── 3. Failed-transaction protection ──────────────────── --}}
         <section id="failed-protection" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">3. Automated failed-transaction protection</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                We built protection directly into the platform so that a failed delivery never costs you money. You never lose
-                money on {{ $siteName }}: every payment is either delivered or refunded to your wallet, and our support team is
+                We built protection directly into the platform: {{ $siteName }} is designed so that a failed delivery never
+                costs you money. Every confirmed payment is delivered or refunded to your wallet, and our support team is
                 available 24/7 if you ever need a human.
             </p>
 
@@ -219,9 +195,9 @@
                 <h3 class="mt-4 text-lg font-bold text-white sm:text-xl">Failed delivery? Automatic refund after a fast system check.</h3>
                 <p class="mt-2 text-sm leading-relaxed text-blue-100">
                     If your payment is taken but our delivery system fails to deliver your digital product because of a network
-                    timeout, our system detects the failure automatically and issues an instant refund to your wallet, usually
-                    within 60 seconds. You do not need to contact us or fill out any form. Your money is returned to your wallet
-                    so you can try again right away - and if anything ever looks wrong, our 24/7 support team will make it right.
+                    timeout, our system detects the failure automatically and issues an automatic refund to your wallet,
+                    typically within minutes. You do not need to contact us or fill out any form. Your money is returned to your
+                    wallet so you can try again right away - and if anything ever looks wrong, our 24/7 support team will make it right.
                 </p>
             </div>
         </section>
@@ -264,7 +240,7 @@
                     </span>
                     <div>
                         <p class="text-sm font-bold text-zinc-900">Email</p>
-                        <p class="mt-1 text-sm leading-relaxed text-zinc-600">Best for high-value disputes, travel changes and digital real estate issues, where a written record keeps a clear audit trail. Write to <a href="mailto:{{ $disputesEmail }}" class="font-medium text-blue-600 hover:underline">{{ $disputesEmail }}</a>. For everyday help, email <a href="mailto:{{ $supportEmail }}" class="font-medium text-blue-600 hover:underline">{{ $supportEmail }}</a>.</p>
+                        <p class="mt-1 text-sm leading-relaxed text-zinc-600">Best for high-value disputes, where a written record keeps a clear audit trail. Write to <a href="mailto:{{ $disputesEmail }}" class="font-medium text-blue-600 hover:underline">{{ $disputesEmail }}</a>. For everyday help, email <a href="mailto:{{ $supportEmail }}" class="font-medium text-blue-600 hover:underline">{{ $supportEmail }}</a>.</p>
                     </div>
                 </div>
             </div>

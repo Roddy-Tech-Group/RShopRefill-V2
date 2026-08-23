@@ -1346,6 +1346,10 @@
                      admin layout. Full-width so the legal line sits flush with
                      the page edges. `mt-auto` pins it to the bottom. --}}
                 <footer class="mt-auto hidden w-full pt-12 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[11px] font-semibold text-zinc-600 lg:flex dark:text-zinc-300">
+                    <a href="{{ route('shop.terms') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Terms</a>
+                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                    <a href="{{ route('shop.refund-policy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Refund Policy</a>
+                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <a href="{{ route('shop.privacy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Privacy Policy</a>
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <span>version 2.0.0</span>

@@ -55,9 +55,13 @@ class SeoHeadTest extends TestCase
         config(['services.google.analytics_id' => 'G-TEST123']);
         $this->withoutVite();
 
-        $this->get('/')
-            ->assertOk()
-            ->assertSee('googletagmanager.com/gtag/js?id=G-TEST123', false);
+        $html = $this->get('/')->assertOk()->getContent();
+
+        // The tag ships inside the consent-gated loader, never as a direct
+        // <script src> - it only loads after the cookie banner is accepted.
+        $this->assertStringContainsString('"G-TEST123"', $html);
+        $this->assertStringContainsString('cookie-consent-accepted', $html);
+        $this->assertStringNotContainsString('<script async src="https://www.googletagmanager.com', $html);
     }
 
     public function test_admin_setting_overrides_env_for_analytics(): void
@@ -68,7 +72,7 @@ class SeoHeadTest extends TestCase
 
         $html = $this->get('/')->assertOk()->getContent();
 
-        $this->assertStringContainsString('gtag/js?id=G-ADMINSET', $html);
+        $this->assertStringContainsString('"G-ADMINSET"', $html);
         $this->assertStringNotContainsString('G-ENVFALLBACK', $html);
     }
 
