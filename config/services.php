@@ -131,11 +131,37 @@ return [
         'fee_paid_by_user' => (bool) env('NOWPAYMENTS_FEE_PAID_BY_USER', true),
     ],
 
-    'maplerad' => [
-        'secret' => env('MAPLERAD_SECRET_KEY'),
-        'secret_key' => env('MAPLERAD_SECRET_KEY'), // Legacy alias
-        'url' => env('MAPLERAD_BASE_URL', 'https://api.maplerad.com/v1'),
-        'webhook_secret' => env('MAPLERAD_WEBHOOK_SECRET'), // Svix Webhook Secret
+    // Smile ID: identity (KYC) verification for the Tier 2 step-up. Every
+    // customer gets Global Document Verification (worldwide, full searchable
+    // country list in the hosted widget); per-country Biometric KYC routing is
+    // available but currently disabled (see biometric_countries below).
+    // Prepaid pay-as-you-go, one account.
+    'smileid' => [
+        'partner_id' => env('SMILE_PARTNER_ID'),
+        'api_key' => env('SMILE_API_KEY'),
+        // Smile's sid_server convention: 0 = sandbox, 1 = production.
+        'server' => (int) env('SMILE_SERVER', 0),
+        'callback_url' => env('SMILE_CALLBACK_URL'),
+        // Smile ResultCodes accepted as "identity verified". Default is the KYC
+        // exact-match code; confirm/extend against Smile's result-code docs and
+        // sandbox before switching KYC enforcement on.
+        'approved_result_codes' => ['1012'],
+        // Countries routed to Biometric KYC (government ID + selfie match)
+        // instead of Global Document Verification. EMPTY by CTO decision
+        // (2026-08-16): every customer gets the worldwide Document Verification
+        // flow, whose hosted widget lists ALL countries with search - one
+        // consistent experience, $0.80 flat. Smile's biometric coverage per the
+        // fee schedule is NG, GH, KE, ZA (NIN $0.50 / GH KE $0.75 / ZA $1.30);
+        // repopulate this list to re-enable per-country biometric routing once
+        // NIN/BVN are approved on the Smile account and the stronger/cheaper
+        // check is preferred over the uniform UX.
+        'biometric_countries' => [],
+        // Optional: pin the hosted widget's country -> ID-type list (also
+        // de-duplicates its country menu). Only list ID types ENABLED on the
+        // Smile partner account, or their jobs will fail. Example once NIN/BVN
+        // are enabled: ['NG' => ['NIN_V2', 'BVN', 'VOTER_ID']]. Null = let the
+        // widget offer everything the account supports.
+        'id_selection' => null,
     ],
 
     'trustpilot' => [

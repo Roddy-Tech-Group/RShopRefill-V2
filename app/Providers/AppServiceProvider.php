@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Domain\Audit\Listeners\AuditLogListener;
+use App\Domain\Audit\Observers\UserAuditObserver;
 use App\Http\View\Composers\CartComposer;
 use App\Http\View\Composers\SiteIdentityComposer;
 use App\Listeners\BackupFailureListener;
 use App\Listeners\ScheduledTaskFailureListener;
+use App\Models\User;
 use App\Support\FeatureFlag;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Append security-relevant events to the audit log.
         Event::subscribe(AuditLogListener::class);
+
+        // Model-level audit of sensitive account fields (ban/suspend/KYC/identity):
+        // captures EVERY surface that changes them, not just the admin panel.
+        User::observe(UserAuditObserver::class);
 
         // Escalate backup failures to Sentry + the critical log channel. A backup
         // that stops running silently is the failure mode backups exist to avoid.
