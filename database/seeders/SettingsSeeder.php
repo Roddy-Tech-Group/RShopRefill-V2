@@ -51,11 +51,12 @@ class SettingsSeeder extends Seeder
             ['key' => 'redemption_min_rcoin', 'value' => 2000, 'type' => 'integer', 'description' => 'Minimum RCOIN required to use for a purchase'],
             ['key' => 'redemption_max_percentage', 'value' => 30.0, 'type' => 'float', 'description' => 'Maximum percentage of an order total that can be paid via RCOIN'],
 
-            // Compliance & security - soft by default so flipping them OFF stays
-            // a deliberate product decision. Toggle ON to hard-gate checkout
-            // behind a verified email or withdrawals behind verified KYC.
-            ['key' => 'require_email_verified_for_checkout', 'value' => false, 'type' => 'boolean', 'description' => 'Require a verified email address before allowing checkout'],
+            // Compliance & security - soft by default so flipping OFF stays a
+            // deliberate product decision. Toggle ON to hard-gate withdrawals
+            // behind verified KYC. Email verification at checkout is mandatory
+            // and enforced by the EnsureEmailVerified middleware, not a setting.
             ['key' => 'require_kyc_for_withdrawal', 'value' => false, 'type' => 'boolean', 'description' => 'Require KYC-verified status before allowing Rcoin withdrawals'],
+            ['key' => 'kyc_tier2_threshold_usd', 'value' => 500, 'type' => 'float', 'description' => 'USD amount at which a customer must complete identity (KYC) verification before higher-value transactions'],
         ];
 
         foreach ($settings as $setting) {

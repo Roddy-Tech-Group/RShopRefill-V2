@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
@@ -140,6 +141,19 @@ class AdminCustomerController extends Controller
             ? number_format($amount)
             : number_format($amount, 2);
 
+        // Money moved by an admin's hand is always audited: who, how much,
+        // which direction, and the stated reason.
+        app(AuditLogService::class)->log(
+            action: 'admin.wallet_adjusted',
+            model: $user,
+            metadata: [
+                'direction' => $validated['direction'],
+                'amount' => $amount,
+                'currency' => $currencyCase->value,
+                'reason' => $validated['reason'],
+            ],
+        );
+
         return back()->with('status', "{$verb} {$formatted} {$currencyCase->value}.");
     }
 
@@ -257,6 +271,11 @@ class AdminCustomerController extends Controller
 
         $user->wallets()->update(['is_active' => ! $hold]);
 
+        app(AuditLogService::class)->log(
+            action: $hold ? 'admin.funds_held' : 'admin.funds_released',
+            model: $user,
+        );
+
         return back()->with('status', $hold
             ? 'Customer funds placed on hold.'
             : 'Customer funds released.');
@@ -322,6 +341,13 @@ class AdminCustomerController extends Controller
 
         app(TransactionPinService::class)->adminReset($user);
 
+        // Removing the wallet PIN strips the customer's money-out protection:
+        // a named security-audit record, not just an app log line.
+        app(AuditLogService::class)->log(
+            action: 'transaction_pin.admin_reset',
+            model: $user,
+        );
+
         Log::info('Admin reset customer transaction PIN', [
             'admin_id' => $request->user()?->id,
             'user_id' => $user->id,
@@ -339,6 +365,14 @@ class AdminCustomerController extends Controller
      */
     public function loginAsCustomer(Request $request, User $user): RedirectResponse
     {
+        // Audit BEFORE switching guards, while the acting admin is still the
+        // authenticated context - impersonation is the single most sensitive
+        // admin capability and every use must be attributable.
+        app(AuditLogService::class)->log(
+            action: 'admin.impersonation_started',
+            model: $user,
+        );
+
         Auth::guard('web')->login($user);
 
         Log::info('Admin impersonation started', [
@@ -366,6 +400,13 @@ class AdminCustomerController extends Controller
         $userId = Auth::guard('web')->id();
         Auth::guard('web')->logout();
 
+        // Bookends: the start is audited, so the end is too - the pair frames
+        // exactly which window of customer activity was actually the admin.
+        app(AuditLogService::class)->log(
+            action: 'admin.impersonation_ended',
+            model: $userId ? User::find($userId) : null,
+        );
+
         Log::info('Admin impersonation ended', [
             'admin_id' => Auth::guard('admin')->id(),
             'user_id' => $userId,
@@ -384,6 +425,12 @@ class AdminCustomerController extends Controller
     public function sendPasswordReset(Request $request, User $user): RedirectResponse
     {
         $status = Password::sendResetLink(['email' => $user->email]);
+
+        app(AuditLogService::class)->log(
+            action: 'admin.password_reset_link_sent',
+            model: $user,
+            metadata: ['result' => (string) $status],
+        );
 
         Log::info('Admin sent customer password reset link', [
             'admin_id' => $request->user()?->id,

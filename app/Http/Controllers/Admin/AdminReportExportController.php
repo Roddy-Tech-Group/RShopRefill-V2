@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Admin\Queries\DashboardMetricsQuery;
+use App\Domain\Audit\Services\AuditLogService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,12 @@ class AdminReportExportController extends Controller
         $series = $query->getReportSeries($start, $end, $granularity, $categoryId);
 
         $filename = 'rshoprefills-report-'.now()->format('Y-m-d-His').'.csv';
+
+        // Revenue/profit data leaving the system is always attributable.
+        app(AuditLogService::class)->log(
+            action: 'report.metrics_exported',
+            metadata: ['filename' => $filename, 'range' => $label, 'granularity' => $granularity, 'category_id' => $categoryId],
+        );
 
         return response()->streamDownload(function () use ($series) {
             $out = fopen('php://output', 'w');

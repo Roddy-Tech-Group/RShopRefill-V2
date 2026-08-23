@@ -108,12 +108,48 @@ class ManagementPagesTest extends TestCase
         $this->get(route('admin.management.runbooks', 'not-a-runbook'))->assertNotFound();
     }
 
+    public function test_the_risk_handbook_is_listed_in_the_library(): void
+    {
+        $this->withoutVite()->asSuperAdmin();
+
+        $this->get(route('admin.management.runbooks'))
+            ->assertOk()
+            ->assertSee('Fraud &amp; Risk Engine Handbook', false)
+            ->assertSee(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'), false);
+    }
+
+    public function test_the_risk_handbook_doc_serves_the_html_as_authored(): void
+    {
+        $this->withoutVite()->asSuperAdmin();
+
+        $this->get(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/html; charset=utf-8')
+            ->assertSee('Fraud &amp; Risk Engine', false);
+    }
+
+    public function test_visiting_the_handbook_through_the_library_route_redirects_to_the_doc(): void
+    {
+        $this->withoutVite()->asSuperAdmin();
+
+        $this->get(route('admin.management.runbooks', 'risk-and-fraud-engine'))
+            ->assertRedirect(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'));
+    }
+
+    public function test_an_unknown_doc_slug_404s(): void
+    {
+        $this->withoutVite()->asSuperAdmin();
+
+        $this->get(route('admin.management.runbooks.doc', 'not-a-doc'))->assertNotFound();
+    }
+
     public function test_management_pages_require_admin_auth(): void
     {
         $this->get(route('admin.management.monitoring'))->assertNotFound();
         $this->get(route('admin.management.finances'))->assertNotFound();
         $this->get(route('admin.management.leaderboards'))->assertNotFound();
         $this->get(route('admin.management.runbooks'))->assertNotFound();
+        $this->get(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'))->assertNotFound();
     }
 
     public function test_management_pages_are_denied_to_admins_without_the_management_section(): void
@@ -124,6 +160,7 @@ class ManagementPagesTest extends TestCase
         // CTO-level `management` section.
         $this->get(route('admin.management.monitoring'))->assertNotFound();
         $this->get(route('admin.management.finances'))->assertNotFound();
+        $this->get(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'))->assertNotFound();
         $this->get(route('admin.payment-insights'))->assertNotFound();
     }
 

@@ -6,10 +6,12 @@
     // enum values: "Completed" = paid, "Pending" = pending+processing+
     // reserved (in-flight), "Cancelled" = expired (timed-out checkout),
     // "Failed" = failed. "Refunded" is special — see below.
-    $statusFilter = strtolower((string) request()->query('status', 'all'));
+    // DEFAULT IS COMPLETED, not All: the first question an admin asks this
+    // page is "what money actually arrived", so that's the opening view.
+    $statusFilter = strtolower((string) request()->query('status', 'completed'));
     $allowedStatuses = ['all', 'completed', 'pending', 'cancelled', 'failed', 'refunded'];
     if (! in_array($statusFilter, $allowedStatuses, true)) {
-        $statusFilter = 'all';
+        $statusFilter = 'completed';
     }
 
     // Free-text reference lookup. The header command bar sends wallet-funding
@@ -66,6 +68,7 @@
             ->paginate(50)
             ->withQueryString()
             ->through(fn ($txn) => [
+                'href'         => null,
                 'customer'     => $txn->wallet?->user?->name ?? 'Unknown customer',
                 'order_number' => null,
                 'meta_label'   => $txn->transaction_category?->value === 'reversal' ? 'Wallet reversal' : 'Wallet refund',
@@ -102,6 +105,7 @@
             $statusValue = $payment->payment_status?->value ?? 'pending';
 
             return [
+                'href'         => route('admin.transaction', $payment),
                 'customer'     => $payment->user?->name ?? 'Unknown customer',
                 'order_number' => $payment->order?->order_number,
                 'meta_label'   => $payment->order ? null : 'Wallet funding',
@@ -137,11 +141,13 @@
         ->first();
     $refundCount = WalletTransaction::whereIn('transaction_category', ['refund', 'reversal'])->count();
 
-    // Preserve other query params when toggling the status filter chips - an
-    // active reference search must survive a chip press, or the chips silently
+    // Preserve other query params when toggling the status filter chips.
+    // Completed is the default view, so its URL stays clean; every other
+    // filter (including All) is explicit in the query string. An active
+    // reference search must survive a chip press, or the chips silently
     // widen the result set back to the whole table.
     $filterUrl = fn (string $status) => route('admin.transactions', array_filter([
-        'status' => $status === 'all' ? null : $status,
+        'status' => $status === 'completed' ? null : $status,
         'q' => $search !== '' ? $search : null,
     ]));
 @endphp
@@ -153,7 +159,7 @@
             {{-- CSV export. Forwards any active filter query params so an admin
                  can scope the file to whatever they were just looking at. --}}
             <a
-                href="{{ route('admin.transactions.export', request()->query()) }}"
+                href="{{ route('admin.transactions.export', array_merge(request()->query(), ['status' => $statusFilter])) }}"
                 class="inline-flex items-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
             >
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -285,7 +291,12 @@
         </div>
 
         @forelse ($rows as $row)
-            <article class="txn-row txn-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400">
+            {{-- A payment attempt row navigates to its detail page on click;
+                 the copy chips inside stop propagation so copying never
+                 navigates. Wallet-refund rows have no detail page (yet). --}}
+            <article
+                @if ($row['href']) x-data @click="Livewire.navigate(@js($row['href']))" @endif
+                class="txn-row txn-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400 {{ $row['href'] ? 'cursor-pointer' : '' }}">
 
                 {{-- Customer — name + reference / order link stacked. The
                      reference line is a click-to-copy chip; clicking it puts

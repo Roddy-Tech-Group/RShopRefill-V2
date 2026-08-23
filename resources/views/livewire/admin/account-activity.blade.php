@@ -12,18 +12,25 @@ use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
-#[Title('Account Activity')]
+#[Title('Audit Log')]
 class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
     public string $search = '';
 
+    /** Inclusive date-range bounds (Y-m-d); empty = unbounded. */
+    #[Url(except: '')]
+    public string $dateFrom = '';
+
+    #[Url(except: '')]
+    public string $dateTo = '';
+
     /** Filter by actor type. all | user | admin | system. */
     #[Url(except: 'all')]
     public string $actorFilter = 'all';
 
-    /** Filter by action category. all | auth | security | financial | other. */
+    /** Filter by action category. all | auth | security | financial | admin | other. */
     #[Url(except: 'all')]
     public string $actionFilter = 'all';
 
@@ -31,6 +38,16 @@ class extends Component {
     public ?int $viewingId = null;
 
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateTo(): void
     {
         $this->resetPage();
     }
@@ -43,7 +60,14 @@ class extends Component {
 
     public function setActionFilter(string $value): void
     {
-        $this->actionFilter = in_array($value, ['all', 'auth', 'security', 'financial', 'other'], true) ? $value : 'all';
+        $this->actionFilter = in_array($value, ['all', 'auth', 'security', 'financial', 'admin', 'other'], true) ? $value : 'all';
+        $this->resetPage();
+    }
+
+    /** One-click reset of every filter back to its default. */
+    public function clearFilters(): void
+    {
+        $this->reset('search', 'dateFrom', 'dateTo', 'actorFilter', 'actionFilter');
         $this->resetPage();
     }
 
@@ -65,9 +89,12 @@ class extends Component {
     private function actionCategory(string $action): string
     {
         return match (true) {
-            str_starts_with($action, 'user_login'), str_starts_with($action, 'password_reset') => 'auth',
-            str_starts_with($action, 'transaction_pin') => 'security',
-            str_contains($action, 'wallet'), str_contains($action, 'funding'), str_contains($action, 'refund'), str_contains($action, 'payment') => 'financial',
+            str_starts_with($action, 'user_login'), str_starts_with($action, 'user_logout'), str_starts_with($action, 'admin_login'), str_starts_with($action, 'admin_logout'), str_starts_with($action, 'password_reset'), str_starts_with($action, 'auth_lockout') => 'auth',
+            str_starts_with($action, 'transaction_pin'), str_starts_with($action, 'user.sensitive'), str_starts_with($action, 'user.password') => 'security',
+            // Financial before admin: money moved by an admin's hand
+            // (admin.wallet_adjusted, admin.order_refunded) reads as financial.
+            str_contains($action, 'wallet'), str_contains($action, 'funding'), str_contains($action, 'refund'), str_contains($action, 'payment'), str_contains($action, 'withdrawal') => 'financial',
+            str_starts_with($action, 'admin.'), str_starts_with($action, 'setting.'), str_starts_with($action, 'risk_review.'), str_starts_with($action, 'order_report.'), str_starts_with($action, 'report.') => 'admin',
             default => 'other',
         };
     }
@@ -79,6 +106,7 @@ class extends Component {
             'auth' => 'blue',
             'security' => 'amber',
             'financial' => 'emerald',
+            'admin' => 'purple',
             default => 'zinc',
         };
     }
@@ -91,8 +119,30 @@ class extends Component {
             $query->where(function ($q) use ($term) {
                 $q->where('action', 'like', "%{$term}%")
                     ->orWhere('ip_address', 'like', "%{$term}%")
-                    ->orWhere('correlation_id', 'like', "%{$term}%");
+                    ->orWhere('correlation_id', 'like', "%{$term}%")
+                    // "Everything about customer X": match the customer as the
+                    // ACTOR (they did it) or as the TARGET (it was done to
+                    // them), by name or email. Admin actors match via the
+                    // actor_email stored in metadata.
+                    ->orWhere('metadata->actor_email', 'like', "%{$term}%")
+                    ->orWhereHas('actor', function ($a) use ($term) {
+                        $a->where('email', 'like', "%{$term}%")->orWhere('name', 'like', "%{$term}%");
+                    })
+                    ->orWhere(function ($qq) use ($term) {
+                        $qq->where('model_type', User::class)
+                            ->whereIn('model_id', User::query()
+                                ->where('email', 'like', "%{$term}%")
+                                ->orWhere('name', 'like', "%{$term}%")
+                                ->select('id'));
+                    });
             });
+        }
+
+        if ($this->dateFrom !== '') {
+            $query->whereDate('created_at', '>=', $this->dateFrom);
+        }
+        if ($this->dateTo !== '') {
+            $query->whereDate('created_at', '<=', $this->dateTo);
         }
 
         if ($this->actorFilter === 'user') {
@@ -110,28 +160,35 @@ class extends Component {
         }
 
         if ($this->actionFilter !== 'all') {
-            $query->where(function ($q) {
-                $patterns = match ($this->actionFilter) {
-                    'auth'     => ['user_login%', 'password_reset%'],
-                    'security' => ['transaction_pin%'],
-                    'financial' => ['%wallet%', '%funding%', '%refund%', '%payment%'],
-                    'other'    => [],
-                    default    => [],
-                };
-                foreach ($patterns as $p) {
+            // Keep these pattern lists in lockstep with actionCategory():
+            // financial wins over admin, and "other" is the complement of
+            // every mapped category.
+            $categoryPatterns = [
+                'auth' => ['user_login%', 'user_logout%', 'admin_login%', 'admin_logout%', 'password_reset%', 'auth_lockout%'],
+                'security' => ['transaction_pin%', 'user.sensitive%', 'user.password%'],
+                'financial' => ['%wallet%', '%funding%', '%refund%', '%payment%', '%withdrawal%'],
+                'admin' => ['admin.%', 'setting.%', 'risk_review.%', 'order_report.%', 'report.%'],
+            ];
+
+            $query->where(function ($q) use ($categoryPatterns) {
+                if ($this->actionFilter === 'other') {
+                    foreach (array_merge(...array_values($categoryPatterns)) as $p) {
+                        $q->where('action', 'not like', $p);
+                    }
+
+                    return;
+                }
+
+                foreach ($categoryPatterns[$this->actionFilter] ?? [] as $p) {
                     $q->orWhere('action', 'like', $p);
                 }
-                if ($this->actionFilter === 'other') {
-                    $q->whereNotIn('action', function ($sub) {
-                        $sub->select('action')->from('audit_logs')
-                            ->where('action', 'like', 'user_login%')
-                            ->orWhere('action', 'like', 'password_reset%')
-                            ->orWhere('action', 'like', 'transaction_pin%')
-                            ->orWhere('action', 'like', '%wallet%')
-                            ->orWhere('action', 'like', '%funding%')
-                            ->orWhere('action', 'like', '%refund%')
-                            ->orWhere('action', 'like', '%payment%');
-                    });
+
+                // "Admin" means admin-surface actions that are not money moves;
+                // those stay under Financial, mirroring actionCategory().
+                if ($this->actionFilter === 'admin') {
+                    foreach ($categoryPatterns['financial'] as $p) {
+                        $q->where('action', 'not like', $p);
+                    }
                 }
             });
         }
@@ -174,15 +231,15 @@ class extends Component {
         }
         $meta = $log->metadata ?? [];
         if (! empty($meta['actor_type']) && str_ends_with($meta['actor_type'], 'Admin')) {
-            return ['name' => $meta['actor_email'] ?? 'Admin', 'email' => $meta['actor_email'] ?? '', 'kind' => 'admin'];
+            return ['name' => $meta['actor_name'] ?? $meta['actor_email'] ?? 'Admin', 'email' => $meta['actor_email'] ?? '', 'kind' => 'admin'];
         }
         return ['name' => 'System', 'email' => '', 'kind' => 'system'];
     };
 @endphp
 
 <div>
-    <x-slot:heading>Account Activity</x-slot:heading>
-    <x-slot:subheading>{{ number_format($summary['total']) }} audit events captured. Every customer login, password reset, and security-sensitive action lands here.</x-slot:subheading>
+    <x-slot:heading>Audit Log</x-slot:heading>
+    <x-slot:subheading>{{ number_format($summary['total']) }} audit events captured. Every login, security-sensitive change, money movement, and admin action lands here.</x-slot:subheading>
 
     <div class="flex flex-1 flex-col gap-6">
 
@@ -213,8 +270,25 @@ class extends Component {
                 <input
                     wire:model.live.debounce.300ms="search"
                     type="search"
-                    placeholder="Search by action, IP, or correlation ID"
+                    placeholder="Search by customer, action, IP, or correlation ID"
                     class="w-full rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                />
+            </div>
+
+            {{-- Inclusive date range --}}
+            <div class="flex items-center gap-1.5">
+                <input
+                    wire:model.live="dateFrom"
+                    type="date"
+                    aria-label="From date"
+                    class="rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
+                />
+                <span class="text-xs text-zinc-500 dark:text-zinc-400">to</span>
+                <input
+                    wire:model.live="dateTo"
+                    type="date"
+                    aria-label="To date"
+                    class="rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-white"
                 />
             </div>
 
@@ -238,7 +312,7 @@ class extends Component {
         <div class="flex flex-wrap items-center gap-1.5">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Category</span>
             @foreach ([
-                'all' => 'All', 'auth' => 'Login & reset', 'security' => 'Security', 'financial' => 'Financial', 'other' => 'Other',
+                'all' => 'All', 'auth' => 'Login & reset', 'security' => 'Security', 'financial' => 'Financial', 'admin' => 'Admin actions', 'other' => 'Other',
             ] as $value => $label)
                 <button
                     type="button"
@@ -250,6 +324,18 @@ class extends Component {
                     ])
                 >{{ $label }}</button>
             @endforeach
+
+            {{-- Appears only while something is filtered, so the default view stays clean. --}}
+            @if ($search !== '' || $dateFrom !== '' || $dateTo !== '' || $actorFilter !== 'all' || $actionFilter !== 'all')
+                <button
+                    type="button"
+                    wire:click="clearFilters"
+                    class="inline-flex items-center gap-1 rounded-[12px] px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-50 dark:text-red-400 dark:ring-red-400/40 dark:hover:bg-red-500/10"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Clear filters
+                </button>
+            @endif
         </div>
 
         {{-- Log table --}}

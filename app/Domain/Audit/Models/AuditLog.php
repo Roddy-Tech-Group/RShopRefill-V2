@@ -12,6 +12,16 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    /**
+     * Append-only: an audit trail that can be edited is not an audit trail.
+     * Updates are refused at the model layer; corrections are new rows.
+     * (Deletes are left to a future retention policy, never ad-hoc code.)
+     */
+    protected static function booted(): void
+    {
+        static::updating(fn () => false);
+    }
+
     protected $fillable = [
         'actor_id',
         'action',

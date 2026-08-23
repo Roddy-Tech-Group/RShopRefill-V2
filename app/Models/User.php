@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Security\PasswordResetMail;
+use App\Domain\Communication\Mail\Security\VerifyEmailMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
 use Database\Factories\UserFactory;
@@ -64,6 +65,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'phone',
+        'phone_verified_at',
         'country',
         'gender',
         'referral_code',
@@ -111,6 +113,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'rcoin_multiplier' => 'decimal:2',
             'banned_at' => 'datetime',
             'suspended_at' => 'datetime',
@@ -202,6 +205,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isKycVerified(): bool
     {
         return strtolower((string) $this->kyc_status) === 'verified';
+    }
+
+    /**
+     * Whether the captured phone number has been proven by OTP. Drives the
+     * PhoneVerified rung of the KYC tier ladder.
+     */
+    public function hasVerifiedPhone(): bool
+    {
+        return $this->phone_verified_at !== null;
     }
 
     /**
@@ -378,6 +390,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Provider-era KYC attempts (Smile ID sessions), newest first.
+     */
+    public function kycVerifications(): HasMany
+    {
+        return $this->hasMany(KycVerification::class)->latest();
+    }
+
+    /**
      * Get all orders placed by this user.
      */
     public function kycTier(): BelongsTo
@@ -503,6 +523,24 @@ class User extends Authenticatable implements MustVerifyEmail
             message: 'We received a request to reset your password. The reset link expires shortly.',
             mailable: new PasswordResetMail($this, $token),
             correlationId: 'password_reset_'.$this->id,
+        );
+    }
+
+    /**
+     * Route the account email-verification message through the Communication
+     * Platform so it is branded (verify@), logged, and preference-audited like
+     * every other transactional email, rather than Laravel's default template.
+     * The mailable mints the same signed link the default notification would.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        app(CommunicationManager::class)->send(
+            recipient: $this,
+            category: CommunicationCategory::EmailVerification,
+            title: 'Verify your email address',
+            message: 'Confirm your email address to activate your account. The verification link expires shortly.',
+            mailable: new VerifyEmailMail($this),
+            correlationId: 'email_verification_'.$this->id,
         );
     }
 }

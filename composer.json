@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "bacon/bacon-qr-code": "*",
+        "barryvdh/laravel-dompdf": "^3.1",
         "jenssegers/agent": "^2.6",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.47",
@@ -22,8 +23,10 @@
         "livewire/volt": "^1.6.7",
         "minishlink/web-push": "*",
         "pragmarx/google2fa": "*",
+        "propaganistas/laravel-phone": "^6.0",
         "resend/resend-php": "^1.3",
         "sentry/sentry-laravel": "^4.25",
+        "smile-identity/smile-identity-core": "^4.0",
         "spatie/laravel-backup": "^9.0",
         "stevebauman/location": "^7.6"
     },

@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RShopRefill — Fraud &amp; Risk Engine Handbook</title>
+<style>
+  :root {
+    /* Light — cool slate neutrals, one amber accent, semantic severity set */
+    --ground: #f5f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef1f5;
+    --ink: #111721;
+    --muted: #56616f;
+    --faint: #8994a2;
+    --hairline: #e2e7ec;
+    --accent: #a5620a;
+    --accent-soft: #f7efe1;
+
+    --allow: #0d8f63;
+    --allow-soft: #e6f4ee;
+    --stepup: #2159d0;
+    --stepup-soft: #e7edfb;
+    --review: #b3760a;
+    --review-soft: #f8efdd;
+    --deny: #cf3b3b;
+    --deny-soft: #fbe9e9;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+
+    --maxw: 1180px;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(16,23,33,.04), 0 8px 24px -12px rgba(16,23,33,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0d1015;
+      --surface: #141922;
+      --surface-2: #1b212c;
+      --ink: #e8ecf2;
+      --muted: #9aa4b2;
+      --faint: #68717f;
+      --hairline: #262e3a;
+      --accent: #e2a446;
+      --accent-soft: #291f12;
+
+      --allow: #37d39b;
+      --allow-soft: #10231c;
+      --stepup: #6ba0fb;
+      --stepup-soft: #131d31;
+      --review: #e2a446;
+      --review-soft: #271f11;
+      --deny: #f4736f;
+      --deny-soft: #2a1517;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0d1015;
+    --surface: #141922;
+    --surface-2: #1b212c;
+    --ink: #e8ecf2;
+    --muted: #9aa4b2;
+    --faint: #68717f;
+    --hairline: #262e3a;
+    --accent: #e2a446;
+    --accent-soft: #291f12;
+    --allow: #37d39b;
+    --allow-soft: #10231c;
+    --stepup: #6ba0fb;
+    --stepup-soft: #131d31;
+    --review: #e2a446;
+    --review-soft: #271f11;
+    --deny: #f4736f;
+    --deny-soft: #2a1517;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ---- Masthead ---- */
+  header.mast {
+    border-bottom: 1px solid var(--hairline);
+    background:
+      radial-gradient(120% 140% at 100% 0%, var(--accent-soft) 0%, transparent 55%),
+      var(--surface);
+  }
+  .mast-inner { padding: 56px 24px 40px; max-width: var(--maxw); margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1.title {
+    font-size: clamp(30px, 4.6vw, 46px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 780;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .lede { font-size: 18px; color: var(--muted); max-width: 68ch; margin: 0; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 20px;
+    margin-top: 26px; font-family: var(--font-mono); font-size: 12.5px; color: var(--faint);
+  }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  /* ---- Status strip ---- */
+  .status {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px; background: var(--hairline);
+    border: 1px solid var(--hairline); border-radius: var(--radius);
+    overflow: hidden; margin: 30px 0 4px;
+  }
+  .status .cell { background: var(--surface); padding: 16px 18px; }
+  .status .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin: 0 0 6px; }
+  .status .v { font-size: 21px; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.01em; }
+  .status .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  /* ---- Layout with TOC ---- */
+  .shell { display: block; padding: 44px 0 96px; }
+  @media (min-width: 1080px) {
+    .shell { display: grid; grid-template-columns: 220px minmax(0,1fr); gap: 52px; align-items: start; }
+    nav.toc { position: sticky; top: 24px; }
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: t; }
+  nav.toc a {
+    display: block; padding: 6px 0 6px 30px; position: relative;
+    color: var(--muted); text-decoration: none; font-size: 13.5px; line-height: 1.35;
+    border-left: 2px solid var(--hairline);
+  }
+  nav.toc a::before {
+    counter-increment: t; content: counter(t, decimal-leading-zero);
+    position: absolute; left: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--faint);
+  }
+  nav.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+  nav.toc .toc-h { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 0 0 12px; }
+
+  /* ---- Sections ---- */
+  section { scroll-margin-top: 20px; margin: 0 0 54px; }
+  section > h2 {
+    font-size: 12px; font-family: var(--font-mono); letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px;
+  }
+  section > h2 .num { color: var(--faint); }
+  section > h3.head { font-size: clamp(21px, 2.6vw, 27px); font-weight: 720; letter-spacing: -0.015em; margin: 0 0 16px; text-wrap: balance; }
+  p { margin: 0 0 15px; max-width: 72ch; }
+  p.tight { max-width: 72ch; }
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--font-mono); font-size: .86em;
+    background: var(--surface-2); padding: .12em .42em; border-radius: 5px;
+    border: 1px solid var(--hairline);
+  }
+  a.inline { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in oklab, var(--accent) 40%, transparent); }
+
+  /* ---- Cards / callouts ---- */
+  .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 22px 24px; box-shadow: var(--shadow); }
+  .grid2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 640px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  .note {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 18px 0; font-size: 15px;
+  }
+  .note.warn { border-left-color: var(--deny); background: var(--deny-soft); }
+  .note b { color: var(--ink); }
+
+  /* ---- Pills ---- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
+  .pill.allow { color: var(--allow); background: var(--allow-soft); border-color: color-mix(in oklab, var(--allow) 25%, transparent); }
+  .pill.stepup { color: var(--stepup); background: var(--stepup-soft); border-color: color-mix(in oklab, var(--stepup) 25%, transparent); }
+  .pill.review { color: var(--review); background: var(--review-soft); border-color: color-mix(in oklab, var(--review) 25%, transparent); }
+  .pill.deny { color: var(--deny); background: var(--deny-soft); border-color: color-mix(in oklab, var(--deny) 30%, transparent); }
+  .pill.flat::before { display: none; }
+
+  /* ---- Tables ---- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--faint); font-weight: 600; padding: 12px 16px;
+    background: var(--surface-2); border-bottom: 1px solid var(--hairline); position: sticky; top: 0;
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
+  td .sig { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  td.w { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; white-space: nowrap; }
+  td.grp { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); white-space: nowrap; }
+  .fires { color: var(--muted); font-size: 13.5px; }
+  .src { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); }
+  .wbar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; margin-left: 8px; opacity: .55; }
+
+  /* pipeline */
+  .pipe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 20px; }
+  .pipe .step { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; background: var(--surface); border: 1px solid var(--hairline); padding: 8px 12px; border-radius: 8px; box-shadow: var(--shadow); }
+  .pipe .arw { color: var(--faint); font-size: 14px; }
+
+  ul.clean { margin: 0 0 15px; padding-left: 0; list-style: none; }
+  ul.clean li { position: relative; padding-left: 22px; margin-bottom: 9px; max-width: 72ch; }
+  ul.clean li::before { content: ""; position: absolute; left: 4px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  ol.steps { counter-reset: s; list-style: none; margin: 0; padding: 0; }
+  ol.steps > li { position: relative; padding: 0 0 18px 46px; }
+  ol.steps > li::before {
+    counter-increment: s; content: counter(s); position: absolute; left: 0; top: -2px;
+    width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 14px;
+    color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+  ol.steps > li:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 30px; bottom: 2px; width: 1px; background: var(--hairline); }
+  ol.steps b { display: block; margin-bottom: 2px; }
+
+  .kbd { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 2px 7px; }
+
+  footer.foot { border-top: 1px solid var(--hairline); padding: 30px 0 60px; color: var(--faint); font-size: 13px; font-family: var(--font-mono); }
+  .lattice { color: var(--muted); font-size: 13px; }
+
+  h4.mini { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 22px 0 10px; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="mast-inner">
+    <p class="eyebrow">Roddy Technologies · Trust &amp; Safety</p>
+    <h1 class="title">Fraud &amp; Risk Engine — Operating Handbook</h1>
+    <p class="lede">One engine every money action passes through. It scores an action, decides what to do with it, records why, and — only when you let it — acts. This is the complete reference: every rule, every number, and every procedure for running it.</p>
+    <div class="meta-row">
+      <span>Policy <b>2026.08.14</b></span>
+      <span>Signals <b>23 active · 2 dormant</b></span>
+      <span>Scoring <b>Two-track</b></span>
+      <span>Choke points <b>Order · Funding</b></span>
+      <span>Status <b>Shadow-ready, flags OFF</b></span>
+    </div>
+
+    <div class="status">
+      <div class="cell"><p class="k">Master scoring</p><div class="v" style="color:var(--faint)">OFF <small>inert</small></div></div>
+      <div class="cell"><p class="k">Enforcement</p><div class="v" style="color:var(--faint)">OFF <small>shadow</small></div></div>
+      <div class="cell"><p class="k">Review SLA</p><div class="v">12<small> h</small></div></div>
+      <div class="cell"><p class="k">Clearance</p><div class="v">24<small> h</small></div></div>
+      <div class="cell"><p class="k">Retention</p><div class="v">24<small> mo</small></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="shell">
+    <nav class="toc" aria-label="Contents">
+      <p class="toc-h">Contents</p>
+      <ol>
+        <li><a href="#how">How a decision is made</a></li>
+        <li><a href="#flags">The two switches</a></li>
+        <li><a href="#outcomes">The four outcomes</a></li>
+        <li><a href="#scoring">Score &amp; bands</a></li>
+        <li><a href="#catalogue">Signal catalogue</a></li>
+        <li><a href="#overrides">Hard overrides</a></li>
+        <li><a href="#choke">Where it runs</a></li>
+        <li><a href="#reviews">The review queue</a></li>
+        <li><a href="#kyc">KYC step-up</a></li>
+        <li><a href="#feedback">Feedback &amp; labels</a></li>
+        <li><a href="#records">Records &amp; audit</a></li>
+        <li><a href="#dash">Dashboard &amp; metrics</a></li>
+        <li><a href="#ops">Ops &amp; config</a></li>
+        <li><a href="#rollout">Turning it on</a></li>
+        <li><a href="#runbook">Runbook</a></li>
+        <li><a href="#notyet">Not built yet</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <!-- 1 -->
+      <section id="how">
+        <h2><span class="num">01</span> Pipeline</h2>
+        <h3 class="head">How a single decision is made</h3>
+        <p>Every order and every wallet funding calls one function, <code>RiskGate::guard()</code>, before any money moves. The gate assembles a <strong>context</strong> (who, how much, from which device/IP, which categories), runs it through the signals, and keeps <strong>two scores</strong>: the <strong>total</strong> (every fired signal) and the <strong>abuse subscore</strong> (abuse-family signals only). The total can raise a step-up; only the abuse subscore can reach review or deny. Both bucket through the same bands, the most severe outcome wins, and an immutable record is written. Overrides can force a decline regardless of score.</p>
+        <div class="pipe">
+          <span class="step">RiskContext</span><span class="arw">→</span>
+          <span class="step">23 signals</span><span class="arw">→</span>
+          <span class="step">total + abuse scores</span><span class="arw">→</span>
+          <span class="step">bands</span><span class="arw">→</span>
+          <span class="step">outcome</span><span class="arw">→</span>
+          <span class="step">persist + act</span>
+        </div>
+        <p>Each signal is a small, self-contained rule that reads one data source and either fires (adding its configured weight) or stays silent. Nothing is a black box: the exact signals that fired, their weights, and the policy version are all stored, so any decision can be reproduced and explained months later — to you, to an auditor, or as chargeback dispute evidence.</p>
+        <div class="note"><b>Design rule.</b> Weights, band cut-offs, the band→outcome map, and every threshold live in <code>config/risk.php</code>, not in code. Tuning the engine is a config change, never a deploy of new logic.</div>
+      </section>
+
+      <!-- 2 -->
+      <section id="flags">
+        <h2><span class="num">02</span> Switches</h2>
+        <h3 class="head">The two switches that govern everything</h3>
+        <p>The engine has exactly two feature flags, both seeded <strong>OFF</strong>. They are independent, and together they define four states.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Master <code>risk_engine_enabled</code></th><th>Enforce <code>risk_engine_enforce_enabled</code></th><th>What happens</th></tr></thead>
+            <tbody>
+              <tr><td><b>OFF</b></td><td>—</td><td>Fully inert. <code>assess()</code> returns before touching any risk table. Checkout &amp; funding behave exactly as before. <b>← current production state.</b></td></tr>
+              <tr><td><b>ON</b></td><td><b>OFF</b></td><td><span class="pill review flat">Shadow</span> Scores, records an assessment, logs the would-be outcome — but always returns <span class="pill allow">allow</span>. Zero customer impact. This is how you collect data.</td></tr>
+              <tr><td><b>ON</b></td><td><b>ON</b></td><td><span class="pill deny flat">Live</span> The decision is acted on: step-up, review-hold, or decline.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note"><b>Golden path.</b> Master ON + Enforce OFF first. Watch the shadow data for weeks. Only then flip enforcement, and narrowly. The flags are in <em>Admin → Settings</em> (keys <code>features.risk_engine_enabled</code> and <code>features.risk_engine_enforce_enabled</code>).</div>
+      </section>
+
+      <!-- 3 -->
+      <section id="outcomes">
+        <h2><span class="num">03</span> Outcomes</h2>
+        <h3 class="head">The four things a decision can do</h3>
+        <p>Modelled on the card-scheme / PSD2 mental model of frictionless → challenge → decline. Severity orders them <code>allow &lt; step_up &lt; review &lt; deny</code>; when more than one rule applies, the most severe wins.</p>
+        <div class="grid2">
+          <div class="card"><p style="margin:0 0 8px"><span class="pill allow">allow</span></p><p class="tight" style="margin:0">Proceed normally. The default for a clean, low-risk action.</p></div>
+          <div class="card"><p style="margin:0 0 8px"><span class="pill stepup">step_up</span></p><p class="tight" style="margin:0">Force identity verification (Smile ID) before continuing. The customer can self-clear, then retry. Reuses the KYC flow.</p></div>
+          <div class="card"><p style="margin:0 0 8px"><span class="pill review">review</span></p><p class="tight" style="margin:0">Hold the attempt and queue it for a human. Neutral "under review" message to the customer; nothing is charged.</p></div>
+          <div class="card"><p style="margin:0 0 8px"><span class="pill deny">deny</span></p><p class="tight" style="margin:0">Refuse with a customer-safe message. Reason codes are recorded internally, never shown.</p></div>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section id="scoring">
+        <h2><span class="num">04</span> Scoring</h2>
+        <h3 class="head">Two-track scoring: verify the new, punish the abusive</h3>
+        <p>Signals belong to one of two families, and the engine keeps a score for each track:</p>
+        <ul class="clean">
+          <li><b>Identity / context family</b> (new account, unverified state, high value, gift-card category, untrusted device): raises the <b>total score</b>, which is <b>capped at step-up</b>. Circumstantial evidence can only ever ask the customer to verify their identity, something a legitimate customer self-clears in minutes and a fraudster with a stolen card cannot.</li>
+          <li><b>Abuse family</b> (declines, velocity bursts, multi-account linkage, bot failures, chargeback history): forms the <b>abuse subscore</b>, the only score that can reach <b>review</b> or <b>deny</b>. Punishment requires evidence of abusive behaviour, never mere newness.</li>
+        </ul>
+        <p>Both scores bucket through the same bands; the most severe outcome wins; overrides can still force a decline. The philosophy: the engine doesn't ask "does this customer have risk signals?", it asks "is this behaviour meaningfully inconsistent with legitimate use?"</p>
+        <div class="grid2">
+          <div class="tbl-wrap"><table style="min-width:0">
+            <thead><tr><th>Band</th><th>Score ≥</th><th>Total score</th><th>Abuse subscore</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill deny flat">CRITICAL</span></td><td class="w">80</td><td><span class="pill stepup">step_up</span> <small>(capped)</small></td><td><span class="pill deny">deny</span></td></tr>
+              <tr><td><span class="pill review flat">HIGH</span></td><td class="w">55</td><td><span class="pill stepup">step_up</span> <small>(capped)</small></td><td><span class="pill review">review</span></td></tr>
+              <tr><td><span class="pill stepup flat">MEDIUM</span></td><td class="w">30</td><td><span class="pill stepup">step_up</span></td><td>—</td></tr>
+              <tr><td><span class="pill allow flat">LOW</span></td><td class="w">0</td><td><span class="pill allow">allow</span></td><td>—</td></tr>
+            </tbody>
+          </table></div>
+          <div class="card">
+            <h4 class="mini" style="margin-top:0">Worked examples</h4>
+            <p class="tight" style="margin:0 0 10px">First-timer, own device, $100 eSIM: total <b>11</b> → <b>allow</b>. First-timer, $600 gift card, no KYC: total <b>77</b>, abuse 0 → <b>step-up</b>, verifies and proceeds.</p>
+            <p class="tight" style="margin:0 0 10px">Card tester (declines + device velocity + bot failures): abuse <b>62</b> → <b>review</b>; with a shared device, <b>87</b> → <b>deny</b>. Repeat chargeback offender: abuse <b>55</b> → <b>review</b>.</p>
+            <p class="tight" style="margin:0">A moderate abuse subscore also lifts the total past 30, so a <em>suspected</em> multi-accounter faces an identity challenge before review territory. Friction lands exactly where evidence exists.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="catalogue">
+        <h2><span class="num">05</span> Rules</h2>
+        <h3 class="head">The full signal catalogue</h3>
+        <p>All active signals, grouped, with the weight each adds and the exact condition that fires it. Every threshold and weight is a config value. Family mapping: <b>Identity, Value, and Device</b> groups form the identity family (step-up cap); <b>Velocity, Payment, Linkage, and Feedback</b> form the abuse family (can reach review/deny). The two overrides force an outcome and are listed in §06.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Group</th><th>Signal</th><th style="text-align:right">Weight</th><th>Fires when</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td class="grp" rowspan="4">Identity</td><td><span class="sig">ACCOUNT_NEW</span></td><td class="w">6<span class="wbar" style="width:6px"></span></td><td class="fires">Account age &lt; 24h — weak evidence, context only</td><td class="src">users</td></tr>
+              <tr><td><span class="sig">ACCOUNT_YOUNG</span></td><td class="w">3<span class="wbar" style="width:3px"></span></td><td class="fires">Age 24h–7d (excludes brand-new)</td><td class="src">users</td></tr>
+              <tr><td><span class="sig">EMAIL_UNVERIFIED</span></td><td class="w">25<span class="wbar" style="width:25px"></span></td><td class="fires">Email not verified — enforced at checkout, so a fire means a guest or a bypass</td><td class="src">users</td></tr>
+              <tr><td><span class="sig">KYC_TIER_BELOW_REQUIRED</span></td><td class="w">20<span class="wbar" style="width:20px"></span></td><td class="fires">Current KYC tier &lt; tier this amount requires</td><td class="src">KycTierService</td></tr>
+
+              <tr><td class="grp" rowspan="3">Value</td><td><span class="sig">HIGH_VALUE</span></td><td class="w">10<span class="wbar" style="width:10px"></span></td><td class="fires">Amount ≥ high-value cut-off (defaults to KYC Tier-2, <b>$500</b>)</td><td class="src">context</td></tr>
+              <tr><td><span class="sig">UNVERIFIED_HIGH_VALUE</span></td><td class="w">30<span class="wbar" style="width:30px"></span></td><td class="fires">High value <b>and</b> not KYC-verified — step-up is exactly the right response</td><td class="src">context + users</td></tr>
+              <tr><td><span class="sig">HIGH_RISK_CATEGORY</span></td><td class="w">6<span class="wbar" style="width:6px"></span></td><td class="fires">Cart touches a high-risk category (<code>gift-cards</code>)</td><td class="src">cart</td></tr>
+
+              <tr><td class="grp">Device</td><td><span class="sig">DEVICE_UNTRUSTED</span></td><td class="w">5<span class="wbar" style="width:5px"></span></td><td class="fires">Device unknown, or seen but never trusted — every first purchase fires this, so it stays context</td><td class="src">trusted_devices</td></tr>
+
+              <tr><td class="grp" rowspan="5">Velocity</td><td><span class="sig">VELOCITY_USER_1H</span></td><td class="w">20<span class="wbar" style="width:20px"></span></td><td class="fires">&gt; 6 orders in the last hour</td><td class="src">orders</td></tr>
+              <tr><td><span class="sig">VELOCITY_USER_24H</span></td><td class="w">12<span class="wbar" style="width:12px"></span></td><td class="fires">&gt; 20 orders in 24h</td><td class="src">orders</td></tr>
+              <tr><td><span class="sig">VELOCITY_IP_1H</span></td><td class="w">12<span class="wbar" style="width:12px"></span></td><td class="fires">&gt; 25 assessments from this IP in 1h — bar set high for carrier CGNAT</td><td class="src">risk_assessments</td></tr>
+              <tr><td><span class="sig">VELOCITY_DEVICE_1H</span></td><td class="w">20<span class="wbar" style="width:20px"></span></td><td class="fires">&gt; 8 assessments from this device in 1h</td><td class="src">risk_assessments</td></tr>
+              <tr><td><span class="sig">VELOCITY_AMOUNT_24H</span></td><td class="w">20<span class="wbar" style="width:20px"></span></td><td class="fires">Paid volume + this amount ≥ <b>$2,000</b> in 24h</td><td class="src">orders</td></tr>
+
+              <tr><td class="grp" rowspan="2">Payment</td><td><span class="sig">REPEATED_DECLINES</span></td><td class="w">30<span class="wbar" style="width:30px"></span></td><td class="fires">≥ 3 declines in 2h — card-testing</td><td class="src">PaymentBackoff</td></tr>
+              <tr><td><span class="sig">TURNSTILE_FAILURES</span></td><td class="w">12<span class="wbar" style="width:12px"></span></td><td class="fires">≥ 5 bot-challenge failures from IP (15-min window)</td><td class="src">cache</td></tr>
+
+              <tr><td class="grp" rowspan="4">Linkage</td><td><span class="sig">DEVICE_SHARED</span></td><td class="w">25<span class="wbar" style="width:25px"></span></td><td class="fires">&gt; 2 distinct accounts on one device — spares a household, catches a farm</td><td class="src">trusted_devices</td></tr>
+              <tr><td><span class="sig">IP_SHARED</span></td><td class="w">10<span class="wbar" style="width:10px"></span></td><td class="fires">&gt; 5 distinct accounts on one IP in 24h — CGNAT-tolerant</td><td class="src">risk_assessments</td></tr>
+              <tr><td><span class="sig">EMAIL_PHONE_SIMILARITY</span></td><td class="w">18<span class="wbar" style="width:18px"></span></td><td class="fires">&gt; 1 account sharing phone, or email once <code>+alias</code> is stripped</td><td class="src">users</td></tr>
+              <tr><td><span class="sig">PAYMENT_INSTRUMENT_REUSE</span></td><td class="w">30<span class="wbar" style="width:30px"></span></td><td class="fires">&gt; 2 accounts on one card fingerprint in 30d — spares a family card <b>*</b></td><td class="src">payment_attempts</td></tr>
+
+              <tr><td class="grp" rowspan="2">Feedback</td><td><span class="sig">CHARGEBACK_HISTORY</span></td><td class="w">15<span class="wbar" style="width:15px"></span></td><td class="fires">≥ 1 chargeback label in the last 365d — adds weight, never blocks alone</td><td class="src">risk_labels</td></tr>
+              <tr><td><span class="sig">CHARGEBACK_REPEAT</span></td><td class="w">40<span class="wbar" style="width:40px"></span></td><td class="fires">≥ 2 chargebacks in 365d — stacks with History to 55, reaching review on its own</td><td class="src">risk_labels</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="lattice" style="margin-top:12px"><b>*</b> <span class="sig" style="font-size:12px">PAYMENT_INSTRUMENT_REUSE</span> is a live-read typed slot: we never store card numbers, so it stays silent until a gateway supplies a non-sensitive card fingerprint in payment metadata, at which point it activates with no schema change.</p>
+        <p class="lattice" style="margin-top:8px"><b>Dormant (registered code kept, unregistered from the engine):</b> <span class="sig" style="font-size:12px">PHONE_UNVERIFIED</span> — no phone-OTP flow exists yet, so it would fire for every customer; re-enable when the OTP flow ships. <span class="sig" style="font-size:12px">GEO_VELOCITY</span> — the country-change proxy is too noisy (VPN/roaming, IP-geo accuracy); parked by CTO decision until a real GeoIP distance/time provider is wired.</p>
+      </section>
+
+      <!-- 6 -->
+      <section id="overrides">
+        <h2><span class="num">06</span> Overrides</h2>
+        <h3 class="head">Two signals that force a decline outright</h3>
+        <p>Some states shouldn't depend on a score crossing a cut-off. When an override signal fires, its outcome is forced regardless of the band. Both currently force <span class="pill deny">deny</span>.</p>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Signal</th><th>Forces</th><th>Fires when</th></tr></thead>
+          <tbody>
+            <tr><td><span class="sig">CONFIRMED_FRAUD_LABEL</span></td><td><span class="pill deny">deny</span></td><td class="fires">Account carries a <code>confirmed_fraud</code> label within 365d</td></tr>
+            <tr><td><span class="sig">ACCOUNT_BANNED</span></td><td><span class="pill deny">deny</span></td><td class="fires">Account is banned</td></tr>
+          </tbody>
+        </table></div>
+        <div class="note"><b>Reserved slot.</b> <code>SANCTIONS_HIT → deny</code> is wired in the override map but commented out; it activates the day AML/sanctions screening is added (recommended as a one-time check bundled into Tier-2 KYC at ~$0.35/check).</div>
+      </section>
+
+      <!-- 7 -->
+      <section id="choke">
+        <h2><span class="num">07</span> Placement</h2>
+        <h3 class="head">Where the gate sits, and what the customer sees</h3>
+        <p>The gate runs at the two money entry points, <em>before</em> anything is written: <code>CheckoutService::placeOrder</code> and <code>WalletFundingService::initializeFunding</code>. Because it runs pre-write, a held or declined attempt costs zero rows. When enforcing, each outcome becomes an HTTP response the storefront already understands:</p>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Outcome</th><th>HTTP</th><th>Body flag</th><th>Customer experience</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill stepup">step_up</span></td><td class="w">422</td><td class="src">kyc_required</td><td class="fires">Smile verification launches; retry after verifying</td></tr>
+            <tr><td><span class="pill review">review</span></td><td class="w">422</td><td class="src">risk_review</td><td class="fires">"Being reviewed, nothing to do" — neutral hold</td></tr>
+            <tr><td><span class="pill deny">deny</span></td><td class="w">403</td><td class="src">risk_declined</td><td class="fires">Generic security decline; contact support</td></tr>
+          </tbody>
+        </table></div>
+        <div class="note"><b>Fail-open by design.</b> The engine never breaks a checkout. Any unexpected internal fault is logged and the action is allowed through. In shadow that's a no-op; even enforcing, availability wins over a scoring bug.</div>
+      </section>
+
+      <!-- 8 -->
+      <section id="reviews">
+        <h2><span class="num">08</span> Reviews</h2>
+        <h3 class="head">The manual review queue &amp; its lifecycle</h3>
+        <p>A <span class="pill review">review</span> outcome opens one queue entry (deduped per customer + context, so repeated taps never spawn duplicates) and holds the attempt. Because the gate is pre-write, "hold" means the attempt is declined-pending-review; an <strong>approval grants a clearance window</strong> so the customer's retry sails through, rather than half-creating an order that must be resumed.</p>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Status</th><th>Effect on the customer</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill review flat">pending</span></td><td class="fires">Held. Awaiting a decision.</td></tr>
+            <tr><td><span class="pill stepup flat">escalated</span></td><td class="fires">Still held; flagged for a second/senior look.</td></tr>
+            <tr><td><span class="pill allow flat">approved</span></td><td class="fires">Cleared. Retry is allowed for <b>24h</b> (clearance window) without re-triggering.</td></tr>
+            <tr><td><span class="pill deny flat">rejected</span></td><td class="fires">Stays refused; auto-records a <code>confirmed_fraud</code> label so future attempts hit the deny override.</td></tr>
+          </tbody>
+        </table></div>
+        <h4 class="mini">Ownership &amp; SLA</h4>
+        <ul class="clean">
+          <li><b>SLA target 12h.</b> The queue badges anything older as breached; the daily report emails owners about breaches.</li>
+          <li><b>Owners</b> come from <code>config('risk.review.owners')</code> — default <code>dev@roddytechgroup.com</code>. Set <code>RISK_REVIEW_OWNERS</code> (comma-separated) to add analysts <em>without</em> removing the standing overseer. Every owner is alerted when a review opens and on SLA breach.</li>
+          <li>Every approve / reject / escalate writes an <b>audit-log</b> row with the admin, before/after state, and reason.</li>
+        </ul>
+        <p>Worked at <em>Admin → Risk → Review queue</em>. Open a row to see the score, the exact signals that fired with their detail, and the approve / reject / escalate actions.</p>
+      </section>
+
+      <!-- 9 -->
+      <section id="kyc">
+        <h2><span class="num">09</span> KYC</h2>
+        <h3 class="head">Risk-driven identity step-up</h3>
+        <p>The gate unifies risk and KYC. A <span class="pill stepup">step_up</span> outcome forces identity verification (Smile ID) on the engine's own authority — a HIGH-risk action can demand verification even on a small amount, via a <em>risk floor</em> the engine hands the KYC tier service. KYC's ordinary value-based step-up (anything at/above the admin's <code>kyc_tier2_threshold_usd</code>, default <b>$500</b>) still applies independently.</p>
+        <div class="note"><b>Sequencing.</b> Because a real step-up mints a live Smile session, only enable risk enforcement once the KYC/Smile program is live and sandbox-verified. Both <code>kyc_enforce</code> and the risk flags are off today, so nothing steps up in production yet.</div>
+      </section>
+
+      <!-- 10 -->
+      <section id="feedback">
+        <h2><span class="num">10</span> Feedback</h2>
+        <h3 class="head">Labels: how the engine learns</h3>
+        <p>Ground-truth labels close the loop and let the engine improve instead of ossifying. Four labels, recorded from <em>Admin → Risk → Record a label</em> or automatically:</p>
+        <div class="grid2">
+          <div class="card"><p style="margin:0 0 6px"><span class="sig">chargeback</span></p><p class="tight" style="margin:0">A dispute happened. Feeds <span class="sig" style="font-size:12px">CHARGEBACK_HISTORY</span> (adds weight) and the dashboard's chargeback-rate metric.</p></div>
+          <div class="card"><p style="margin:0 0 6px"><span class="sig">confirmed_fraud</span></p><p class="tight" style="margin:0">Proven fraud. Trips the <span class="pill deny flat">deny</span> override on every future attempt. Written automatically when a review is rejected.</p></div>
+          <div class="card"><p style="margin:0 0 6px"><span class="sig">false_positive</span></p><p class="tight" style="margin:0">The engine was wrong. Recorded so precision can be measured as data accrues.</p></div>
+          <div class="card"><p style="margin:0 0 6px"><span class="sig">good</span></p><p class="tight" style="margin:0">Known-good actor. Ground truth for tuning.</p></div>
+        </div>
+        <p style="margin-top:15px">Distinction worth remembering: a <b>single chargeback adds risk weight</b> (it doesn't ban anyone), while <b>confirmed fraud is a hard deny</b>.</p>
+      </section>
+
+      <!-- 11 -->
+      <section id="records">
+        <h2><span class="num">11</span> Records</h2>
+        <h3 class="head">What's stored, and for how long</h3>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Table</th><th>Holds</th><th>Mutable?</th></tr></thead>
+          <tbody>
+            <tr><td class="src">risk_assessments</td><td class="fires">One immutable row per decision: score, band, outcome, enforced flag, IP, device, amount, policy version</td><td>No — append-only</td></tr>
+            <tr><td class="src">risk_signals</td><td class="fires">Each fired signal for an assessment: code, weight, PII-safe detail</td><td>No</td></tr>
+            <tr><td class="src">risk_reviews</td><td class="fires">The queue: status, assignee, decision reason, clearance window</td><td>Yes (status changes)</td></tr>
+            <tr><td class="src">risk_labels</td><td class="fires">Ground-truth feedback (chargeback / fraud / false-positive / good)</td><td>Append-only</td></tr>
+          </tbody>
+        </table></div>
+        <ul class="clean" style="margin-top:16px">
+          <li>Every assessment is stamped with the <b>policy version</b> in force, so a decision is always reproducible against the exact weights that produced it.</li>
+          <li>No PANs, CVVs, OTPs, or secrets are ever stored in signal detail.</li>
+          <li><b>Retention 24 months</b>, then <code>risk:prune</code> deletes old assessments (signals cascade). Reviews and labels are kept as audit trail and ground truth.</li>
+        </ul>
+      </section>
+
+      <!-- 12 -->
+      <section id="dash">
+        <h2><span class="num">12</span> Dashboard</h2>
+        <h3 class="head">Reading the metrics</h3>
+        <p>At <em>Admin → Risk</em> (7 / 30 / 90-day windows). Everything is computed from stored rows — no sampling, nothing silently truncated.</p>
+        <ul class="clean">
+          <li><b>Review / decline / step-up rate</b> — share of assessments landing on each outcome. Your friction and workload dials.</li>
+          <li><b>Shadow-vs-enforce delta</b> — "would have acted on N of M". The single most important number before you enforce: it's exactly what enforcement <em>would</em> change, watched with zero customer impact.</li>
+          <li><b>Chargeback rate</b> — chargeback labels ÷ paid orders, against the <b>0.5%</b> acquirer ceiling. The survival metric for a gift-card merchant.</li>
+          <li><b>Band distribution</b> &amp; <b>top-firing signals</b> — where score is coming from; your tuning shortlist.</li>
+          <li><b>Queue health</b> — pending, escalated, SLA-breached.</li>
+        </ul>
+      </section>
+
+      <!-- 13 -->
+      <section id="ops">
+        <h2><span class="num">13</span> Ops</h2>
+        <h3 class="head">Scheduled jobs &amp; the config knobs</h3>
+        <h4 class="mini" style="margin-top:0">Scheduled commands</h4>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Command</th><th>Cadence</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><span class="kbd">risk:report</span></td><td class="src">daily 08:00</td><td class="fires">Logs headline metrics; emails owners about SLA-breached reviews</td></tr>
+            <tr><td><span class="kbd">risk:prune</span></td><td class="src">daily 02:30</td><td class="fires">Deletes assessments past the 24-month window (logs eligible vs deleted)</td></tr>
+          </tbody>
+        </table></div>
+        <h4 class="mini">Knobs</h4>
+        <div class="tbl-wrap"><table style="min-width:0">
+          <thead><tr><th>Where</th><th>Key</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td class="grp">Flag</td><td class="src">features.risk_engine_enabled</td><td class="fires">Master scoring on/off</td></tr>
+            <tr><td class="grp">Flag</td><td class="src">features.risk_engine_enforce_enabled</td><td class="fires">Shadow vs enforce</td></tr>
+            <tr><td class="grp">Setting</td><td class="src">kyc_tier2_threshold_usd</td><td class="fires">Admin-tunable identity threshold (default $500); also the high-value default</td></tr>
+            <tr><td class="grp">Env</td><td class="src">RISK_REVIEW_OWNERS</td><td class="fires">Comma-separated queue owners</td></tr>
+            <tr><td class="grp">Env</td><td class="src">RISK_HIGH_VALUE_USD</td><td class="fires">Split high-value from the KYC threshold, if ever needed</td></tr>
+            <tr><td class="grp">Env</td><td class="src">RISK_POLICY_VERSION</td><td class="fires">Stamp for reproducibility / champion-challenger</td></tr>
+            <tr><td class="grp">Config</td><td class="src">config/risk.php</td><td class="fires">Weights, band cut-offs, band→outcome map, all thresholds, overrides, retention</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <!-- 14 -->
+      <section id="rollout">
+        <h2><span class="num">14</span> Rollout</h2>
+        <h3 class="head">The procedure for turning it on</h3>
+        <ol class="steps">
+          <li><b>Enable scoring, keep enforcement off.</b> Flip <code>risk_engine_enabled → on</code>. The engine begins recording assessments. Customers see nothing.</li>
+          <li><b>Collect 2–4 weeks of shadow data.</b> Let real traffic flow through it.</li>
+          <li><b>Read the shadow delta &amp; tune.</b> On the dashboard, see what <em>would</em> have been reviewed/declined. Adjust weights, band cut-offs, and the band→outcome map in <code>config/risk.php</code> against reality. Bump the policy version when you do.</li>
+          <li><b>Enforce the narrowest, highest-confidence rules first.</b> Flip <code>risk_engine_enforce_enabled → on</code> with the map set so only the certain cases act (e.g. confirmed-fraud/banned overrides and extreme velocity), widening gradually.</li>
+          <li><b>Watch chargeback rate &amp; false-positive labels.</b> Keep enforcement scoped and reversible via the flag at every step.</li>
+        </ol>
+      </section>
+
+      <!-- 15 -->
+      <section id="runbook">
+        <h2><span class="num">15</span> Runbook</h2>
+        <h3 class="head">Common tasks</h3>
+        <div class="grid2">
+          <div class="card"><h4 class="mini" style="margin-top:0">Start collecting data</h4><p class="tight" style="margin:0">Admin → Settings → turn <code>risk_engine_enabled</code> on. Leave enforce off.</p></div>
+          <div class="card"><h4 class="mini" style="margin-top:0">Work the queue</h4><p class="tight" style="margin:0">Admin → Risk → Review queue → open a row → Approve (clears 24h) / Reject (refuses + labels fraud) / Escalate.</p></div>
+          <div class="card"><h4 class="mini" style="margin-top:0">Record a chargeback</h4><p class="tight" style="margin:0">Admin → Risk → Record a label → customer ID + <code>chargeback</code>. Feeds history &amp; the rate metric.</p></div>
+          <div class="card"><h4 class="mini" style="margin-top:0">Clear a false positive</h4><p class="tight" style="margin:0">Record a <code>false_positive</code> (or <code>good</code>) label; approve the held review to release the customer.</p></div>
+          <div class="card"><h4 class="mini" style="margin-top:0">Change who owns the queue</h4><p class="tight" style="margin:0">Set <code>RISK_REVIEW_OWNERS="dev@roddytechgroup.com,analyst@…"</code>. Additive — keep yours.</p></div>
+          <div class="card"><h4 class="mini" style="margin-top:0">Re-tune a threshold</h4><p class="tight" style="margin:0">Edit <code>config/risk.php</code> (weight, cut-off, or map), bump <code>RISK_POLICY_VERSION</code>, ship config.</p></div>
+        </div>
+      </section>
+
+      <!-- 16 -->
+      <section id="notyet">
+        <h2><span class="num">16</span> Roadmap</h2>
+        <h3 class="head">Deliberately left as typed slots</h3>
+        <p>The explainable, auditable core is built; these seams are wired but dormant, to be filled when the data or need arrives — so "industry standard" stays a trajectory, not a one-time claim.</p>
+        <ul class="clean">
+          <li><b>Phone OTP verification</b> — when the flow ships, re-register <span class="sig" style="font-size:12px">PHONE_UNVERIFIED</span> and the KYC phone tier becomes reachable.</li>
+          <li><b>AML / sanctions screening</b> — <code>SANCTIONS_HIT → deny</code> override reserved; bundle a one-time check into Tier-2 KYC.</li>
+          <li><b>True geo distance/time</b> — <span class="sig" style="font-size:12px">GEO_VELOCITY</span> is dormant; re-enable on a real GeoIP distance/time provider instead of the country-change proxy.</li>
+          <li><b>Card-fingerprint reuse</b> — <span class="sig" style="font-size:12px">PAYMENT_INSTRUMENT_REUSE</span> activates once a gateway supplies fingerprints in metadata.</li>
+          <li><b>Automatic dispute webhooks</b> — chargeback labels are recorded by hand today; per-gateway dispute webhooks can write them automatically (feeding History/Repeat without an admin touch).</li>
+          <li><b>Champion / challenger &amp; ML</b> — the policy-version stamp enables running a new weight set in shadow against the live one; the signals→score→policy structure is ML-ready when volume justifies it.</li>
+          <li><b>Guest checkout</b> — off by policy: guests bypass the identity track entirely, so the engine could only hold or deny them, never clear them. Revisit only as a category-limited, low-cap flow.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<footer class="foot">
+  <div class="wrap">
+    RShopRefill · Fraud &amp; Risk Engine · policy 2026.08.14 (two-track) · both flags OFF (shadow-ready) · internal reference
+  </div>
+</footer>
+</body>
+</html>

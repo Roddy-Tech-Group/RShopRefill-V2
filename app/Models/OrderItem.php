@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
+use App\Domain\Shared\Enums\ComplianceCategory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,6 +45,7 @@ class OrderItem extends Model
         'product_variant_id',
         'category_id',
         'subcategory_id',
+        'compliance_category',
         'provider_name',
         'provider_offer_id',
         'product_snapshot',
@@ -67,6 +69,7 @@ class OrderItem extends Model
     {
         return [
             'fulfillment_status' => FulfillmentStatus::class,
+            'compliance_category' => ComplianceCategory::class,
             'product_snapshot' => 'array',
             'variant_snapshot' => 'array',
             'quantity' => 'integer',

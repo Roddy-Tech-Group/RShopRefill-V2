@@ -3,29 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Cart\Services\CartManager;
-use App\Domain\Cart\Services\CartPricingService;
-use App\Domain\Fraud\Services\FraudDetectionService;
+use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
-use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
-use App\Domain\Payment\Services\PaymentGatewayFactory;
+use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
+use App\Domain\Risk\Exceptions\RiskDeniedException;
+use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Http\Resources\PaymentSessionResource;
+use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentSession;
-use App\Models\Setting;
-use App\Models\User;
+use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -66,63 +66,27 @@ class CheckoutController extends Controller
         ]);
 
         $user = $request->user();
-        $isGuestCheckout = false;
 
-        // Guest checkout (features.guest_checkout_enabled, default ON): the
-        // order runs through the exact same pipeline under a shadow account
-        // keyed by the delivery email. The guest claims the account later via
-        // the emailed link (password + transaction PIN).
+        // Guest purchase is removed: checkout is signed-in-only. Guests keep
+        // their cart (it merges into the account at sign-in, and the checkout
+        // page returns them here to pay); this guard is the server-side
+        // backstop for a hand-crafted POST.
         if (! $user) {
-            abort_unless(FeatureFlag::on('guest_checkout'), 403, 'Please sign in to complete checkout.');
-
-            $this->ensureGuestCheckoutRateLimits($request, $data['delivery_email']);
-
-            // Wallet and Rcoin belong to signed-in accounts: a guest keying in
-            // a registered customer's email must never spend that account's
-            // balance or points.
-            if ($data['payment_method'] === 'wallet' || $request->boolean('apply_rcoin') || $request->input('apply_rcoin') === 'full') {
-                $msg = 'Sign in to pay with your wallet or Rcoin.';
-                if ($request->expectsJson() || $request->ajax()) {
-                    return response()->json(['message' => $msg], 422);
-                }
-
-                return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
-            }
-
-            $user = $this->resolveGuestUser($data['delivery_email']);
-            $isGuestCheckout = true;
-        }
-
-        // Optional hard-gate: when the compliance toggle is ON, the buyer must
-        // have a verified email address before they can pay. Soft by default
-        // so the storefront stays browseable without verification friction.
-        // Guest shadow accounts are exempt: their inbox is proven later by the
-        // claim link, and the fulfilled email goes to that same inbox anyway.
-        if (! $isGuestCheckout && Setting::get('require_email_verified_for_checkout', false) && ! $user->hasVerifiedEmail()) {
-            $msg = 'Please verify your email address before completing checkout. Check your inbox for the verification link.';
+            $msg = 'Please sign in to complete checkout.';
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['message' => $msg, 'redirect' => route('verification.notice')], 403);
+                return response()->json(['message' => $msg], 401);
             }
 
-            return redirect()->route('verification.notice')->with('checkout_status', $msg);
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
         }
 
-        // Guests keep their cart under the guest_token cookie; the shadow user
-        // was only just created, so resolving by user id would mint an empty cart.
-        $guestToken = $request->cookie('guest_token') ?? $request->header('X-Guest-Token');
-        $cart = $isGuestCheckout && $guestToken
-            ? $this->cartManager->resolveCart(null, $guestToken)
-            : ($isGuestCheckout ? null : $this->cartManager->resolveCart($user->id));
+        $cart = $this->cartManager->resolveCart($user->id);
         $cart?->load('items.product', 'items.variant');
 
         if (! $cart || $cart->items->isEmpty()) {
             return redirect($this->shopRoute($request, 'checkout'))
                 ->with('checkout_status', 'Your cart is empty.');
         }
-
-        $fraudService = app(FraudDetectionService::class);
-        $cartTotals = app(CartPricingService::class)->calculateCartTotals($cart->items);
-        $amount = $cartTotals['total'];
 
         // Display currency comes from the customer's locale (hidden field on the
         // checkout form). Settlement is always USD; this is presentation only.
@@ -153,18 +117,6 @@ class CheckoutController extends Controller
             default => 'flutterwave',
         };
 
-        if ($fraudService->isSuspiciousCheckout($user, $amount, $request->ip())) {
-            $msg = $user->isKycVerified()
-                ? 'Your checkout attempt was flagged by our security systems. Please contact support.'
-                : 'Your checkout attempt was flagged by our security systems. Please complete KYC verification to proceed.';
-
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['message' => $msg], 403);
-            }
-
-            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
-        }
-
         try {
             $order = $this->checkoutService->placeOrder(
                 user: $user,
@@ -184,19 +136,9 @@ class CheckoutController extends Controller
                 selectedMethod: $data['payment_method'],
             );
 
-            if ($order->wasRecentlyCreated) {
-                $fraudService->recordCheckout($user, $request->ip());
-            }
-
             // Order placed - the cart is converted, so drop the ephemeral
             // "Buy now" tag too (its item ids are now stale).
             $request->session()->forget('cart.buy_now_items');
-
-            // The confirmation page is user-scoped; grant this browser session
-            // access to its own guest orders (the guest has no login yet).
-            if ($isGuestCheckout) {
-                $request->session()->push('guest_order_numbers', $order->order_number);
-            }
         } catch (GatewayDisabledException $e) {
             // An admin has switched this gateway off. Nothing was written;
             // surface the same "temporarily unavailable" message the greyed
@@ -207,6 +149,19 @@ class CheckoutController extends Controller
                     'message' => $e->customerMessage(),
                     'gateway_disabled' => true,
                 ], 503);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (PaymentCategoryIneligibleException $e) {
+            // A product category in the cart is not approved on the resolved
+            // gateway. The gate runs before any write, so nothing needs cleanup;
+            // surface the customer-safe message and keep the cart so the buyer
+            // can remove the item or come back later.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => $e->customerMessage(),
+                    'category_ineligible' => true,
+                ], 422);
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
@@ -247,6 +202,38 @@ class CheckoutController extends Controller
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $message);
+        } catch (KycStepUpRequiredException $e) {
+            // The transaction crossed the identity-verification threshold. Nothing
+            // was written; hand the customer the Smile session so the frontend can
+            // launch verification, then retry once verified.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (SpendingLimitExceededException $e) {
+            // Rolling spending cap reached. Nothing was written; the message
+            // nudges unverified customers toward KYC (which raises the cap).
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (RiskReviewRequiredException $e) {
+            // Held for manual review. Nothing was written; the attempt is queued
+            // for an admin and the customer sees a neutral "under review" message.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (RiskDeniedException $e) {
+            // Refused by the risk engine. Customer-safe message, no reason codes.
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json($e->toResponse(), 403);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
         } catch (Throwable $e) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
@@ -272,68 +259,17 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Scope an order lookup to its rightful viewer: the owning user when
-     * signed in, or - for guest checkout - an order number this browser
-     * session placed. Order numbers can never be enumerated by others.
+     * Scope an order lookup to its rightful viewer: the owning, signed-in
+     * user. Order numbers can never be enumerated by others. (Legacy guest
+     * orders are reached by claiming the account, never by session.)
      */
     private function orderScopedToViewer(Request $request, string $orderNumber)
     {
-        $query = Order::query()->where('order_number', $orderNumber);
+        abort_unless($request->user(), 404);
 
-        if ($request->user()) {
-            return $query->where('user_id', $request->user()->id);
-        }
-
-        abort_unless(
-            in_array($orderNumber, $request->session()->get('guest_order_numbers', []), true),
-            404,
-        );
-
-        return $query;
-    }
-
-    /**
-     * Find or create the shadow account a guest order is placed under. An
-     * email that already belongs to a registered customer attaches the order
-     * to that account (the fulfilled email goes to the same inbox either
-     * way); a fresh email gets an unclaimed guest account with a random
-     * password, converted to a real account via the emailed claim link.
-     */
-    private function resolveGuestUser(string $email): User
-    {
-        $existing = User::where('email', $email)->first();
-        if ($existing) {
-            return $existing;
-        }
-
-        return User::create([
-            'name' => Str::ucfirst(Str::before($email, '@')) ?: 'Guest',
-            'email' => $email,
-            'password' => Hash::make(Str::random(40)),
-            'is_guest' => true,
-        ]);
-    }
-
-    /**
-     * Guest checkout abuse guard: per-IP and per-email attempt caps (the
-     * route's throttle:10,1 still applies on top). Signed-in checkout is
-     * untouched - it already has fraud detection keyed to the account.
-     */
-    private function ensureGuestCheckoutRateLimits(Request $request, string $email): void
-    {
-        $limits = [
-            'guest-checkout:ip:'.$request->ip() => 8,
-            'guest-checkout:email:'.strtolower($email) => 4,
-        ];
-
-        foreach ($limits as $key => $maxAttempts) {
-            abort_if(
-                RateLimiter::tooManyAttempts($key, $maxAttempts),
-                429,
-                'Too many checkout attempts. Please try again in a few minutes.',
-            );
-            RateLimiter::hit($key, 600); // 10-minute window
-        }
+        return Order::query()
+            ->where('order_number', $orderNumber)
+            ->where('user_id', $request->user()->id);
     }
 
     /**
@@ -382,29 +318,59 @@ class CheckoutController extends Controller
         }
 
         // payment_sessions has no user_id of its own - ownership lives on the
-        // underlying PaymentAttempt. Guard there so a logged-in customer can't
-        // hand-craft a URL pointing at someone else's session. Guests must
-        // have the order number in their session.
-        if ($request->user()) {
-            abort_unless($attempt->user_id === $request->user()->id, 403);
-        } else {
-            $guestOrders = $request->session()->get('guest_order_numbers', []);
-            abort_unless($attempt->order && in_array($attempt->order->order_number, $guestOrders, true), 403);
-        }
+        // underlying PaymentAttempt. Guard there so a customer can't
+        // hand-craft a URL pointing at someone else's session. Signed-in
+        // only: guest purchase is removed, so an unauthenticated return leg
+        // has no business here (the webhook still settles the payment).
+        abort_unless($request->user(), 403);
+        abort_unless($attempt->user_id === $request->user()->id, 403);
 
         $reportedStatus = strtolower((string) $request->query('status'));
 
-        if (in_array($reportedStatus, ['successful', 'completed'], true)) {
-            /** @var FlutterwavePaymentProvider $flw */
-            $flw = app(PaymentGatewayFactory::class)->getProvider('flutterwave');
+        // Flutterwave reports an explicit status in the query string; the
+        // backup gateways (Paystack) send only the transaction reference, so
+        // for them the verification call itself is the only trustworthy
+        // signal, and a cancelled payment simply fails to verify.
+        $shouldVerify = $attempt->gateway === 'flutterwave'
+            ? in_array($reportedStatus, ['successful', 'completed'], true)
+            : true;
 
-            // Verify against Flutterwave instead of trusting the query string.
-            // If verification succeeds the provider marks the attempt Paid and
-            // the webhook handler will complete the order fulfilment chain.
-            $verified = $flw->verifyPayment($attempt);
+        if ($shouldVerify) {
+            // Verify against the gateway AND run the full settlement chain in
+            // one synchronous pass (VerifyPaymentJob: gateway verify, order ->
+            // Paid, session confirmed, cart cleared, confirmation email,
+            // fulfillment dispatched; for fundings it credits the wallet).
+            // The old code called verifyPayment() bare, which stamped the
+            // attempt Paid and then relied on the webhook - but the webhook
+            // path stands down when it finds the attempt already Paid, so the
+            // browser winning the race stranded the order in Pending forever.
+            try {
+                dispatch_sync(new VerifyPaymentJob($attempt));
+            } catch (Throwable $e) {
+                // Inline settlement failed (gateway hiccup, lock contention).
+                // Queue the same job so its retries finish the chain; the
+                // webhook remains a second settlement authority.
+                Log::warning('hostedReturn: inline settlement failed, queued for retry', [
+                    'attempt_id' => $attempt->id,
+                    'message' => $e->getMessage(),
+                ]);
+                VerifyPaymentJob::dispatch($attempt);
+            }
+
+            $attempt->refresh();
+            $verified = $attempt->payment_status === PaymentStatus::Paid;
 
             if ($verified && $attempt->order) {
                 return redirect($this->shopRoute($request, 'order', $attempt->order->order_number));
+            }
+
+            // Wallet fundings arrive here too when a backup gateway's hosted
+            // page redirects back. VerifyPaymentJob has already credited the
+            // balance (idempotent, locked; the webhook doing it again stands
+            // down cleanly), so the wallet page loads correct.
+            if ($verified && $attempt->payable_type === WalletFunding::class) {
+                return redirect()->route('dashboard.wallet')
+                    ->with('wallet_status', 'Your wallet top-up was received and is being credited.');
             }
         }
 

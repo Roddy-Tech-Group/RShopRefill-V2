@@ -644,7 +644,6 @@
                     // so the highlight is never statically stuck on Gift Cards.
                     $currentCat = match (true) {
                         request()->routeIs('shop.gift-cards', 'shop.brand') => 'Gift Cards',
-                        request()->routeIs('shop.sell-gift-cards')          => 'Sell Gift Cards',
                         request()->routeIs('shop.gomarket')                 => 'GoMarket',
                         request()->routeIs('shop.esims', 'shop.esim')       => 'eSIMs',
                         request()->routeIs('shop.topups', 'shop.topup')     => 'Mobile top up',
@@ -675,15 +674,6 @@
                     <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} opacity-40 grayscale" loading="lazy">
                     Buy Gift Cards
                 </span>
-                @endif
-
-                {{-- Sell Gift Cards (coming soon) - hidden until its feature
-                     flag is switched on, unlike the greyed-out categories above --}}
-                @if (\App\Support\FeatureFlag::on('sell_gift_cards', false))
-                <a href="{{ route('shop.sell-gift-cards') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Sell Gift Cards') }}">
-                    <img src="{{ asset('assets/' . rawurlencode('gift cards.svg')) }}" alt="" class="{{ $catImgClass }} {{ $catIconState('Sell Gift Cards') }}" loading="lazy">
-                    Sell Gift Cards
-                </a>
                 @endif
 
                 {{-- GoMarket (coming soon) - hidden until its feature flag is switched on --}}

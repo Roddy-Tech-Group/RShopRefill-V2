@@ -8,12 +8,17 @@ use App\Domain\Order\Events\OrderPlaced;
 use App\Domain\Order\Exceptions\InvalidCouponException;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
+use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
+use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\PaymentMethodNormaliser;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Rewards\Services\RewardEngine;
+use App\Domain\Risk\DTOs\RiskContext;
+use App\Domain\Risk\Services\RiskGate;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletService;
@@ -40,6 +45,8 @@ class CheckoutService
         private readonly CurrencyRateService $currencyRateService,
         private readonly CouponApplicationService $couponApplicationService,
         private readonly CouponRedemptionService $couponRedemptionService,
+        private readonly PaymentEligibilityService $paymentEligibilityService,
+        private readonly RiskGate $riskGate,
     ) {}
 
     /**
@@ -87,6 +94,33 @@ class CheckoutService
         //     money into a known-bad provider.
         $this->assertGatewayEnabled($paymentMethod);
 
+        // -0.5. Category-aware gateway selection + eligibility gate, before any
+        //       write or reuse. For the fiat family the provisional gateway is
+        //       the first live gateway APPROVED for this cart, so a category one
+        //       gateway does not approve still routes to a backup that does;
+        //       requireFiatGatewayFor throws a clean refusal (a plain outage vs a
+        //       category that no live gateway approves) when none qualifies. For
+        //       wallet/crypto the gateway is the method itself. pay() re-resolves
+        //       per method at commitment and enforces again as the authoritative
+        //       gate. Shadow mode leaves selection and this gate inert.
+        $cart->loadMissing('items.product.category');
+        $eligibilityCategories = $cart->items->map(fn ($item) => $item->product->complianceCategory());
+
+        $gateway = $paymentMethod === 'flutterwave'
+            ? $this->paymentEligibilityService->requireFiatGatewayFor($eligibilityCategories, $displayCurrency)
+            : $paymentMethod;
+
+        $eligibilityBlockers = $this->paymentEligibilityService->blockers(
+            $eligibilityCategories,
+            $gateway,
+            $displayCurrency,
+            ['stage' => 'checkout', 'cart_id' => $cart->id],
+        );
+
+        if ($eligibilityBlockers !== []) {
+            throw new PaymentCategoryIneligibleException($eligibilityBlockers, $gateway);
+        }
+
         // 0. Idempotent re-entry. A customer who taps Pay again on an unchanged
         //    cart while their previous checkout is still live gets that same
         //    checkout back instead of a second order. Repeat taps are the single
@@ -124,6 +158,16 @@ class CheckoutService
 
         // 1. Recalculate and validate cart items/prices (in raw USD)
         $validatedTotals = $this->orderValidationService->validateForCheckout($cart);
+
+        // 1a. Unified risk + KYC gate. Runs the risk engine (always records an
+        //     immutable assessment for the audit trail); with risk enforcement on
+        //     it acts on the decision - identity step-up (Smile), a manual-review
+        //     hold, or a refusal - and KYC's value-based step-up applies too. With
+        //     both flags off it is inert: it records and returns, and behaves
+        //     exactly like the old KYC gate. The intentional step-up/review/deny
+        //     exceptions are surfaced by the controller. Raw USD total is the
+        //     transaction's exposure value.
+        $this->riskGate->guard($this->orderRiskContext($user, $cart, (float) $validatedTotals['total'], $displayCurrency));
 
         // 1b. Resolve the display currency rate via CurrencyRateService so the
         //     same freshness gate that protects wallet funding protects the order
@@ -164,7 +208,7 @@ class CheckoutService
 
             // Re-lock the cart to avoid race conditions
             $lockedCart = Cart::where('id', $cart->id)->lockForUpdate()->firstOrFail();
-            $lockedCart->load('items.product', 'items.variant');
+            $lockedCart->load('items.product.category', 'items.variant');
 
             // Coupon redemption. Resolved BEFORE Rcoin so the customer's wallet
             // redemption is calculated against the discounted total. Coupons are
@@ -310,6 +354,7 @@ class CheckoutService
                         'product_variant_id' => $item->product_variant_id,
                         'category_id' => $item->product->category_id,
                         'subcategory_id' => $item->product->subcategory_id,
+                        'compliance_category' => $item->product->complianceCategory(),
                         'provider_name' => $item->variant->metadata['provider'] ?? $item->product->provider_name,
                         'provider_offer_id' => $item->variant->provider_offer_id,
                         'product_snapshot' => array_merge($item->product->toArray(), [
@@ -358,11 +403,15 @@ class CheckoutService
             return $order;
         });
 
-        // 4. Create the PaymentAttempt
+        // 4. Create the PaymentAttempt. $gateway was resolved up front (before
+        //    the eligibility gate). For the fiat rail it is the router's current
+        //    first choice (Flutterwave in normal operation, a backup during an
+        //    outage); pay() re-resolves per method at commitment while the
+        //    session is still pre-charge.
         $attempt = PaymentAttempt::create([
             'order_id' => $order->id,
             'user_id' => $user->id,
-            'gateway' => $paymentMethod,
+            'gateway' => $gateway,
             // Null when Flutterwave was chosen without a specific method — the
             // session's pay() call records it the moment the customer commits.
             'payment_method' => PaymentMethodNormaliser::normalise($selectedMethod ?? $paymentMethod),
@@ -381,7 +430,7 @@ class CheckoutService
         //    customer's cart is preserved (see step 3 comment) so they can fix
         //    the .env / pick another method and try again without re-adding items.
         try {
-            $provider = $this->paymentGatewayFactory->getProvider($paymentMethod);
+            $provider = $this->paymentGatewayFactory->getProvider($gateway);
             $initResult = $provider->initializePayment($attempt);
         } catch (\Throwable $e) {
             DB::transaction(function () use ($order, $attempt, $user) {
@@ -460,6 +509,18 @@ class CheckoutService
      */
     private function assertGatewayEnabled(string $paymentMethod): void
     {
+        // 'flutterwave' is the checkout page's vocabulary for "the fiat rail",
+        // kept for API compatibility. The rail is open while ANY fiat gateway
+        // (primary or backup) is on; the concrete gateway cannot be picked
+        // until the customer commits to a method in the payment wizard.
+        if ($paymentMethod === 'flutterwave') {
+            if (! FiatGatewayRouter::anyFiatGatewayEnabled()) {
+                throw new GatewayDisabledException('fiat');
+            }
+
+            return;
+        }
+
         $gateway = $paymentMethod === 'crypto' ? 'nowpayments' : $paymentMethod;
 
         if (! FeatureFlag::gatewayEnabled($gateway)) {
@@ -504,6 +565,42 @@ class CheckoutService
     }
 
     /**
+     * Build the risk context for this order. Category resolution is best-effort:
+     * a failure there degrades the HIGH_RISK_CATEGORY signal to "no categories"
+     * rather than breaking checkout. The gate call itself is NOT wrapped - its
+     * step-up/review/deny exceptions are intentional control flow the controller
+     * handles.
+     */
+    private function orderRiskContext(User $user, Cart $cart, float $amountUsd, string $displayCurrency): RiskContext
+    {
+        $categories = [];
+
+        try {
+            $categories = $cart->loadMissing('items.product.category')->items
+                ->map(fn ($item) => $item->product?->category?->slug)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            Log::warning('risk.order_categories_failed', [
+                'cart_id' => $cart->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return RiskContext::capture(
+            user: $user,
+            context: 'order',
+            amountUsd: $amountUsd,
+            currency: $displayCurrency,
+            categories: $categories,
+            subjectType: 'cart',
+            subjectId: (string) $cart->id,
+        );
+    }
+
+    /**
      * The customer's own still-payable checkout for this exact cart, if one
      * exists. Returns null the moment anything differs, so a changed cart or a
      * lapsed session always produces a fresh order.
@@ -511,10 +608,10 @@ class CheckoutService
     private function findReusableCheckout(User $user, Cart $cart, string $fingerprint): ?Order
     {
         $candidates = Order::where('cart_id', $cart->id)
-            // Scoped to the buyer, not just the cart. A guest cart is resolved
-            // from a cookie and each guest email mints its own shadow account,
-            // so one cart really can carry orders belonging to different users.
-            // Matching on cart alone would hand somebody else's order back.
+            // Scoped to the buyer, not just the cart: one cart row can carry
+            // orders belonging to different users (a shared device switching
+            // accounts, or legacy guest-era carts), so matching on cart alone
+            // would hand somebody else's order back.
             ->where('user_id', $user->id)
             ->where('order_status', OrderStatus::Pending)
             ->where('payment_status', PaymentStatus::Unpaid)

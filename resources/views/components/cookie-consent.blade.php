@@ -6,6 +6,7 @@
 <div
     x-data="{ show: false }"
     x-init="$nextTick(() => { show = ! localStorage.getItem('cookie_consent') })"
+    @open-cookie-settings.window="show = true"
     x-show="show"
     x-cloak
     x-transition:enter="transition ease-out duration-300"
@@ -35,7 +36,7 @@
             </button>
             <button
                 type="button"
-                @click="localStorage.setItem('cookie_consent', 'accepted'); show = false"
+                @click="localStorage.setItem('cookie_consent', 'accepted'); show = false; window.dispatchEvent(new Event('cookie-consent-accepted'))"
                 class="flex-1 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:flex-none"
             >
                 Accept cookies

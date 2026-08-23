@@ -5,7 +5,6 @@ namespace App\Domain\Rewards\Services;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Rewards\RcoinEarnedMail;
 use App\Domain\Communication\Services\CommunicationManager;
-use App\Domain\Fraud\Services\FraudDetectionService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
@@ -21,7 +20,6 @@ class RewardEngine
 {
     public function __construct(
         private readonly WalletService $walletService,
-        private readonly FraudDetectionService $fraudDetectionService
     ) {}
 
     /**

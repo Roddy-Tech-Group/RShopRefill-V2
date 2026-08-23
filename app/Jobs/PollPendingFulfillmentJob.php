@@ -7,12 +7,14 @@ use App\Domain\Fulfillment\Services\FulfillmentProviderFactory;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\FulfillmentFailed;
 use App\Domain\Order\Events\FulfillmentSucceeded;
+use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Order\Services\GatewayRefundService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Notifications\CriticalSystemAlert;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,7 +23,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
-use App\Notifications\CriticalSystemAlert;
 
 class PollPendingFulfillmentJob implements ShouldQueue
 {
@@ -122,6 +123,7 @@ class PollPendingFulfillmentJob implements ShouldQueue
                             ['Order Item ID' => $lockedItem->id]
                         ));
                 });
+
                 return;
             }
 
@@ -159,7 +161,7 @@ class PollPendingFulfillmentJob implements ShouldQueue
             Notification::route('mail', config('mail.admin_address') ?? 'dev@roddytechgroup.com')
                 ->notify(new CriticalSystemAlert(
                     'Action Required: Polling Job Failed Permanently',
-                    "Order Item {$item->id} polling job failed permanently. It has been frozen in the 'Delayed' state. Exception: " . $e->getMessage(),
+                    "Order Item {$item->id} polling job failed permanently. It has been frozen in the 'Delayed' state. Exception: ".$e->getMessage(),
                     ['Order Item ID' => $item->id]
                 ));
         });
@@ -183,23 +185,54 @@ class PollPendingFulfillmentJob implements ShouldQueue
                 ]);
             });
 
-            if (! $hasSuccessfulItem) {
-                if ($walletPayment->payment_status === PaymentStatus::Reserved) {
-                    $walletProvider->releaseFunds($walletPayment);
-                } else {
-                    $walletProvider->refundPayment($walletPayment, $order->total_amount);
-                }
+            $refundService = app(GatewayRefundService::class);
+            $svc = app(OrderService::class);
 
+            if (! $hasSuccessfulItem) {
                 $order->payment_status = PaymentStatus::Failed;
                 $order->order_status = OrderStatus::Failed;
                 $order->failed_at = now();
                 $order->save();
+
+                if ($walletPayment->payment_status === PaymentStatus::Reserved) {
+                    $walletProvider->releaseFunds($walletPayment);
+                } else {
+                    // Only what has not already been given back per-item.
+                    $remaining = max(0.0, round(
+                        (float) $order->total_amount - $svc->refundedTotalFor($order->fresh()),
+                        2,
+                    ));
+
+                    if ($remaining > 0 && $walletProvider->refundPayment($walletPayment, $remaining, 'final-'.$order->id)) {
+                        $svc->recordRefundedAmount($order, $remaining, 'final-'.$order->id);
+                        DB::afterCommit(fn () => RefundIssued::dispatch(
+                            $order,
+                            $remaining,
+                            'Your order could not be delivered, so we refunded it to your wallet.',
+                            'final-'.$order->id,
+                        ));
+                    }
+                }
             } else {
-                $refundAmount = $item->subtotal_amount;
-                if ($walletPayment->payment_status === PaymentStatus::Paid) {
-                    $walletProvider->refundPayment($walletPayment, $refundAmount);
-                } elseif ($walletPayment->payment_status === PaymentStatus::Reserved) {
-                    $walletProvider->releasePartialFunds($walletPayment, $refundAmount);
+                // This item's DISCOUNT-AWARE share of what was captured; the
+                // raw subtotal over-refunds RCOIN/coupon-discounted orders.
+                $share = $refundService->capturedShareForItem($order, $item, (float) $order->total_amount);
+
+                if ($share > 0 && $walletPayment->payment_status === PaymentStatus::Paid) {
+                    if ($walletProvider->refundPayment($walletPayment, $share, "item-{$item->id}")) {
+                        $svc->recordRefundedAmount($order, $share, "item-{$item->id}");
+                        DB::afterCommit(fn () => RefundIssued::dispatch(
+                            $order,
+                            $share,
+                            'An item on your order could not be delivered, so we refunded it to your wallet.',
+                            "item-{$item->id}",
+                        ));
+                    }
+                } elseif ($share > 0 && $walletPayment->payment_status === PaymentStatus::Reserved) {
+                    // Unlocked, never captured - recorded all the same so the
+                    // admin cap and the final-remainder math both see it.
+                    $walletProvider->releasePartialFunds($walletPayment, $share);
+                    $svc->recordRefundedAmount($order, $share, "release-item-{$item->id}");
                 }
             }
 

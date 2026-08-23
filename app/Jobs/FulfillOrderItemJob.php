@@ -8,6 +8,7 @@ use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\FulfillmentFailed;
 use App\Domain\Order\Events\FulfillmentQueued;
 use App\Domain\Order\Events\FulfillmentSucceeded;
+use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Order\Services\GatewayRefundService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
@@ -206,22 +207,52 @@ class FulfillOrderItemJob implements ShouldQueue
                 ]);
             });
 
-            if (! $hasDeliverableItem) {
-                if ($walletPayment->payment_status === PaymentStatus::Reserved) {
-                    $walletProvider->releaseFunds($walletPayment);
-                } else {
-                    $walletProvider->refundPayment($walletPayment, $order->total_amount);
-                }
+            $orderService = app(OrderService::class);
 
+            if (! $hasDeliverableItem) {
                 $order->payment_status = PaymentStatus::Failed;
                 $order->order_status = OrderStatus::Failed;
                 $order->failed_at = now();
                 $order->save();
+
+                if ($walletPayment->payment_status === PaymentStatus::Reserved) {
+                    $walletProvider->releaseFunds($walletPayment);
+                } else {
+                    // Only what has NOT already been given back: earlier failed
+                    // items may have been refunded per-item, and refunding the
+                    // full total on top would pay those shares twice.
+                    $remaining = max(0.0, round(
+                        (float) $order->total_amount - $orderService->refundedTotalFor($order->fresh()),
+                        2,
+                    ));
+
+                    if ($remaining > 0 && $walletProvider->refundPayment($walletPayment, $remaining, 'final-'.$order->id)) {
+                        $orderService->recordRefundedAmount($order, $remaining, 'final-'.$order->id);
+                        DB::afterCommit(fn () => RefundIssued::dispatch(
+                            $order,
+                            $remaining,
+                            'Your order could not be delivered, so we refunded it to your wallet.',
+                            'final-'.$order->id,
+                        ));
+                    }
+                }
             } else {
-                // Partial fulfillment: refund only this item's share
-                $refundAmount = $item->subtotal_amount;
+                // Partial fulfillment: this item's DISCOUNT-AWARE share of what
+                // was actually captured. The raw subtotal over-refunds every
+                // RCOIN/coupon-discounted order.
                 if ($walletPayment->payment_status === PaymentStatus::Paid) {
-                    $walletProvider->refundPayment($walletPayment, $refundAmount);
+                    $share = app(GatewayRefundService::class)
+                        ->capturedShareForItem($order, $item, (float) $order->total_amount);
+
+                    if ($share > 0 && $walletProvider->refundPayment($walletPayment, $share, "item-{$item->id}")) {
+                        $orderService->recordRefundedAmount($order, $share, "item-{$item->id}");
+                        DB::afterCommit(fn () => RefundIssued::dispatch(
+                            $order,
+                            $share,
+                            'An item on your order could not be delivered, so we refunded it to your wallet.',
+                            "item-{$item->id}",
+                        ));
+                    }
                 }
                 // If Reserved, the full reservation will be settled when remaining items resolve.
             }

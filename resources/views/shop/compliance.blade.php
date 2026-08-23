@@ -4,7 +4,7 @@
     // -> navy in dark) while coloured accents (text-red-600 / text-blue-700) read in
     // both themes.
     $complianceEmail = 'info@rshoprefill.com';
-    $lastUpdated = 'May 23, 2026';
+    $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Compliance and Regulatory Framework | '.$siteName">
@@ -25,7 +25,7 @@
             {{ $siteName }} operates a multi-vertical digital commerce and payments platform serving customers across Africa,
             Europe and North America. This framework sets out the governance, controls and standards we apply to meet our
             regulatory obligations, protect our customers and partners, and safeguard the integrity of the financial system.
-            Our program is risk-based, independently reviewed, and continuously updated to reflect evolving law and
+            Our program is risk-based and continuously updated to reflect evolving law and
             international best practice.
         </p>
 
@@ -38,8 +38,7 @@
                 <li><a href="#kyc" class="font-medium text-blue-600 hover:underline">3. KYC and identity verification stages</a></li>
                 <li><a href="#sanctions" class="font-medium text-blue-600 hover:underline">4. Sanctions and geographic restrictions</a></li>
                 <li><a href="#fraud" class="font-medium text-blue-600 hover:underline">5. Fraud prevention and payment integrity</a></li>
-                <li><a href="#real-estate" class="font-medium text-blue-600 hover:underline">6. Digital real estate and asset compliance</a></li>
-                <li><a href="#contact" class="font-medium text-blue-600 hover:underline">7. Compliance contact for regulators and partners</a></li>
+                <li><a href="#contact" class="font-medium text-blue-600 hover:underline">6. Compliance contact for regulators and partners</a></li>
             </ol>
         </nav>
 
@@ -107,19 +106,14 @@
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
                         <tr>
-                            <td class="px-4 py-3 font-medium text-zinc-900">Tier 1<br><span class="text-xs font-normal text-zinc-500">Low-value retail</span></td>
-                            <td class="px-4 py-3 text-zinc-600">Mobile top-ups, eSIMs, small purchases.</td>
-                            <td class="px-4 py-3 text-zinc-600">Basic account registration: a verified email address and a verified mobile number.</td>
+                            <td class="px-4 py-3 font-medium text-zinc-900">Tier 1<br><span class="text-xs font-normal text-zinc-500">Registered</span></td>
+                            <td class="px-4 py-3 text-zinc-600">Everyday digital purchases below our identity-verification threshold.</td>
+                            <td class="px-4 py-3 text-zinc-600">Account registration with a verified email address.</td>
                         </tr>
                         <tr>
-                            <td class="px-4 py-3 font-medium text-zinc-900">Tier 2<br><span class="text-xs font-normal text-zinc-500">Medium-value</span></td>
-                            <td class="px-4 py-3 text-zinc-600">Flights, hotel stays, large gift cards.</td>
-                            <td class="px-4 py-3 text-zinc-600">Full legal name, validation of a government-issued ID, and date of birth.</td>
-                        </tr>
-                        <tr>
-                            <td class="px-4 py-3 font-medium text-zinc-900">Tier 3<br><span class="text-xs font-normal text-zinc-500">High-value</span></td>
-                            <td class="px-4 py-3 text-zinc-600">Digital real estate, bulk corporate B2B.</td>
-                            <td class="px-4 py-3 text-zinc-600">Advanced KYC and KYB, including official government database checks (for example BVN or NIN in Nigeria, IPRS in Kenya, and SSN or EIN in the United States where applicable) and address verification.</td>
+                            <td class="px-4 py-3 font-medium text-zinc-900">Tier 2<br><span class="text-xs font-normal text-zinc-500">Identity verified</span></td>
+                            <td class="px-4 py-3 text-zinc-600">Purchases at or above our identity-verification threshold, whether in a single transaction or cumulatively, and any activity our risk engine flags.</td>
+                            <td class="px-4 py-3 text-zinc-600">A government-issued identity document plus selfie liveness and face-match verification, processed through our identity-verification partner.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -135,10 +129,11 @@
         <section id="sanctions" class="mt-12 scroll-mt-24">
             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">4. Sanctions and geographic restrictions</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                We run automated daily screenings of customers and counterparties against global sanctions lists, including
-                those maintained by the US Office of Foreign Assets Control (OFAC), the United Nations, the European Union and
-                the United Kingdom HM Treasury. Screening is performed at onboarding and on an ongoing basis, and we also screen
-                for Politically Exposed Persons (PEPs).
+                We restrict our services by geography and do not operate in comprehensively sanctioned jurisdictions. Every
+                transaction passes through our automated risk engine, which scores identity, velocity, device and
+                payment-behaviour signals in real time; flagged activity is held for manual compliance review, and confirmed
+                bad actors are permanently refused. We are expanding our screening program, including sanctions and
+                politically-exposed-person list checks, as the platform scales.
             </p>
 
             <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
@@ -169,24 +164,9 @@
             </p>
         </section>
 
-        {{-- ── 6. Digital real estate ────────────────────────────── --}}
-        <section id="real-estate" class="mt-12 scroll-mt-24">
-            <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">6. Digital real estate and asset compliance</h2>
-            <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                Our digital real estate offerings strictly adhere to the property ownership laws and the fractionalization and
-                asset-compliance requirements of the jurisdiction in which each physical property resides. Where local law
-                requires it, allocations, title and fractional contracts are structured and recorded through licensed local
-                entities and qualified professionals.
-            </p>
-            <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                We provide clear disclosures to participants and honour any cooling-off periods or investor-protection rules
-                mandated in the relevant region. We do not offer these products where doing so would conflict with local law.
-            </p>
-        </section>
-
-        {{-- ── 7. Compliance contact ─────────────────────────────── --}}
+        {{-- ── 6. Compliance contact ─────────────────────────────── --}}
         <section id="contact" class="mt-12 scroll-mt-24">
-            <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">7. Compliance contact for regulators and partners</h2>
+            <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">6. Compliance contact for regulators and partners</h2>
             <p class="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
                 Banking partners, payment providers, law enforcement, regulators and corporate compliance teams may contact our
                 compliance department directly for due-diligence questionnaires, audit requests, regulatory enquiries and

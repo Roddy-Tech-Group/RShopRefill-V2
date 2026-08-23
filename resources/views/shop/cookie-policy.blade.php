@@ -3,7 +3,7 @@
     // remapped classes (bg-white/bg-zinc-50/bg-blue-50 -> navy in dark) while
     // coloured accents (text-red-600 / text-blue-700) read in both themes.
     $supportEmail = 'support@rshoprefill.com';
-    $lastUpdated = 'May 23, 2026';
+    $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Cookie Policy | '.$siteName">
@@ -76,7 +76,11 @@
                         </tr>
                         <tr>
                             <td class="px-4 py-3 font-medium text-zinc-900">Analytics</td>
-                            <td class="px-4 py-3 text-zinc-600">Help us understand how the platform is used, in aggregate, so we can make it better.</td>
+                            <td class="px-4 py-3 text-zinc-600">Help us understand how the platform is used, in aggregate, so we can make it better. We use Google Analytics and Google Tag Manager. These load only after you accept cookies.</td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-3 font-medium text-zinc-900">Advertising</td>
+                            <td class="px-4 py-3 text-zinc-600">Measure how well our own marketing campaigns perform. We use Meta Pixel. It loads only after you accept cookies, and you can decline it at any time.</td>
                         </tr>
                         <tr>
                             <td class="px-4 py-3 font-medium text-zinc-900">Security and fraud prevention</td>
@@ -115,7 +119,7 @@
             </p>
             <ul class="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500 sm:text-base">
                 <li><span class="font-semibold text-zinc-900">Your browser settings.</span> Most browsers let you block or delete cookies. Check your browser's help pages for how to do this.</li>
-                <li><span class="font-semibold text-zinc-900">Our cookie settings.</span> Where available, use the cookie settings link in the footer to adjust your choices.</li>
+                <li><span class="font-semibold text-zinc-900">Our cookie settings.</span> Use the cookie settings link in the footer to reopen the consent banner and change your choice at any time.</li>
             </ul>
 
             <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
@@ -139,8 +143,8 @@
             <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 <div>
-                    <p class="text-sm font-bold text-blue-700">We never sell your data through cookies</p>
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">Cookies help us run the platform, keep it secure and improve it. We do not use them to sell your personal data to advertisers. See our Privacy Policy for full details.</p>
+                    <p class="text-sm font-bold text-blue-700">We do not sell your personal data</p>
+                    <p class="mt-1 text-sm leading-relaxed text-zinc-600">Cookies help us run the platform, keep it secure and improve it. We use advertising cookies (Meta Pixel) only to measure our own campaigns, never to sell your personal data, and you can decline them at any time. See our Privacy Policy for full details.</p>
                 </div>
             </div>
         </section>

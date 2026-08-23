@@ -58,6 +58,18 @@ class EvaluateLoginRiskListener
             $userAgent
         );
 
+        // The account's FIRST device is trusted at birth: it belongs to the
+        // person who just created the account (or to the account's owner on
+        // the first login after this feature shipped). Without this, a brand
+        // new registrant was greeted with "new device detected" and an OTP
+        // for the very browser they registered on, and the entire existing
+        // user base would have been OTP-challenged at rollout.
+        if (! $device->isTrusted()
+            && $user->trustedDevices()->whereKeyNot($device->id)->doesntExist()) {
+            $this->deviceTrustManager->markAsTrusted($device);
+            $device->refresh();
+        }
+
         $riskLevel = $this->riskEngine->evaluateLoginRisk($user, $device, $ipAddress);
 
         // Create the unified session overlay
@@ -75,20 +87,33 @@ class EvaluateLoginRiskListener
             $needsOtp = true;
         }
 
+        // A device that signs in WITHOUT needing verification (preference
+        // "never", or low risk) still becomes a known device: trust starts
+        // now, and the 24-hour maturity clock with it. Leaving it untrusted
+        // forever meant a "never" user could NEVER pass the new-device hold
+        // on sensitive actions, on any device, for the life of the account.
+        if (! $needsOtp && ! $device->isTrusted()) {
+            $this->deviceTrustManager->markAsTrusted($device);
+        }
+
         if ($needsOtp) {
             // Store intermediate state so middleware knows to restrict access
             // until the OTP is verified.
             session()->put('pending_email_otp', true);
             session()->put('pending_device_id', $device->id);
 
-            // Automatically send the first OTP
-            $otp = sprintf('%06d', mt_rand(1, 999999));
+            // Automatically send the first OTP. random_int is a CSPRNG and the
+            // (0, 999999) range covers the full six-digit space including 000000.
+            $otp = sprintf('%06d', random_int(0, 999999));
             $throttleKey = 'otp_throttle_'.$user->id;
             $attemptsKey = 'otp_attempts_'.$user->id;
 
             Cache::put('device_otp_'.$user->id, $otp, now()->addMinutes(10));
             Cache::put($throttleKey, now()->addSeconds(60)->timestamp, now()->addSeconds(60));
             Cache::put($attemptsKey, 1, now()->addHours(24));
+
+            // A fresh code gets a fresh guess budget (see DeviceVerificationController::verifyOtp).
+            Cache::forget('otp_verify_fails_'.$user->id);
 
             OtpRequested::dispatch($user, $otp, 'login');
         }

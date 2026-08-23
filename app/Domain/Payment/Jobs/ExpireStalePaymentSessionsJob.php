@@ -68,6 +68,11 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         'awaiting_transfer',
         'awaiting_confirmation',
         'awaiting_customer_action',
+        // The backup gateways' hosted-page state. Missing from this list, a
+        // customer who never came back from Paystack/Kora's page left a
+        // session no sweep could see: RCOIN stayed locked and the coupon slot
+        // stayed held forever.
+        'awaiting_redirect',
     ];
 
     /**
@@ -158,7 +163,11 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                 if ($attempt
                     && ($attempt->order || $attempt->payable_type === WalletFunding::class)
                     && $attempt->gateway !== 'wallet'
-                    && ! in_array($attempt->payment_status, [PaymentStatus::Paid, PaymentStatus::Failed], true)) {
+                    // Paid attempts go through too: an attempt stamped Paid by
+                    // the hosted return leg whose order never confirmed is
+                    // exactly the stranded settlement VerifyPaymentJob now
+                    // finishes. Only Failed is final here.
+                    && $attempt->payment_status !== PaymentStatus::Failed) {
                     try {
                         dispatch_sync(new VerifyPaymentJob($attempt));
                     } catch (\Throwable $e) {

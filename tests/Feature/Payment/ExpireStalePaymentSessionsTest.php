@@ -47,7 +47,7 @@ class ExpireStalePaymentSessionsTest extends TestCase
      * The default is comfortably past both the TTL and the 30-minute floor. Pass a
      * smaller age to model a session the customer still has time to pay.
      */
-    private function staleCheckout(int $ageMinutes = 45): array
+    private function staleCheckout(int $ageMinutes = 45, string $sessionStatus = 'awaiting_confirmation'): array
     {
         $user = User::factory()->create();
 
@@ -74,7 +74,7 @@ class ExpireStalePaymentSessionsTest extends TestCase
             'payment_attempt_id' => $attempt->id,
             'provider' => 'flutterwave',
             'session_type' => 'card',
-            'status' => 'awaiting_confirmation',
+            'status' => $sessionStatus,
             'client_reference' => 'SESS_'.Str::random(20),
             'amount' => 25.00,
             'currency' => 'USD',
@@ -285,6 +285,48 @@ class ExpireStalePaymentSessionsTest extends TestCase
         $this->assertSame(PaymentStatus::Failed, $attempt->fresh()->payment_status, 'the attempt must carry the failure');
         $this->assertNotNull($funding->fresh()->failed_reason, 'the funding must record why it died');
         Event::assertDispatched(FundingFailed::class);
+    }
+
+    /**
+     * The awaiting_redirect black hole: a customer sent to a backup gateway's
+     * hosted page who never comes back left a session no sweep, no expiry and
+     * no cancel could see - RCOIN stayed locked and the coupon slot stayed
+     * held forever. The sweep must now drive it to terminal like every other
+     * abandoned state.
+     */
+    public function test_abandoned_hosted_redirect_session_is_swept(): void
+    {
+        $this->fakeGatewayUnpaid();
+        [$order, $attempt, $session] = $this->staleCheckout(45, 'awaiting_redirect');
+
+        (new ExpireStalePaymentSessionsJob)->handle(
+            app(PaymentSessionService::class),
+            app(OrderService::class),
+        );
+
+        $this->assertSame('expired', $session->fresh()->status);
+        $this->assertSame(PaymentStatus::Expired, $attempt->fresh()->payment_status);
+        $this->assertSame(OrderStatus::Cancelled, $order->fresh()->order_status);
+    }
+
+    /**
+     * The other half of the hosted-return race: the attempt was stamped Paid
+     * but the order never confirmed. The sweep must finish that settlement,
+     * never cancel it.
+     */
+    public function test_stranded_paid_redirect_session_is_completed_not_cancelled(): void
+    {
+        [$order, $attempt, $session] = $this->staleCheckout(45, 'awaiting_redirect');
+        $attempt->update(['payment_status' => PaymentStatus::Paid]);
+
+        (new ExpireStalePaymentSessionsJob)->handle(
+            app(PaymentSessionService::class),
+            app(OrderService::class),
+        );
+
+        $this->assertSame(PaymentStatus::Paid, $order->fresh()->payment_status, 'the sweep must finish a stranded paid settlement');
+        $this->assertSame('confirmed', $session->fresh()->status);
+        $this->assertNotSame(OrderStatus::Cancelled, $order->fresh()->order_status);
     }
 
     public function test_paid_attempt_is_never_touched_by_the_sweeper(): void

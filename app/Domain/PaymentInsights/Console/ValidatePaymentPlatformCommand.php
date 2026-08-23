@@ -12,6 +12,7 @@ use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\PaymentInsights\Enums\FailureCategory;
 use App\Domain\PaymentInsights\Enums\IneligibilityReason;
 use App\Domain\PaymentInsights\Enums\OutcomeType;
@@ -1093,7 +1094,15 @@ class ValidatePaymentPlatformCommand extends Command
             try {
                 $this->ensure(! FeatureFlag::gatewayEnabled('flutterwave'), 'flag off but gateway reports enabled');
                 $this->ensure(FeatureFlag::gatewayEnabled('nowpayments'), 'disabling flutterwave leaked onto nowpayments');
-                $this->ensure(FeatureFlag::disabledGateways() === ['flutterwave'], 'disabledGateways() wrong');
+                // Contains, not equals: the backup gateway flags (paystack,
+                // korapay) sit off by default, so their presence in the list
+                // depends on the environment's current failover posture.
+                $this->ensure(in_array('flutterwave', FeatureFlag::disabledGateways(), true), 'disabledGateways() missing flutterwave');
+                $this->ensure(! in_array('nowpayments', FeatureFlag::disabledGateways(), true), 'disabledGateways() leaked nowpayments');
+
+                // The router must never hand new money to a disabled primary,
+                // whatever the backup flags currently say.
+                $this->ensure(FiatGatewayRouter::resolve('card', 'USD') !== 'flutterwave', 'router resolved a disabled gateway');
 
                 // ...must still confirm. This is the safety rule: the switch
                 // gates new money only, money already moving always lands.
@@ -1102,6 +1111,12 @@ class ValidatePaymentPlatformCommand extends Command
             } finally {
                 $this->setFlag('gateway_flutterwave', true);
             }
+
+            // With the primary back on, every fiat method must route home to
+            // it, whatever the backup flags say: backups only ever serve
+            // while Flutterwave is off.
+            $this->ensure(FiatGatewayRouter::resolve('card', 'USD') === 'flutterwave', 'primary restored but router did not route home');
+            $this->ensure(FiatGatewayRouter::resolve('mobile_money', 'XAF') === 'flutterwave', 'primary restored but mobile money did not route home');
         });
     }
 

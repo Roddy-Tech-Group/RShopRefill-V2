@@ -19,8 +19,13 @@ interface PaymentProviderInterface
 
     /**
      * Refund a previously captured payment.
+     *
+     * $reference scopes the refund's idempotency: one attempt can carry
+     * several distinct refunds (one per failed item, a final remainder, an
+     * admin partial), and each must be its own idempotent operation. A null
+     * reference keeps the legacy one-refund-per-attempt key.
      */
-    public function refundPayment(PaymentAttempt $attempt, float $amount): bool;
+    public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool;
 
     /**
      * Normalize incoming webhook payload into a standardized structure.

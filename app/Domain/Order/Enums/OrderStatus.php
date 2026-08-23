@@ -10,6 +10,7 @@ enum OrderStatus: string
     case PartiallyCompleted = 'partially_completed';
     case Failed = 'failed';
     case Cancelled = 'cancelled';
+    case Refunded = 'refunded';
     case RequiresAttention = 'requires_attention';
 
     public function label(): string
@@ -21,6 +22,7 @@ enum OrderStatus: string
             self::PartiallyCompleted => 'Partially Completed',
             self::Failed => 'Failed',
             self::Cancelled => 'Cancelled',
+            self::Refunded => 'Refunded',
             self::RequiresAttention => 'Requires Attention',
         };
     }

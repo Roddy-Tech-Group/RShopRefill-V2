@@ -31,6 +31,16 @@ Artisan::command('inspire', function () {
 // SyncExchangeRatesJob still runs hourly as a safety net so any admin manual
 // edit to a CurrencyRate row propagates within the hour even without `rates:fetch`.
 Schedule::command('rates:fetch')->dailyAt('03:00')->name('rates:fetch-daily')->sentryMonitor('rates-fetch-daily');
+
+// Fraud/risk engine housekeeping. The daily report logs the headline metrics and
+// pings the review-queue owners about any SLA-breached reviews; the prune keeps
+// the assessment store inside the retention window.
+Schedule::command('risk:report')->dailyAt('08:00')->name('risk:report-daily');
+Schedule::command('risk:prune')->dailyAt('02:30')->name('risk:prune-daily');
+
+// Audit retention: archive-then-delete rows past the two-year window
+// (config/audit.php). Monthly is plenty - the window moves a day at a time.
+Schedule::command('audit:prune')->monthlyOn(1, '02:45')->name('audit:prune-monthly');
 Schedule::job(new SyncExchangeRatesJob)->hourly()->sentryMonitor('sync-exchange-rates');
 Schedule::job(new ReconcilePendingFundingsJob)->hourly()->sentryMonitor('reconcile-pending-fundings');
 
@@ -312,12 +322,6 @@ Schedule::command('crypto:sync-currencies')
 
 // Enterprise Provider Monitoring
 Schedule::command('zendit:check-balance --threshold=250')->hourly()->sentryMonitor('zendit-check-balance');
-
-// Check for stuck bank payouts and fallback to manual processing
-Schedule::command('payouts:check-stuck')
-    ->everyFifteenMinutes()
-    ->withoutOverlapping()
-    ->name('payouts:check-stuck-15m');
 
 // Dispatch scheduled push notification campaigns
 Schedule::command('campaigns:dispatch')

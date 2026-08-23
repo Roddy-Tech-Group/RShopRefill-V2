@@ -182,7 +182,8 @@
 
             <p class="text-xs">Version 2.0.0</p>
 
-            <a href="{{ route('shop.cookie-policy') }}#manage" class="text-xs font-medium transition-colors hover:text-zinc-900">Cookie settings</a>
+            {{-- Reopens the consent banner so the choice can actually be changed. --}}
+            <button type="button" x-data @click="$dispatch('open-cookie-settings')" class="text-xs font-medium transition-colors hover:text-zinc-900">Cookie settings</button>
         </div>
 
         {{-- Divider --}}

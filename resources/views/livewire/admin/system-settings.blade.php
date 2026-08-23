@@ -20,6 +20,116 @@ class extends Component {
     public array $savedKeys = [];
 
     /**
+     * Sub-headings INSIDE the features card: purely visual labels dividing the
+     * same list into scannable clusters. No database change - every flag stays
+     * in the `features` group; this map only orders and labels the rendering.
+     * The 19 eligibility_* cells join Payments by prefix so future cells land
+     * automatically; any brand-new unmapped key falls into "Other" instead of
+     * silently vanishing.
+     *
+     * @var array<string, list<string>>
+     */
+    private const FEATURE_SECTIONS = [
+        'Payments & Gateways' => [
+            'features.gateway_flutterwave_enabled',
+            'features.gateway_paystack_enabled',
+            'features.gateway_korapay_enabled',
+            'features.gateway_nowpayments_enabled',
+            'features.gateway_wallet_enabled',
+            'features.checkout_enabled',
+            'features.wallet_funding_enabled',
+            'features.wallet_withdraw_enabled',
+            'features.payment_eligibility_enforce_enabled',
+            'features.progressive_backoff_enabled',
+            'features.payment_backoff_enforce_enabled',
+            'features.payment_insights_enabled',
+            'features.frontend_payment_tracking_enabled',
+        ],
+        'Risk & Fraud' => [
+            'features.risk_engine_enabled',
+            'features.risk_engine_enforce_enabled',
+            'features.device_restriction_enabled',
+        ],
+        'Verification & Limits' => [
+            'features.kyc_enforce_enabled',
+            'features.kyc_tier2_threshold_usd',
+            'features.spending_limits_enforce_enabled',
+        ],
+        'Users & Auth' => [
+            'features.signup_enabled',
+            'features.guest_cart_enabled',
+            'features.device_management_enabled',
+            'features.admin_inactivity_timeout_enabled',
+            'features.admin_inactivity_timeout_minutes',
+            'features.admin_security_question_enabled',
+        ],
+        'Commerce & Catalog' => [
+            'features.gift_cards_enabled',
+            'features.esims_enabled',
+            'features.topups_enabled',
+            'features.bills_enabled',
+            'features.flights_enabled',
+            'features.stays_enabled',
+            'features.zendit_esims_enabled',
+            'features.gomarket_enabled',
+        ],
+        'Content & Marketing' => [
+            'features.newsletter_signup_enabled',
+            'features.feedback_widget_enabled',
+        ],
+    ];
+
+    /**
+     * The features card's render list: heading labels (strings) interleaved
+     * with the setting rows in section order. Rows keep their models; the
+     * blade branches on is_string() to draw the sub-heading.
+     *
+     * @return list<string|\App\Models\SiteSetting>
+     */
+    public function featureRows($groupSettings): array
+    {
+        $byKey = $groupSettings->keyBy('key');
+        $out = [];
+        $used = [];
+
+        foreach (self::FEATURE_SECTIONS as $label => $keys) {
+            $rows = [];
+
+            foreach ($keys as $key) {
+                if (isset($byKey[$key])) {
+                    $rows[] = $byKey[$key];
+                    $used[$key] = true;
+                }
+            }
+
+            // The eligibility matrix cells belong with payments, matched by
+            // prefix (they keep their alphabetical order from settings()).
+            if ($label === 'Payments & Gateways') {
+                foreach ($byKey as $key => $setting) {
+                    if (! isset($used[$key]) && str_starts_with($key, 'features.eligibility_')) {
+                        $rows[] = $setting;
+                        $used[$key] = true;
+                    }
+                }
+            }
+
+            if ($rows !== []) {
+                $out[] = $label;
+                array_push($out, ...$rows);
+            }
+        }
+
+        $leftovers = $byKey->reject(fn ($setting, $key) => isset($used[$key]))->values();
+
+        if ($leftovers->isNotEmpty()) {
+            $out[] = 'Other';
+            array_push($out, ...$leftovers->all());
+        }
+
+        return $out;
+    }
+
+    /**
      * Display order for the groups - operational toggles (system + features)
      * sit at the top so the admin lands on the kill-switches first. Anything
      * not in this list falls to the bottom alphabetically.
@@ -77,15 +187,40 @@ class extends Component {
     public function updateSetting(string $key, string $value): void
     {
         $existing = SiteSetting::query()->where('key', $key)->first();
+        $previous = $existing?->value;
 
         $decoded = json_decode($value, true);
         $stored  = json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
+
+        // Safety interlock: enforcing the eligibility matrix with ZERO
+        // approved cells would refuse every restricted-category cart on every
+        // gateway - a one-toggle full-catalogue outage. Refuse the flip with a
+        // clear instruction instead. (PaymentEligibilityService carries the
+        // same guard as an un-bypassable runtime backstop.)
+        if ($key === 'features.payment_eligibility_enforce_enabled'
+            && in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
+            && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->approvedCellCount() === 0) {
+            $this->addError('settings.'.$key, 'Refused: no eligibility cell is approved yet. Approve at least one gateway x category cell before enforcing, or every cart would be refused.');
+
+            return;
+        }
 
         SiteSetting::put(
             $key,
             $stored,
             $existing?->group ?? 'general',
             $existing?->description,
+        );
+
+        // Governance: every settings/feature-flag change is audited with who,
+        // which key, and before -> after. This is what makes flipping an
+        // enforcement switch (risk, KYC, eligibility, limits) attributable.
+        app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+            action: 'setting.updated',
+            model: $existing,
+            beforeState: ['value' => $previous],
+            afterState: ['value' => $stored],
+            metadata: ['key' => $key, 'group' => $existing?->group ?? 'general'],
         );
 
         $this->savedKeys[$key] = now()->toTimeString();
@@ -120,7 +255,18 @@ class extends Component {
                 </div>
 
                 <ul class="divide-inset">
-                    @foreach ($groupSettings as $setting)
+                    {{-- Inside the FEATURES card only, the same rows render
+                         under sub-heading labels (Payments & Gateways, Risk &
+                         Fraud, ...) so the admin scans to the right cluster
+                         instantly. Every other card renders its flat list
+                         exactly as before. --}}
+                    @foreach ($group === 'features' ? $this->featureRows($groupSettings) : $groupSettings as $setting)
+                        @if (is_string($setting))
+                            <li class="mx-3 mt-4 mb-1 px-5">
+                                <p class="border-b border-blue-100 pb-1.5 text-[11px] font-extrabold uppercase tracking-widest text-blue-600 dark:border-blue-400/20 dark:text-blue-300">{{ $setting }}</p>
+                            </li>
+                            @continue
+                        @endif
                         @php $displayVal = $this->displayValue($setting->value); @endphp
                         <li class="group relative mx-3 flex flex-col gap-3 rounded-[12px] px-5 py-4 transition-colors hover:bg-blue-50 sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15">
                             {{-- Key + description --}}
@@ -134,6 +280,9 @@ class extends Component {
                                 @if ($setting->description)
                                     <p class="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{{ $setting->description }}</p>
                                 @endif
+                                @error('settings.'.$setting->key)
+                                    <p class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ $message }}</p>
+                                @enderror
                             </div>
 
                             {{-- Editable value input + explicit Save button.

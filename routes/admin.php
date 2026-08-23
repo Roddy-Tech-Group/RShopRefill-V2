@@ -7,11 +7,15 @@ use App\Http\Controllers\Admin\AdminCustomerExportController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminFintechController;
 use App\Http\Controllers\Admin\AdminKycController;
+use App\Http\Controllers\Admin\AdminOrderReportController;
 use App\Http\Controllers\Admin\AdminReportExportController;
 use App\Http\Controllers\Admin\AdminRewardAnalyticsController;
 use App\Http\Controllers\Admin\AdminRewardSettingsController;
+use App\Http\Controllers\Admin\AdminRiskReviewController;
+use App\Http\Controllers\Admin\AdminRunbookDocController;
 use App\Http\Controllers\Admin\AdminSearchController;
 use App\Http\Controllers\Admin\AdminSreController;
+use App\Http\Controllers\Admin\AdminTransactionController;
 use App\Http\Controllers\Admin\AdminTransactionExportController;
 use App\Http\Controllers\Admin\Auth\AdminLoginController;
 use App\Http\Controllers\Admin\Auth\AdminSecurityQuestionController;
@@ -122,21 +126,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Global command-bar search for the admin header. Unlike products/search-
         // suggest (catalogue only), this searches the whole back office -
         // customers, orders, eSIMs by ICCID, transactions, wallet money,
-        // gift-card trades, catalogue, coupons, and the admin pages themselves -
+        // catalogue, coupons, and the admin pages themselves -
         // returning TYPED rows with a ready-made `url` so every hit links
         // straight to the page that shows it. Every branch is permission-gated
         // inside the service, so the bar can never surface a record the signed-in
         // admin is blocked from opening.
         Route::get('search-suggest', [AdminSearchController::class, 'suggest'])->name('search-suggest');
 
-        // Gift Card Trading Routes
-        Volt::route('gift-cards/trades', 'admin.gift-cards.trades.index')->name('gift-cards.trades.index');
-        Volt::route('gift-cards/trades/{trade}', 'admin.gift-cards.trades.show')->name('gift-cards.trades.show');
-        Volt::route('gift-cards/trades/{trade}/receipt', 'admin.gift-cards.trades.receipt')->name('gift-cards.trades.receipt');
-        Volt::route('gift-cards/brands', 'admin.gift-cards.brands')->name('gift-cards.brands');
-        Volt::route('gift-cards/rates', 'admin.gift-cards.rates')->name('gift-cards.rates');
-
         Route::view('orders', 'admin.orders')->name('orders');
+        // Order report: preview page first (view + Download/Share), PDF behind
+        // it. Viewing and downloading are separately audited.
+        Route::get('orders/{order}/report', [AdminOrderReportController::class, 'show'])->name('order.report');
+        Route::get('orders/{order}/report/pdf', [AdminOrderReportController::class, 'pdf'])->name('order.report.pdf');
         Route::get('orders/{order}', function (Order $order) {
             return view('admin.order', [
                 'order' => $order->load(['user', 'items', 'paymentAttempts']),
@@ -169,13 +170,27 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 'totalSpent' => (float) $totalSpentUsd,
                 'unreadNotifications' => $user->notifications()->whereNull('read_at')->count(),
                 'kyc' => $user->kycSubmissions()->first(),
+                'kycVerifications' => $user->kycVerifications()->limit(5)->get(),
             ]);
         })->name('customer');
 
-        // KYC review - serve documents from the private disk + approve / reject.
+        // KYC review - serve documents from the private disk + approve / reject
+        // (legacy manual submissions), plus the provider-era reconciliation:
+        // ask Smile's job-status API about a pending attempt whose webhook has
+        // not arrived.
         Route::get('kyc/{submission}/document/{type}', [AdminKycController::class, 'document'])->name('kyc.document');
         Route::post('kyc/{submission}/approve', [AdminKycController::class, 'approve'])->name('kyc.approve');
         Route::post('kyc/{submission}/reject', [AdminKycController::class, 'reject'])->name('kyc.reject');
+        Route::post('kyc/verifications/{verification}/sync', [AdminKycController::class, 'sync'])->name('kyc.sync');
+
+        // Risk engine - metrics dashboard, manual-review queue, and feedback labels.
+        Route::get('risk', [AdminRiskReviewController::class, 'dashboard'])->name('risk.dashboard');
+        Route::post('risk/label', [AdminRiskReviewController::class, 'label'])->name('risk.label');
+        Route::get('risk/reviews', [AdminRiskReviewController::class, 'index'])->name('risk.reviews');
+        Route::get('risk/reviews/{review}', [AdminRiskReviewController::class, 'show'])->name('risk.review');
+        Route::post('risk/reviews/{review}/approve', [AdminRiskReviewController::class, 'approve'])->name('risk.review.approve');
+        Route::post('risk/reviews/{review}/reject', [AdminRiskReviewController::class, 'reject'])->name('risk.review.reject');
+        Route::post('risk/reviews/{review}/escalate', [AdminRiskReviewController::class, 'escalate'])->name('risk.review.escalate');
 
         // Customer admin actions: edit profile, ban/unban, hold/release funds,
         // and send a direct (email + dashboard) message.
@@ -197,6 +212,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('customers/{user}/message', fn (User $user) => redirect()->route('admin.customer', $user));
         Route::view('transactions', 'admin.transactions')->name('transactions');
         Route::get('transactions/export.csv', [AdminTransactionExportController::class, 'csv'])->name('transactions.export');
+        // Transaction detail + report (preview-first, same pattern as the
+        // order report). Attempt ids are UUIDs; whereUuid keeps the wildcard
+        // clear of the export.csv route above.
+        Route::get('transactions/{attempt}', [AdminTransactionController::class, 'show'])->whereUuid('attempt')->name('transaction');
+        Route::get('transactions/{attempt}/report', [AdminTransactionController::class, 'report'])->whereUuid('attempt')->name('transaction.report');
+        Route::get('transactions/{attempt}/report/pdf', [AdminTransactionController::class, 'reportPdf'])->whereUuid('attempt')->name('transaction.report.pdf');
         Route::view('wallets', 'admin.wallets')->name('wallets');
         Volt::route('rates', 'admin.rates')->name('rates');
         Volt::route('account', 'admin.account')->name('account');
@@ -209,6 +230,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Volt::route('monitoring', 'admin.management.monitoring')->name('monitoring');
             Volt::route('finances', 'admin.management.finances')->name('finances');
             Volt::route('leaderboards', 'admin.management.leaderboards')->name('leaderboards');
+            // Self-contained HTML reference docs (e.g. the Fraud & Risk Engine
+            // handbook) served as authored; two segments, so no clash with the
+            // one-segment Volt wildcard below.
+            Route::get('runbooks/doc/{doc}', AdminRunbookDocController::class)->name('runbooks.doc');
             Volt::route('runbooks/{runbook?}', 'admin.management.runbooks')->name('runbooks');
         });
         Volt::route('notifications', 'admin.notifications')->name('notifications');

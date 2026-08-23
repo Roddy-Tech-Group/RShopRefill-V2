@@ -6,6 +6,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Transaction\Exceptions\DuplicateTransactionException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Domain\Wallet\Services\TransactionPinService;
@@ -61,23 +62,25 @@ class WalletPaymentProvider implements PaymentProviderInterface
         $user = $attempt->user;
         $pinService = app(TransactionPinService::class);
 
-        if (! $pinService->validateAuthToken($user, $authToken)) {
+        // Claim BEFORE any funds move: the claim is atomic (first caller
+        // wins), so a double-clicked Pay can never double-lock the wallet off
+        // one PIN entry. If anything below fails after the claim, the token
+        // is burned and the customer re-enters their PIN, which is the safe
+        // direction to fail.
+        if (! $pinService->claimAuthToken($user, $authToken)) {
             throw new \Exception('Invalid or expired authorization token.');
         }
 
         $currencyEnum = Currency::from(strtoupper($attempt->currency));
         $wallet = $this->walletService->getOrCreateWallet($user, $currencyEnum);
 
-        DB::transaction(function () use ($wallet, $attempt, $pinService, $user, $authToken) {
+        DB::transaction(function () use ($wallet, $attempt) {
             // Lock the funds now that we have authorization
             $this->walletService->lockFunds($wallet, $attempt->amount);
 
             $attempt->payment_status = PaymentStatus::Reserved;
             $attempt->gateway_reference = 'WL-LOCK-'.uniqid();
             $attempt->save();
-
-            // Consume the token so it cannot be reused
-            $pinService->consumeAuthToken($user, $authToken);
         });
     }
 
@@ -157,25 +160,47 @@ class WalletPaymentProvider implements PaymentProviderInterface
         });
     }
 
-    public function refundPayment(PaymentAttempt $attempt, float $amount): bool
+    public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
         $user = $attempt->user;
         $currencyEnum = Currency::from(strtoupper($attempt->currency));
         $wallet = $this->walletService->getOrCreateWallet($user, $currencyEnum);
 
-        DB::transaction(function () use ($wallet, $attempt, $amount) {
-            $this->walletService->credit(
-                wallet: $wallet,
-                amount: $amount,
-                category: TransactionCategory::Refund,
-                description: "Refund for Order {$attempt->order->order_number}",
-                reference: "REF-{$attempt->order->order_number}",
-                idempotencyKey: "refund-{$attempt->id}"
-            );
+        // Reference-scoped key: one attempt can legitimately carry several
+        // refunds (one per failed item, a final remainder, an admin partial).
+        // The old per-attempt key made the SECOND failed item's refund throw
+        // DuplicateTransaction out of the caller's transaction, so a customer
+        // with two undelivered items was refunded for one.
+        $idempotencyKey = $reference !== null
+            ? "refund-{$attempt->id}-{$reference}"
+            : "refund-{$attempt->id}";
 
-            $attempt->payment_status = PaymentStatus::Refunded;
-            $attempt->save();
-        });
+        // The ledger reference carries the same scope: wallet_transactions
+        // .reference is UNIQUE, so two refunds on one order need two
+        // references just as they need two idempotency keys.
+        $ledgerReference = $reference !== null
+            ? "REF-{$attempt->order->order_number}-{$reference}"
+            : "REF-{$attempt->order->order_number}";
+
+        try {
+            DB::transaction(function () use ($wallet, $attempt, $amount, $idempotencyKey, $ledgerReference) {
+                $this->walletService->credit(
+                    wallet: $wallet,
+                    amount: $amount,
+                    category: TransactionCategory::Refund,
+                    description: "Refund for Order {$attempt->order->order_number}",
+                    reference: $ledgerReference,
+                    idempotencyKey: $idempotencyKey
+                );
+
+                $attempt->payment_status = PaymentStatus::Refunded;
+                $attempt->save();
+            });
+        } catch (DuplicateTransactionException) {
+            // This exact refund already landed (a retry replaying the same
+            // key). The money moved once; report success, move no more.
+            return true;
+        }
 
         return true;
     }

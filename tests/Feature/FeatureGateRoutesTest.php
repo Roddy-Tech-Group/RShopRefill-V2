@@ -13,22 +13,21 @@ use Tests\TestCase;
  *
  * Two things are covered here. First, the throwaway /debug-login-browser route
  * (which logged any visitor in as User::first()) is gone and must stay gone.
- * Second, the financial features still under construction - virtual cards, P2P
- * transfers, fiat withdrawals and FX - are hidden in the dashboard nav behind
- * ef_* flags, and the routes themselves now carry the same gate so a typed URL
- * cannot reach a half-built page.
+ * Second, the embedded-finance features - virtual cards, P2P transfers, fiat
+ * withdrawals and FX - have been removed entirely, so their dashboard URLs must
+ * stay unreachable (404); a typed URL must never reach a deleted feature.
  *
- * The gate has to fail CLOSED: FeatureFlag::on() defaults to true for a missing
- * settings row, so EnsureFeatureEnabled passes an explicit false. A regression
- * there would silently expose every unfinished feature at once, which is the
- * case worth pinning down.
+ * The generic feature gate must still fail CLOSED: FeatureFlag::on() defaults to
+ * true for a missing settings row, so EnsureFeatureEnabled passes an explicit
+ * false. A regression there would silently expose any gated feature, which is
+ * the case worth pinning down (the demo_gate probes below).
  */
 class FeatureGateRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Dashboard routes gated while their backing services are unfinished. */
-    private const GATED_DASHBOARD_PATHS = [
+    /** Embedded-finance dashboard routes that were removed; their URLs must 404. */
+    private const REMOVED_DASHBOARD_PATHS = [
         '/dashboard/virtual-cards',
         '/dashboard/transfers',
         '/dashboard/withdrawals',
@@ -44,14 +43,14 @@ class FeatureGateRoutesTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_unfinished_dashboard_routes_are_closed_by_default(): void
+    public function test_removed_embedded_finance_routes_are_not_found(): void
     {
         $user = User::factory()->create();
 
-        foreach (self::GATED_DASHBOARD_PATHS as $path) {
+        foreach (self::REMOVED_DASHBOARD_PATHS as $path) {
             $this->actingAs($user)
                 ->get($path)
-                ->assertNotFound("{$path} should be gated off while the feature is unfinished");
+                ->assertNotFound();
         }
     }
 

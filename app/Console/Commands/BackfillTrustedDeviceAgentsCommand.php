@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Security\Services\DeviceTrustManager;
 use App\Models\TrustedDevice;
 use Illuminate\Console\Command;
 use Jenssegers\Agent\Agent;
@@ -47,6 +48,14 @@ class BackfillTrustedDeviceAgentsCommand extends Command
                     $device->browser = $agent->browser() ?: 'Unknown Browser';
                     $device->device_type = $agent->isDesktop() ? 'desktop' : ($agent->isTablet() ? 'tablet' : 'mobile');
 
+                    // Rows captured before names were derived show "Unknown
+                    // Device" in both the admin panel and the customer's
+                    // security centre; give them the same friendly name new
+                    // captures get. Never overwrites a name a row already has.
+                    if (blank($device->device_name)) {
+                        $device->device_name = DeviceTrustManager::friendlyDeviceName($agent);
+                    }
+
                     if (! $dryRun) {
                         $device->save();
                     }
@@ -74,6 +83,7 @@ class BackfillTrustedDeviceAgentsCommand extends Command
     {
         return empty($device->os)
             || str_contains($device->os, 'Unknown')
-            || $device->os === '0';
+            || $device->os === '0'
+            || blank($device->device_name);
     }
 }

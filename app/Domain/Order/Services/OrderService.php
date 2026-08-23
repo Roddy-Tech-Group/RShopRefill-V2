@@ -4,6 +4,7 @@ namespace App\Domain\Order\Services;
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Jobs\ProcessOrderRewardsJob;
@@ -75,7 +76,17 @@ class OrderService
                     $order->payment_status = PaymentStatus::Paid;
 
                     if ($newStatus === FulfillmentStatus::PartiallyFulfilled) {
-                        $failedTotal = (float) $order->items->where('fulfillment_status', FulfillmentStatus::Failed)->sum('subtotal_amount');
+                        // Each failed item's share of what was actually CAPTURED,
+                        // not its list price: a discounted (RCOIN/coupon) order
+                        // captured less than the item subtotals, and refunding
+                        // subtotals hands back more than the customer ever paid.
+                        $refundService = app(GatewayRefundService::class);
+                        $failedTotal = round(
+                            (float) $order->items
+                                ->where('fulfillment_status', FulfillmentStatus::Failed)
+                                ->sum(fn ($item) => $refundService->capturedShareForItem($order, $item, (float) $order->total_amount)),
+                            2,
+                        );
 
                         // Reverse each failed item exactly once: anything already
                         // unlocked at failure time was never debited, so refunding the
@@ -83,8 +94,14 @@ class OrderService
                         $alreadyReleased = max(0.0, round((float) $order->total_amount - $stillReserved, 2));
                         $refundable = round($failedTotal - $alreadyReleased, 2);
 
-                        if ($refundable > 0) {
-                            $walletProvider->refundPayment($walletPayment, $refundable);
+                        if ($refundable > 0 && $walletProvider->refundPayment($walletPayment, $refundable, 'settle-'.$order->id)) {
+                            $this->applyRefundRecord($order, $refundable, 'settle-'.$order->id);
+                            DB::afterCommit(fn () => RefundIssued::dispatch(
+                                $order,
+                                $refundable,
+                                'Part of your order could not be delivered, so we refunded it to your wallet.',
+                                'settle-'.$order->id,
+                            ));
                         }
                     }
                 }
@@ -115,5 +132,56 @@ class OrderService
                 }
             }
         });
+    }
+
+    /**
+     * Everything ever given back on this order, across BOTH refund families:
+     * automatic reversals (failed fulfillment) and admin refunds. The admin
+     * cap reads this, so an order that was auto-refunded cannot be refunded a
+     * second time by hand - the two families used to keep separate books.
+     */
+    public function refundedTotalFor(Order $order): float
+    {
+        return round((float) ($order->metadata['refunded_total'] ?? 0), 2);
+    }
+
+    /**
+     * Record money given back on this order under an idempotency tag. The
+     * ledger is a tag => amount map; replaying a tag (job retry, double-run
+     * failure path) records nothing, and refunded_total is always the sum of
+     * the map, so the admin cap can never drift from what actually moved.
+     * Takes its own lock; callers holding the order open must not save their
+     * stale instance afterwards (record last, or use applyRefundRecord).
+     */
+    public function recordRefundedAmount(Order $order, float $amount, string $tag): float
+    {
+        return DB::transaction(function () use ($order, $amount, $tag) {
+            $fresh = Order::where('id', $order->id)->lockForUpdate()->firstOrFail();
+
+            $this->applyRefundRecord($fresh, $amount, $tag);
+            $fresh->save();
+
+            return $this->refundedTotalFor($fresh);
+        });
+    }
+
+    /**
+     * The in-place variant for callers already holding the order row lock:
+     * mutates the given instance and leaves saving to the caller's flow.
+     */
+    public function applyRefundRecord(Order $order, float $amount, string $tag): void
+    {
+        $metadata = $order->metadata ?? [];
+        $records = (array) ($metadata['refund_records'] ?? []);
+
+        if (array_key_exists($tag, $records)) {
+            return;
+        }
+
+        $records[$tag] = round($amount, 2);
+        $metadata['refund_records'] = $records;
+        $metadata['refunded_total'] = round(array_sum($records), 2);
+
+        $order->metadata = $metadata;
     }
 }

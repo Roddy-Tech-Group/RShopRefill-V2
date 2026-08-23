@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payment;
 
+use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Order\Services\GatewayRefundService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
@@ -18,6 +19,7 @@ use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -221,6 +223,26 @@ class GatewayRefundOnFailureTest extends TestCase
             ->first();
         $this->assertNotNull($tx);
         $this->assertEqualsWithDelta(6510.00, (float) $tx->amount, 0.01);
+    }
+
+    public function test_an_automatic_refund_tells_the_customer_exactly_once(): void
+    {
+        Event::fake([RefundIssued::class]);
+
+        $item = $this->failedMomoOrder(6510.00, 'XAF');
+        $service = app(GatewayRefundService::class);
+
+        $service->refundFailedItemToWallet($item);
+
+        // The customer hears about the money, tagged to THIS refund.
+        Event::assertDispatched(
+            RefundIssued::class,
+            fn ($event) => abs($event->amount - 6510.00) < 0.01 && $event->tag === "item-{$item->id}",
+        );
+
+        // A replayed reversal moves no money and announces nothing new.
+        $service->refundFailedItemToWallet($item);
+        Event::assertDispatchedTimes(RefundIssued::class, 1);
     }
 
     public function test_refund_is_idempotent_across_retries(): void

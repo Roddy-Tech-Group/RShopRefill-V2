@@ -947,8 +947,16 @@ window.rshopOpenGoogleOAuth = function (href) {
         if (! data || data.source !== 'rshop-google-oauth') { return; }
         window.removeEventListener('message', onMessage);
         if (data.status === 'success') {
-            // Match the original full-redirect destination.
-            window.location.href = '/dashboard';
+            // Return to the page that asked for the sign-in (checkout's
+            // "Sign in to pay" sets rshopAuthReturnTo); default matches the
+            // original full-redirect destination. Only ever a local path we
+            // set ourselves, never anything from the message payload.
+            const returnTo = typeof window.rshopAuthReturnTo === 'string'
+                && window.rshopAuthReturnTo.startsWith('/')
+                && ! window.rshopAuthReturnTo.startsWith('//')
+                ? window.rshopAuthReturnTo
+                : '/dashboard';
+            window.location.href = returnTo;
         }
         // status === 'cancelled' leaves the user on the current page.
     };

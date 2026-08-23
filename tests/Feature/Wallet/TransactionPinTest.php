@@ -10,6 +10,7 @@ use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Wallet\Events\TransactionPinCreated;
 use App\Domain\Wallet\Events\TransactionPinLocked;
 use App\Domain\Wallet\Events\TransactionPinVerificationFailed;
+use App\Domain\Wallet\Services\TransactionPinService;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\User;
@@ -75,6 +76,28 @@ class TransactionPinTest extends TestCase
 
         $token = $response->json('auth_token');
         $this->assertTrue(Cache::has("pin_auth_{$this->user->id}_{$token}"));
+    }
+
+    public function test_an_auth_token_can_be_claimed_exactly_once()
+    {
+        $this->user->transaction_pin = Hash::make('9482');
+        $this->user->save();
+
+        $service = app(TransactionPinService::class);
+        $token = $service->verifyPin($this->user, '9482');
+
+        // First claim wins and burns the token; every later claim is refused,
+        // so a double-clicked Pay can never double-authorize one PIN entry.
+        $this->assertTrue($service->claimAuthToken($this->user, $token));
+        $this->assertFalse($service->claimAuthToken($this->user, $token));
+        $this->assertFalse(Cache::has("pin_auth_{$this->user->id}_{$token}"));
+    }
+
+    public function test_a_claim_on_an_unknown_token_is_refused()
+    {
+        $service = app(TransactionPinService::class);
+
+        $this->assertFalse($service->claimAuthToken($this->user, 'auth_pin_forged'));
     }
 
     public function test_invalid_pin_increments_attempts()

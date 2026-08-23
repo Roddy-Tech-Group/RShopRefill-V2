@@ -5,5 +5,5 @@
 
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Our gift card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online.</p>
 
-    <x-emails.button :url="url('/dashboard/gift-cards')" align="center">Trade gift cards now</x-emails.button>
+    <x-emails.button :url="url('/dashboard/shop/gift-cards')" align="center">Shop gift cards now</x-emails.button>
 </x-emails.layout>

@@ -35,44 +35,24 @@ class ComplianceGatesTest extends TestCase
         Cache::flush();
     }
 
-    public function test_email_verification_gate_off_lets_unverified_user_checkout(): void
+    public function test_unverified_user_is_always_blocked_at_checkout(): void
     {
-        Setting::set('require_email_verified_for_checkout', false, 'boolean');
-
+        // Email verification is mandatory (no toggle): an unverified user is
+        // stopped at checkout by the EnsureEmailVerified middleware.
         $user = User::factory()->unverified()->create();
         $this->seedCartFor($user);
 
-        $response = $this->actingAs($user)->post(route('checkout.process'), [
+        $response = $this->actingAs($user)->from(route('shop.checkout'))->post(route('checkout.process'), [
             'delivery_email' => 'buyer@example.test',
             'payment_method' => 'wallet',
             'currency' => 'USD',
         ]);
 
-        // Should not be redirected to verification.notice
-        $response->assertSessionMissing('checkout_status');
+        $response->assertSessionHasErrors('email');
     }
 
-    public function test_email_verification_gate_on_blocks_unverified_user_checkout(): void
+    public function test_verified_user_passes_the_checkout_email_gate(): void
     {
-        Setting::set('require_email_verified_for_checkout', true, 'boolean');
-
-        $user = User::factory()->unverified()->create();
-        $this->seedCartFor($user);
-
-        $response = $this->actingAs($user)->post(route('checkout.process'), [
-            'delivery_email' => 'buyer@example.test',
-            'payment_method' => 'wallet',
-            'currency' => 'USD',
-        ]);
-
-        $response->assertRedirect(route('verification.notice'));
-        $response->assertSessionHas('checkout_status');
-    }
-
-    public function test_email_verification_gate_on_lets_verified_user_checkout(): void
-    {
-        Setting::set('require_email_verified_for_checkout', true, 'boolean');
-
         $user = User::factory()->create(['email_verified_at' => now()]);
         $this->seedCartFor($user);
 
@@ -82,9 +62,9 @@ class ComplianceGatesTest extends TestCase
             'currency' => 'USD',
         ]);
 
-        // Verified user gets past the gate (whatever happens next is fine,
-        // we're only asserting the gate did not bounce them).
-        $response->assertSessionMissing('checkout_status');
+        // Past the email gate; whatever the checkout does next, it is not an
+        // email-verification block.
+        $response->assertSessionDoesntHaveErrors('email');
     }
 
     public function test_kyc_gate_off_lets_unverified_user_request_withdrawal(): void

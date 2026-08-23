@@ -17,7 +17,6 @@
     // sidebar's list so swapping between the two surfaces is consistent.
     $categories = [
         ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',  'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
-        ['slug' => 'sell-gift-cards', 'label' => 'Sell Gift Cards', 'icon' => 'gift cards.svg', 'url' => $r('sell-gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',        'icon' => 'Shop.svg',       'url' => $r('gomarket')],
         ['slug' => 'esims',           'label' => 'eSIMs',           'icon' => 'esim.svg',       'url' => $r('esims')],
         ['slug' => 'mobile-airtime',  'label' => 'Mobile top-ups',  'icon' => 'topup1.svg',     'url' => $r('topups')],
@@ -31,7 +30,7 @@
     // FeatureFlag::categoryVisible(): unlike the live categories they are
     // removed rather than greyed, because there is no catalogue behind either.
     // Their routes 404 in the same state, so link and page vanish together.
-    $hiddenWhenOff = ['sell-gift-cards' => 'sell_gift_cards', 'gomarket' => 'gomarket'];
+    $hiddenWhenOff = ['gomarket' => 'gomarket'];
     $categories = array_values(array_filter(
         $categories,
         fn ($c) => (! isset($hiddenWhenOff[$c['slug']]) || \App\Support\FeatureFlag::on($hiddenWhenOff[$c['slug']], false))

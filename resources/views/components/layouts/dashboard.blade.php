@@ -381,11 +381,10 @@
                             All Categories
                         </a>
                         @php
-                            // Sell Gift Cards + GoMarket are hidden entirely (not
-                            // greyed) until their feature flag is switched on.
+                            // GoMarket is hidden entirely (not greyed) until its
+                            // feature flag is switched on.
                             $shopSubItems = array_values(array_filter([
                                 ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
-                                \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['Sell Gift Cards', route('dashboard.shop.sell-gift-cards'), null] : null,
                                 \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
                                 ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
                                 \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('dashboard.shop.flights'), null] : null,
@@ -433,67 +432,11 @@
                     </span>
                 </a>
 
-                @if (\App\Support\FeatureFlag::on('ef_virtual_cards', false))
-                    @php $active = request()->routeIs('dashboard.virtual-cards'); @endphp
-                    <a href="{{ route('dashboard.virtual-cards') }}" wire:navigate.hover data-tip="Virtual Cards" class="{{ $navItem($active) }}">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                                <line x1="1" y1="10" x2="23" y2="10"/>
-                            </svg>
-                            Virtual Cards
-                        </span>
-                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
-                    </a>
-                @endif
-
-                @if (\App\Support\FeatureFlag::on('ef_transfers', false))
-                    @php $active = request()->routeIs('dashboard.transfers'); @endphp
-                    <a href="{{ route('dashboard.transfers') }}" wire:navigate.hover data-tip="P2P Transfers" class="{{ $navItem($active) }}">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M17 3l4 4-4 4"/>
-                                <path d="M3 7h18"/>
-                                <path d="M7 21l-4-4 4-4"/>
-                                <path d="M21 17H3"/>
-                            </svg>
-                            Transfers
-                        </span>
-                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
-                    </a>
-                @endif
-
-                @if (\App\Support\FeatureFlag::on('ef_fiat_withdrawals', false))
-                    @php $active = request()->routeIs('dashboard.withdrawals'); @endphp
-                    <a href="{{ route('dashboard.withdrawals') }}" wire:navigate.hover data-tip="Withdrawals" class="{{ $navItem($active) }}">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                                <polyline points="7 10 12 15 17 10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            Withdrawals
-                        </span>
-                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30">Test</span>
-                    </a>
-                @endif
-
                 @php $active = $isCurrent('dashboard.transactions*'); @endphp
                 <a href="{{ route('dashboard.transactions') }}" wire:navigate.hover data-tip="Transactions" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
                         <img src="{{ asset('assets/' . rawurlencode('transactions.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
                         Transactions
-                    </span>
-                </a>
-
-                @php $active = $isCurrent('dashboard.gift-cards*'); @endphp
-                <a href="{{ route('dashboard.gift-cards.history') }}" wire:navigate.hover data-tip="Trade Gift Cards" class="{{ $navItem($active) }}">
-                    <span class="flex items-center gap-3">
-                        <svg class="h-5 w-5 shrink-0 {{ $active ? 'text-black dark:text-white' : 'text-zinc-600' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="2" y1="10" x2="22" y2="10"/>
-                        </svg>
-                        Trade Gift Cards
                     </span>
                 </a>
 
@@ -1392,10 +1335,21 @@
                     {{ $slot }}
                 </div>
 
+                {{-- Smile ID verification modal (window.rshopKyc). Shared across
+                     dashboard pages so the wallet-funding step-up flow can launch
+                     identity verification, exactly like checkout. --}}
+                @auth
+                    @include('partials.kyc-verification-modal')
+                @endauth
+
                 {{-- Footer — Privacy Policy + version + copyright. Mirrors the
                      admin layout. Full-width so the legal line sits flush with
                      the page edges. `mt-auto` pins it to the bottom. --}}
                 <footer class="mt-auto hidden w-full pt-12 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[11px] font-semibold text-zinc-600 lg:flex dark:text-zinc-300">
+                    <a href="{{ route('shop.terms') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Terms</a>
+                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                    <a href="{{ route('shop.refund-policy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Refund Policy</a>
+                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <a href="{{ route('shop.privacy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Privacy Policy</a>
                     <span class="text-zinc-300 dark:text-zinc-600">·</span>
                     <span>version 2.0.0</span>
@@ -1581,7 +1535,7 @@
              'open-mobile-menu' window event. Renders the sidebar nav as a card grid
              instead of sliding the Flux sidebar drawer out. lg:hidden so it never shows on desktop. --}}
         @php
-            $mobileMenuItems = [
+            $mobileMenuItems = array_values(array_filter([
                 ['label' => 'Home',          'href' => route('dashboard'),           'icon' => 'Home.svg',           'tone' => 'bg-blue-500',     'nav' => true],
                 ['label' => 'Shop',          'href' => route('dashboard.shop.gift-cards'), 'icon' => 'Shop.svg',           'tone' => 'bg-pink-500',     'nav' => true],
                 ['label' => 'Orders',        'href' => route('dashboard.orders'),    'icon' => 'order.svg',          'tone' => 'bg-sky-500',      'nav' => true],
@@ -1594,13 +1548,12 @@
                 ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
                 // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
                 // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
-                ['label' => 'Trade Card',    'href' => route('dashboard.gift-cards.history'), 'icon' => 'gift cards.svg', 'tone' => 'bg-orange-500', 'nav' => true],
                 // The rewards page is the Rcoin programme (cashback, referrals,
                 // withdrawals, conversion) - the tile carries the Rcoin name,
                 // not the old "Referrals" alias that hid it.
                 ['label' => 'Rcoin',         'href' => route('dashboard.rewards'),    'icon' => 'wallet 2.svg',        'tone' => 'bg-yellow-500',   'nav' => true],
                 ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'tone' => 'bg-cyan-500', 'nav' => false],
-            ];
+            ]));
         @endphp
         {{-- Mobile menu wrapper: `contents` removes the div from Flux's grid layout so it
              doesn't push flux:sidebar/header/main into an unexpected row. --}}

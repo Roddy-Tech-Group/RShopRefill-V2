@@ -123,6 +123,13 @@ class extends Component {
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Credential change on an admin account is always audited (never the
+        // password itself, only the fact it changed).
+        app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+            action: 'admin.password_changed',
+            model: $this->admin,
+        );
+
         $this->reset('current_password', 'password', 'password_confirmation');
 
         \Flux::toast('Password updated successfully.', variant: 'success');

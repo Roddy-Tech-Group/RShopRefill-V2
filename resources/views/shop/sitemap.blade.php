@@ -1,11 +1,9 @@
 @php
     // HTML sitemap — a human-friendly index of every section. Dark-mode safe.
     $columns = [
-        // Sell Gift Cards + GoMarket stay out of the index until their
-        // feature flag is switched on.
+        // GoMarket stays out of the index until its feature flag is on.
         'Shop' => array_values(array_filter([
             ['Buy Gift Cards', route('shop.gift-cards')],
-            \App\Support\FeatureFlag::on('sell_gift_cards', false) ? ['Sell Gift Cards', route('shop.sell-gift-cards')] : null,
             \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('shop.gomarket')] : null,
             ['eSIMs', route('shop.esims')],
             ['Mobile top up', route('shop.topups')],

@@ -51,10 +51,34 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->reset('current_password', 'password', 'password_confirmation');
 
         \App\Domain\Security\Events\PasswordChanged::dispatch(Auth::user());
-        
+
         $this->dispatch('toast', message: 'Your password has been updated.');
     }
-    
+
+    /**
+     * "Forgot Password?" for a SIGNED-IN user. The old link pointed at the
+     * guest-only password.request route, whose RedirectIfAuthenticated
+     * middleware bounced every logged-in click straight back to the
+     * dashboard. Sending the standard reset link keeps the flow inbox-gated
+     * (the email proves ownership), so it stays available even during the
+     * new-device hold on in-app password changes.
+     */
+    public function sendPasswordResetLink(): void
+    {
+        $user = Auth::user();
+
+        $sent = \Illuminate\Support\Facades\RateLimiter::attempt(
+            'pwd-reset-link:'.$user->id,
+            1,
+            fn () => \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]),
+            60,
+        );
+
+        $this->dispatch('toast', message: $sent
+            ? 'Password reset link sent to '.$user->email.'.'
+            : 'A reset link was just sent. Check your inbox, or try again in a minute.');
+    }
+
     public function setOtpPreference($value): void
     {
         $this->enforceDeviceTrust('emailOtpPreference');
@@ -152,7 +176,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 <div x-data="{ show: false }">
                     <div class="mb-1.5 flex items-center justify-between">
                         <label for="password-current" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ __('Current password') }}</label>
-                        <a href="{{ route('password.request') }}" class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">Forgot Password?</a>
+                        <button type="button" wire:click="sendPasswordResetLink" wire:loading.attr="disabled" class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300">Forgot Password?</button>
                     </div>
                     <div class="relative">
                         <input

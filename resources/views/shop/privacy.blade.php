@@ -5,7 +5,7 @@
     // Privacy / DPO contact is a formal legal channel - kept on the info@
     // inbox for the record, not the support@ help queue.
     $supportEmail = 'info@rshoprefill.com';
-    $lastUpdated = 'May 23, 2026';
+    $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Privacy Policy | '.$siteName">
@@ -26,8 +26,9 @@
             Your privacy matters to us. This policy explains, in plain language, what information {{ $siteName }} collects, how we
             use it, who we share it with, and the rights you have over your data. We serve customers across Africa and
             internationally, and we work to comply with applicable data-protection laws, including the EU GDPR, the California
-            CCPA, the Nigeria Data Protection Act (NDPA) and the Kenya Data Protection Act. By using {{ $siteName }}, you agree to
-            this policy.
+            CCPA, the Nigeria Data Protection Act (NDPA) and the Kenya Data Protection Act. We process your data to perform
+            our contract with you, to meet legal obligations (including anti-money-laundering law), for our legitimate
+            interests in securing the platform, and with your consent for marketing.
         </p>
 
         {{-- On this page --}}
@@ -64,9 +65,9 @@
                 <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Identity verification (KYC)</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
-                        <li>Government-issued identification, such as a national ID card.</li>
-                        <li>Passport details, where required for flight bookings.</li>
-                        <li>Where the law requires it for certain transactions, such as some African real estate purchases, identifiers like a BVN or NIN.</li>
+                        <li>A government-issued identity document, such as a national ID card or passport.</li>
+                        <li>A selfie used for liveness and face-match verification. This is biometric information; it is processed by our identity-verification partner solely to confirm the document belongs to you.</li>
+                        <li>Verification is required when your purchases reach our identity-verification threshold or when our risk checks require it.</li>
                     </ul>
                 </div>
 
@@ -89,6 +90,7 @@
                     <h3 class="text-base font-bold text-zinc-900">Technical and location data</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Your IP address and device identifiers.</li>
+                        <li>Device fingerprints and risk signals (how your device connects and behaves), used to protect your account and payments from fraud.</li>
                         <li>Approximate geolocation, used to help prevent fraudulent international transactions.</li>
                     </ul>
                 </div>
@@ -123,9 +125,9 @@
                 only what is needed to complete your request, and we require these partners to protect your data.
             </p>
             <ul class="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500 sm:text-base">
-                <li><span class="font-semibold text-zinc-900">Airline and hotel partners</span>, to confirm and manage your flight and stay bookings.</li>
                 <li><span class="font-semibold text-zinc-900">Telecom and gift-card suppliers</span>, to deliver eSIMs, mobile top-ups, data and gift card codes.</li>
-                <li><span class="font-semibold text-zinc-900">Regulated third-party payment gateways</span>, to process your payments securely.</li>
+                <li><span class="font-semibold text-zinc-900">Regulated payment processors</span>, such as Flutterwave for card, bank and mobile-money payments and NowPayments for crypto, to process your payments securely.</li>
+                <li><span class="font-semibold text-zinc-900">Our identity-verification partner</span>, to verify your identity documents when required.</li>
                 <li><span class="font-semibold text-zinc-900">Identity-verification and fraud-prevention providers</span>, to confirm who you are and keep accounts safe.</li>
                 <li><span class="font-semibold text-zinc-900">Cloud and technology providers</span>, who host and run our platform under strict agreements.</li>
                 <li><span class="font-semibold text-zinc-900">Regulators and authorities</span>, when we are legally required to share information.</li>
@@ -164,6 +166,7 @@
                 <li><span class="font-semibold text-zinc-900">Delete</span> your account and personal data, subject to the exception below.</li>
                 <li><span class="font-semibold text-zinc-900">Object to or restrict</span> certain uses of your data.</li>
                 <li><span class="font-semibold text-zinc-900">Withdraw consent</span> where we rely on it.</li>
+                <li><span class="font-semibold text-zinc-900">Complain</span> to your data-protection authority, including the Nigeria Data Protection Commission (NDPC).</li>
             </ul>
 
             <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
@@ -176,7 +179,9 @@
 
             <p class="text-sm leading-relaxed text-zinc-600 sm:text-base">
                 We keep your data only for as long as we need it for the purposes in this policy, or for as long as the law
-                requires, whichever is longer.
+                requires, whichever is longer. As a guide: transaction and identity-verification records are kept for five to
+                seven years after your relationship with us ends, as financial and anti-money-laundering laws require; fraud
+                and risk signals are kept for up to 24 months; and marketing preferences until you withdraw them.
             </p>
         </section>
 

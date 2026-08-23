@@ -4,20 +4,14 @@ namespace Tests\Feature\Mail;
 
 use App\Domain\Communication\Mail\Notifications\GiftCardsRestoredMail;
 use App\Domain\Communication\Mail\Notifications\GiftCardsUnavailableMail;
-use App\Domain\Communication\Mail\Orders\TradeStatusMail;
-use App\Domain\Communication\Mail\System\AdminNewTradeMail;
-use App\Enums\TradeStatus;
-use App\Models\GiftCardBrand;
-use App\Models\GiftCardRate;
-use App\Models\GiftCardTrade;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Guards that the gift-card trade + availability emails render through the
- * shared branded <x-emails.layout> (logo, blue accent, social footer) instead
- * of Laravel's stock markdown mail theme. Regression cover for the CTO's
+ * Guards that the gift-card availability emails render through the shared
+ * branded <x-emails.layout> (logo, blue accent, social footer) instead of
+ * Laravel's stock markdown mail theme. Regression cover for the CTO's
  * mail/* templates drifting from the rest of resources/views/emails/.
  */
 class GiftCardMailBrandingTest extends TestCase
@@ -39,51 +33,6 @@ class GiftCardMailBrandingTest extends TestCase
         $this->assertStringNotContainsString('x-mail::message', $html);
     }
 
-    private function makeTrade(): GiftCardTrade
-    {
-        $user = User::factory()->make(['name' => 'Jane Doe', 'email' => 'jane@example.test']);
-
-        $rate = new GiftCardRate;
-        $rate->setRelation('brand', new GiftCardBrand(['name' => 'Amazon']));
-
-        $trade = new GiftCardTrade([
-            'uuid' => 'abcd1234-5678-90ab-cdef-000000000000',
-            'declared_value' => 100,
-            'payout_currency' => 'USD',
-            'calculated_payout' => 90,
-        ]);
-        $trade->id = 7;
-        $trade->status = TradeStatus::Approved;
-        $trade->setRelation('user', $user);
-        $trade->setRelation('rate', $rate);
-
-        return $trade;
-    }
-
-    public function test_trade_status_mail_is_branded(): void
-    {
-        $html = (new TradeStatusMail($this->makeTrade(), 'Card verified.'))->render();
-
-        $this->assertBranded($html);
-        $this->assertStringContainsString('Jane Doe', $html);
-        $this->assertStringContainsString('abcd1234', $html);
-        $this->assertStringContainsString(TradeStatus::Approved->label(), $html);
-        $this->assertStringContainsString('Card verified.', $html);
-        $this->assertStringContainsString('View trade details', $html);
-    }
-
-    public function test_admin_new_trade_mail_is_branded(): void
-    {
-        $html = (new AdminNewTradeMail($this->makeTrade()))->render();
-
-        $this->assertBranded($html);
-        $this->assertStringContainsString('New gift card trade submitted', $html);
-        $this->assertStringContainsString('jane@example.test', $html);
-        $this->assertStringContainsString('Amazon', $html);
-        $this->assertStringContainsString('100.00', $html);
-        $this->assertStringContainsString('Review trade now', $html);
-    }
-
     public function test_gift_cards_restored_mail_is_branded(): void
     {
         $user = User::factory()->make(['name' => 'Sam Buyer']);
@@ -92,8 +41,10 @@ class GiftCardMailBrandingTest extends TestCase
 
         $this->assertBranded($html);
         $this->assertStringContainsString('Sam Buyer', $html);
-        $this->assertStringContainsString('Trade gift cards now', $html);
-        $this->assertStringContainsString('/dashboard/gift-cards', $html);
+        // Trading is removed: the CTA points at the BUY page, never the old
+        // trading dashboard.
+        $this->assertStringContainsString('Shop gift cards now', $html);
+        $this->assertStringContainsString('/dashboard/shop/gift-cards', $html);
     }
 
     public function test_gift_cards_unavailable_mail_is_branded(): void

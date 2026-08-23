@@ -150,11 +150,33 @@ class extends Component {
             $payload['password'] = Hash::make($this->password);
         }
 
+        // Admin accounts govern everything else, so their lifecycle is always
+        // audited: who changed which account, and what changed (never the
+        // password itself, only the fact it was set).
+        $auditable = ['name', 'email', 'role', 'permissions', 'is_active'];
+
         if ($this->editingId) {
-            Admin::findOrFail($this->editingId)->update($payload);
+            $admin = Admin::findOrFail($this->editingId);
+            $before = collect($admin->only($auditable))->toArray();
+
+            $admin->update($payload);
+
+            app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+                action: 'admin.admin_updated',
+                model: $admin,
+                beforeState: $before,
+                afterState: collect($payload)->only($auditable)->toArray(),
+                metadata: ['password_changed' => filled($this->password)],
+            );
             session()->flash('status', $this->name . ' updated.');
         } else {
-            Admin::create($payload);
+            $admin = Admin::create($payload);
+
+            app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+                action: 'admin.admin_created',
+                model: $admin,
+                afterState: collect($payload)->only($auditable)->toArray(),
+            );
             session()->flash('status', $this->name . ' created.');
         }
 
@@ -175,6 +197,12 @@ class extends Component {
 
         $admin = Admin::findOrFail($id);
         $admin->update(['is_active' => ! $admin->is_active]);
+
+        app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+            action: $admin->is_active ? 'admin.admin_activated' : 'admin.admin_deactivated',
+            model: $admin,
+        );
+
         unset($this->admins);
     }
 
@@ -192,6 +220,14 @@ class extends Component {
         session()->put('impersonator_admin_id', $currentAdminId);
 
         $admin = Admin::findOrFail($id);
+
+        // Audit BEFORE switching guards, while the acting super admin is still
+        // the authenticated context (mirrors customer impersonation).
+        app(\App\Domain\Audit\Services\AuditLogService::class)->log(
+            action: 'admin.admin_switched',
+            model: $admin,
+        );
+
         auth()->guard('admin')->login($admin);
 
         // Redirect them based on what the target admin can access
