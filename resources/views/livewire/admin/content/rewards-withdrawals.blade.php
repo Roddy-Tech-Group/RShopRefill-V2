@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\WalletService;
@@ -85,6 +86,17 @@ class extends Component {
             'reviewed_at' => now(),
         ]);
 
+        // A payout decision is money moved by an admin's hand: it belongs in
+        // the Audit Log, not only on the withdrawal row.
+        app(AuditLogService::class)->log(
+            action: 'admin.withdrawal_approved',
+            model: $withdrawal->user,
+            metadata: [
+                'withdrawal_id' => $withdrawal->id,
+                'rcoin_amount' => $withdrawal->rcoin_amount,
+            ],
+        );
+
         // Tell the customer the request is approved; another email follows
         // when an admin marks it as paid. Best-effort so a mail outage
         // doesn't block the admin's workflow.
@@ -150,6 +162,18 @@ class extends Component {
                 'reviewed_by' => (string) (Auth::guard('admin')->id() ?? 'system'),
                 'reviewed_at' => now(),
             ]);
+
+            // Rejection reverses money (the Rcoin credit above): audited with
+            // the amount and the stated reason.
+            app(AuditLogService::class)->log(
+                action: 'admin.withdrawal_rejected',
+                model: $withdrawal->user,
+                metadata: [
+                    'withdrawal_id' => $withdrawal->id,
+                    'rcoin_amount' => $withdrawal->rcoin_amount,
+                    'reason' => $this->rejectReason,
+                ],
+            );
         });
 
         // Email the customer with the reason. The Rcoin has already been
@@ -195,6 +219,18 @@ class extends Component {
             'payout_reference' => $this->payoutReference,
             'paid_at' => now(),
         ]);
+
+        // The external payout reference is the end-to-end money trail: who
+        // settled it, how much, and against which bank/wallet receipt.
+        app(AuditLogService::class)->log(
+            action: 'admin.withdrawal_paid',
+            model: $withdrawal->user,
+            metadata: [
+                'withdrawal_id' => $withdrawal->id,
+                'rcoin_amount' => $withdrawal->rcoin_amount,
+                'payout_reference' => $this->payoutReference,
+            ],
+        );
 
         // Final confirmation email - same template as the approval but with
         // `paid: true` so the copy says "your payout has been settled" and

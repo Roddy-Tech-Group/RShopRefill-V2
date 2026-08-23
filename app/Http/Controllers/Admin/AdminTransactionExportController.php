@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Audit\Services\AuditLogService;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentAttempt;
 use Illuminate\Http\Request;
@@ -38,6 +39,13 @@ class AdminTransactionExportController extends Controller
         $search = trim((string) $request->string('q')->toString());
 
         $filename = 'transactions-'.($status !== '' && $status !== 'all' ? $status.'-' : '').now()->format('Y-m-d-His').'.csv';
+
+        // Bulk financial + customer data leaving the system is always
+        // attributable: who exported, with which filters.
+        app(AuditLogService::class)->log(
+            action: 'report.transactions_exported',
+            metadata: ['filename' => $filename, 'status' => $status ?: 'all', 'gateway' => $gateway ?: 'all', 'search' => $search],
+        );
 
         return response()->streamDownload(function () use ($status, $gateway, $search) {
             $out = fopen('php://output', 'w');

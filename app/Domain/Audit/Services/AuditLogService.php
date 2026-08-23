@@ -38,7 +38,13 @@ class AuditLogService
             // it points at a real users.id (the FK will catch them otherwise).
             $resolvedActorId = $actorId;
         } else {
-            $authedUser = Auth::user();
+            // Auth::user() reads the DEFAULT guard, which is only switched to
+            // 'admin' when the auth middleware runs on the request. Livewire
+            // component actions can arrive without that switch, leaving the
+            // default guard ('web') empty even though an admin is signed in -
+            // which used to record admin actions as "System". Fall back to the
+            // admin guard explicitly.
+            $authedUser = Auth::user() ?? Auth::guard('admin')->user();
 
             if ($authedUser instanceof User) {
                 $resolvedActorId = $authedUser->getKey();
@@ -50,6 +56,7 @@ class AuditLogService
                     'actor_type' => Admin::class,
                     'actor_id' => $authedUser->getKey(),
                     'actor_email' => $authedUser->email,
+                    'actor_name' => $authedUser->name,
                 ];
             } elseif ($authedUser !== null) {
                 // Some other authenticatable - take the key but don't trust
