@@ -81,11 +81,17 @@ class DeviceVerificationController extends Controller
 
         $delay = $delays[$attempts];
 
-        $otp = sprintf('%06d', mt_rand(1, 999999));
+        // random_int is a CSPRNG (mt_rand is not) and the (0, 999999) range
+        // covers the full six-digit space including 000000, which mt_rand(1, ...)
+        // could never produce.
+        $otp = sprintf('%06d', random_int(0, 999999));
 
         Cache::put('device_otp_'.$user->id, $otp, now()->addMinutes(10));
         Cache::put($throttleKey, now()->addSeconds($delay)->timestamp, now()->addSeconds($delay));
         Cache::put($attemptsKey, $attempts, now()->addHours(24));
+
+        // A fresh code gets a fresh guess budget (see verifyOtp).
+        Cache::forget('otp_verify_fails_'.$user->id);
 
         OtpRequested::dispatch($user, $otp, 'login');
 
@@ -102,8 +108,26 @@ class DeviceVerificationController extends Controller
 
         $user = Auth::user();
         $storedOtp = Cache::get('device_otp_'.$user->id);
+        $failsKey = 'otp_verify_fails_'.$user->id;
 
-        if (! $storedOtp || $storedOtp !== $request->otp) {
+        // hash_equals is constant-time; a plain !== leaks how many leading
+        // digits matched via response timing. Compare as strings so a numeric
+        // cache value and the string input still line up.
+        if (! $storedOtp || ! hash_equals((string) $storedOtp, (string) $request->otp)) {
+            // Cap wrong guesses so the six-digit code cannot be brute-forced
+            // inside its 10-minute life. After five misses the code is burned
+            // and the user must request a new one.
+            $fails = (int) Cache::get($failsKey, 0) + 1;
+
+            if ($fails >= 5) {
+                Cache::forget('device_otp_'.$user->id);
+                Cache::forget($failsKey);
+
+                return back()->withErrors(['otp' => 'Too many incorrect attempts. Please request a new code.']);
+            }
+
+            Cache::put($failsKey, $fails, now()->addMinutes(10));
+
             return back()->withErrors(['otp' => 'Invalid or expired code.']);
         }
 
@@ -111,6 +135,7 @@ class DeviceVerificationController extends Controller
         Cache::forget('device_otp_'.$user->id);
         Cache::forget('otp_throttle_'.$user->id);
         Cache::forget('otp_attempts_'.$user->id);
+        Cache::forget($failsKey);
         session()->forget('pending_email_otp');
 
         $deviceId = session()->pull('pending_device_id');

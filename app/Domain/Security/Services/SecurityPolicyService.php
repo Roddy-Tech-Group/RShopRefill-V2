@@ -3,7 +3,7 @@
 namespace App\Domain\Security\Services;
 
 use App\Models\TrustedDevice;
-use Illuminate\Support\Carbon;
+use App\Support\FeatureFlag;
 
 class SecurityPolicyService
 {
@@ -12,16 +12,16 @@ class SecurityPolicyService
      */
     public function isDeviceMature(TrustedDevice $device): bool
     {
-        if (\App\Support\FeatureFlag::off('device_restriction')) {
+        if (FeatureFlag::off('device_restriction')) {
             return true;
         }
 
-        if (!$device->isTrusted()) {
+        if (! $device->isTrusted()) {
             return false;
         }
 
         $restrictionHours = config('security.device_restriction_hours', 24);
-        
+
         return $device->trusted_since->diffInHours(now()) >= $restrictionHours;
     }
 
@@ -40,11 +40,6 @@ class SecurityPolicyService
         return $this->isDeviceMature($device);
     }
 
-    public function canCreateVirtualCard(TrustedDevice $device): bool
-    {
-        return $this->isDeviceMature($device);
-    }
-    
     public function canDisable2FA(TrustedDevice $device): bool
     {
         return $this->isDeviceMature($device);

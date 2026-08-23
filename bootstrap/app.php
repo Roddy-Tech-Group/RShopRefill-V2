@@ -8,6 +8,8 @@ use App\Http\Middleware\EnforceDeviceVerification;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureAccountNotSuspended;
+use App\Http\Middleware\EnsureDeviceMature;
+use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
@@ -81,6 +83,11 @@ return Application::configure(basePath: dirname(__DIR__))
             // wallet funding). Suspended users stay logged in so they can
             // see the banner + request a review - only the action is refused.
             'not-suspended' => EnsureAccountNotSuspended::class,
+            // Selectively applied to the money-in write routes (order placement,
+            // wallet funding). A logged-in, unverified customer is refused and
+            // re-sent their verification link; guests and verified users pass.
+            // Never attach to the global web group — browsing stays open.
+            'verified-email' => EnsureEmailVerified::class,
             // Hard kill-switch for transactional writes when the admin flips
             // system.maintenance_mode on. Browsing stays open, only state
             // changes are refused. Admin operators always bypass.
@@ -89,6 +96,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Gate for features still under construction. Fails closed, so a
             // route stays 404 until an admin turns its features.* row on.
             'feature' => EnsureFeatureEnabled::class,
+            // The 24-hour hold on new devices for account-security mutations
+            // (PIN change/reset/remove, device revoke, OTP preference).
+            'device.mature' => EnsureDeviceMature::class,
         ]);
 
         $middleware->append(TraceRequestMiddleware::class);

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CheckoutApiController;
 use App\Http\Controllers\Api\CryptoQrController;
 use App\Http\Controllers\Api\InteractionTrackingController;
+use App\Http\Controllers\Api\KycStatusController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentSessionController;
@@ -15,15 +16,13 @@ use App\Http\Controllers\Api\Storefront\EsimCatalogController;
 use App\Http\Controllers\Api\UserDashboardController;
 use App\Http\Controllers\Api\UserTransactionController;
 use App\Http\Controllers\Api\UserWalletController;
-use App\Http\Controllers\Api\VirtualCardController;
 use App\Http\Controllers\Api\Wallet\TransactionPinController;
 use App\Http\Controllers\Api\Webhooks\NowPaymentsWebhookController;
 use App\Http\Controllers\Webhooks\AiraloWebhookController;
 use App\Http\Controllers\Webhooks\FlutterwaveWebhookController;
 use App\Http\Controllers\Webhooks\KorapayWebhookController;
-use App\Http\Controllers\Webhooks\MapleradWebhookController;
 use App\Http\Controllers\Webhooks\PaystackWebhookController;
-use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Controllers\Webhooks\SmileWebhookController;
 use App\Http\Middleware\VerifyWebhookSignature;
 use Illuminate\Support\Facades\Route;
 
@@ -55,10 +54,6 @@ Route::post('webhooks/nowpayments', [NowPaymentsWebhookController::class, 'handl
     ->middleware(VerifyWebhookSignature::class.':nowpayments')
     ->name('api.webhooks.nowpayments');
 
-Route::post('webhooks/maplerad', [MapleradWebhookController::class, 'handle'])
-    ->middleware(VerifyWebhookSignature::class.':maplerad')
-    ->name('api.webhooks.maplerad');
-
 // Airalo low-data + expiry notifications, HMAC-signed with X-Airalo-Signature.
 // Verification lives in the shared middleware alongside every other provider so
 // there is one implementation to audit, and so this endpoint inherits the same
@@ -67,17 +62,10 @@ Route::post('webhooks/airalo', AiraloWebhookController::class)
     ->middleware(VerifyWebhookSignature::class.':airalo')
     ->name('api.webhooks.airalo');
 
-// Financial Features (Requires Auth + Pin)
-Route::middleware(['auth', 'require-pin'])->group(function () {
-    // Virtual Cards
-    Route::middleware([EnsureFeatureEnabled::class.':virtual_cards'])->group(function () {
-        Route::post('cards', [VirtualCardController::class, 'store']);
-        Route::post('cards/{id}/fund', [VirtualCardController::class, 'fund']);
-        Route::post('cards/{id}/freeze', [VirtualCardController::class, 'freeze']);
-        Route::post('cards/{id}/unfreeze', [VirtualCardController::class, 'unfreeze']);
-        Route::post('cards/{id}/terminate', [VirtualCardController::class, 'terminate']);
-    });
-});
+// Smile ID KYC result callback. Signed in the request BODY (verified inside the
+// provider via the Smile SDK), so it uses no header-signature middleware.
+Route::post('webhooks/smileid', [SmileWebhookController::class, 'handle'])
+    ->name('api.webhooks.smileid');
 
 // Storefront Catalog APIs (Public)
 Route::prefix('storefront')->name('api.storefront.')->group(function () {
@@ -142,27 +130,40 @@ Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function
 Route::middleware('auth')->group(function () {
     Route::get('dashboard', [UserDashboardController::class, 'index'])->name('api.dashboard');
 
+    // Poll KYC state after completing the Smile flow, so the UI can wait for the
+    // callback and then retry the action that required verification.
+    Route::get('kyc/status', [KycStatusController::class, 'show'])->name('api.kyc.status');
+
+    // Self-serve identity verification: the KYC page's "Verify now" button mints
+    // a Smile session here, and the modal marks the capture as submitted so the
+    // page can show an honest "in review" state while the verdict is in flight.
+    Route::post('kyc/start', [KycStatusController::class, 'start'])->middleware('throttle:6,1')->name('api.kyc.start');
+    Route::post('kyc/submitted', [KycStatusController::class, 'submitted'])->middleware('throttle:6,1')->name('api.kyc.submitted');
+
     Route::prefix('wallets')->name('api.wallets.')->group(function () {
         Route::get('/', [UserWalletController::class, 'index'])->name('index');
         Route::get('/fundings', [UserWalletController::class, 'fundings'])->name('fundings');
         Route::get('/fundings/{reference}', [UserWalletController::class, 'fundingDetails'])->name('fundings.show');
         Route::get('{currency}', [UserWalletController::class, 'show'])->name('show');
-        Route::post('fund/initiate', [UserWalletController::class, 'initiateFunding'])->middleware('not-suspended')->name('fund.initiate');
+        Route::post('fund/initiate', [UserWalletController::class, 'initiateFunding'])->middleware(['not-suspended', 'verified-email'])->name('fund.initiate');
 
         // Transaction PIN Routes
         Route::prefix('pin')->name('pin.')->group(function () {
             Route::get('status', [TransactionPinController::class, 'status'])->name('status');
             Route::post('setup', [TransactionPinController::class, 'setup'])->name('setup');
             Route::post('verify', [TransactionPinController::class, 'verify'])->name('verify')->middleware('throttle:5,1');
-            Route::put('change', [TransactionPinController::class, 'change'])->name('change');
-            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->name('reset.request');
-            Route::post('reset/confirm', [TransactionPinController::class, 'confirmReset'])->name('reset.confirm');
-            Route::delete('remove', [TransactionPinController::class, 'remove'])->name('remove');
+            // The 24-hour new-device hold covers every PIN MUTATION. setup
+            // (first-time) and verify (spending) stay open: a new customer
+            // must be able to set a PIN, and paying is never device-gated.
+            Route::put('change', [TransactionPinController::class, 'change'])->middleware('device.mature')->name('change');
+            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->middleware('device.mature')->name('reset.request');
+            Route::post('reset/confirm', [TransactionPinController::class, 'confirmReset'])->middleware('device.mature')->name('reset.confirm');
+            Route::delete('remove', [TransactionPinController::class, 'remove'])->middleware('device.mature')->name('remove');
         });
     });
 
     Route::prefix('checkout')->name('api.checkout.')->group(function () {
-        Route::post('place-order', [CheckoutApiController::class, 'placeOrder'])->name('place-order')->middleware(['throttle:10,1', 'not-suspended']);
+        Route::post('place-order', [CheckoutApiController::class, 'placeOrder'])->name('place-order')->middleware(['throttle:10,1', 'not-suspended', 'verified-email']);
     });
 
     Route::prefix('orders')->name('api.orders.')->group(function () {
@@ -197,7 +198,10 @@ Route::middleware('auth')->group(function () {
 
     // Security Center APIs
     Route::prefix('security')->name('api.security.')->group(function () {
-        Route::put('preferences', [SecurityController::class, 'updatePreferences'])->name('preferences.update');
-        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->name('devices.revoke');
+        // Both behind the new-device hold: flipping the OTP preference to
+        // "never" or revoking the owner's real devices are exactly the moves
+        // an account thief makes in their first hour.
+        Route::put('preferences', [SecurityController::class, 'updatePreferences'])->middleware('device.mature')->name('preferences.update');
+        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->middleware('device.mature')->name('devices.revoke');
     });
 });
