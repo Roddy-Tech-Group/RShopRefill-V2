@@ -67,6 +67,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'phone',
         'phone_verified_at',
         'country',
+        'profile_completed_at',
         'gender',
         'referral_code',
         'password',
@@ -114,6 +115,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'profile_completed_at' => 'datetime',
             'rcoin_multiplier' => 'decimal:2',
             'banned_at' => 'datetime',
             'suspended_at' => 'datetime',
@@ -126,6 +128,21 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_guest' => 'boolean',
             'guest_claim_last_sent_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Does this account still owe us the details every customer needs (country,
+     * phone, gender, terms)?
+     *
+     * Only a Google sign-up can answer true: the register wizard collects all of
+     * it up front, and every account that predates the completion step was
+     * backfilled by its migration. Legacy guest shadow accounts are exempt for
+     * the same reason they skip the email gate - they are claimed, not
+     * registered.
+     */
+    public function needsProfileCompletion(): bool
+    {
+        return ! $this->is_guest && $this->profile_completed_at === null;
     }
 
     /**

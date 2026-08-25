@@ -47,6 +47,13 @@ Route::middleware('auth')->group(function () {
 
     Volt::route('confirm-password', 'auth.confirm-password')
         ->name('password.confirm');
+
+    // Finishes a Google sign-up. Google returns no country, phone or gender, so
+    // a brand-new Google account is held here by EnsureProfileCompleted until it
+    // supplies them and accepts the terms. Every other account passes straight
+    // through and never sees this page.
+    Volt::route('auth/complete-profile', 'auth.complete-profile')
+        ->name('auth.complete-profile');
 });
 
 Route::post('logout', Logout::class)

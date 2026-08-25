@@ -44,14 +44,118 @@ class ProfileUpdateTest extends TestCase
 
         $this->actingAs($user);
 
+        // Stored as the ISO code, the same shape registration writes, so every
+        // ISO-comparing reader (Smile ID's product routing) matches it.
+        Volt::test('settings.profile')
+            ->set('name', $user->name)
+            ->set('email', $user->email)
+            ->set('country', 'CM')
+            ->call('updateProfileInformation')
+            ->assertHasNoErrors();
+
+        $this->assertEquals('CM', $user->refresh()->country);
+    }
+
+    public function test_account_country_rejects_the_display_name_now_that_iso_codes_are_stored(): void
+    {
+        $user = User::factory()->create(['country' => null]);
+
+        $this->actingAs($user);
+
         Volt::test('settings.profile')
             ->set('name', $user->name)
             ->set('email', $user->email)
             ->set('country', 'Cameroon')
             ->call('updateProfileInformation')
+            ->assertHasErrors('country');
+    }
+
+    public function test_a_national_phone_number_is_stored_as_e164(): void
+    {
+        $user = User::factory()->create(['country' => null, 'phone' => null]);
+
+        $this->actingAs($user);
+
+        // Typed with the trunk 0, as a Nigerian customer would.
+        Volt::test('settings.profile')
+            ->set('name', $user->name)
+            ->set('email', $user->email)
+            ->set('country', 'NG')
+            ->set('phone', '08031234567')
+            ->call('updateProfileInformation')
             ->assertHasNoErrors();
 
-        $this->assertEquals('Cameroon', $user->refresh()->country);
+        $this->assertSame('+2348031234567', $user->refresh()->phone);
+    }
+
+    public function test_a_phone_number_belonging_to_another_account_is_refused(): void
+    {
+        User::factory()->create(['phone' => '+2348031234567']);
+        $user = User::factory()->create(['country' => null, 'phone' => null]);
+
+        $this->actingAs($user);
+
+        // The national form of a number another account already holds: the
+        // check runs on the canonical E.164 value, so the two are seen as the
+        // same line. One verified line, one account.
+        Volt::test('settings.profile')
+            ->set('name', $user->name)
+            ->set('email', $user->email)
+            ->set('country', 'NG')
+            ->set('phone', '08031234567')
+            ->call('updateProfileInformation')
+            ->assertHasErrors('phone');
+
+        $this->assertNull($user->refresh()->phone);
+    }
+
+    public function test_keeping_your_own_unchanged_phone_number_is_not_a_duplicate(): void
+    {
+        $user = User::factory()->create(['country' => 'NG', 'phone' => '+2348031234567']);
+
+        $this->actingAs($user);
+
+        Volt::test('settings.profile')
+            ->set('name', 'Renamed Person')
+            ->set('email', $user->email)
+            ->set('country', 'NG')
+            ->set('phone', '+2348031234567')
+            ->call('updateProfileInformation')
+            ->assertHasNoErrors();
+
+        $this->assertSame('+2348031234567', $user->refresh()->phone);
+    }
+
+    public function test_a_number_that_is_not_valid_for_the_chosen_country_is_refused(): void
+    {
+        $user = User::factory()->create(['country' => null, 'phone' => null]);
+
+        $this->actingAs($user);
+
+        Volt::test('settings.profile')
+            ->set('name', $user->name)
+            ->set('email', $user->email)
+            ->set('country', 'NG')
+            ->set('phone', '12')
+            ->call('updateProfileInformation')
+            ->assertHasErrors('phone');
+    }
+
+    public function test_the_phone_can_be_cleared(): void
+    {
+        $user = User::factory()->create(['country' => 'NG', 'phone' => '+2348031234567']);
+
+        $this->actingAs($user);
+
+        Volt::test('settings.profile')
+            ->set('name', $user->name)
+            ->set('email', $user->email)
+            ->set('country', 'NG')
+            ->set('phone', '')
+            ->call('updateProfileInformation')
+            ->assertHasNoErrors();
+
+        $this->assertNull($user->refresh()->phone);
     }
 
     public function test_account_country_rejects_values_outside_the_country_list(): void

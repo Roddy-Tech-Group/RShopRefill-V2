@@ -183,6 +183,10 @@ new class extends Component {
             'phone' => $phoneE164,
             'password' => Hash::make($validated['regPassword']),
             'gender' => $validated['regGender'],
+            // The wizard just collected everything an account needs, terms
+            // included, so this signup is complete on arrival and never meets
+            // the Google completion step.
+            'profile_completed_at' => now(),
         ]);
 
         // Fire Registered (which sends the email-verification mail). We
