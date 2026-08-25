@@ -4,6 +4,7 @@ namespace App\Domain\Auth\Services;
 
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
@@ -97,9 +98,17 @@ class GoogleAuthService
      *
      * This handles the case where someone registered with email/password
      * and later clicks "Sign in with Google" using the same email.
+     *
+     * When the link is what finally proves the address, the Verified event is
+     * fired so the rest of the platform reacts exactly as it would to a clicked
+     * verification link. Without it, someone who registered by password, never
+     * verified, then signed in with Google ended up verified but never welcomed:
+     * the welcome waits on Verified, and nothing else was raising it.
      */
     private function linkGoogleAccount(User $user, SocialiteUser $googleUser): void
     {
+        $wasUnverified = ! $user->hasVerifiedEmail();
+
         $user->update([
             'google_id' => $googleUser->getId(),
             // Keep an already-uploaded photo; otherwise adopt the Google one.
@@ -110,6 +119,13 @@ class GoogleAuthService
             // links Google should not be asked to verify again.
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
+
+        // Only when this link is what verified them: an already-verified account
+        // re-linking must not raise it again. WelcomeListener is idempotent per
+        // account regardless, so this can never produce a second welcome.
+        if ($wasUnverified && $user->hasVerifiedEmail()) {
+            event(new Verified($user));
+        }
 
         Log::info('Google account linked to existing user', [
             'user_id' => $user->id,
@@ -124,6 +140,12 @@ class GoogleAuthService
      * event is fired to trigger any listeners (e.g., wallet creation).
      * Email is automatically marked as verified since Google already
      * verified it.
+     *
+     * Google returns no country, phone or gender, so profile_completed_at is
+     * deliberately left null: EnsureProfileCompleted holds the new account on
+     * the completion step until the customer supplies them and accepts the
+     * terms. Returning and account-linking users (scenarios 1 and 2) never
+     * reach here, so their sign-in is untouched.
      */
     private function createGoogleUser(SocialiteUser $googleUser): User
     {

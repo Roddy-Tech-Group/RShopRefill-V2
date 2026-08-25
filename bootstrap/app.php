@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureAccountNotSuspended;
 use App\Http\Middleware\EnsureDeviceMature;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\EnsureProfileCompleted;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\ResolveRegion;
@@ -25,6 +26,9 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Log;
+use Livewire\Exceptions\MethodNotFoundException;
+use Livewire\Exceptions\PublicPropertyNotFoundException;
+use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Psy\Exception\BreakException;
 use Sentry\Laravel\Integration;
 
@@ -129,6 +133,10 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
             EnforceDeviceVerification::class,
+            // Holds a brand-new Google sign-up on the completion step until it
+            // supplies the country / phone / gender / terms the register wizard
+            // collects. Inert for every other account.
+            EnsureProfileCompleted::class,
             // Order matters on the response unwind: AdvertiseDiscoveryLinks runs
             // first (while the body is still HTML) so it can set the Link header,
             // then NegotiateMarkdown converts the body for agents while keeping it.
@@ -175,9 +183,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->dontReport([
             BreakException::class,
-            \Livewire\Exceptions\MethodNotFoundException::class,
-            \Livewire\Exceptions\PublicPropertyNotFoundException::class,
-            \Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException::class,
+            MethodNotFoundException::class,
+            PublicPropertyNotFoundException::class,
+            CorruptComponentPayloadException::class,
         ]);
 
         $exceptions->dontFlash([

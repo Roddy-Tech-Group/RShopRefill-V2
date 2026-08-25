@@ -28,6 +28,11 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            // Factory users are fully registered by default, the same state the
+            // register wizard leaves a real signup in. Without this every test
+            // user would owe the completion step and the guard would redirect
+            // them away from the page under test.
+            'profile_completed_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -40,6 +45,20 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * A fresh Google sign-up: authenticated, email verified by Google, but still
+     * owing the country / phone / gender / terms the register wizard collects.
+     */
+    public function profileIncomplete(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'profile_completed_at' => null,
+            'country' => null,
+            'phone' => null,
+            'gender' => null,
         ]);
     }
 }
