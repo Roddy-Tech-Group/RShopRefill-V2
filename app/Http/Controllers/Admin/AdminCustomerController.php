@@ -13,6 +13,7 @@ use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\User;
+use App\Support\PhoneCountries;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,7 +38,10 @@ class AdminCustomerController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
-            'country' => ['nullable', 'string', Rule::in(array_keys(config('countries.codes', [])))],
+            // ISO 3166-1 alpha-2, the one shape users.country holds. Storing the
+            // display name here (as this rule used to accept) put a second
+            // format in the column that no ISO-comparing reader could match.
+            'country' => ['nullable', 'string', Rule::in(PhoneCountries::isoCodes())],
             'gender' => ['nullable', 'in:male,female,other'],
         ]);
 

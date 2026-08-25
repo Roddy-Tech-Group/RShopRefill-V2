@@ -1,13 +1,17 @@
 <?php
 
 use App\Models\User;
+use App\Support\PhoneCountries;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 new #[Layout('components.layouts.dashboard')] class extends Component {
     use WithFileUploads;
@@ -65,6 +69,23 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     {
         $user = Auth::user();
 
+        $phoneInput = trim((string) $this->phone);
+        $isInternational = str_starts_with($phoneInput, '+');
+
+        // Phone rules match the register wizard's: libphonenumber decides, and
+        // the stored value is E.164. A number typed in international form is
+        // validated on its own dial code so an account whose declared country
+        // differs from its line's country (diaspora, a travel SIM) still saves;
+        // a national number needs the country to say which numbering plan it
+        // belongs to.
+        $phoneRules = ['nullable', 'string', 'max:32'];
+
+        if ($phoneInput !== '') {
+            $phoneRules[] = $isInternational
+                ? (new Phone)->international()
+                : (new Phone)->countryField('country');
+        }
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
 
@@ -77,26 +98,54 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 Rule::unique(User::class)->ignore($user->id)
             ],
 
-            // Phone: free-form for now, allows + and digits and spaces. Backend can swap in a stricter rule
-            // (libphonenumber, country-aware) once a phone library ships.
-            'phone'  => ['nullable', 'string', 'max:32', 'regex:/^[\d\s\+\-\(\)]+$/'],
+            'phone' => $phoneRules,
 
             // Account country - the user's declared country (profile attribute,
-            // shown in their info and to admins). Constrained to the known
-            // country list so junk can't be stored. NOT the shopping region.
-            'country' => ['nullable', 'string', Rule::in(array_keys(config('countries.codes', [])))],
+            // shown in their info and to admins). Stored as the ISO 3166-1
+            // alpha-2 code, the same shape registration writes, so every reader
+            // (Smile ID's per-country routing above all) sees one format.
+            // Required alongside a national phone number, which cannot be
+            // validated without knowing its country.
+            'country' => array_filter([
+                'nullable',
+                $phoneInput !== '' && ! $isInternational ? 'required_with:phone' : null,
+                'string',
+                Rule::in(PhoneCountries::isoCodes()),
+            ]),
 
             // Gender enum stored as a short string. Add new values to the migration column and the union here.
             'gender' => ['nullable', 'in:male,female,other'],
         ]);
 
+        // Canonicalise before the uniqueness check: a national-number comparison
+        // could not see that 0803... and +234803... are the same line, which is
+        // how this page used to let two accounts claim one number.
+        $phoneE164 = null;
+
+        if ($phoneInput !== '') {
+            $phoneE164 = $isInternational
+                ? (new PhoneNumber($phoneInput))->formatE164()
+                : (new PhoneNumber($phoneInput, [$validated['country']]))->formatE164();
+
+            if (User::where('phone', $phoneE164)->whereKeyNot($user->getKey())->exists()) {
+                throw ValidationException::withMessages([
+                    'phone' => 'This phone number is already registered to another account.',
+                ]);
+            }
+        }
+
         $user->fill($validated);
+        $user->phone = $phoneE164;
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
         $user->save();
+
+        // Reflect the canonical value back into the form so the customer sees
+        // what was actually stored rather than what they typed.
+        $this->phone = $phoneE164;
 
         $this->dispatch('profile-updated', name: $user->name);
     }
@@ -442,11 +491,18 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Country</p>
                         <p class="mt-0.5 flex items-center gap-2 text-sm font-medium text-black dark:text-white">
-                            @php $profileCc = strtolower((string) (config('countries.codes')[$country] ?? '')); @endphp
+                            @php
+                                // country holds the ISO code; resolve it back to a
+                                // display name (and flag) for the reader.
+                                $profileCc = $country ? strtolower($country) : '';
+                                $profileCountryName = $country
+                                    ? (array_search(strtoupper($country), config('countries.codes', []), true) ?: $country)
+                                    : '';
+                            @endphp
                             @if ($profileCc)
                                 <img src="https://flagcdn.com/w40/{{ $profileCc }}.png" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200">
                             @endif
-                            <span>{{ $country ?: 'Not set' }}</span>
+                            <span>{{ $profileCountryName ?: 'Not set' }}</span>
                         </p>
                     </div>
                 </div>
@@ -506,8 +562,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     @php
                         // Same option shape the KYC dropdown consumes, so the country
                         // field reuses the shared kycSelect modern dropdown component.
-                        $countryOptions = collect(array_keys(config('countries.codes', [])))
-                            ->map(fn ($cName) => ['value' => $cName, 'label' => $cName])
+                        // Value is the ISO code we store; the label stays the
+                        // country name the customer recognises.
+                        $countryOptions = collect(App\Support\PhoneCountries::all())
+                            ->map(fn (array $c) => ['value' => $c['iso'], 'label' => $c['name']])
                             ->values();
                     @endphp
                     <div>

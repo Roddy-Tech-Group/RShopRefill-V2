@@ -74,7 +74,8 @@
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Country</dt>
-                    <dd class="mt-1 font-medium text-zinc-700">{{ $user->country ?: '-' }}</dd>
+                    {{-- Stored as the ISO code; show the operator the name. --}}
+                    <dd class="mt-1 font-medium text-zinc-700">{{ $user->country ? (array_search(strtoupper($user->country), config('countries.codes', []), true) ?: $user->country) : '-' }}</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sign-in</dt>
@@ -458,8 +459,10 @@
                         <div class="relative mt-1.5">
                             <select name="country" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <option value="">Not set</option>
-                                @foreach (array_keys(config('countries.codes', [])) as $cName)
-                                    <option value="{{ $cName }}" @selected(old('country', $user->country) === $cName)>{{ $cName }}</option>
+                                {{-- Value is the ISO code the column stores; the
+                                     label stays the readable country name. --}}
+                                @foreach (App\Support\PhoneCountries::all() as $cRow)
+                                    <option value="{{ $cRow['iso'] }}" @selected(old('country', $user->country) === $cRow['iso'])>{{ $cRow['name'] }}</option>
                                 @endforeach
                             </select>
                             <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
