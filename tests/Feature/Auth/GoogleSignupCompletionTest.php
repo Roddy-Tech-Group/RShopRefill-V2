@@ -4,13 +4,17 @@ namespace Tests\Feature\Auth;
 
 use App\Domain\Admin\Enums\AdminRole;
 use App\Domain\Auth\Services\GoogleAuthService;
+use App\Http\Middleware\EnsureProfileCompleted;
 use App\Models\Admin;
 use App\Models\CommunicationLog;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
 
@@ -110,6 +114,57 @@ class GoogleSignupCompletionTest extends TestCase
         $this->assertSame('NG', $user->country);
         $this->assertSame('+2348031234567', $user->phone);
         $this->assertSame('female', $user->gender);
+    }
+
+    public function test_livewire_calls_are_never_intercepted_while_the_hold_is_on(): void
+    {
+        // The bug this pins shipped to production: the exemption was the literal
+        // 'livewire/*', but Livewire 4 fingerprints its endpoint to
+        // livewire-<hash>/update, so the guard redirected every wire:click and
+        // wire:submit on the completion form. The page appeared to reload and
+        // render itself inside itself, and no control worked.
+        //
+        // Volt::test() calls the component directly and never crosses the
+        // middleware, which is exactly why the rest of this file stayed green
+        // while the form was broken. This asserts the middleware itself.
+        $user = User::factory()->profileIncomplete()->create();
+
+        $middleware = new EnsureProfileCompleted;
+        $reached = false;
+
+        $request = Request::create(Livewire::getUpdateUri(), 'POST');
+        $request->setUserResolver(fn () => $user);
+
+        $middleware->handle($request, function () use (&$reached) {
+            $reached = true;
+
+            return new Response('ok');
+        });
+
+        $this->assertTrue($reached, 'The Livewire endpoint must reach the app, not be redirected by the profile hold.');
+    }
+
+    public function test_an_ordinary_page_is_still_held(): void
+    {
+        // The other half of the same guard: relaxing Livewire must not relax
+        // everything else.
+        $user = User::factory()->profileIncomplete()->create();
+
+        $middleware = new EnsureProfileCompleted;
+        $reached = false;
+
+        $request = Request::create('/dashboard', 'GET');
+        $request->setLaravelSession(app('session.store'));
+        $request->setUserResolver(fn () => $user);
+
+        $response = $middleware->handle($request, function () use (&$reached) {
+            $reached = true;
+
+            return new Response('ok');
+        });
+
+        $this->assertFalse($reached);
+        $this->assertSame(route('auth.complete-profile'), $response->headers->get('Location'));
     }
 
     public function test_logging_out_is_still_possible_while_held(): void
