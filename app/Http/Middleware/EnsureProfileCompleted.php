@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
+use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -30,10 +31,7 @@ class EnsureProfileCompleted
      * Paths that must stay reachable while the hold is on, or the hold would
      * trap the customer with no way to satisfy or escape it.
      *
-     * `livewire/*` is the important one: the completion form itself submits
-     * through Livewire's update endpoint, so redirecting it would make the page
-     * unable to save the very data it is asking for. That is not a hole - every
-     * component behind it lives on a page this guard already refuses to serve.
+     * Livewire's own endpoint is matched separately, in isLivewireRequest().
      *
      * @var list<string>
      */
@@ -41,12 +39,33 @@ class EnsureProfileCompleted
         'auth/complete-profile',
         'auth/popup-complete',
         'logout',
-        'livewire/*',
         // The admin panel authenticates on its own guard; a customer session
         // that happens to ride alongside it must never redirect an operator.
         'admin',
         'admin/*',
     ];
+
+    /**
+     * Is this Livewire talking to itself?
+     *
+     * The completion form submits through Livewire's update endpoint, so
+     * redirecting that call leaves the page unable to save the very data it is
+     * asking for: the browser follows the redirect and re-renders the form
+     * inside itself. Letting it through is not a hole - every component behind
+     * that endpoint lives on a page this guard already refuses to serve, and the
+     * completion component guards its own write.
+     *
+     * The prefix is ASKED OF LIVEWIRE rather than guessed, because Livewire
+     * fingerprints it per application: v4 serves livewire-<hash>/update where v3
+     * served livewire/update. A hardcoded 'livewire/*' matched nothing on v4 and
+     * broke every control on the form in production. The literals are a safety
+     * net should that API ever move.
+     */
+    private function isLivewireRequest(Request $request): bool
+    {
+        return $request->is(trim(Livewire::getUriPrefix(), '/').'/*')
+            || $request->is('livewire/*', 'livewire-*/*');
+    }
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -55,7 +74,10 @@ class EnsureProfileCompleted
         // Must be a customer, and the check must come before anything that
         // calls a User method: an admin session resolves $request->user() to an
         // Admin, which knows nothing about profile completion.
-        if (! $user instanceof User || $request->is(...self::EXEMPT) || ! $user->needsProfileCompletion()) {
+        if (! $user instanceof User
+            || $request->is(...self::EXEMPT)
+            || $this->isLivewireRequest($request)
+            || ! $user->needsProfileCompletion()) {
             return $next($request);
         }
 
