@@ -6,6 +6,7 @@ use App\Domain\Auth\Exceptions\EmailVerificationRequiredException;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
+use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
@@ -303,7 +304,13 @@ class WalletFundingService
             // telemetry sees crypto fundings whichever door they came in by.
             $attempt->recordPaymentMethod('crypto');
 
-            $result = $this->paymentGatewayFactory->getProvider('nowpayments')->chargeCrypto($attempt, $payCurrency);
+            $provider = $this->paymentGatewayFactory->getProvider('nowpayments');
+
+            if (! $provider instanceof NowPaymentsProvider) {
+                throw new WalletFundingException('We could not start this crypto payment. Please try again.');
+            }
+
+            $result = $provider->chargeCrypto($attempt, $payCurrency);
 
             if (($result['status'] ?? null) !== 'awaiting_transfer') {
                 // Throwing inside the transaction rolls the funding, the attempt
@@ -424,7 +431,21 @@ class WalletFundingService
             return;
         }
 
-        if ($funding->status === FundingStatus::Failed || $funding->status === FundingStatus::Cancelled) {
+        if ($funding->status === FundingStatus::Cancelled) {
+            throw WalletFundingException::alreadyProcessed($txRef);
+        }
+
+        // Failed is final for a fiat funding: the gateway said no, and a
+        // replayed webhook must not resurrect it. A CRYPTO funding is different.
+        // Our own expiry sweep fails one on the clock while the customer's coins
+        // may still be confirming on-chain, and NOWPayments then delivers a
+        // genuine `finished` for it. Refusing that here left real money at the
+        // gateway and the wallet never credited. So a failed crypto funding
+        // falls through to the server-to-server verification below: if the
+        // gateway confirms full settlement it is credited, otherwise
+        // failFunding() keeps it failed. The ledger idempotency key and the
+        // Completed check make a double credit impossible either way.
+        if ($funding->status === FundingStatus::Failed && ! in_array($funding->gateway, ['nowpayments', 'crypto'], true)) {
             throw WalletFundingException::alreadyProcessed($txRef);
         }
 
@@ -496,11 +517,14 @@ class WalletFundingService
                 ]
             );
 
-            // Mark funding completed
+            // Mark funding completed. failed_reason is cleared because a crypto
+            // funding can arrive here from Failed (see the guard above); a
+            // completed deposit must not carry the sweep's old verdict.
             $funding->update([
                 'status' => FundingStatus::Completed,
                 'gateway_reference' => $flwTransactionId,
                 'provider_payload_snapshot' => $rawPayload,
+                'failed_reason' => null,
                 'completed_at' => now(),
                 'processed_at' => now(),
             ]);
