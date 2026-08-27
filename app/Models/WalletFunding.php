@@ -7,6 +7,7 @@ use App\Domain\Shared\Enums\FundingStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -84,5 +85,15 @@ class WalletFunding extends Model
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(Wallet::class);
+    }
+
+    /**
+     * The payment attempt collecting this funding (polymorphic payable). A
+     * funding whose attempt never got a gateway reference never reached a
+     * gateway: no address was issued, no charge was started.
+     */
+    public function paymentAttempt(): MorphOne
+    {
+        return $this->morphOne(PaymentAttempt::class, 'payable');
     }
 }
