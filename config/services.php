@@ -45,6 +45,10 @@ return [
         'key' => env('RESEND_KEY'),
         'from_address' => env('MAIL_FROM_ADDRESS', 'noreply@rshoprefills.com'),
         'from_name' => env('MAIL_FROM_NAME', 'RshopRefills'),
+        // Resend allows 10 requests/second per account; the throttle in front
+        // of every send shares this ceiling across all queue workers.
+        'max_requests_per_second' => (int) env('RESEND_MAX_REQUESTS_PER_SECOND', 8),
+        'throttle_wait_ms' => (int) env('RESEND_THROTTLE_WAIT_MS', 5000),
     ],
 
     'slack' => [
