@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\PaymentAttempt;
+use App\Models\WalletFunding;
 use Illuminate\Console\Command;
 
 /**
@@ -35,18 +37,41 @@ class ReconcileNowPaymentsCommand extends Command
             ->whereNotNull('gateway_reference')
             ->whereNotIn('payment_status', [
                 PaymentStatus::Paid->value,
-                PaymentStatus::Failed->value,
                 PaymentStatus::Refunded->value,
                 // PartiallyPaid is settled at the gateway and terminal for this
                 // payment id — re-verifying it hourly forever produced no state
                 // change, only noise. Recovery is the customer's top-up (which
                 // creates a NEW payment) or an operator, not this sweep.
                 PaymentStatus::PartiallyPaid->value,
-                PaymentStatus::Expired->value,
             ])
             ->when($hours !== null, fn ($q) => $q->where('created_at', '>=', now()->subHours((int) $hours)))
             ->orderBy('id')
-            ->get();
+            ->get()
+            // Failed and Expired attempts used to be excluded outright, which
+            // conflated two different things: "the gateway said expired" (final,
+            // nothing to recover) and "our own sweep timed it out" (the gateway
+            // may still be confirming the customer's coins). The scheduler's own
+            // comment says polling is the only way late deposits are ever seen -
+            // and this exclusion made the poll blind to exactly the attempts the
+            // sweep had orphaned. Re-check a failed/expired WALLET FUNDING whose
+            // gateway status is not itself terminal; leave orders and gateway-
+            // final attempts alone.
+            ->filter(function (PaymentAttempt $attempt): bool {
+                if (! in_array($attempt->payment_status, [PaymentStatus::Failed, PaymentStatus::Expired], true)) {
+                    return true;
+                }
+
+                if ($attempt->payable_type !== WalletFunding::class) {
+                    return false;
+                }
+
+                $gatewayStatus = NowPaymentsStatus::normalize(data_get($attempt->metadata, 'crypto.status'));
+
+                return ! NowPaymentsStatus::isFailed($gatewayStatus)
+                    && ! NowPaymentsStatus::isExpired($gatewayStatus)
+                    && ! NowPaymentsStatus::isRefunded($gatewayStatus);
+            })
+            ->values();
 
         if ($candidates->isEmpty()) {
             $this->info('No pending NOWPayments attempts to reconcile.');

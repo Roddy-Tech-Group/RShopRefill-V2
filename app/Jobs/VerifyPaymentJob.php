@@ -7,6 +7,7 @@ use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\Order;
@@ -45,7 +46,17 @@ class VerifyPaymentJob implements ShouldQueue
         DB::transaction(function () use ($gatewayFactory, $orderService) {
             $attempt = PaymentAttempt::where('id', $this->attempt->id)->lockForUpdate()->first();
 
-            if (! $attempt || $attempt->payment_status === PaymentStatus::Failed) {
+            if (! $attempt) {
+                return;
+            }
+
+            // Failed is final, with one exception: a crypto wallet funding that
+            // OUR sweeper failed on the clock while the gateway still had the
+            // customer's coins confirming. The gateway never said failed, so
+            // when its `finished` IPN arrives, or the hourly reconcile asks, the
+            // money is real and must be credited. Only a status the gateway
+            // itself reported as terminal closes the door for good.
+            if ($attempt->payment_status === PaymentStatus::Failed && ! $this->failedLocallyWhileGatewayStillOpen($attempt)) {
                 return;
             }
 
@@ -148,6 +159,30 @@ class VerifyPaymentJob implements ShouldQueue
                 Log::warning("VerifyPaymentJob: payment verification returned unpaid/pending for attempt {$attempt->id}");
             }
         });
+    }
+
+    /**
+     * A crypto wallet-funding attempt marked Failed by our own expiry sweep,
+     * not by the gateway. The gateway's last known word is kept on the attempt
+     * (crypto.status); only failed / expired / refunded / cancelled from the
+     * gateway are final. Scoped to wallet fundings: an order the sweep cancelled
+     * has a fulfilment lifecycle of its own and is not reopened here.
+     */
+    private function failedLocallyWhileGatewayStillOpen(PaymentAttempt $attempt): bool
+    {
+        if ($attempt->payable_type !== WalletFunding::class) {
+            return false;
+        }
+
+        if (! in_array($attempt->gateway, ['nowpayments', 'crypto'], true)) {
+            return false;
+        }
+
+        $gatewayStatus = NowPaymentsStatus::normalize(data_get($attempt->metadata, 'crypto.status'));
+
+        return ! NowPaymentsStatus::isFailed($gatewayStatus)
+            && ! NowPaymentsStatus::isExpired($gatewayStatus)
+            && ! NowPaymentsStatus::isRefunded($gatewayStatus);
     }
 
     /**
