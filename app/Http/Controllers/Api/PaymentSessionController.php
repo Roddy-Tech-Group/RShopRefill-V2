@@ -12,18 +12,17 @@ use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
-use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\FulfillOrderItemJob;
-use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
@@ -739,60 +738,11 @@ class PaymentSessionController extends Controller
      */
     private function rejectUnusableCoin(PaymentAttempt $attempt, string $payCurrency): ?string
     {
-        $coin = CurrencyRate::query()
-            ->crypto()
-            ->where('code', strtoupper(trim($payCurrency)))
-            ->first();
-
-        if (! $coin) {
-            return 'That cryptocurrency is not available. Please choose another coin.';
-        }
-
-        if (! $coin->is_active || ! $coin->is_payable) {
-            return "{$coin->name} is temporarily unavailable. Please choose another coin.";
-        }
-
-        // Fails open on an unsynced minimum — see CurrencyRate::acceptsOrderValue.
-        $usd = $this->attemptValueInUsd($attempt);
-
-        if ($usd !== null && ! $coin->acceptsOrderValue($usd)) {
-            $minimum = '$'.number_format((float) $coin->min_amount_usd, 2);
-
-            return "Orders paid with {$coin->name} must be at least {$minimum}. Please choose another coin or add more to your order.";
-        }
-
-        return null;
-    }
-
-    /**
-     * The attempt's value in USD, or null when it cannot be established.
-     *
-     * Null means "do not gate" rather than "reject": a rate lookup failure must not
-     * block a payment the gateway would have accepted.
-     */
-    private function attemptValueInUsd(PaymentAttempt $attempt): ?float
-    {
-        $currency = strtoupper((string) $attempt->currency);
-        $amount = (float) $attempt->amount;
-
-        if ($amount <= 0) {
-            return null;
-        }
-
-        if ($currency === 'USD') {
-            return $amount;
-        }
-
-        try {
-            return $amount * app(CurrencyRateService::class)->resolveRate($currency, 'USD');
-        } catch (\Throwable $e) {
-            Log::warning('Could not resolve order value in USD for crypto minimum check', [
-                'attempt_id' => $attempt->id,
-                'currency' => $currency,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
+        // One gate for checkout and wallet funding - see CryptoCoinGate.
+        return app(CryptoCoinGate::class)->rejection(
+            $payCurrency,
+            (float) $attempt->amount,
+            (string) $attempt->currency,
+        );
     }
 }
