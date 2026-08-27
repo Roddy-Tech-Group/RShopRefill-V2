@@ -47,11 +47,14 @@ Schedule::job(new ReconcilePendingFundingsJob)->hourly()->sentryMonitor('reconci
 // Airalo requires syncing GET /v2/packages at least once every 60 minutes
 // or they email warning the catalog may be stale. withoutOverlapping prevents
 // a slow sync from doubling up; runInBackground so cron isn't blocked while
-// the API call is paginating. Logs go to storage/logs/laravel.log.
+// the API call is paginating. Command output is appended to
+// storage/logs/airalo-sync.log; without that, a background run only
+// ever surfaces as "exited with code 1".
 Schedule::command('airalo:sync-esims')
     ->hourlyAt(17)
     ->withoutOverlapping(60)
     ->runInBackground()
+    ->appendOutputTo(storage_path('logs/airalo-sync.log'))
     ->name('airalo:sync-esims-hourly');
 
 // Zendit catalog syncs - keep gift cards, top-ups and bills fresh without
