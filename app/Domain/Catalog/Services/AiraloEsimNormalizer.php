@@ -30,8 +30,6 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
         $countryCode = strlen($rawLocation) === 2 ? $rawLocation : 'WW';
         $regionName = $rawItem['title'] ?? ($countryCode === 'WW' ? 'Global' : $countryCode);
 
-        // Grouping logic: identical to Zendit so Airalo plans fall under the same Region Product
-        $productSlug = Str::slug("esim-{$countryCode}-{$regionName}");
         // Name every product by its real region ("Middle East and North Africa eSIM",
         // "Discover Global eSIM", "Europe eSIM"). Non-country products used to be a
         // blanket "Global eSIM", which made the admin product list / command bar a wall
@@ -39,16 +37,29 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
         // slug; this stores the same region name so admin surfaces match.
         $productName = "{$regionName} eSIM";
 
-        // Preserve admin-arranged categories on existing rows so the hourly
-        // re-sync doesn't wipe manual organisation.
-        $existing = Product::where('slug', $productSlug)->first();
+        // Airalo's own slug ("united-states", "discover-global") is the stable
+        // identity of a package group; the title is not (Airalo renamed
+        // "Discover Global" to "Global" on 2026-08-27). It is stored in
+        // provider_reference so a rename updates the row instead of inserting
+        // a duplicate that then collides with another provider's slug.
+        $providerReference = isset($rawItem['slug']) && is_string($rawItem['slug']) && $rawItem['slug'] !== ''
+            ? $rawItem['slug']
+            : null;
 
-        $product = Product::updateOrCreate(
+        $existing = $this->findExistingProduct($providerName, $providerReference, $countryCode, $regionName, $rawItem);
+
+        // Slugs are storefront URLs, so an existing product keeps its slug;
+        // only a brand-new product gets one, and only one nobody else owns.
+        $productSlug = $existing?->slug ?? $this->availableSlug($providerName, $countryCode, $regionName);
+
+        $product = $existing ?? new Product;
+        $product->fill(
             [
                 'provider_name' => $providerName,
+                'provider_reference' => $providerReference ?? $existing?->provider_reference,
                 'slug' => $productSlug,
-            ],
-            [
+                // Preserve admin-arranged categories on existing rows so the hourly
+                // re-sync doesn't wipe manual organisation.
                 'category_id' => $existing?->category_id ?? $category->id,
                 'subcategory_id' => $existing?->subcategory_id ?? $subcategory->id,
                 // country_code and name are admin-editable; preserve any edits.
@@ -64,6 +75,7 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
                 'logo_url' => $rawItem['image']['url'] ?? null,
             ]
         );
+        $product->save();
 
         // 4. Variant Normalization
         $operators = $rawItem['operators'] ?? [];
@@ -172,5 +184,75 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
                 );
             }
         }
+    }
+
+    /**
+     * Resolve the product this Airalo item already maps to, in order of how
+     * stable the key is: Airalo's slug, then our derived slug, then whichever
+     * product this item's packages were attached to last time (covers rows
+     * synced before provider_reference was recorded, across a title rename).
+     *
+     * @param  array<string, mixed>  $rawItem
+     */
+    private function findExistingProduct(
+        string $providerName,
+        ?string $providerReference,
+        string $countryCode,
+        string $regionName,
+        array $rawItem,
+    ): ?Product {
+        if ($providerReference !== null) {
+            $byReference = Product::where('provider_name', $providerName)
+                ->where('provider_reference', $providerReference)
+                ->first();
+            if ($byReference) {
+                return $byReference;
+            }
+        }
+
+        $bySlug = Product::where('provider_name', $providerName)
+            ->where('slug', Str::slug("esim-{$countryCode}-{$regionName}"))
+            ->first();
+        if ($bySlug) {
+            return $bySlug;
+        }
+
+        foreach (($rawItem['operators'] ?? []) as $operator) {
+            foreach (($operator['packages'] ?? []) as $pkg) {
+                if (empty($pkg['id'])) {
+                    continue;
+                }
+                $variant = ProductVariant::with('product')
+                    ->where('provider_offer_id', "airalo_{$pkg['id']}")
+                    ->first();
+                if ($variant?->product && $variant->product->provider_name === $providerName) {
+                    return $variant->product;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The products table enforces slug uniqueness globally, so when another
+     * provider already owns the natural slug ("esim-ww-global" is Zendit's)
+     * a new product takes a provider-suffixed one instead of crashing the
+     * whole sync page on the unique index.
+     */
+    private function availableSlug(string $providerName, string $countryCode, string $regionName): string
+    {
+        $slug = Str::slug("esim-{$countryCode}-{$regionName}");
+        if (! Product::where('slug', $slug)->exists()) {
+            return $slug;
+        }
+
+        $suffixed = Str::slug("{$slug}-{$providerName}");
+        $candidate = $suffixed;
+        for ($i = 2; Product::where('slug', $candidate)->exists(); $i++) {
+            $candidate = "{$suffixed}-{$i}";
+        }
+
+        return $candidate;
     }
 }

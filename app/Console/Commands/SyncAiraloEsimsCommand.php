@@ -7,6 +7,7 @@ use App\Domain\Catalog\Services\AiraloEsimNormalizer;
 use App\Domain\Catalog\Services\CatalogSyncService;
 use App\Models\ProductVariant;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class SyncAiraloEsimsCommand extends Command
 {
@@ -20,6 +21,7 @@ class SyncAiraloEsimsCommand extends Command
 
         $page = max(1, (int) $this->option('page'));
         $totalProcessed = 0;
+        $totalFailed = 0;
 
         $this->info('Syncing Airalo eSIMs...');
 
@@ -27,13 +29,22 @@ class SyncAiraloEsimsCommand extends Command
             try {
                 $result = $syncService->sync($page, 100);
             } catch (\Throwable $e) {
-                $this->error("Page {$page} failed: {$e->getMessage()}");
+                // A whole page failing (API down, auth broken) is not something
+                // a later page can recover from; report it with the exception
+                // class so the scheduler log says more than "exit code 1".
+                $this->error("Page {$page} failed: [".get_class($e)."] {$e->getMessage()}");
+                Log::error('Airalo eSIM sync page failed', [
+                    'page' => $page,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                ]);
 
                 return self::FAILURE;
             }
 
             $totalProcessed += $result['processed'];
-            $this->line("  page {$page}: {$result['processed']} offers");
+            $totalFailed += $result['failed'];
+            $this->line("  page {$page}: {$result['processed']} offers".($result['failed'] > 0 ? ", {$result['failed']} failed" : ''));
             $page++;
 
             // Be respectful to Airalo's rate limits
@@ -46,6 +57,12 @@ class SyncAiraloEsimsCommand extends Command
 
         $airaloCount = ProductVariant::where('metadata->provider', 'airalo')->count();
         $this->info("Total Airalo variants in DB: {$airaloCount}");
+
+        if ($totalFailed > 0) {
+            $this->error("{$totalFailed} item(s) failed to sync; see laravel.log for each one.");
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

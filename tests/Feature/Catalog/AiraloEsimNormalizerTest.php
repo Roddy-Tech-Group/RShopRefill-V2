@@ -3,6 +3,7 @@
 namespace Tests\Feature\Catalog;
 
 use App\Domain\Catalog\Services\AiraloEsimNormalizer;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,6 +12,16 @@ use Tests\TestCase;
 class AiraloEsimNormalizerTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function product(array $attributes): Product
+    {
+        $category = Category::firstOrCreate(['slug' => 'esims'], ['name' => 'eSIMs', 'type' => 'digital']);
+
+        return Product::factory()->create(['category_id' => $category->id] + $attributes);
+    }
 
     private function sync(): void
     {
@@ -115,5 +126,94 @@ class AiraloEsimNormalizerTest extends TestCase
 
         $this->assertSame('WW', $product->country_code);
         $this->assertSame('Middle East and North Africa eSIM', $product->name);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function globalItem(string $title, string $airaloSlug = 'discover-global', string $packageId = 'discover-1gb-7d'): array
+    {
+        return [
+            'country_code' => '',
+            'slug' => $airaloSlug,
+            'title' => $title,
+            'operators' => [[
+                'title' => 'Discover',
+                'plan_type' => 'data',
+                'packages' => [
+                    ['id' => $packageId, 'data' => '1 GB', 'day' => 7, 'price' => 9, 'net_price' => 5],
+                ],
+            ]],
+        ];
+    }
+
+    public function test_slug_owned_by_another_provider_gets_a_provider_suffix_instead_of_crashing(): void
+    {
+        // Production 2026-08-27: Zendit already owns esim-ww-global and Airalo
+        // renamed "Discover Global" to "Global". The unique index on slug made
+        // the insert throw and killed the whole sync page.
+        $zendit = $this->product(['provider_name' => 'zendit', 'slug' => 'esim-ww-global']);
+
+        (new AiraloEsimNormalizer)->normalizeAndSave($this->globalItem('Global', 'world'), 'airalo');
+
+        $airalo = Product::where('provider_name', 'airalo')->where('provider_reference', 'world')->firstOrFail();
+        $this->assertSame('esim-ww-global-airalo', $airalo->slug);
+        $this->assertSame('Global eSIM', $airalo->name);
+        $this->assertSame('esim-ww-global', $zendit->fresh()->slug);
+
+        $variant = ProductVariant::where('provider_offer_id', 'airalo_discover-1gb-7d')->firstOrFail();
+        $this->assertSame($airalo->id, $variant->product_id);
+    }
+
+    public function test_renamed_product_updates_the_existing_row_via_provider_reference(): void
+    {
+        $normalizer = new AiraloEsimNormalizer;
+        $normalizer->normalizeAndSave($this->globalItem('Discover Global'), 'airalo');
+        $original = Product::where('slug', 'esim-ww-discover-global')->firstOrFail();
+
+        $normalizer->normalizeAndSave($this->globalItem('Global'), 'airalo');
+
+        $this->assertSame(1, Product::where('provider_name', 'airalo')->count());
+        $original->refresh();
+        // The storefront URL never moves under a rename.
+        $this->assertSame('esim-ww-discover-global', $original->slug);
+        $this->assertSame('discover-global', $original->provider_reference);
+        $this->assertStringContainsString('High-speed eSIM for Global', $original->description);
+        $this->assertSame($original->id, ProductVariant::where('provider_offer_id', 'airalo_discover-1gb-7d')->firstOrFail()->product_id);
+    }
+
+    public function test_renamed_product_synced_before_provider_reference_existed_is_found_through_its_variants(): void
+    {
+        // Rows synced by the old normalizer carry no provider_reference, so a
+        // rename can only be recognised by the packages already attached.
+        $legacy = $this->product([
+            'provider_name' => 'airalo',
+            'provider_reference' => null,
+            'slug' => 'esim-ww-discover-global',
+            'name' => 'Discover Global eSIM',
+        ]);
+        ProductVariant::factory()->create([
+            'product_id' => $legacy->id,
+            'provider_offer_id' => 'airalo_discover-1gb-7d',
+        ]);
+        $this->product(['provider_name' => 'zendit', 'slug' => 'esim-ww-global']);
+
+        (new AiraloEsimNormalizer)->normalizeAndSave($this->globalItem('Global'), 'airalo');
+
+        $this->assertSame(1, Product::where('provider_name', 'airalo')->count());
+        $legacy->refresh();
+        $this->assertSame('esim-ww-discover-global', $legacy->slug);
+        $this->assertSame('discover-global', $legacy->provider_reference);
+        $this->assertSame('Discover Global eSIM', $legacy->name);
+    }
+
+    public function test_provider_suffixed_slug_is_itself_deduplicated(): void
+    {
+        $this->product(['provider_name' => 'zendit', 'slug' => 'esim-ww-global']);
+        $this->product(['provider_name' => 'other', 'slug' => 'esim-ww-global-airalo']);
+
+        (new AiraloEsimNormalizer)->normalizeAndSave($this->globalItem('Global', 'world'), 'airalo');
+
+        $this->assertDatabaseHas('products', ['provider_name' => 'airalo', 'slug' => 'esim-ww-global-airalo-2']);
     }
 }

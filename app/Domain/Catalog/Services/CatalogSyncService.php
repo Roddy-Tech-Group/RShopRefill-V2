@@ -3,6 +3,7 @@
 namespace App\Domain\Catalog\Services;
 
 use App\Domain\Catalog\Providers\ProviderInterface;
+use Illuminate\Support\Facades\Log;
 
 /**
  * High-level service to orchestrate catalog syncing from a provider.
@@ -16,6 +17,8 @@ class CatalogSyncService
 
     /**
      * Fetch raw data from the provider and normalize it into our domain models.
+     *
+     * @return array{processed: int, failed: int, has_more: bool, total: int}
      */
     public function sync(int $page = 1, int $limit = 100): array
     {
@@ -29,10 +32,27 @@ class CatalogSyncService
         $total = $rawPayload['total'] ?? ($meta['total'] ?? ($meta['totalCount'] ?? 0));
 
         $processedItems = 0;
+        $failedItems = 0;
 
-        foreach ($items as $rawItem) {
-            $this->normalizer->normalizeAndSave($rawItem, $this->provider->getProviderName());
-            $processedItems++;
+        // One bad item must not take the rest of the page (or the pages after
+        // it) down with it. The failure is logged with enough context to find
+        // the item, counted, and the sync moves on.
+        foreach ($items as $index => $rawItem) {
+            try {
+                $this->normalizer->normalizeAndSave($rawItem, $this->provider->getProviderName());
+                $processedItems++;
+            } catch (\Throwable $e) {
+                $failedItems++;
+                Log::error('Catalog sync item failed', [
+                    'provider' => $this->provider->getProviderName(),
+                    'page' => $page,
+                    'index' => $index,
+                    'item_title' => $rawItem['title'] ?? $rawItem['name'] ?? null,
+                    'item_slug' => $rawItem['slug'] ?? null,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Prefer explicit page metadata (Airalo), then a "next" link, then fall back
@@ -47,6 +67,7 @@ class CatalogSyncService
 
         return [
             'processed' => $processedItems,
+            'failed' => $failedItems,
             'has_more' => $hasMore,
             'total' => $total,
         ];
