@@ -72,7 +72,16 @@ class ResendProvider implements MailProviderInterface
         // A 429 or 5xx is retried in place, honouring Retry-After, so a
         // transient burst never becomes a job failure plus a Sentry event.
         // Other 4xx (bad address, bad payload) are final and not retried.
-        $response = Http::withToken($this->apiKey)
+        $request = Http::withToken($this->apiKey);
+
+        // Resend dedupes on this header for 24h, so if the response to an
+        // accepted send is lost and we retry, the recipient still gets one
+        // email. Keyed per channel so an email and its in-app twin never clash.
+        if (! empty($metadata['idempotency_key'])) {
+            $request = $request->withHeader('Idempotency-Key', 'email/'.$metadata['idempotency_key']);
+        }
+
+        $response = $request
             ->retry(
                 self::MAX_HTTP_ATTEMPTS,
                 fn (int $attempt, \Exception $exception): int => $this->retryDelayMilliseconds($attempt, $exception),

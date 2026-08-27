@@ -116,6 +116,35 @@ class ResendProviderRetryTest extends TestCase
         $this->assertSame(1000, $delay->call($provider, 2, new ConnectionException('timeout')));
     }
 
+    public function test_every_attempt_carries_the_same_idempotency_key_so_a_retry_cannot_double_send(): void
+    {
+        Http::fake([
+            'api.resend.com/*' => Http::sequence()
+                ->push('gateway timeout', 504)
+                ->push(['id' => 'resend-ok'], 200),
+        ]);
+        $user = User::factory()->create();
+        $provider = new ResendProvider(new ResendApiThrottle(maxPerSecond: 100, maxWaitMilliseconds: 0));
+
+        $provider->send(
+            $user->email, 'Security <security@rshoprefill.com>', 'support@rshoprefill.com', 'Your Security Code',
+            new WelcomeMail($user), ['idempotency_key' => 'c66a29edf0deb946b1dca999b468880c'],
+        );
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => $request->hasHeader('Idempotency-Key', 'email/c66a29edf0deb946b1dca999b468880c'));
+        Http::assertNotSent(fn ($request) => ! $request->hasHeader('Idempotency-Key'));
+    }
+
+    public function test_no_idempotency_header_when_the_caller_has_no_key(): void
+    {
+        Http::fake(['api.resend.com/*' => Http::response(['id' => 'resend-ok'], 200)]);
+
+        $this->send();
+
+        Http::assertSent(fn ($request) => ! $request->hasHeader('Idempotency-Key'));
+    }
+
     public function test_each_request_takes_a_throttle_slot(): void
     {
         Http::fake(['api.resend.com/*' => Http::response(['id' => 'resend-ok'], 200)]);
