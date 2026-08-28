@@ -9,6 +9,7 @@ use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,7 +52,7 @@ use Illuminate\Support\Str;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements HasLocalePreference, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -74,6 +75,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'avatar_url',
         'avatar',
         'theme',
+        'locale',
         'display_currency',
         'rcoin_multiplier',
         'kyc_status',
@@ -109,6 +111,25 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @return array<string, string>
      */
+    /**
+     * The language this user's mail and notifications should render in.
+     *
+     * Laravel calls this on every Mailable and Notification addressed to the
+     * model, which is what stops a queued job inheriting whichever locale the
+     * worker happened to be left in by the previous job.
+     *
+     * Falls back rather than returning null: null would leave the queue on the
+     * worker's current locale, which is the leak this exists to prevent.
+     */
+    public function preferredLocale(): string
+    {
+        $supported = array_keys(config('localization.supported', ['en' => []]));
+
+        return in_array($this->locale, $supported, true)
+            ? $this->locale
+            : (string) config('localization.default', config('app.fallback_locale', 'en'));
+    }
+
     protected function casts(): array
     {
         return [

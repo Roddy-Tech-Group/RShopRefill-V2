@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasTranslations;
 use Database\Factories\BlogPostFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +33,16 @@ use Illuminate\Support\Carbon;
  */
 class BlogPost extends Model
 {
+    use HasTranslations;
+
+    /**
+     * Prose the admin can translate. The column stays the SOURCE text;
+     * a locale with no row here reads straight through to it.
+     *
+     * @var array<int, string>
+     */
+    protected array $translatable = ['title', 'excerpt', 'body', 'attachment_label'];
+
     /** @use HasFactory<BlogPostFactory> */
     use HasFactory;
 

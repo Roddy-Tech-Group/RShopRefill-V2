@@ -127,6 +127,61 @@ class Review extends Model
         });
     }
 
+    /**
+     * Average rating and review count per gift-card brand, in ONE query.
+     *
+     * The listing renders a card per brand and there are ~688 of them, so
+     * asking each card for its own rating would be a page of N+1 queries on
+     * top of the variant eager-load the price range already needs. This takes
+     * the page's brand keys and comes back with everything they need.
+     *
+     * The inner select is DISTINCT on (brand, review): an order holding two
+     * gift cards of the same brand joins its one review twice, which would
+     * count it twice and leave the average untouched but the count wrong.
+     *
+     * Only reviews the storefront would actually show are counted - published,
+     * and ours rather than an external platform's - so the number under a
+     * brand always matches the reviews readable on its page.
+     *
+     * @param  iterable<string>  $brandKeys
+     * @return array<string, array{average: float, count: int}>
+     */
+    public static function brandRatings(iterable $brandKeys): array
+    {
+        $keys = array_values(array_unique(array_filter(
+            is_array($brandKeys) ? $brandKeys : iterator_to_array($brandKeys)
+        )));
+
+        if ($keys === []) {
+            return [];
+        }
+
+        $distinct = DB::table('reviews')
+            ->join('orders', 'orders.id', '=', 'reviews.order_id')
+            ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->where('reviews.is_published', true)
+            ->where(function ($query): void {
+                $query
+                    ->where('reviews.is_customer_submitted', true)
+                    ->orWhereNotIn(DB::raw('LOWER(reviews.source)'), self::EXTERNAL_SOURCES);
+            })
+            ->whereIn('products.brand_key', $keys)
+            ->distinct()
+            ->select('products.brand_key', 'reviews.id', 'reviews.rating');
+
+        return DB::query()
+            ->fromSub($distinct, 'brand_reviews')
+            ->groupBy('brand_key')
+            ->select('brand_key', DB::raw('AVG(rating) as average'), DB::raw('COUNT(*) as total'))
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->brand_key => [
+                'average' => round((float) $row->average, 1),
+                'count' => (int) $row->total,
+            ]])
+            ->all();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

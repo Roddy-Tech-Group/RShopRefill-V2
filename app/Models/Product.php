@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Enums\PricingBasis;
+use App\Models\Concerns\HasTranslations;
+use App\Support\DisplayCurrency;
 use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +15,16 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
+    use HasTranslations;
+
+    /**
+     * Prose the admin can translate. The column stays the SOURCE text;
+     * a locale with no row here reads straight through to it.
+     *
+     * @var array<int, string>
+     */
+    protected array $translatable = ['name', 'description', 'redeem_instructions', 'terms_and_conditions'];
+
     use HasFactory, SoftDeletes;
 
     /**
@@ -208,7 +220,15 @@ class Product extends Model
             return null;
         }
 
-        $sym = self::currencySymbol($this->currency_code ?: 'USD');
+        // In the customer's chosen display currency when one is set and the
+        // pair is priceable; the product's own currency otherwise. See
+        // App\Support\DisplayCurrency for the resolution and fallbacks.
+        [$min, $code] = DisplayCurrency::convert((float) $min, $this->currency_code);
+        if ($max !== null) {
+            [$max] = DisplayCurrency::convert((float) $max, $this->currency_code);
+        }
+
+        $sym = self::currencySymbol($code);
         $fmt = fn ($v) => $sym.rtrim(rtrim(number_format($v, 2), '0'), '.');
 
         return ($max !== null && $max > $min)

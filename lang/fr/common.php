@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * Voir lang/en/common.php pour la portée de ce fichier.
+ */
+return [
+    'menu' => 'Menu',
+    'continue' => 'Continuer',
+    'cancel' => 'Annuler',
+    'save' => 'Enregistrer',
+    'close' => 'Fermer',
+    'back' => 'Retour',
+    'back_to_website' => 'Retour au site',
+    'search' => 'Rechercher',
+    'clear' => 'Effacer',
+    'show_all_results' => 'Voir tous les résultats',
+    'popular_searches' => 'Recherches populaires',
+    'recent_searches' => 'Recherches récentes',
+    'loading' => 'Chargement…',
+    'searching' => 'Recherche en cours…',
+    'no_results' => 'Aucun résultat',
+    'nothing_here_yet' => 'Rien pour le moment',
+    'try_again' => 'Réessayer',
+    'learn_more' => 'En savoir plus',
+    'get_started' => 'Commencer',
+    'copy' => 'Copier',
+    'copied' => 'Copié',
+    'preferences' => 'Préférences',
+    'language' => 'Langue',
+    'country' => 'Pays',
+    'payment_currency' => 'Devise de paiement',
+    'theme' => 'Thème',
+    'theme_light' => 'Clair',
+    'theme_dark' => 'Sombre',
+    'theme_system' => 'Système',
+    'help' => 'Aide',
+    'invite_a_friend' => 'Inviter un ami',
+    'change_country' => 'Changer de pays',
+    'shop_in' => 'Payer en :currency',
+];

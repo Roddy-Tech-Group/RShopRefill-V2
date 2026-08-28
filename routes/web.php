@@ -18,6 +18,7 @@ use App\Http\Controllers\EsimTopupController;
 use App\Http\Controllers\GoogleMerchantFeedController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\KycController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PressController;
 use App\Http\Controllers\RcoinConvertController;
 use App\Http\Controllers\RcoinWithdrawalController;
@@ -41,6 +42,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Livewire\Volt\Volt;
 
+// Interface language. POST because it writes stored preferences - a GET would
+// let any page flip a visitor's language with an <img> tag. Session + cookie +
+// the account when signed in; see App\Http\Middleware\SetLocale for the read
+// order. Deliberately separate from country and currency: they are three
+// preferences, and someone shopping US gift cards in French is not confused.
+Route::post('locale', LocaleController::class)->name('locale.update');
+
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
@@ -56,13 +64,43 @@ Route::view('gift-cards', 'shop.gift-cards')->name('shop.gift-cards');
 // type. Legacy `slug`/`country` fields are kept for backward compatibility.
 Route::get('api/search/brands', function (Request $request) {
     $q = trim((string) $request->query('q', ''));
-    if (mb_strlen($q) < 2) {
-        return response()->json([]);
-    }
 
-    // Category slug -> URL segment + human label for the result row.
+    // Category slug -> URL segment + human label for the result row. Declared
+    // before the popular branch because that branch builds the same rows.
     $segByCat = ['gift-cards' => 'gift-cards', 'mobile-airtime' => 'topups', 'bill-payments' => 'bills', 'esims' => 'esims'];
     $labelByCat = ['gift-cards' => 'Gift card', 'mobile-airtime' => 'Mobile top-up', 'bill-payments' => 'Bill payment', 'esims' => 'eSIM'];
+
+    // No query yet: the search panels open on focus and show "Popular searches",
+    // so an empty q returns the curated Popular row rather than nothing.
+    //
+    // Product::popularForRegion() is the same source the storefront's Popular
+    // brand row uses - config/popular_brands.php, ordered, with the visitor's
+    // own region floated to the top. Nothing here is a hardcoded list of names.
+    if (mb_strlen($q) < 2) {
+        // Same resolver the storefront and dashboard Popular rows use: the
+        // region the middleware put on the request, US otherwise.
+        $region = strtoupper((string) ($request->attributes->get('region') ?: 'US'));
+
+        $popular = Product::popularForRegion($region)
+            ->take(8)
+            ->map(function (Product $p) use ($segByCat, $labelByCat) {
+                $cat = $p->category?->slug ?? 'gift-cards';
+                $seg = $segByCat[$cat] ?? 'gift-cards';
+                $slug = Product::brandSlug($p->brand_key);
+
+                return [
+                    'type' => $labelByCat[$cat] ?? 'Product',
+                    'name' => Product::brandDisplayName($p->brand_key),
+                    'logo' => Product::brandLogoUrl($p->brand_key, $p->logo_url),
+                    'url' => '/'.$seg.'/'.$slug,
+                    'slug' => $slug,
+                    'country' => $p->country_code,
+                ];
+            })
+            ->values();
+
+        return response()->json($popular);
+    }
 
     $brandIds = Product::query()
         ->where('is_active', true)
@@ -147,7 +185,53 @@ Route::get('api/search/brands', function (Request $request) {
         ->take(4)
         ->values();
 
-    return response()->json($items->concat($esimItems)->concat($pages)->values());
+    // Countries, so typing a place offers to SWITCH the storefront's region
+    // rather than only finding products in it. Restricted to countries the
+    // catalogue actually stocks - the same availability rule the locale modal
+    // applies - so switching can never land the visitor on an empty catalogue.
+    //
+    // Names and codes come from config/countries.php and the currency from
+    // config/country_currency.php: the same lookups the locale modal uses, so
+    // the two can never disagree about what a country maps to.
+    $stocked = Product::query()
+        ->where('is_active', true)
+        ->whereNotNull('country_code')
+        ->distinct()
+        ->pluck('country_code')
+        ->map(fn ($c) => strtoupper((string) $c))
+        ->flip();
+
+    $currencyByCode = (array) config('country_currency.map', []);
+
+    $countries = collect((array) config('countries.codes', []))
+        ->filter(fn (string $code, string $name) => $stocked->has(strtoupper($code))
+            && str_contains(mb_strtolower($name), mb_strtolower($q)))
+        ->take(4)
+        ->map(function (string $code, string $name) use ($currencyByCode) {
+            $code = strtoupper($code);
+            $currency = $currencyByCode[$code] ?? 'USD';
+
+            // Regional-indicator pair - derived from the ISO code rather than
+            // stored, so a new country needs no flag added anywhere.
+            $flag = mb_chr(0x1F1E6 + ord($code[0]) - 65, 'UTF-8')
+                .mb_chr(0x1F1E6 + ord($code[1]) - 65, 'UTF-8');
+
+            return [
+                'type' => 'Country',
+                'name' => $name,
+                'logo' => Product::flagUrl($code),
+                // No url: picking one switches the region in place, it does not navigate.
+                'url' => null,
+                'slug' => null,
+                'country' => $code,
+                'flag' => $flag,
+                'currency' => $currency,
+                'currencySymbol' => Product::currencySymbol($currency),
+            ];
+        })
+        ->values();
+
+    return response()->json($items->concat($esimItems)->concat($pages)->concat($countries)->values());
 })->name('api.search.brands');
 
 // Brand-level detail page. The URL slug is a kebab-cased brand_key

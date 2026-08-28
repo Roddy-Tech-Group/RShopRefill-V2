@@ -13,7 +13,9 @@ use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
+use App\Http\Middleware\ResolveDisplayCurrency;
 use App\Http\Middleware\ResolveRegion;
+use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
 use App\Models\Admin;
@@ -25,6 +27,9 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Log;
+use Livewire\Exceptions\MethodNotFoundException;
+use Livewire\Exceptions\PublicPropertyNotFoundException;
+use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Psy\Exception\BreakException;
 use Sentry\Laravel\Integration;
 
@@ -125,7 +130,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            // FIRST in the append list, which puts it after EncryptCookies and
+            // StartSession and before anything that renders.
+            //
+            // It cannot be prepended: prepend runs ahead of the framework's own
+            // web stack, where the locale cookie is still encrypted and there is
+            // no session yet - so both of those sources silently read as absent
+            // and every request fell back to English.
+            SetLocale::class,
             ResolveRegion::class,
+            ResolveDisplayCurrency::class,
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
             EnforceDeviceVerification::class,
@@ -175,9 +189,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->dontReport([
             BreakException::class,
-            \Livewire\Exceptions\MethodNotFoundException::class,
-            \Livewire\Exceptions\PublicPropertyNotFoundException::class,
-            \Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException::class,
+            MethodNotFoundException::class,
+            PublicPropertyNotFoundException::class,
+            CorruptComponentPayloadException::class,
         ]);
 
         $exceptions->dontFlash([

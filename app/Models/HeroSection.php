@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasTranslations;
 use Database\Factories\HeroSectionFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +30,16 @@ use Illuminate\Support\Facades\Cache;
  */
 class HeroSection extends Model
 {
+    use HasTranslations;
+
+    /**
+     * Prose the admin can translate. The column stays the SOURCE text;
+     * a locale with no row here reads straight through to it.
+     *
+     * @var array<int, string>
+     */
+    protected array $translatable = ['title', 'subtitle', 'cta_label'];
+
     /** @use HasFactory<HeroSectionFactory> */
     use HasFactory;
 

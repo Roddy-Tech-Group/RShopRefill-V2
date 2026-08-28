@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * Voir lang/en/products.php. Les noms de marques et les intitules fournis par
+ * les fournisseurs ne sont jamais traduits.
+ */
+return [
+    'sort' => 'Trier',
+    'category_unavailable' => 'Les cartes cadeaux sont temporairement indisponibles',
+    'coming_soon' => 'Bientôt',
+    'flag_off' => 'Inactif',
+    'browse_categories_label' => 'Parcourir les catégories',
+    'pick_a_category' => 'Choisir une catégorie',
+    'subcategories' => 'Sous-catégories',
+    'see_more' => 'Voir plus',
+    'request_a_product' => 'Demander un produit',
+    'didnt_find' => 'Vous n\'avez pas trouvé ce que vous cherchiez ?',
+    'showing_out_of' => ':shown sur :total affichés',
+    'recently_added' => 'Ajouts récents',
+    'popular_brands' => 'Marques populaires',
+    'popular_brands_heading' => 'Découvrez les marques les plus populaires !',
+    'gift_card_categories' => 'Catégories de cartes cadeaux',
+    'all_gift_cards' => 'Toutes les cartes cadeaux',
+    'shop_by_category' => 'Cartes cadeaux par catégorie',
+    'next_page' => 'Plus de :category',
+    'previous_page' => ':category précédents',
+    'browse_all_countries' => 'Parcourir tous les pays',
+    'switch_country' => 'Changer de pays',
+    'no_gift_cards_in_country_hint' => 'Nous ne vendons pas encore de cartes cadeaux pour ce pays. Choisissez-en un autre pour voir ce qui est disponible.',
+    'no_gift_cards_in_country' => 'Aucune carte cadeau disponible pour :country',
+    'clear_all_filters' => 'Effacer tous les filtres',
+    'no_products_hint' => 'Essayez d\'effacer la recherche ou choisissez une autre catégorie.',
+    'more_gift_cards' => 'Plus de cartes cadeaux',
+    'rating_out_of_five' => 'Note de :rating sur 5 pour :count avis',
+    'browse_categories' => 'Parcourir les catégories',
+    'gift_cards_desc' => 'Achetez des cartes cadeaux numériques des plus grandes marques, livrées immédiatement.',
+    'esims_desc' => 'Des eSIM de voyage instantanées pour plus de 200 destinations, sans frais d’itinérance.',
+    'mobile_refill_desc' => 'Rechargez du crédit et des forfaits data pour des numéros mobiles partout dans le monde.',
+    'bill_payments_desc' => 'Réglez vos factures, abonnements et services du quotidien.',
+    'check_it_out' => 'Découvrir',
+    'temporarily_unavailable' => 'Temporairement indisponible',
+    'out_of_stock' => 'Rupture de stock',
+    'view_all' => 'Tout voir',
+    'select_amount' => 'Choisissez un montant',
+    'add_to_cart' => 'Ajouter au panier',
+    'buy_now' => 'Acheter',
+    'no_products' => 'Aucun produit ne correspond à votre recherche',
+];

@@ -140,6 +140,14 @@
         }
         window.location.reload();
     }
+    // The locale modal stages a language and applies it on Save. It needs the
+    // cookie written without the immediate reload applyByName() does, so the
+    // one reload the Save already causes is what shows the translation.
+    window.rshopSetTranslateCookie = function (name) {
+        var code = nameToCode(name);
+        if (code === "en") { clearGoogTrans(); } else { setGoogTrans("/en/" + code); }
+    };
+
     window.__applyStoredLanguage = function () {
         var name = readStored();
         if (name && nameToCode(name) !== 'en') {

@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * Voir lang/en/navigation.php pour la portee de ce fichier.
+ */
+return [
+    'popular_in' => 'Populaire en :country',
+    'categories' => 'Catégories',
+    'featured' => 'En vedette',
+    'gift_cards' => 'Cartes cadeaux',
+    'esims' => 'eSIM',
+    'mobile_refill' => 'Recharge mobile',
+    'bill_payments' => 'Paiement de factures',
+    'flights' => 'Vols',
+    'stays' => 'Hébergements',
+    'search_placeholder' => 'Rechercher une marque, une catégorie, un pays',
+    'sign_in' => 'Connexion',
+    'cart' => 'Panier',
+    'account' => 'Compte',
+    'my_orders' => 'Mes commandes',
+    'redeem' => 'Utiliser mes points',
+    'settings' => 'Paramètres',
+    'limits' => 'Plafonds',
+    'logout' => 'Déconnexion',
+    'shop' => 'Boutique',
+    'company' => 'Entreprise',
+    'legal' => 'Mentions légales',
+    'get_the_app' => 'Télécharger l’application',
+    'follow_us' => 'Nous suivre',
+    'help_center' => 'Aide',
+    'faqs' => 'Questions fréquentes',
+    'contact_us' => 'Nous contacter',
+    'how_it_works' => 'Comment ça marche',
+    'earn_points' => 'Gagner des points',
+    'terms_of_service' => 'Conditions générales',
+    'privacy_policy' => 'Politique de confidentialité',
+    'cookie_policy' => 'Politique relative aux cookies',
+    'compliance' => 'Conformité',
+    'refund_policy' => 'Politique de remboursement',
+    'accessibility' => 'Accessibilité',
+    'sitemap' => 'Plan du site',
+];
