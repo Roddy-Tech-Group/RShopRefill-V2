@@ -92,7 +92,7 @@
                         <td class="em-pad" style="padding:24px 40px 8px; text-align:center; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; color:#71717a; font-size:12px; line-height:1.7;">
                             <p style="margin:0 0 12px;">
                                 <a href="{{ \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Facebook</a>
-                                <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">X</a>
+                                <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/roddytech237') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">X</a>
                                 <a href="{{ \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">TikTok</a>
                                 <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Instagram</a>
                             </p>

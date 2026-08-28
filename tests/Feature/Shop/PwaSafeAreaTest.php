@@ -39,11 +39,13 @@ class PwaSafeAreaTest extends TestCase
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        // The padding belongs on <header class="sticky">, not on the top bar
-        // inside it: the eSIM floating plan bars position themselves off that
-        // element's measured height, so growing the header keeps them clear.
+        // The padding belongs on the <header> itself, not on the top bar inside
+        // it, so the reserved strip is part of the same block and carries the
+        // same background. (It used to matter for a second reason - the eSIM
+        // floating bars measured this element - but the header is no longer
+        // sticky and they no longer measure anything.)
         $this->assertMatchesRegularExpression(
-            '/<header class="sticky[^"]*pt-\[env\(safe-area-inset-top\)\]/',
+            '/<header class="[^"]*pt-\[env\(safe-area-inset-top\)\]/',
             $html,
         );
     }
@@ -83,11 +85,21 @@ class PwaSafeAreaTest extends TestCase
         }
     }
 
+    /**
+     * The drawer is the menu sheet now - fixed inset-y-0 on the left, holding
+     * the categories and the utilities under them. It owes BOTH insets: the
+     * status bar at the top, the home indicator at the foot.
+     *
+     * The floor is its own 1.25rem padding rather than the 0.75rem the search
+     * sheet used, or the top would read tighter than the sides on a phone with
+     * no inset at all.
+     */
     public function test_the_mobile_nav_drawer_pads_for_its_inset(): void
     {
         $nav = File::get(resource_path('views/components/nav/main-nav.blade.php'));
 
-        $this->assertStringContainsString('pt-[max(0.75rem,env(safe-area-inset-top))]', $nav);
+        $this->assertStringContainsString('pt-[max(1.25rem,env(safe-area-inset-top))]', $nav);
+        $this->assertStringContainsString('pb-[max(1.25rem,env(safe-area-inset-bottom))]', $nav);
     }
 
     /**

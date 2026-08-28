@@ -2,27 +2,45 @@
 
 namespace Tests\Feature\Nav;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The first-visit region-tip modal's "how it works" flow: left-aligned, one step
- * per line, a 10px-radius box, and no decorative middot separators between steps.
+ * The first-visit "Shopping from your country?" modal was removed outright.
+ *
+ * This file used to assert its internals. It is kept as a regression guard
+ * instead of deleted: the component was self-gating via sessionStorage, so a
+ * reintroduction would be invisible to anyone who had already dismissed it once
+ * and could sit unnoticed in the layout for a long time.
  */
 class CountryTipTest extends TestCase
 {
-    public function test_flow_steps_are_left_aligned_with_no_dot_separators(): void
+    use RefreshDatabase;
+
+    public function test_the_country_tip_component_no_longer_exists(): void
     {
-        $blade = file_get_contents(resource_path('views/components/nav/country-tip.blade.php'));
+        $this->assertFalse(
+            File::exists(resource_path('views/components/nav/country-tip.blade.php'))
+        );
+    }
 
-        // All four steps still render.
-        $this->assertStringContainsString('Buy from any country/region', $blade);
-        $this->assertStringContainsString('Pay in your currency', $blade);
-        $this->assertStringContainsString('Switch your account to the country you bought from', $blade);
-        $this->assertStringContainsString('Redeem it, pay &amp; enjoy', $blade);
+    public function test_the_layout_does_not_render_it(): void
+    {
+        $header = File::get(resource_path('views/components/layouts/app/header.blade.php'));
+        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $header);
 
-        // Left-aligned, 10px radius, and the blue middot separators are gone.
-        $this->assertStringContainsString('rounded-[10px]', $blade);
-        $this->assertStringContainsString('text-left', $blade);
-        $this->assertStringNotContainsString('&middot;', $blade);
+        $this->assertStringNotContainsString('<x-nav.country-tip', $markup);
+    }
+
+    public function test_no_storefront_page_shows_the_nudge(): void
+    {
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('Shopping from your country?', $html);
+        $this->assertStringNotContainsString('Switch your region to see the gift', $html);
+
+        // The locale modal it pointed at is a separate control and stays.
+        $this->assertStringContainsString('Region and currency', $html);
     }
 }

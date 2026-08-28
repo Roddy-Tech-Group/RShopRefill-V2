@@ -5,6 +5,14 @@
     // Subcategory links for the active category, built by the page so filter
     // state is preserved. Each: ['label' => string, 'url' => string, 'active' => bool].
     'subItems' => [],
+    // The list of OTHER storefronts. The nav's category rail already carries
+    // it on every page, so a storefront with subcategories of its own can drop
+    // the duplicate and give that space to the filters people came for.
+    'showCategories' => true,
+    // When the page already holds every category, a subcategory click filters
+    // in place instead of navigating. Off by default: a storefront that renders
+    // one category at a time has nothing to filter and must keep the round trip.
+    'clientFilter' => false,
 ])
 
 @php
@@ -17,7 +25,7 @@
     // The single source of truth for the storefront category list. Categories
     // without a live page render as disabled "Soon" entries until one ships.
     $categories = [
-        ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',       'url' => $r('gift-cards')],
+        ['slug' => 'gift-cards',      'label' => 'Gift Cards',       'url' => $r('gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',             'url' => $r('gomarket')],
         ['slug' => 'mobile-airtime',  'label' => 'Mobile top up & data', 'url' => $r('topups')],
         ['slug' => 'esims',           'label' => 'eSIMs',                'url' => $r('esims')],
@@ -41,13 +49,22 @@
 
 {{-- Shared category sidebar — used by every category storefront so the catalog
      navigation is identical everywhere. Sticky as one unit; the inner panel
-     scrolls if the subcategory list outgrows the viewport. --}}
+     scrolls if the subcategory list outgrows the viewport.
+
+     Hover and selected are written as arbitrary hexes on purpose. app.css
+     flattens bg-blue-100, hover:bg-blue-100 and this panel's bg-[#eff6ff] all
+     to var(--ash) in dark mode, and those rules are unlayered - so they beat
+     this component's own dark: variants and painted hover, selection and panel
+     the same colour. #ffffff and #dbeafe are not in that remap, which lets
+     dark:hover:bg-white/10 and dark:bg-blue-500/25 through. Renaming either to
+     a Tailwind blue would silently kill both states again. --}}
 <aside class="hidden self-start lg:sticky lg:top-[156px] lg:block">
     <div class="max-h-[calc(100vh-180px)] overflow-y-auto rounded-[14px] bg-[#eff6ff] p-3 border border-zinc-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-[#0c1a36] dark:border-[#24364f]">
 
-        {{-- Categories — switches the storefront entirely --}}
-        <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Categories</p>
-        <nav class="space-y-0.5 text-sm" aria-label="Product categories">
+        {{-- Categories — switches the storefront entirely. --}}
+        @if ($showCategories)
+        <p class="px-3 pb-2 pt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300">{{ __('navigation.categories') }}</p>
+        <nav class="space-y-0.5 text-[16px]" aria-label="{{ __('navigation.categories') }}">
             @foreach ($categories as $cat)
                 @php $catEnabled = \App\Support\FeatureFlag::categoryEnabled($cat['slug']); @endphp
                 @if ($cat['url'] && $catEnabled)
@@ -55,9 +72,9 @@
                         href="{{ $cat['url'] }}"
                         wire:navigate
                         @class([
-                            'flex items-center justify-between rounded-[12px] px-3 py-1.5 transition-colors',
-                            'bg-blue-100 font-bold text-blue-700 dark:bg-white/10 dark:text-white' => $active === $cat['slug'],
-                            'text-zinc-700 hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white' => $active !== $cat['slug'],
+                            'flex items-center justify-between rounded-[12px] px-3 py-2 transition-colors',
+                            'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-white' => $active === $cat['slug'],
+                            'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300' => $active !== $cat['slug'],
                         ])
                         @if ($active === $cat['slug']) aria-current="page" @endif
                     >
@@ -65,32 +82,48 @@
                     </a>
                 @elseif ($cat['url'] && ! $catEnabled)
                     {{-- Feature off: stays visible but greyed and non-clickable. --}}
-                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-1.5 text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="Temporarily unavailable">
+                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-2 font-bold text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="{{ __('products.temporarily_unavailable') }}">
                         <span>{{ $cat['label'] }}</span>
-                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Off</span>
+                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">{{ __('products.flag_off') }}</span>
                     </span>
                 @else
-                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-1.5 text-zinc-400 dark:text-zinc-500">
+                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-2 font-bold text-zinc-400 dark:text-zinc-500">
                         <span>{{ $cat['label'] }}</span>
-                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Soon</span>
+                        <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">{{ __('products.coming_soon') }}</span>
                     </span>
                 @endif
             @endforeach
         </nav>
+        @endif
 
-        {{-- Subcategories — of the active category only --}}
+        {{-- Subcategories — of the active category only. Heads the panel when
+             the category list above is off, so it carries no top margin then. --}}
         @if (! empty($subItems))
-            <p class="mt-4 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Subcategories</p>
-            <nav class="space-y-0.5 text-sm" aria-label="Subcategories">
+            <p class="{{ $showCategories ? 'mt-4 ' : '' }}px-3 pb-2 pt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300">{{ __('products.subcategories') }}</p>
+            <nav class="space-y-0.5 text-[16px]" aria-label="{{ __('products.subcategories') }}">
                 @foreach ($subItems as $item)
+                    @php $slug = $item['slug'] ?? ''; @endphp
                     <a
                         href="{{ $item['url'] }}"
-                        wire:navigate
-                        @class([
-                            'block rounded-[12px] px-3 py-1.5 transition-colors',
-                            'bg-blue-100 font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' => $item['active'] ?? false,
-                            'text-zinc-700 hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white' => ! ($item['active'] ?? false),
-                        ])
+                        @if (! $clientFilter) wire:navigate @endif
+                        @if ($clientFilter)
+                            {{-- .prevent only on a plain click: a middle-click or
+                                 cmd-click must still open the real URL. --}}
+                            @click.prevent="$dispatch('category-filtered', { slug: @js($slug) })"
+                        @endif
+                        @if ($clientFilter)
+                            :class="activeCategory === @js($slug)
+                                ? 'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-blue-300'
+                                : 'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300'"
+                            :aria-current="activeCategory === @js($slug) ? 'true' : null"
+                            class="block rounded-[12px] px-3 py-2 transition-colors"
+                        @else
+                            @class([
+                                'block rounded-[12px] px-3 py-2 transition-colors',
+                                'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-blue-300' => $item['active'] ?? false,
+                                'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300' => ! ($item['active'] ?? false),
+                            ])
+                        @endif
                     >
                         {{ $item['label'] }}
                     </a>

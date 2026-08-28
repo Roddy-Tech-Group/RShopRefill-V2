@@ -27,7 +27,10 @@
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
         @endif
     </head>
-    <body class="flex min-h-screen flex-col bg-white dark:bg-[#0c1a36] text-zinc-900 antialiased">
+    {{-- `storefront` is the scope hook for the shared outline colour in
+         app.css. The dashboard and admin have their own <body> and keep the
+         plain zinc scale. --}}
+    <body class="storefront flex min-h-screen flex-col bg-white dark:bg-[#0c1a36] text-zinc-900 antialiased">
 
         {{-- Themed branded loader on hard reload / first paint. Shown on the
              storefront too (not just the dashboard) so a website reload follows
@@ -36,7 +39,7 @@
         <x-ui.app-loader />
 
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
-        @include('partials.translate-engine')
+        @include("partials.translate-engine")
 
         <div
             x-data="storefrontLocale()"
@@ -46,7 +49,7 @@
             class="flex flex-1 flex-col"
         >
             {{-- Maintenance banner - amber strip when system.maintenance_mode is on.
-                 Sits above the sticky header so it announces itself first. --}}
+                 Sits above the header so it announces itself first. --}}
             @include('partials.maintenance-banner')
 
             @if(\App\Support\FeatureFlag::off('gift_cards'))
@@ -56,23 +59,24 @@
             {{-- Announcement / coupon bar - blue strip rotating admin-set promos. --}}
             @include('partials.announcement-bar')
 
-            {{-- The whole header is sticky as one block (sticky needs a tall
-                 containing block, the body provides that here). main-nav's
-                 own Alpine then collapses the primary row on scroll, leaving
-                 just the top bar + category strip pinned.
+            {{-- The header scrolls away with the page - it is NOT sticky.
+                 main-nav still carries a mobile-only scroll-collapse for the
+                 primary row; with nothing pinned it simply never gets seen,
+                 since the nav is off-screen before its 140px threshold.
+
+                 There is no separate top utility bar any more: Help, region and
+                 currency, account, cart and the theme picker share the logo's
+                 line inside main-nav, and Invite a Friend shares the category
+                 line. See x-nav.utility-cluster.
 
                  pt-[env(safe-area-inset-top)] + the matching bg: with
                  viewport-fit=cover (see partials/head) the page paints
                  edge-to-edge, so the header has to reserve the status-bar strip
-                 itself or the top bar sits under the clock in the installed
-                 PWA. The padding is on the <header>, not the top bar, so
-                 `document.querySelector('header.sticky')` - which the eSIM
-                 floating plan bars measure to place themselves - grows with it
-                 and those bars stay clear of the nav. bg-zinc-50 matches
-                 x-nav.top-bar so the reserved strip is the same colour as the
-                 bar under it (the dark remap sends both to the card grey). --}}
-            <header class="sticky top-0 z-50 w-full bg-zinc-50 pt-[env(safe-area-inset-top)]">
-                <x-nav.top-bar />
+                 itself or the nav sits under the clock in the installed PWA.
+                 The eSIM and discover floating bars used to measure
+                 `header.sticky` to place themselves below the pinned nav; with
+                 nothing pinned they take a plain offset instead. --}}
+            <header class="nav-surface relative z-50 w-full pt-[env(safe-area-inset-top)]">
                 <x-nav.main-nav />
             </header>
 
@@ -87,15 +91,9 @@
 
             <x-footer />
 
-            <x-back-to-top />
-
             <x-cookie-consent />
 
             <x-nav.locale-modal />
-
-            {{-- First-visit nudge pointing new visitors at the country pill so they
-                 can switch the catalogue to their own region. Once per session. --}}
-            <x-nav.country-tip />
 
             {{-- Global confirm modal — intercepts any form/button with `data-confirm`. --}}
             <x-confirm-modal />

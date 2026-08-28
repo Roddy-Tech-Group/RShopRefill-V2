@@ -38,14 +38,21 @@
         opacity: 1;
         transition: opacity 300ms ease;
     }
+    /* Dark: the page's own ground, not a colour of the loader's own.
+       It painted #0c1a36 and then #000000 under .pure-dark, while every
+       dark page renders var(--ground) - so the loader flashed pure black
+       and handed over to a page that was not, on every reload.
+
+       The literal is a fallback, not a duplicate: this <style> is inline
+       and the loader's whole job is the moment BEFORE the stylesheet that
+       defines --ground has landed. Keep the two in step - the token is the
+       source, app.css owns it.
+
+       One rule, not two: the theme engine applies .pure-dark alongside
+       .dark unconditionally, so a separate .dark.pure-dark rule could only
+       ever restate this one. */
     .dark .app-loader {
-        background: #0c1a36;
-    }
-    /* Extra Dark (pure black): match the true-black page so the loader follows
-       the theme. .pure-dark is applied to <html> before first paint by the
-       theme engine, so this resolves with no flash. */
-    .dark.pure-dark .app-loader {
-        background: #000000;
+        background: var(--ground, #060607);
     }
     /* Hidden state: fade out, then drop out of the layout so it can't trap
        clicks once the page is usable. */

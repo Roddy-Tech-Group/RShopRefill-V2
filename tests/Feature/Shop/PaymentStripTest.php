@@ -6,11 +6,16 @@ use App\Domain\Payment\Support\PaymentStripBadges;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Models\CurrencyRate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The homepage "Payment Methods We Accept" row.
+ * The "Payment Methods We Accept" row.
+ *
+ * It used to sit on the homepage and was removed from it; the component itself
+ * is unchanged, so these render it in isolation rather than through a page.
+ * HomeTrustPanelTest is what guards it staying off the homepage.
  *
  * Every badge is a promise that checkout accepts that rail, so the badge list is
  * asserted against SupportedPaymentMethods rather than eyeballed, and the crypto
@@ -34,6 +39,12 @@ class PaymentStripTest extends TestCase
         // badge cache with it, or the first test's lineup leaks into the rest.
         CurrencyRate::query()->delete();
         PaymentStripBadges::forgetCryptoCache();
+    }
+
+    /** The strip has no page to render through any more, so render it directly. */
+    private function strip(): string
+    {
+        return Blade::render('<x-home.payment-methods />');
     }
 
     private function coin(
@@ -218,67 +229,64 @@ class PaymentStripTest extends TestCase
      */
     public function test_the_ussd_mark_names_no_specific_bank(): void
     {
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $html = $this->strip();
 
         foreach (['*737#', '*894#', '*966#', '*901#'] as $bankCode) {
             $this->assertStringNotContainsString($bankCode, $html);
         }
 
-        // The generic short-code chip is what should be there instead.
-        $this->assertStringContainsString('*###', $html);
-    }
-
-    public function test_homepage_renders_the_marquee_with_each_badge_twice(): void
-    {
-        $this->coin('BTC', 'Bitcoin', 'BTC.svg');
-
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-
-        $this->assertStringContainsString('pay-strip-track', $html);
-        $this->assertStringContainsString('Payment Methods We Accept', $html);
-
-        // Every badge is rendered twice so the -50% translate loops seamlessly;
-        // one copy is aria-hidden so screen readers hear one set of methods. The
-        // accessible name is the img alt / sr-only span - never a title
-        // attribute, which ARIA does not expose on a generic div.
-        // Both copies of the artwork are present...
-        $this->assertSame(2, substr_count($html, 'assets/visa.svg'));
-        $this->assertSame(2, substr_count($html, 'assets/BTC.svg'));
-        // ...while the accessible name appears exactly once per method: the
-        // clone's img carries alt="" and its inline marks get no sr-only span.
-        $this->assertSame(1, substr_count($html, 'alt="Visa"'));
-        $this->assertSame(1, substr_count($html, 'alt="Bitcoin"'));
-        $this->assertSame(1, substr_count($html, 'sr-only">Verve</span>'));
-        $this->assertStringContainsString('alt=""', $html);
-
-        // Spacing lives on the marks, not as a flex gap on the track: a gap
-        // makes 2N-1 gaps for 2N items and -50% then misses a full copy.
-        $this->assertStringContainsString('mr-7 flex h-[52px] w-[104px] shrink-0', $html);
-        $this->assertStringNotContainsString('pay-strip-track flex w-max items-center gap-', $html);
-
-        // A pause control exists (WCAG 2.2.2) - hover alone excludes keyboard
-        // and touch users.
-        $this->assertStringContainsString('aria-pressed', $html);
+        // The mark is now a keypad glyph rather than a "*###" chip, so it names
+        // no code at all - which satisfies the rule above more strictly than the
+        // placeholder did. The label is what identifies the rail.
+        $this->assertStringContainsString('>USSD</span>', $html);
     }
 
     /**
-     * The heading IS the row's left edge: marks travel left and clip out exactly
-     * where "Payment Methods We Accept" starts, while the right side runs off to
-     * the viewport edge so they enter from off-screen instead of popping in
-     * mid-column. That is a one-sided bleed - a full `mx-` bleed would push the
-     * left cut-off out to the screen edge and break the alignment.
+     * The row used to be a marquee that rendered every badge twice - once real,
+     * once as an aria-hidden clone - so the loop could seam. It is a static
+     * pyramid now, so each badge must appear exactly ONCE. A second copy would
+     * be a duplicate logo on the page, not a seam.
      */
-    public function test_the_row_starts_on_the_heading_and_bleeds_right_only(): void
+    public function test_homepage_renders_each_badge_exactly_once(): void
+    {
+        $this->coin('BTC', 'Bitcoin', 'BTC.svg');
+
+        $html = $this->strip();
+
+        $this->assertStringContainsString('Payment Methods We Accept', $html);
+
+        $this->assertSame(1, substr_count($html, 'assets/visa.svg'));
+        $this->assertSame(1, substr_count($html, 'assets/BTC.svg'));
+
+        // Alt text and the inline marks' accessible names survive the rewrite.
+        $this->assertSame(1, substr_count($html, 'alt="Visa"'));
+        $this->assertSame(1, substr_count($html, 'alt="Bitcoin"'));
+        $this->assertSame(1, substr_count($html, 'sr-only">Verve</span>'));
+
+        // No clone pass, and nothing to pause: both the aria-hidden duplicates
+        // and the WCAG 2.2.2 pause control belonged to the animation. Checked
+        // against the COMPONENT, not the page - other carousels on the homepage
+        // legitimately keep their own pause controls.
+        $this->assertStringNotContainsString('pay-strip-track', $html);
+
+        $component = File::get(resource_path('views/components/home/payment-methods.blade.php'));
+        $this->assertStringNotContainsString('aria-pressed', $component);
+    }
+
+    /**
+     * The marquee bled to the viewport edge so marks could enter off-screen.
+     * Nothing moves now, so the block is plainly centred inside its panel - any
+     * surviving bleed would push it outside the panel's padding.
+     */
+    public function test_the_payment_row_no_longer_bleeds_to_the_viewport(): void
     {
         $component = File::get(resource_path('views/components/home/payment-methods.blade.php'));
 
-        $this->assertStringContainsString('pay-strip mr-[calc(50%-50vw)]', $component);
-        $this->assertStringNotContainsString('mx-[calc(50%-50vw)]', $component);
-        $this->assertStringNotContainsString('ml-[calc(50%-50vw)]', $component);
+        foreach (['mr-[calc(50%-50vw)]', 'mx-[calc(50%-50vw)]', 'ml-[calc(50%-50vw)]'] as $bleed) {
+            $this->assertStringNotContainsString($bleed, $component);
+        }
 
-        // The clip is what enforces the left edge, so the track must never be
-        // given its own left padding or margin to sit inside.
-        $this->assertStringNotContainsString('pay-strip-track flex w-max items-center pl-', $component);
+        $this->assertStringNotContainsString('pay-strip', $component);
     }
 
     /** Bare marks, no card plate: the gift-card tiles below own that treatment. */
@@ -292,24 +300,53 @@ class PaymentStripTest extends TestCase
     }
 
     /**
-     * A fixed duration meant the row sped up every time the crypto sync added a
-     * coin, because the same seconds had to cover a longer track. Pinning it to
-     * seconds-per-mark keeps the drift at one cadence whatever the lineup is.
+     * The rows are computed, not hardcoded, because the crypto sync adds coins
+     * to this list - a fixed 3/5/7/8 would break the shape the first time a
+     * badge joined. Two things have to hold whatever the count: every mark is
+     * placed exactly once, and no row is narrower than the row above it.
      */
-    public function test_the_drift_speed_scales_with_the_mark_count(): void
+    public function test_the_marks_form_a_pyramid(): void
     {
         $this->coin('BTC', 'Bitcoin', 'BTC.svg');
 
-        $expected = max(45, count(PaymentStripBadges::all()) * 3);
+        $expected = count(PaymentStripBadges::all());
 
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $html = $this->strip();
 
-        $this->assertStringContainsString('--pay-strip-duration: '.$expected.'s', $html);
+        // Each row opens with this exact class string; splitting on it gives one
+        // chunk per row (the first chunk is everything before row one).
+        $chunks = explode('flex flex-wrap items-center justify-center gap-x-7', $html);
+        array_shift($chunks);
+
+        $this->assertNotEmpty($chunks, 'No pyramid rows rendered.');
+
+        $counts = array_map(
+            fn (string $chunk): int => substr_count($chunk, 'h-[52px] w-[104px]'),
+            $chunks
+        );
+
+        // explode() already yields one disjoint chunk per row, so these counts
+        // stand on their own - no overlap to undo.
+        $perRow = $counts;
+
+        $this->assertSame($expected, array_sum($perRow), 'Every mark should be placed exactly once.');
+
+        foreach ($perRow as $i => $count) {
+            $this->assertGreaterThan(0, $count, "Row {$i} is empty.");
+
+            if ($i > 0) {
+                $this->assertGreaterThanOrEqual(
+                    $perRow[$i - 1],
+                    $count,
+                    "Row {$i} is narrower than the row above it - that is not a pyramid."
+                );
+            }
+        }
     }
 
     public function test_an_empty_coin_table_still_renders_the_strip(): void
     {
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $html = $this->strip();
 
         // No coins configured is not a broken page: the fixed rails stand alone.
         $this->assertStringContainsString('Payment Methods We Accept', $html);

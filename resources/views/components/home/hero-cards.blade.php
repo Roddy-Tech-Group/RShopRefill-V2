@@ -18,7 +18,7 @@
 @if ($heroCards->isNotEmpty())
 {{-- data-hero-cards: hook for the scroll-scrubbed leftward slide in app.js --}}
 <section data-reveal data-hero-cards aria-label="Hero highlights" class="mb-8">
-    {{-- One full-bleed overflowing row at every size (mx-[calc(50%-50vw)]
+    {{-- One full-bleed overflowing row at every size (.full-bleed
          escapes the page container; the pl-[max(...)] values line the first
          card up with the content column, same as the reviews carousel). --}}
     {{-- No scroll-smooth and NO scroll-snap here: on mobile app.js lerps this
@@ -28,7 +28,7 @@
          breathe: an overflow-x container clips vertically too, so without it
          the top and bottom edges of the cards get cut off (same trick as the
          reviews carousel). --}}
-    <div data-hero-cards-track class="mx-[calc(50%-50vw)] overflow-x-auto py-3 pl-[max(1rem,calc((100vw-1550px)/2+1rem))] pr-4 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:pl-[max(1.5rem,calc((100vw-1550px)/2+1.5rem))] sm:pr-6 lg:pl-[max(2rem,calc((100vw-1550px)/2+2rem))] lg:pr-8">
+    <div data-hero-cards-track class="full-bleed overflow-x-auto py-3 pl-[max(1rem,calc((100vw-1550px)/2+1rem))] pr-4 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:pl-[max(1.5rem,calc((100vw-1550px)/2+1.5rem))] sm:pr-6 lg:pl-[max(2rem,calc((100vw-1550px)/2+2rem))] lg:pr-8">
         <div data-reveal-group data-hero-cards-row class="flex w-max gap-4 sm:w-full sm:gap-5">
             @foreach ($heroCards as $card)
                 {{-- sm+: flex-1 fits every card on screen at rest; the scroll

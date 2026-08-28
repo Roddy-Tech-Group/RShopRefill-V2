@@ -5,6 +5,13 @@
     // Subcategory links for the active category, built by the page (same shape
     // as the desktop sidebar): ['label' => string, 'url' => string, 'active' => bool].
     'subItems' => [],
+    // The list of OTHER storefronts. The nav's category rail already carries it
+    // on every page, so a storefront with subcategories of its own can drop the
+    // duplicate - matching x-shop.category-sidebar.
+    'showCategories' => true,
+    // Filter in place instead of navigating - see x-shop.category-sidebar. The
+    // sheet closes on pick either way, so the result is visible immediately.
+    'clientFilter' => false,
 ])
 
 @php
@@ -16,7 +23,7 @@
     // Single source of truth for the mobile category strip. Mirrors the desktop
     // sidebar's list so swapping between the two surfaces is consistent.
     $categories = [
-        ['slug' => 'gift-cards',      'label' => 'Buy Gift Cards',  'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
+        ['slug' => 'gift-cards',      'label' => 'Gift Cards',  'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',        'icon' => 'Shop.svg',       'url' => $r('gomarket')],
         ['slug' => 'esims',           'label' => 'eSIMs',           'icon' => 'esim.svg',       'url' => $r('esims')],
         ['slug' => 'mobile-airtime',  'label' => 'Mobile top-ups',  'icon' => 'topup1.svg',     'url' => $r('topups')],
@@ -40,9 +47,12 @@
     $current = collect($categories)->firstWhere('slug', $active) ?? ($categories[0] ?? null);
 @endphp
 
-{{-- Mobile category picker. Dark navy pill that mirrors the country picker
-     style; tap to open a slide-up sheet with every category. Hidden at sm+
-     where the desktop category sidebar takes over. --}}
+{{-- Mobile category picker. Wears the storefront chip style - white fill,
+     page-tone ring, full radius - not the invite pill wash: the section
+     behind this is that same wash (#f4f6f5), and a wash-on-wash pill reads
+     as plain text with no rest or hover state at all. Tap to open a
+     slide-up sheet with every category. Hidden at sm+ where the desktop
+     category sidebar takes over. --}}
 <div
     x-data="{ open: false }"
     @keydown.escape.window="open = false"
@@ -55,13 +65,13 @@
         @click="open = true"
         aria-haspopup="dialog"
         :aria-expanded="open.toString()"
-        class="flex w-full items-center justify-between gap-2 rounded-[12px] bg-[#0c1a36] px-4 py-3 text-left text-sm font-semibold text-white ring-1 ring-white/15 transition-colors hover:bg-[#1d3252]"
+        class="flex w-full items-center justify-between gap-2 rounded-full bg-[#ffffff] px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-[#dee3e1] transition-colors duration-150 hover:bg-[#f4f6f5] hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/15"
     >
         <span class="flex min-w-0 items-center gap-2.5">
-            <img src="{{ asset('assets/' . rawurlencode($current['icon'])) }}" alt="" class="h-5 w-5 shrink-0 object-contain brightness-0 invert" loading="lazy">
+            <img src="{{ asset('assets/' . rawurlencode($current['icon'])) }}" alt="" class="h-5 w-5 shrink-0 object-contain dark:brightness-0 dark:invert" loading="lazy">
             <span class="truncate">{{ $current['label'] }}</span>
         </span>
-        <svg class="h-4 w-4 shrink-0 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <svg class="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
         </svg>
     </button>
@@ -97,17 +107,36 @@
              head partial applies a global modalRise animation, which stacked on top
              of the x-transition below and made this sheet animate differently to the
              menu. Opting out leaves the single x-transition in charge. --}}
-        class="modal-norise fixed inset-x-3 bottom-3 z-[71] max-h-[85dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 pb-4 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
+        class="modal-norise fixed inset-x-3 bottom-3 z-[71] isolate max-h-[85dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 pb-4 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
         role="dialog"
         aria-modal="true"
-        aria-label="Pick a category"
+        aria-label="{{ __('products.pick_a_category') }}"
     >
-        <div class="flex justify-center pt-3">
+        {{-- Handle + close, pinned.
+
+             The sheet itself scrolls, so this row is sticky rather than just
+             absolute: a close button that scrolls away with a 30-row
+             subcategory list is a close button you cannot reach when you need
+             it. The drag handle reads as decoration to plenty of people, and
+             the backdrop was the only other way out. --}}
+        <div class="sticky top-0 z-10 flex items-center justify-center pt-3 pb-1">
             <span class="h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-white/25"></span>
+
+        <button
+            type="button"
+            @click="open = false"
+            aria-label="{{ __('common.close') }}"
+            class="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-zinc-400"
+        >
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
         </div>
 
+        @if ($showCategories)
         <div class="px-5 pt-3">
-            <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">Browse categories</p>
+            <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">{{ __('products.browse_categories_label') }}</p>
         </div>
 
         <ul class="mt-3 px-3">
@@ -122,9 +151,9 @@
                             href="{{ $cat['url'] }}"
                             wire:navigate
                             @class([
-                                'flex items-center gap-3 rounded-[15px] px-3 py-3 text-sm transition-colors',
-                                'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $isActive,
-                                'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! $isActive,
+                                'flex items-center gap-3 rounded-[15px] px-3 py-3 text-sm',
+                                'font-bold text-[#0c1a36] dark:text-white' => $isActive,
+                                'font-medium text-[#0c1a36] dark:text-zinc-200' => ! $isActive,
                             ])
                             @if ($isActive) aria-current="page" @endif
                         >
@@ -140,38 +169,57 @@
                         </a>
                     @else
                         {{-- Feature off: visible but greyed and non-clickable. --}}
-                        <span class="flex cursor-not-allowed items-center gap-3 rounded-[15px] px-3 py-3 text-sm font-medium text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="Temporarily unavailable">
+                        <span class="flex cursor-not-allowed items-center gap-3 rounded-[15px] px-3 py-3 text-sm font-medium text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="{{ __('products.temporarily_unavailable') }}">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 grayscale dark:bg-white/10">
                                 <img src="{{ asset('assets/' . rawurlencode($cat['icon'])) }}" alt="" class="h-5 w-5 object-contain opacity-50 dark:brightness-0 dark:invert" loading="lazy">
                             </span>
                             <span class="flex-1">{{ $cat['label'] }}</span>
-                            <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">Off</span>
+                            <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">{{ __('products.flag_off') }}</span>
                         </span>
                     @endif
                 </li>
             @endforeach
         </ul>
+        @endif
 
         {{-- Subcategories of the active category (when the page supplies them).
-             Lets the sheet switch both the category and its subcategory. --}}
+             Lets the sheet switch both the category and its subcategory. Heads
+             the sheet when the category list above is off, so it carries no top
+             margin then. --}}
         @if (! empty($subItems))
-            <div class="mt-4 px-5">
-                <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">Subcategories</p>
+            <div class="{{ $showCategories ? 'mt-4' : 'mt-3' }} px-5">
+                <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">{{ __('products.subcategories') }}</p>
             </div>
             <ul class="mt-2 px-3">
                 @foreach ($subItems as $item)
+                    @php $slug = $item['slug'] ?? ''; @endphp
                     <li>
                         <a
                             href="{{ $item['url'] }}"
-                            wire:navigate
-                            @class([
-                                'flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm transition-colors',
-                                'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-200 dark:bg-white/10 dark:text-blue-300 dark:ring-white/15' => $item['active'] ?? false,
-                                'font-medium text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10' => ! ($item['active'] ?? false),
-                            ])
+                            @if (! $clientFilter) wire:navigate @endif
+                            @if ($clientFilter)
+                                @click.prevent="open = false; $dispatch('category-filtered', { slug: @js($slug) })"
+                                :class="activeCategory === @js($slug)
+                                    ? 'font-bold text-[#0c1a36] dark:text-white'
+                                    : 'font-medium text-[#0c1a36] dark:text-zinc-200'"
+                                class="flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm"
+                            @else
+                                @class([
+                                    'flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm',
+                                    'font-bold text-[#0c1a36] dark:text-white' => $item['active'] ?? false,
+                                    'font-medium text-[#0c1a36] dark:text-zinc-200' => ! ($item['active'] ?? false),
+                                ])
+                            @endif
                         >
                             <span class="flex-1">{{ $item['label'] }}</span>
-                            @if ($item['active'] ?? false)
+
+                            @if ($clientFilter)
+                                <template x-if="activeCategory === @js($slug)">
+                                    <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                    </svg>
+                                </template>
+                            @elseif ($item['active'] ?? false)
                                 <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                                 </svg>

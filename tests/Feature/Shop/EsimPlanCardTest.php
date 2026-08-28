@@ -2,42 +2,69 @@
 
 namespace Tests\Feature\Shop;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * eSIM data plan cards must all be the same height. The variable-length tier chip
- * ("TRIP"/"EXPLORER"/"ADVENTURER"/"NOMAD") used to wrap onto a 2nd line on long
- * names and make those data cards taller, so the tier chip now renders only on
- * voice plans - every data plan card carries the single "Data only" badge. This
- * applies everywhere data plans are listed: the eSIM detail page and the
- * Discover Global home section.
- *
- * Those pages lean on MySQL-only JSON functions and render the cards client-side,
- * so assert against the card template markup directly.
- */
 class EsimPlanCardTest extends TestCase
 {
-    public function test_esim_detail_page_data_plans_show_only_the_data_only_badge(): void
-    {
-        $markup = file_get_contents(resource_path('views/shop/esim.blade.php'));
+    use RefreshDatabase;
 
-        // Alpine: tier chip gated on p.is_voice.
-        $this->assertStringContainsString('x-show="p.is_voice && tiers[idx % 4]', $markup);
-        // Tiny See-more button sharing a bottom row with the price (button left, price right),
-        // and a smaller variant inside the dashboard.
-        $this->assertStringContainsString('mt-auto flex items-center justify-between gap-2 pt-3', $markup);
-        $this->assertStringContainsString("\$inDash ? 'rounded-md px-1.5 text-[10px]' : 'rounded-[8px] px-2 text-[11px]'", $markup);
+    private function card(): string
+    {
+        return file_get_contents(resource_path('views/shop/esim.blade.php'));
     }
 
-    public function test_discover_global_data_plans_show_only_the_data_only_badge(): void
+    private function css(): string
     {
-        $markup = file_get_contents(resource_path('views/components/home/discover-global.blade.php'));
+        return file_get_contents(resource_path('css/app.css'));
+    }
 
-        // Blade: tier chip gated on $plan['is_voice'].
-        $this->assertStringContainsString("\$plan['is_voice'] && \$tiers[\$idx % 4]", $markup);
-        // Tiny See-more button sharing a bottom row with the price (button left, price right),
-        // and a smaller variant inside the dashboard.
-        $this->assertStringContainsString('mt-auto flex items-center justify-between gap-2 pt-3', $markup);
-        $this->assertStringContainsString("\$onDashboard ? 'rounded-md px-1.5 text-[10px]' : 'rounded-[8px] px-2 text-[11px]'", $markup);
+    public function test_plan_cards_keep_the_surface_the_esim_tiles_already_had(): void
+    {
+        // The card is still an .esim-tile on a transparent background, so it
+        // resolves through the one rule that owns the eSIM surface rather than
+        // painting its own. That rule is what carries ground + grain in dark.
+        $this->assertStringContainsString('class="esim-tile relative isolate flex', $this->card());
+        $this->assertStringContainsString('bg-transparent', $this->card());
+
+        preg_match('/\.dark \.esim-tile,\s*\.dark \.pure-card \{(.*?)\}/s', $this->css(), $m);
+        $this->assertNotEmpty($m, 'esim-tile rule missing.');
+        $this->assertStringContainsString('background-color: var(--ash) !important;', $m[1]);
+        $this->assertStringContainsString('background-image: var(--grain) !important;', $m[1]);
+    }
+
+    public function test_card_carries_the_new_design_pieces(): void
+    {
+        $card = $this->card();
+
+        // Allowance as one large figure, with the unit split off beside it.
+        $this->assertStringContainsString('x-text="p.data_num"', $card);
+        $this->assertStringContainsString('x-text="p.data_unit"', $card);
+
+        // Unlimited plans hold a word, not a number, so they step down a size.
+        $this->assertStringContainsString("p.is_unlimited ? 'text-[30px]' : 'text-[58px]'", $card);
+
+        $this->assertStringContainsString('om-glow', $card);
+        $this->assertStringContainsString('esim-plate', $card);
+        $this->assertStringContainsString('Total', $card);
+    }
+
+    public function test_cta_opts_out_of_the_dark_surface_remap(): void
+    {
+        // `.bg-white` is remapped to the card surface in dark. The CTA has to
+        // stay white there, so it is authored as dark:bg-white - a different
+        // class the remap does not touch.
+        $this->assertStringContainsString('dark:bg-white dark:text-zinc-900', $this->card());
+    }
+
+    public function test_spinning_badge_border_respects_reduced_motion(): void
+    {
+        $css = $this->css();
+
+        $this->assertStringContainsString('animation: om-spin', $css);
+        $this->assertMatchesRegularExpression(
+            '/@media \(prefers-reduced-motion: reduce\) \{\s*\.om-glow::before \{ animation: none; \}/',
+            $css
+        );
     }
 }

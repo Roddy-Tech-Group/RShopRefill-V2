@@ -1,5 +1,6 @@
-{{-- Trust signals strip. 4 separate cards.
-     Mobile: 2 columns x 2 rows. Desktop (sm+): 4 columns x 1 row.
+{{-- Trust signals, as a compact inline row under the payment pyramid.
+     Was four bordered cards; the panel already provides the surface, so a
+     second set of boxes inside it read as boxes-in-a-box.
      Each icon is loaded as a file so it renders in its original colours.
      The "Wide Selection" tile reads the live product-variant count from the
      catalog (cached 10 min) so the marketing number tracks the real DB. --}}
@@ -15,43 +16,36 @@
     $catalogVariantsRounded = max(100, intdiv($catalogVariantCount, 100) * 100);
 @endphp
 <section data-reveal aria-label="Why shop with {{ $siteName }}">
-    <ul class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
+    <ul class="flex flex-wrap items-start justify-center gap-x-10 gap-y-6 sm:gap-x-14">
 
-        {{-- Best Prices --}}
-        <li class="flex min-h-[110px] items-center gap-3 rounded-[14px] border border-zinc-200 p-4 sm:min-h-0 sm:p-5 dark:border-zinc-700">
-            <img src="{{ asset('assets/' . rawurlencode('best prices.svg')) }}" alt="" class="h-7 w-7 shrink-0 object-contain" loading="lazy">
-            <div class="min-w-0 leading-tight">
-                <p class="text-base font-semibold text-zinc-900 dark:text-white">Best Prices</p>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Competitive rates</p>
-            </div>
-        </li>
+        @php
+            // Title + supporting line, in one place: the row renders them
+            // identically and only the copy differs.
+            $signals = [
+                ['icon' => 'best prices.svg',         'title' => 'Best Prices',          'note' => 'Competitive rates',       'mono' => false],
+                ['icon' => 'wide selection.svg',      'title' => 'Wide Selection',       'note' => number_format($catalogVariantsRounded).'+ products', 'mono' => false],
+                ['icon' => 'trusted by millions.svg', 'title' => 'Trusted by Thousands', 'note' => 'Join our global community', 'mono' => false],
+                ['icon' => 'Easy & Fast.webp',        'title' => 'Easy & Fast',          'note' => 'Simple 3-step checkout',  'mono' => true],
+            ];
+        @endphp
 
-        {{-- Wide Selection --}}
-        <li class="flex min-h-[110px] items-center gap-3 rounded-[14px] border border-zinc-200 p-4 sm:min-h-0 sm:p-5 dark:border-zinc-700">
-            <img src="{{ asset('assets/' . rawurlencode('wide selection.svg')) }}" alt="" class="h-7 w-7 shrink-0 object-contain" loading="lazy">
-            <div class="min-w-0 leading-tight">
-                <p class="text-base font-semibold text-zinc-900 dark:text-white">Wide Selection</p>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ number_format($catalogVariantsRounded) }}+ products</p>
-            </div>
-        </li>
-
-        {{-- Trusted by Thousands --}}
-        <li class="flex min-h-[110px] items-center gap-3 rounded-[14px] border border-zinc-200 p-4 sm:min-h-0 sm:p-5 dark:border-zinc-700">
-            <img src="{{ asset('assets/' . rawurlencode('trusted by millions.svg')) }}" alt="" class="h-7 w-7 shrink-0 object-contain" loading="lazy">
-            <div class="min-w-0 leading-tight">
-                <p class="text-base font-semibold text-zinc-900 dark:text-white">Trusted by Thousands</p>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Join our global community</p>
-            </div>
-        </li>
-
-        {{-- Easy & Fast --}}
-        <li class="flex min-h-[110px] items-center gap-3 rounded-[14px] border border-zinc-200 p-4 sm:min-h-0 sm:p-5 dark:border-zinc-700">
-            <img src="{{ asset('assets/' . rawurlencode('Easy & Fast.webp')) }}" alt="" class="h-7 w-7 shrink-0 object-contain brightness-0 dark:invert" loading="lazy">
-            <div class="min-w-0 leading-tight">
-                <p class="text-base font-semibold text-zinc-900 dark:text-white">Easy & Fast</p>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Simple 3-step checkout</p>
-            </div>
-        </li>
+        @foreach ($signals as $signal)
+            <li class="flex items-center gap-2.5">
+                <img
+                    src="{{ asset('assets/' . rawurlencode($signal['icon'])) }}"
+                    alt=""
+                    @class([
+                        'h-6 w-6 shrink-0 object-contain',
+                        'brightness-0 dark:invert' => $signal['mono'],
+                    ])
+                    loading="lazy"
+                >
+                <span class="leading-tight">
+                    <span class="block text-[15px] font-semibold text-zinc-900 dark:text-white">{{ $signal['title'] }}</span>
+                    <span class="block text-[13px] text-[#0c1a36]/70 dark:text-zinc-400">{{ $signal['note'] }}</span>
+                </span>
+            </li>
+        @endforeach
 
     </ul>
 </section>

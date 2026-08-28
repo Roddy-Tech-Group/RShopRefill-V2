@@ -42,12 +42,19 @@ new #[Lazy] class extends Component
             ->sortByDesc(fn ($w) => $primaryWallet && $w->id === $primaryWallet->id)
             ->values();
 
+        // How many rows the Recent Transactions card can draw on. The desktop
+        // card stretches to match the left column's height, so the number it
+        // can show depends on the viewport - it asks for a pool and renders
+        // what fits, scrolling the rest. Both source queries take this many,
+        // because either could supply the whole merged list.
+        $recentTransactionPool = 25;
+
         // Recent money activity - the wallet ledger (top-ups, wallet purchases,
         // Rcoin credits) MERGED with paid gateway order payments (card / mobile
         // money / crypto), which never touch a wallet and were otherwise
         // invisible here. Wallet-gateway attempts are excluded: their ledger
         // debit already covers them. Uniform row shape for the blade.
-        $walletRecent = $user->walletTransactions()->latest()->limit(8)->get()->map(fn ($txn) => (object) [
+        $walletRecent = $user->walletTransactions()->latest()->limit($recentTransactionPool)->get()->map(fn ($txn) => (object) [
             'key' => 'txn-'.$txn->id,
             'is_credit' => $txn->type === \App\Domain\Shared\Enums\WalletTransactionType::Credit,
             'title' => $txn->description ?: ($txn->transaction_category?->label() ?? 'Wallet transaction'),
@@ -68,7 +75,7 @@ new #[Lazy] class extends Component
             ])
             ->with('order:id,order_number')
             ->latest()
-            ->limit(8)
+            ->limit($recentTransactionPool)
             ->get()
             ->map(fn ($attempt) => (object) [
                 'key' => 'pay-'.$attempt->id,
@@ -80,7 +87,7 @@ new #[Lazy] class extends Component
                 'date' => $attempt->confirmed_at ?? $attempt->created_at,
             ]);
 
-        $recentTransactions = $walletRecent->concat($paymentRecent)->sortByDesc('date')->take(8)->values();
+        $recentTransactions = $walletRecent->concat($paymentRecent)->sortByDesc('date')->take($recentTransactionPool)->values();
 
         // Latest 5 orders for the Recent Orders card. Mobile renders all 5; the
         // desktop card slices ->take(3) to keep its right-rail compact.
@@ -199,6 +206,9 @@ new #[Lazy] class extends Component
             'recentTransactions' => $recentTransactions,
             'recentOrders' => $recentOrders,
             'popularProducts' => $popularProducts,
+            // One rollup for both carousels rather than a query per card -
+            // see Review::brandRatings().
+            'brandRatings' => \App\Models\Review::brandRatings($popularProducts->pluck('brand_key')->all()),
             'initialWalletColor' => $colorFor($walletCurrencyCode),
         ];
     }
@@ -281,6 +291,13 @@ new #[Lazy] class extends Component
                     :view-all-href="route('dashboard.shop.gift-cards')"
                     view-all-variant="plus"
                     :cols="5"
+                    {{-- The storefront row, not the wrapping grid this used to
+                         be - same control, same depth, same paging. --}}
+                    :carousel="true"
+                    :rows="2"
+                    :mobile-rows="3"
+                    {{-- The track would span 100vw and overrun this column. --}}
+                    :bleed="false"
                 >
                     @foreach ($popularProducts as $p)
                         @php
@@ -291,6 +308,7 @@ new #[Lazy] class extends Component
                         <x-home.brand-card
                             :name="$label"
                             :price-range="$p->priceRangeLabel()"
+                            :rating="$brandRatings[$p->brand_key] ?? null"
                             :href="route('dashboard.shop.brand', ['brandSlug' => Product::brandSlug($p->brand_key)])"
                             :card-class="$logo ? 'bg-[#ffffff]' : ($brandColor ? '' : 'bg-zinc-100')"
                             :style="! $logo && $brandColor ? 'background-color: ' . $brandColor . ';' : false"
@@ -305,11 +323,6 @@ new #[Lazy] class extends Component
                 </x-home.brand-row>
             </div>
         @endif
-
-        {{-- Discover Global eSIM - tap a plan to Add to cart / Buy now inline --}}
-        <div class="rounded-[15px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
-            <x-home.discover-global :contained="true" />
-        </div>
 
         {{-- Give the Perfect Gift promo - placed here on mobile (desktop keeps its own copy in the right rail). --}}
         <div class="relative overflow-hidden rounded-[12px] bg-blue-950 p-5 text-white">
@@ -390,7 +403,11 @@ new #[Lazy] class extends Component
 
         {{-- Recent Transactions - mobile only; mirrors the desktop right-rail card.
              Shows top-ups (credits) and purchases (debits) interleaved since both
-             write to wallet_transactions. Capped at 8 here, full history is on
+             write to wallet_transactions.
+
+             Sliced to 8 here while the desktop card renders the whole pool: this
+             card has no height to fill, so it grows with its content and the
+             pool would run it off the bottom of the page. Full history is on
              /dashboard/transactions via the See more "+" button. --}}
         <div class="relative overflow-hidden rounded-[15px] bg-[#eff6ff] dash-shimmer p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors dark:border-zinc-700 dark:shadow-none">
             <x-ui.floating-confetti />
@@ -404,7 +421,7 @@ new #[Lazy] class extends Component
             </div>
 
             <ul class="relative z-10 mt-4 space-y-3">
-                @forelse ($recentTransactions as $txn)
+                @forelse ($recentTransactions->take(8) as $txn)
                     <li class="flex items-center gap-3">
                         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm shadow-zinc-900/5">
                             @if ($txn->is_credit)
@@ -485,24 +502,13 @@ new #[Lazy] class extends Component
                         x-data="{
                             open: false,
                             theme: window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'),
-                            softDark: window.pureDarkOn ? ! window.pureDarkOn() : false,
                             choose(value) {
                                 this.theme = value;
                                 window.setTheme(value);
                                 this.open = false;
                             },
-                            toggleSoftDark() {
-                                this.softDark = ! this.softDark;
-                                // Pure black is the default, so the stored pure-dark flag is the inverse.
-                                window.setPureDark(! this.softDark);
-                                if (this.softDark && ! window.themeIsDark()) {
-                                    this.theme = 'dark';
-                                    window.setTheme('dark');
-                                }
-                            },
                         }"
                         x-on:theme-changed.window="theme = localStorage.getItem('theme') || 'system'"
-                        x-on:pure-dark-changed.window="softDark = ! window.pureDarkOn()"
                         @click.outside="open = false"
                         @keydown.escape="open = false"
                         class="relative self-start"
@@ -601,32 +607,6 @@ new #[Lazy] class extends Component
                                 </button>
                             @endforeach
 
-                            {{-- Soft dark (navy) - dark mode is pure black by default;
-                                 flipping this on switches to dark immediately and swaps
-                                 the pure black for the softer navy palette. --}}
-                            <button
-                                type="button"
-                                @click="toggleSoftDark()"
-                                class="flex w-full items-center justify-between gap-3 rounded-[12px] px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
-                                role="menuitemcheckbox"
-                                :aria-checked="softDark.toString()"
-                            >
-                                <span class="inline-flex items-center gap-2.5">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
-                                    </svg>
-                                    Soft dark
-                                </span>
-                                <span
-                                    :class="softDark ? 'bg-blue-600' : 'bg-zinc-200'"
-                                    class="theme-static relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-[12px] transition-colors"
-                                >
-                                    <span
-                                        :class="softDark ? 'translate-x-4' : 'translate-x-0.5'"
-                                        class="inline-block h-4 w-4 transform rounded-[12px] bg-white shadow transition-transform"
-                                    ></span>
-                                </span>
-                            </button>
 
                             {{-- Divider --}}
                             <div class="my-1 h-px bg-zinc-100"></div>
@@ -951,6 +931,15 @@ new #[Lazy] class extends Component
                                 subtitle="Top-rated gift cards in your region"
                                 :view-all-href="route('dashboard.shop.gift-cards')"
                                 :cols="5"
+                                :carousel="true"
+                                :rows="2"
+                                :mobile-rows="3"
+                                {{-- Three across, two deep. Measured rather than
+                                     fixed: this column is 8 of 12, so the
+                                     storefront's 280px card would show two. --}}
+                                :per-view="3"
+                                {{-- Sits in the desktop left column, not the page. --}}
+                                :bleed="false"
                             >
                                 @foreach ($popularProducts as $p)
                                     @php
@@ -961,6 +950,7 @@ new #[Lazy] class extends Component
                                     <x-home.brand-card
                                         :name="$label"
                                         :price-range="$p->priceRangeLabel()"
+                                        :rating="$brandRatings[$p->brand_key] ?? null"
                                         :href="route('dashboard.shop.brand', ['brandSlug' => Product::brandSlug($p->brand_key)])"
                                         :card-class="$logo ? 'bg-[#ffffff]' : ($brandColor ? '' : 'bg-zinc-100')"
                                         :style="! $logo && $brandColor ? 'background-color: ' . $brandColor . ';' : false"
@@ -1040,7 +1030,11 @@ new #[Lazy] class extends Component
                         <a href="{{ route('dashboard.transactions') }}" wire:navigate class="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">View all</a>
                     </div>
 
-                    <ul class="relative z-10 mt-4 flex-1 space-y-3">
+                    {{-- min-h-0 is load-bearing: without it this flex child refuses
+                         to shrink below its content, so a long list stretches the
+                         card instead of scrolling inside it. The scrollbar is
+                         hidden to match every other scroll surface here. --}}
+                    <ul class="relative z-10 mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         @forelse ($recentTransactions as $txn)
                             <li class="flex items-center gap-3">
                                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm shadow-zinc-900/5">
@@ -1073,11 +1067,6 @@ new #[Lazy] class extends Component
                     </ul>
                 </div>
             </div>
-        </div>
-
-        {{-- Discover Global eSIM - full-width below the grid so the plan cards open out on desktop --}}
-        <div class="mt-6 rounded-[15px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
-            <x-home.discover-global :contained="true" />
         </div>
 
     </div>

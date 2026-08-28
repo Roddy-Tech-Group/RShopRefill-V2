@@ -46,16 +46,9 @@
         default => $themeCookieHead === '1',
     };
 
-    // Extra Dark (pure black) is the DEFAULT dark palette on the customer side -
-    // navy is the opt-in "Soft dark" appearance. The choice lives in a cookie
-    // mirrored from the theme engine so the first paint already carries the right
-    // ramp. Absent cookie: customer defaults ON (black), admin stays OFF (navy).
-    $themePureDarkCookieHead = $themeIsAdminAreaHead
-        ? request()->cookie('theme_admin_puredark')
-        : request()->cookie('theme_web_puredark');
-    $themeIsPureDarkInitial = $themeIsDarkInitial && ($themeIsAdminAreaHead
-        ? $themePureDarkCookieHead === '1'
-        : $themePureDarkCookieHead !== '0');
+    // Soft dark is retired: there is a single dark palette, so the first paint
+    // no longer needs a second cookie to pick a ramp. .pure-dark now rides
+    // along with .dark wherever dark resolves.
 @endphp
 
 {{-- Tell the browser the resolved scheme so the OS-default blank-page bg
@@ -77,7 +70,9 @@
         @if ($themeIsDarkInitial)
             document.documentElement.classList.add('dark');
         @endif
-        @if ($themeIsPureDarkInitial)
+        @if ($themeIsDarkInitial)
+            {{-- One dark palette now, so .pure-dark rides along with .dark
+                 rather than being a separate stored preference. --}}
             document.documentElement.classList.add('pure-dark');
         @endif
         try {
@@ -107,14 +102,17 @@
      correct rule wins from the first paint. --}}
 <style>
     html { background-color: #ffffff; }
-    html.dark { background-color: #1a1a1a; }
-    /* Extra Dark is the default dark palette (customer side); paint the pre-CSS
-       frame true black so the default never flashes navy first. */
-    html.dark.pure-dark { background-color: #000000; }
-    /* Kill the ~15px horizontal scrollbar from full-bleed sections
-       (mx-[calc(50%-50vw)]) at the viewport root. `clip` keeps vertical scroll
-       and, unlike doing this on an inner wrapper, never becomes a containing
-       block/clip context for position:fixed modals + bars. */
+    /* Paint the pre-CSS frame at the grainy-black ground so the first byte
+       already matches the palette and dark never flashes a lighter grey. */
+    html.dark { background-color: #060607; }
+    /* Kill the horizontal scrollbar from full-bleed sections (.full-bleed in
+       app.css) at the viewport root. `clip` keeps vertical scroll and, unlike
+       doing this on an inner wrapper, never becomes a containing block/clip
+       context for position:fixed modals + bars.
+
+       This is belt-and-braces now: .full-bleed corrects for the scrollbar
+       itself, so a bleeding row no longer overhangs the right edge in the first
+       place. Kept because other pages still bleed with a raw calc(50%-50vw). */
     html { overflow-x: clip; }
 </style>
 
@@ -178,7 +176,7 @@
 
     $brandProfiles = array_values(array_filter([
         \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills'),
-        \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills'),
+        \App\Models\SiteSetting::get('social.x', 'https://x.com/roddytech237'),
         \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills'),
         \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills'),
         config('services.trustpilot.profile_url'),

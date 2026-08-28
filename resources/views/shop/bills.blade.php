@@ -146,7 +146,7 @@
     <section class="min-h-full bg-zinc-100">
         <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr] lg:gap-8">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[268px_1fr] lg:gap-8">
 
                 {{-- Shared category sidebar — same component on every storefront. --}}
                 <x-shop.category-sidebar active="bill-payments" :sub-items="$sidebarSubItems" />
@@ -234,7 +234,7 @@
                          carry no logo, so cards render as solid-colour name tiles. --}}
                     <div>
                         @if ($products->isNotEmpty())
-                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
                                 @foreach ($products as $product)
                                     @php
                                         $variants   = $product->variants;
@@ -291,10 +291,10 @@
                                                  the styled tile already shows it) + amount range. --}}
                                             <div class="mt-2 px-0.5">
                                                 @if ($logoSrc)
-                                                    <p class="truncate text-[13px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $billerName }}</p>
+                                                    <p class="truncate text-[16px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $billerName }}</p>
                                                 @endif
                                                 @if ($priceLabel)
-                                                    <p class="mt-0.5 truncate text-[14px] text-zinc-600">{{ $priceLabel }}</p>
+                                                    <p class="mt-0.5 truncate text-[14px] font-bold text-zinc-900 dark:text-white">{{ $priceLabel }}</p>
                                                 @endif
                                             </div>
                                         </a>

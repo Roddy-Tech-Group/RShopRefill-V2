@@ -110,10 +110,13 @@
         $rangeMin = $variable->min_amount;
         $rangeMax = $variable->max_amount;
     }
+    // Same conversion as the tile label that led here - see DisplayCurrency.
+    [$rangeMinDisplay, $rangeCurrency] = \App\Support\DisplayCurrency::convert((float) $rangeMin, $currency);
+    [$rangeMaxDisplay] = \App\Support\DisplayCurrency::convert((float) $rangeMax, $currency);
     $rangeText = ($rangeMin !== null && $rangeMax !== null)
-        ? $sym($currency) . rtrim(rtrim(number_format((float) $rangeMin, 2), '0'), '.')
+        ? $sym($rangeCurrency) . rtrim(rtrim(number_format($rangeMinDisplay, 2), '0'), '.')
             . ' - '
-            . rtrim(rtrim(number_format((float) $rangeMax, 2), '0'), '.')
+            . rtrim(rtrim(number_format($rangeMaxDisplay, 2), '0'), '.')
         : null;
 
     // All active currency rates (fiat + crypto) from the admin-managed `currency_rates`
@@ -152,8 +155,19 @@
     // currency (a UK card is GBP, a US card is USD). The face value is intrinsic
     // to the card and is never converted; only the price the customer pays is.
     $displayRate = 1.0;
-    $displaySymbol = Product::currencySymbol($currency);
-    $conv = fn ($v) => $displaySymbol . number_format((float) $v, 2);
+    $displayCurrencyCode = $currency;
+    // The customer's chosen display currency, when it prices this pair -
+    // $conv and the per-denomination 'disp' values convert with it.
+    $chosenDisplay = \App\Support\DisplayCurrency::code();
+    if ($chosenDisplay && $chosenDisplay !== strtoupper((string) $currency)) {
+        $chosenRate = \App\Support\DisplayCurrency::rate(strtoupper((string) $currency), $chosenDisplay);
+        if ($chosenRate !== null && $chosenRate > 0) {
+            $displayRate = $chosenRate;
+            $displayCurrencyCode = $chosenDisplay;
+        }
+    }
+    $displaySymbol = Product::currencySymbol($displayCurrencyCode);
+    $conv = fn ($v) => $displaySymbol . number_format((float) $v * $displayRate, 2);
 
     // A variable product's amount is entered in the VARIANT's own currency (e.g. a
     // utility top-up priced in XOF), not USD. These format the custom-amount UI in it.

@@ -14,6 +14,7 @@
 return [
     'logos' => [
         'Apple' => 'apple.webp',
+        'DiscordNitro' => 'discord-nitro.webp',
         'Amazon' => 'amazon.webp',
         'AmazonPrime' => 'amazon.webp',
         'GooglePlay' => 'googleplay.webp',

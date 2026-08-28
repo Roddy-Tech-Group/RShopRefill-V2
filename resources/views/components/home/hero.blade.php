@@ -60,7 +60,7 @@
 
         @php
             // Shared heading classes used by both the visible h1 and the glowing overlay copy
-            $headingClass = 'mx-auto my-0 max-w-[1200px] p-0 text-center text-[50px] font-extrabold leading-[1.1] tracking-normal text-zinc-900 sm:text-5xl md:text-6xl lg:text-[80px] lg:leading-[80px]';
+            $headingClass = 'mx-auto my-0 max-w-[1300px] p-0 text-center text-[34px] font-extrabold leading-[1.15] tracking-tight text-zinc-900 sm:text-[42px] md:text-[54px] lg:text-[64px] lg:leading-[1.1]';
         @endphp
 
         <div
@@ -77,9 +77,8 @@
         >
             {{-- Base (visible) heading --}}
             <h1 style="font-family: 'Urbanist', sans-serif;" class="{{ $headingClass }}">
-                One Ecosystem<br>
-                All your Digital<br class="sm:hidden">
-                Solutions
+                {{ __('home.hero_heading_line_one') }}<br class="hidden lg:inline">
+                {{ __('home.hero_heading_line_two') }}
             </h1>
 
             {{-- Glow overlay: bright green copy masked to a small circle that follows
@@ -91,15 +90,14 @@
                 :style="`mask-image: radial-gradient(circle 170px at ${x}px ${y}px, #000 0%, #000 80%, transparent 100%); -webkit-mask-image: radial-gradient(circle 170px at ${x}px ${y}px, #000 0%, #000 80%, transparent 100%);`"
             >
                 <div style="font-family: 'Urbanist', sans-serif;" class="{{ $headingClass }} hero-glow-accent">
-                    One Ecosystem<br>
-                    All your Digital<br class="sm:hidden">
-                    Solutions
+                    {{ __('home.hero_heading_line_one') }}<br class="hidden lg:inline">
+                    {{ __('home.hero_heading_line_two') }}
                 </div>
             </div>
         </div>
 
-        <p data-anim="hero-subtitle" class="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-zinc-900">
-            Everything you need to stay connected, shop globally, and manage everyday digital services and lifestyle all in one place.
+        <p data-anim="hero-subtitle" class="card-text-face mx-auto mt-5 max-w-2xl text-zinc-900">
+            {{ __('home.hero_subtitle') }}
         </p>
 
         {{-- CTAs --}}
@@ -107,7 +105,7 @@
 
             {{-- Shop Gift Cards (primary) --}}
             <a href="{{ route('shop.gift-cards') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
-                Shop Gift Cards
+                {{ __('home.hero_cta_gift_cards') }}
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3z"/>
                     <path d="m7 16 3 -3 3 3"/>
@@ -116,11 +114,11 @@
             </a>
 
             {{-- Explore eSIMs - pure transparent glass that adapts to theme:
-                 dark text + zinc ring on light hero, white text + white ring on
-                 dark hero. Backdrop blur stays the same; only the visible
-                 contrast pieces flip. --}}
-            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-transparent backdrop-blur-md px-5 py-3 text-base font-semibold text-zinc-900 ring-1 ring-zinc-400 transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-zinc-500 dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
-                Explore eSIMs
+                 dark text + the storefront's #dee3e1 ring on the light hero,
+                 white text + white ring on the dark one. Backdrop blur stays the
+                 same; only the visible contrast pieces flip. --}}
+            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-transparent backdrop-blur-md px-5 py-3 text-base font-semibold text-zinc-900 ring-1 ring-[#dee3e1] transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-[#c9d0cd] dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
+                {{ __('home.hero_cta_esims') }}
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M6 3h8.5L19 7.5V20a1 1 0 0 1 -1 1H6a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1z"/>
                     <path d="M9 11h3v6"/>
@@ -164,36 +162,36 @@
             $heroChips = [
                 [
                     'illo'     => 'gift',
-                    'title'    => $productsRounded.'+ digital products',
-                    'subtitle' => 'Gift cards, eSIMs, top-ups and bill payments worldwide',
+                    'title'    => __('home.chip_products_title', ['count' => $productsRounded]),
+                    'subtitle' => __('home.chip_products_subtitle'),
                     'href'     => route('shop.gift-cards'),
                 ],
                 [
                     'illo'     => 'globe',
-                    'title'    => $countriesRounded.'+ countries covered',
-                    'subtitle' => 'Travel eSIMs and local top-ups in over '.$countriesRounded.' destinations',
+                    'title'    => __('home.chip_countries_title', ['count' => $countriesRounded]),
+                    'subtitle' => __('home.chip_countries_subtitle', ['count' => $countriesRounded]),
                     'href'     => route('shop.esims'),
                 ],
                 [
                     'illo'     => 'shield',
-                    'title'    => 'Verified customer reviews',
+                    'title'    => __('home.chip_reviews_title'),
                     // Describes what /reviews actually shows. The page renders
                     // only the reviews our own form collected, so promising
                     // Trustpilot and Google feedback there would be a claim the
                     // destination cannot keep.
-                    'subtitle' => 'Real feedback from customers who bought here',
+                    'subtitle' => __('home.chip_reviews_subtitle'),
                     'href'     => route('shop.reviews'),
                 ],
                 [
                     'illo'     => 'mobile',
-                    'title'    => 'Works on every device',
-                    'subtitle' => 'Compatible with laptop, iPad and mobile',
+                    'title'    => __('home.chip_devices_title'),
+                    'subtitle' => __('home.chip_devices_subtitle'),
                     'href'     => route('shop.mobile-app'),
                 ],
                 [
                     'illo'     => 'search',
-                    'title'    => 'Find what you need fast',
-                    'subtitle' => 'Search gift cards, eSIMs and top-ups in seconds',
+                    'title'    => __('home.chip_search_title'),
+                    'subtitle' => __('home.chip_search_subtitle'),
                     'href'     => route('shop.topups'),
                 ],
             ];
@@ -277,7 +275,7 @@
                             current === {{ $i }} && direction < 0 ? 'rshop-chip-from-left' : '',
                             current === {{ $i }} && direction > 0 ? 'rshop-chip-from-right' : ''
                         ]"
-                        class="group inline-flex h-[84px] shrink-0 items-center rounded-full bg-transparent backdrop-blur-md ring-1 ring-zinc-400 transition-colors hover:bg-zinc-900/5 hover:ring-zinc-500 dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50 lg:transition-all lg:duration-500 lg:ease-out sm:h-[100px]"
+                        class="group inline-flex h-[84px] shrink-0 items-center rounded-full bg-transparent backdrop-blur-md ring-1 ring-[#dee3e1] transition-colors hover:bg-zinc-900/5 hover:ring-[#c9d0cd] dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50 lg:transition-all lg:duration-500 lg:ease-out sm:h-[100px]"
                         aria-label="{{ $chip['title'] }}"
                     >
                         {{-- Icon (always visible) — inline animated SVG when available

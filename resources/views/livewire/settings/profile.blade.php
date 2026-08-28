@@ -228,7 +228,6 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         country: 'Cameroon',
         countryFlag: '🇨🇲',
         countryCode: 'cm',
-        language: 'English',
         gender: @js($authUser?->gender ?? ''),
         genderMenuOpen: false,
         loaded: false,
@@ -237,7 +236,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             this.$nextTick(() => { this.loaded = true; });
         }
     }"
-    x-on:locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode; language = $event.detail.language"
+    x-on:locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode"
     x-on:livewire-upload-start="uploading = true"
     x-on:livewire-upload-finish="uploading = false"
     x-on:livewire-upload-error="uploading = false"

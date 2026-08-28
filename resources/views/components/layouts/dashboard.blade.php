@@ -244,7 +244,7 @@
         @endauth
 
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
-        @include('partials.translate-engine')
+        @include("partials.translate-engine")
 
         @php
             $user = Auth::user();
@@ -384,7 +384,7 @@
                             // GoMarket is hidden entirely (not greyed) until its
                             // feature flag is switched on.
                             $shopSubItems = array_values(array_filter([
-                                ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
+                                ['Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
                                 \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
                                 ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
                                 \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('dashboard.shop.flights'), null] : null,
@@ -928,13 +928,12 @@
                     country: 'United States',
                     countryFlag: '🇺🇸',
                     countryCode: 'US',
-                    language: 'English',
                 }"
                 @mouseenter="if (!locked) open = true"
                 @mouseleave="if (!locked) open = false"
                 @click.outside="open = false; locked = false"
                 @keydown.escape.window="open = false; locked = false"
-                @locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode; language = $event.detail.language"
+                @locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode"
                 class="relative"
             >
                 {{-- Avatar button. No notification dot here on purpose - the
@@ -1022,7 +1021,7 @@
             // page uses the slim white inner top bar (hamburger + title + bell) below.
             $skipMobileHero = ! request()->routeIs('dashboard');
 
-            // Top chrome placement: the glass nav band and the notification pill
+            // Top chrome placement: the nav band and the notification pill
             // belong to the OVERVIEW alone. Store pages keep only the two shopping
             // pills - cart and country switcher - floating without a band, because
             // that is where the cart can be acted on and where the country switcher
@@ -1051,13 +1050,13 @@
              (e.g. wallet card on the overview). Inner pages with their own sticky header
              (settings, password, appearance) skip this hero entirely. --}}
         @unless ($skipMobileHero)
-        {{-- Identity strip - OVERVIEW ONLY, a fixed frosted-glass nav; the page
+        {{-- Identity strip - OVERVIEW ONLY, a fixed nav band; the page
              scrolls beneath it. Fixed instead of sticky because the
              pull-to-refresh transform moves sticky ancestors and makes them
              bounce. The z-[55] chrome pills (flag / cart / bell) float on top
              of this band, composing one nav. Store and task pages render no
              band at all - store pages carry only the floating shopping pills. --}}
-        <div class="nav-glass-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
+        <div class="nav-band-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
             {{-- Compact identity strip - avatar + small online dot on the left,
                  notification bell on the right. Replaces the old "Hello /
                  Welcome back" greeting so the wallet card sits closer to the
@@ -1105,13 +1104,13 @@
             </div>
         </div>
 
-        {{-- Spacer holding the glass nav's room in normal flow. --}}
+        {{-- Spacer holding the nav band's room in normal flow. --}}
         <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
 
         {{-- Blue hero - overview only, same @unless as the identity strip above.
              Scrolls away with the page; the floating wallet chip + Top Up button
              inside <x-slot:mobileHero> take over once the hero leaves the viewport. --}}
-        {{-- Wallet card slot - scrolls with the page (under the glass nav),
+        {{-- Wallet card slot - scrolls with the page (under the nav band),
              so the wallet info hits the customer immediately on page load,
              leaving the rest of the viewport for product categories. --}}
         <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden">
@@ -1238,14 +1237,13 @@
             @if ($showMobileTopChrome)
             {{-- ALWAYS pinned - no scroll-triggered show/hide, so the pills can
                  never flicker or shake. This row IS the chips: the overview gets
-                 flag + cart + bell floating over its glass band; shop pages get
+                 flag + cart + bell floating over its band; shop pages get
                  flag + cart alone, with no band underneath. --}}
             <div
                 x-data="{
                     scrolled: false,
                     country: 'United States',
                     countryCode: 'US',
-                    language: 'English',
                     // Hysteresis for the hamburger only: appears past 96px, leaves
                     // under 40px, so boundary jitter can't toggle it repeatedly.
                     onScroll() {
@@ -1258,7 +1256,7 @@
                         window.addEventListener('scroll', () => this.onScroll(), { passive: true });
                     },
                 }"
-                @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode; language = $event.detail.language"
+                @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode"
                 class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-end gap-2 px-3 lg:hidden"
                 style="top: max(0.5rem, env(safe-area-inset-top));"
             >
@@ -1267,13 +1265,15 @@
                      bell below is additionally scoped to the overview, where the
                      nav band it visually belongs to lives. --}}
                 <div class="pointer-events-auto flex items-center gap-2" x-data>
-                    {{-- Language + currency toggle (opens the locale modal). --}}
+                    {{-- Region + currency toggle (opens the locale modal,
+                         which also holds the language pane - no separate
+                         language control up here). --}}
                     <button
                         type="button"
                         x-data="{ code: (localStorage.getItem('locale.countryCode') || 'US').toLowerCase() }"
                         @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                         x-on:click="$dispatch('open-locale-modal')"
-                        aria-label="Region, language and currency"
+                        aria-label="{{ __('common.country') }} / {{ __('common.payment_currency') }}"
                         class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
                     >
                         <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
@@ -1304,7 +1304,7 @@
 
             {{-- Status-bar / floating-pill spacer for every page that is NOT the
                  overview. The overview has its own spacer above (it holds the
-                 glass band's room); nothing held room here, so once
+                 band's room); nothing held room here, so once
                  viewport-fit=cover made env(safe-area-inset-top) resolve to a
                  real number the viewport grew upward under the status bar and
                  these pages had only pt-5 to survive on - the whole page read as
@@ -1511,18 +1511,18 @@
              Mounted outside flux:header so its position:fixed centers against the viewport
              rather than against a transformed sticky ancestor. Profile dropdown menu items
              dispatch 'open-locale-modal' to open it; we dispatch 'locale-updated' back
-             whenever country / language change so the profile chip values stay in sync. --}}
+             whenever the country changes so the profile chip values stay in sync. --}}
         <div
             x-data="storefrontLocale()"
             x-init="
                 init();
                 // The floating chips, desktop switcher and profile chip are separate
-                // Alpine scopes that default to United States/English and only sync via
-                // this event. Broadcast the persisted values once on load so they show
-                // the saved country/language instead of reverting to USA on every reload.
-                $nextTick(() => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
-                $watch('country',  v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
-                $watch('language', v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
+                // Alpine scopes that default to United States and only sync via this
+                // event. Broadcast the persisted values once on load so they show the
+                // saved country instead of reverting to USA on every reload. Language
+                // is server state and travels with the page, not with this event.
+                $nextTick(() => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode }));
+                $watch('country',  v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode }));
             "
             x-on:open-locale-modal.window="localeModalOpen = true"
             @keydown.escape.window="localeModalOpen = false"

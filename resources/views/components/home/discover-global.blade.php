@@ -180,20 +180,11 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-6"
-            {{-- Drops in BELOW the sticky nav, never over/behind it: the offset
-                 tracks the live header height (varies per breakpoint/collapse). --}}
-            x-data="{ navH: 0 }"
-            x-init="
-                const nav = document.querySelector('header.sticky');
-                if (nav) {
-                    const sync = () => navH = Math.round(nav.getBoundingClientRect().height);
-                    sync();
-                    new ResizeObserver(sync).observe(nav);
-                }
-            "
+            {{-- A plain 12px from the top. It used to track the live header
+                 height to sit below the pinned nav; nothing is pinned now. --}}
             {{-- Object syntax: a string :style would REPLACE the whole style
                  attribute and wipe the display x-show manages. --}}
-            :style="{ top: (navH + 12) + 'px' }"
+            style="top: 12px"
             style="display:none;"
             class="fixed inset-x-0 z-[100] px-3 sm:px-5"
         >

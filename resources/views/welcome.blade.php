@@ -92,27 +92,82 @@
      The hero is pinned (sticky) while the sections below scroll up and pass
      over it. The outer relative wrapper bounds the pin, so the hero unpins
      and scrolls away with the page before the footer arrives. --}}
-<div class="relative">
+{{-- Home runs its own light-mode tone pair. Everywhere else the page is
+     #f4f6f5 with #ffffff cards lifted off it (see LIGHT THEME SURFACES in
+     app.css); here the page is #ffffff and the cards sit on #f4f6f5, ringed in
+     #dee3e1 - surface, fill and border are three distinct values. The bloom
+     inside stays blue on purpose: a neutral edge with a blue wash off it, which
+     is the treatment the hero chips use too.
+
+     Both are authored as literal hex, not bg-white, which is this codebase's
+     idiom for opting OUT of the dark-mode flip - dark is pinned explicitly by
+     the dark: variant beside it. The wrapper needs the fill too, not just the
+     inner section: the hero sits above that and would otherwise show <main>'s
+     own tone as a band across the top.
+
+     Both are <section>, never <div>. app.css grants the dark PAGE tone only to
+     the elements it names (body, main, section, footer, the min-h wrappers);
+     on a div the same dark:bg-[#0c1a36] falls through to the CARD tone and the
+     hero band comes back a shade lighter than everything under it. --}}
+<section class="relative bg-[#ffffff] dark:bg-[#0c1a36]">
     {{-- The hero scrolls with the page (the old sticky pin + nav-height
          tracking was removed). --}}
     <x-home.hero-slider />
 
     {{-- Content below the hero: opaque page background, stacked above the
          hero so the lifted category cards can overlap its bottom edge. --}}
-    <div class="relative z-10 bg-[#eff6ff] dark:bg-[#0c1a36]">
+    <section class="relative z-10 bg-[#ffffff] dark:bg-[#0c1a36]">
 
-<div class="mx-auto w-full max-w-[1550px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+<div class="mx-auto w-full max-w-[1350px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
 
     {{-- Category cards - one tile per catalogue area, first thing under the hero --}}
     <x-home.category-cards />
 
-    {{-- Every payment method the platform accepts, as a slow self-scrolling row
-         of marks that clips out on the heading's left edge --}}
-    <x-home.payment-methods />
+    {{-- The payment pyramid, in its own panel. The four trust tiles used to
+         share this block and have been removed. Stats go below this.
 
-    {{-- Trust strip --}}
-    <div class="mt-8">
-        <x-home.trust-strip />
+         Fill, ring AND bloom are the category card's, verbatim: white on the
+         light page, black in dark, the same 1px edge, and the same wash
+         bleeding in from that edge rather than a flat fill. The panel used to
+         be a navy island in both themes - see .trust-panel in app.css for why
+         that also took a set of scoped ink remaps with it.
+
+         `isolate` is load-bearing: .cat-card-glow sits at z-index -1, so
+         without a stacking context here it escapes behind the section's own
+         background and vanishes.
+
+         No tex-grain either. That layer paints dark noise at 0.5 opacity, which
+         is built for a near-black ground and reads as grey static on a white
+         card. The cards it now matches carry no texture. --}}
+    <div class="trust-panel isolate mt-8 overflow-hidden rounded-[20px] bg-[#f4f6f5] px-5 py-10 ring-1 ring-[#dee3e1] sm:px-10 sm:py-14 dark:bg-transparent dark:ring-zinc-700/60">
+
+        {{-- The bloom rising from the panel's edge - see .cat-card-glow in
+             app.css. Same layer the four cards above use. --}}
+        <span aria-hidden="true" class="cat-card-glow"></span>
+
+        <h2 class="mx-auto max-w-[900px] text-center text-[30px] font-extrabold leading-[1.1] tracking-tight text-zinc-900 sm:text-[40px] lg:text-[52px] dark:text-white">
+            Instant Delivery, Zero Hassle.
+        </h2>
+        <p class="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-zinc-600 sm:text-lg dark:text-white/70">
+            Clean, broad, and works across gift cards, eSIMs, mobile top-ups, and bill payments.
+        </p>
+
+        {{-- Trust signals. A compact row rather than the four bordered cards
+             this used to be: the panel is already a surface, and boxes inside
+             it read as boxes-in-a-box.
+
+             The payment pyramid used to sit above this, between the heading and
+             the rule. It was removed; x-home.payment-methods is now unreferenced
+             but left in place rather than deleted. --}}
+        <div class="mt-10 border-t border-zinc-200 pt-10 dark:border-white/12">
+            <x-home.trust-strip />
+        </div>
+
+        {{-- Gift-card categories. Inside this panel, straight after the four
+             tiles above it - the tiles say what we sell, these say what kind of
+             gift card, which is the question most visitors arrive with. --}}
+        <x-home.gift-card-categories />
+
     </div>
 
     {{-- Brand rows - all wired to the synced catalog (one card per brand_key).
@@ -131,6 +186,15 @@
         ];
     @endphp
 
+    @php
+        // One rollup for every row on the page rather than a query per card -
+        // see Review::brandRatings(). Keys are collected across all rows first
+        // because the same brand can appear in more than one of them.
+        $brandRatings = \App\Models\Review::brandRatings(
+            collect($renderRow)->pluck('brands')->flatten()->pluck('brand_key')->all()
+        );
+    @endphp
+
     @foreach ($renderRow as $row)
         @if ($row['brands']->isNotEmpty())
             <div class="mt-12">
@@ -140,6 +204,13 @@
                     :view-all-href="$row['href'] ?? route('shop.gift-cards')"
                     :cols="$row['cols']"
                     :carousel="$row['carousel'] ?? false"
+                    {{-- Two deep on a desktop, three on a phone: a screenful
+                         shows several times the brands without several times
+                         the scroll, and the depth follows the card size at each
+                         breakpoint. A row can opt back to a single line with
+                         'rows' => 1 in the list above. --}}
+                    :rows="$row['rows'] ?? 2"
+                    :mobile-rows="$row['mobileRows'] ?? 3"
                 >
                     @foreach ($row['brands'] as $p)
                         @php
@@ -150,6 +221,7 @@
                         <x-home.brand-card
                             :name="$label"
                             :price-range="$p->priceRangeLabel()"
+                            :rating="$brandRatings[$p->brand_key] ?? null"
                             :href="route('shop.brand', ['brandSlug' => Product::brandSlug($p->brand_key)])"
                             :card-class="$logo ? 'bg-[#ffffff]' : ($brandColor ? '' : 'bg-zinc-100')"
                             :style="! $logo && $brandColor ? 'background-color: ' . $brandColor . ';' : false"
@@ -165,11 +237,6 @@
             </div>
         @endif
     @endforeach
-
-    {{-- Discover Global eSIM - tap a plan to add to cart inline (no page change) --}}
-    <div class="mt-12">
-        <x-home.discover-global />
-    </div>
 
     {{-- How it works --}}
     <div class="mt-12">
@@ -197,7 +264,7 @@
     <x-home.customer-reviews />
 </div>
 
-    </div>
-</div>
+    </section>
+</section>
 
 </x-layouts.app.header>

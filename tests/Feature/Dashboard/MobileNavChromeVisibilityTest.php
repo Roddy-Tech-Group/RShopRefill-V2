@@ -15,7 +15,7 @@ use Tests\TestCase;
  *   - The floating bottom nav bar (its centre Menu button dispatches
  *     'open-mobile-menu') stays on EVERY dashboard page - it is the primary
  *     navigation and must always be reachable.
- *   - The glass nav band and the notification pill belong to the OVERVIEW alone.
+ *   - The nav band and the notification pill belong to the OVERVIEW alone.
  *   - The two shopping pills - cart and country switcher - ride on the overview
  *     and the shop pages, floating without a band on the latter.
  *   - Task/inner pages (orders, wallet, settings, ...) carry no top chrome at
@@ -37,8 +37,8 @@ class MobileNavChromeVisibilityTest extends TestCase
     /** The cart chip - the other shopping-only control. */
     private const CART_MARKER = 'aria-label="Cart"';
 
-    /** The glass nav band the overview's identity strip sits in. */
-    private const BAND_MARKER = 'nav-glass-top';
+    /** The nav band the overview's identity strip sits in. */
+    private const BAND_MARKER = 'nav-band-top';
 
     public function test_overview_shows_the_nav_band_bell_and_shopping_pills(): void
     {
@@ -97,7 +97,13 @@ class MobileNavChromeVisibilityTest extends TestCase
      * and the fixed pinned chrome, which made the top pills (country switcher,
      * cart, notification) visibly duplicate as the page scrolled.
      */
-    private const LOCALE_CHIP_MARKER = 'aria-label="Region, language and currency"';
+    private function localeChipMarker(): string
+    {
+        // Built from the keys, not the English: the label was hardcoded when
+        // this was written and is translated now, so a literal would hold in
+        // one locale and quietly stop testing anything in the other.
+        return 'aria-label="'.__('common.country').' / '.__('common.payment_currency').'"';
+    }
 
     public function test_shop_pages_render_the_top_chrome_pills_only_once(): void
     {
@@ -108,7 +114,7 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertSame(1, substr_count($html, self::LOCALE_CHIP_MARKER));
+        $this->assertSame(1, substr_count($html, $this->localeChipMarker()));
     }
 
     public function test_overview_renders_the_top_chrome_pills_only_once(): void
@@ -120,7 +126,7 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertSame(1, substr_count($html, self::LOCALE_CHIP_MARKER));
+        $this->assertSame(1, substr_count($html, $this->localeChipMarker()));
     }
 
     /** Back button - removed entirely; the bottom nav bar covers navigation. */

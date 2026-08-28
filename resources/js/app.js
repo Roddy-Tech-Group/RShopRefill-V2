@@ -551,7 +551,7 @@ document.addEventListener('livewire:navigated', bootAll);
 
 /**
  * Shared locale Alpine component used by both the storefront and customer-dashboard
- * layouts. Owns: locale modal open state, country (name + flag + ISO code), language,
+ * layouts. Owns: locale modal open state, country (name + flag + ISO code),
  * and currency (code + symbol). Persists to localStorage so the user's preferences
  * survive page navigation. When the user changes country or currency AND they're on
  * a shop page that supports those URL filters (currently /gift-cards), it pushes
@@ -968,6 +968,11 @@ window.rshopOpenGoogleOAuth = function (href) {
  * with a small debounce, renders a dropdown of matching brands while the user
  * types. Pressing Enter submits the form to /gift-cards?q= for the full
  * results page.
+ *
+ * Focusing the field with nothing typed opens the panel on "Popular searches"
+ * instead of staying shut. Same endpoint with an empty q, which answers with the
+ * curated Popular row (Product::popularForRegion), so the list is real catalogue
+ * data rather than a static set of names.
  */
 window.navBrandSearch = function () {
     return {
@@ -975,18 +980,142 @@ window.navBrandSearch = function () {
         results: [],
         open: false,
         loading: false,
+        // The popular list is fetched at most once per page and kept, so
+        // focus/blur/clear cycles do not re-request it.
+        popular: [],
+        popularLoaded: false,
+        showingPopular: false,
+        // Last few queries this browser ran. Local only - a search history is
+        // the visitor's, so it never leaves the device.
+        recent: [],
         _debounce: null,
         _aborter: null,
+
+        /** Result rows in display order, split into labelled sections. */
+        get groups() {
+            const order = ['Gift card', 'Mobile top-up', 'Bill payment', 'eSIM', 'Page', 'Country'];
+            const heading = {
+                'Gift card': 'Gift Cards',
+                'Mobile top-up': 'Mobile Refill',
+                'Bill payment': 'Bill Payments',
+                'eSIM': 'eSIMs',
+                'Page': 'Suggestions',
+                'Country': 'Change Country',
+            };
+
+            return order
+                .map((type) => ({
+                    type,
+                    label: heading[type],
+                    rows: this.results.filter((r) => r.type === type),
+                }))
+                .filter((g) => g.rows.length > 0);
+        },
+
+        readRecent() {
+            try {
+                const raw = localStorage.getItem('rshop.recentSearches');
+                this.recent = raw ? JSON.parse(raw).slice(0, 5) : [];
+            } catch (_) {
+                this.recent = [];
+            }
+        },
+
+        /** Record a query the visitor actually ran. Newest first, de-duped, capped at 5. */
+        rememberQuery(q) {
+            q = (q || '').trim();
+            if (q.length < 2) return;
+
+            try {
+                const next = [q, ...this.recent.filter((r) => r.toLowerCase() !== q.toLowerCase())].slice(0, 5);
+                localStorage.setItem('rshop.recentSearches', JSON.stringify(next));
+                this.recent = next;
+            } catch (_) { /* private mode - the feature is a convenience, not a requirement */ }
+        },
+
+        clearRecent() {
+            try { localStorage.removeItem('rshop.recentSearches'); } catch (_) {}
+            this.recent = [];
+        },
+
+        /** Clicking a recent term re-runs it rather than only filling the field. */
+        useRecent(q) {
+            this.query = q;
+            this.showingPopular = false;
+            this.open = true;
+            this.loading = true;
+            this.fetchResults(q);
+        },
+
+        /**
+         * Pick a country from the "Change Country" group.
+         *
+         * Writes the same five properties the locale modal sets. This component
+         * is nested inside the storefrontLocale() scope, and Alpine's merged
+         * scope proxy assigns through to whichever object in the chain owns the
+         * key - so these land on the shared locale state, exactly as the modal's
+         * own handler does, and its watchers persist + reload from there.
+         */
+        pickCountry(row) {
+            this.country = row.name;
+            this.countryFlag = row.flag;
+            this.countryCode = row.country;
+            this.currency = row.currency;
+            this.currencySymbol = row.currencySymbol;
+            this.open = false;
+        },
+
+        /** Focus or click on the field. Typed query reopens its results; empty opens Popular. */
+        onFocus() {
+            this.readRecent();
+
+            if (this.query.trim().length >= 2) {
+                this.open = true;
+                return;
+            }
+            this.showPopular();
+        },
+
+        async showPopular() {
+            this.showingPopular = true;
+
+            if (this.popularLoaded) {
+                this.results = this.popular;
+                this.open = this.popular.length > 0;
+                return;
+            }
+
+            this.open = true;
+            this.loading = true;
+
+            try {
+                const res = await fetch('/api/search/brands?q=', {
+                    headers: { 'Accept': 'application/json' },
+                });
+                this.popular = res.ok ? await res.json() : [];
+            } catch (err) {
+                this.popular = [];
+            } finally {
+                this.popularLoaded = true;
+                this.results = this.popular;
+                this.loading = false;
+                this.open = this.popular.length > 0;
+            }
+        },
 
         onInput() {
             const q = this.query.trim();
             if (q.length < 2) {
-                this.results = [];
-                this.open = false;
-                this.loading = false;
+                // Falling back to Popular rather than closing: the panel is
+                // already open and shutting it on every backspace past two
+                // characters reads as a flicker.
                 if (this._aborter) this._aborter.abort();
+                clearTimeout(this._debounce);
+                this.loading = false;
+                this.showPopular();
                 return;
             }
+            this.showingPopular = false;
             this.open = true;
             this.loading = true;
             clearTimeout(this._debounce);
@@ -1009,6 +1138,9 @@ window.navBrandSearch = function () {
                     return;
                 }
                 this.results = await res.json();
+                // Only remembered once a query returned something - half-typed
+                // prefixes on the way to a real search are not history.
+                if (this.results.length > 0) this.rememberQuery(q);
             } catch (err) {
                 if (err.name === 'AbortError') return; // expected when typing fast
                 this.results = [];
@@ -1019,10 +1151,10 @@ window.navBrandSearch = function () {
 
         clear() {
             this.query = '';
-            this.results = [];
-            this.open = false;
             this.loading = false;
             this.$refs.search.focus();
+            // Back to Popular, not to an empty panel - the field still has focus.
+            this.showPopular();
         },
     };
 };
@@ -1271,9 +1403,13 @@ window.storefrontLocale = function () {
         country:        read('country',        'United States'),
         countryFlag:    read('countryFlag',    '🇺🇸'),
         countryCode:    read('countryCode',    'US'),
-        language:       read('language',       'English'),
         currency:       read('currency',       'USD'),
         currencySymbol: read('currencySymbol', '$'),
+
+        // The translate engine's chosen language (partials/translate-engine
+        // owns it). Read, never written here: the engine and the locale modal
+        // are what set it, and the nav only needs to name it.
+        language:       read('language',       'English'),
 
         activeCategory: 'Gift Cards',
 
@@ -1282,11 +1418,18 @@ window.storefrontLocale = function () {
                 try { localStorage.setItem('locale.' + key, val ?? ''); } catch (_) {}
             };
 
+            // `locale.language` is NOT dropped here. It is the translate
+            // engine's live choice again (partials/translate-engine), and this
+            // used to delete it on every page load - a leftover from the spell
+            // when the engine was gone and language was server state. With the
+            // engine back, that removal wiped the choice on every navigation;
+            // only the googtrans cookie kept the page translated, and the nav
+            // fell back to reading "English".
+
             // Persist each piece independently.
             this.$watch('country',        save('country'));
             this.$watch('countryFlag',    save('countryFlag'));
             this.$watch('countryCode',    save('countryCode'));
-            this.$watch('language',       save('language'));
             this.$watch('currency',       save('currency'));
             this.$watch('currencySymbol', save('currencySymbol'));
 
@@ -1310,8 +1453,15 @@ window.storefrontLocale = function () {
                     if (this.countryCode) url.searchParams.set('country', this.countryCode);
                     else url.searchParams.delete('country');
 
-                    if (this.currency) url.searchParams.set('currency', this.currency);
-                    else url.searchParams.delete('currency');
+                    // display_currency, NOT currency: ?currency= is the gift-card
+                    // listing's own catalogue FILTER, so writing the locale's
+                    // currency there hid every product not priced in it - picking
+                    // a country from the search panel cut the listing from 756
+                    // tiles to 70. ?display_currency= converts the prices instead
+                    // and leaves the catalogue whole, which is what the locale
+                    // modal has always sent.
+                    if (this.currency) url.searchParams.set('display_currency', this.currency);
+                    else url.searchParams.delete('display_currency');
 
                     // Checkout hard-reloads (payment scripts + server-side rate math);
                     // everywhere else uses Livewire's fast SPA navigation when available.
@@ -1334,10 +1484,6 @@ window.storefrontLocale = function () {
                 window.dispatchEvent(new CustomEvent('currency-changed'));
             });
 
-            // NOTE: the locale modal dispatches `language-changed` itself when a
-            // language is picked (works regardless of which Alpine scope the modal
-            // is mounted in - storefront vs dashboard). We intentionally do NOT
-            // dispatch it from this watcher to avoid a double trigger / double reload.
         },
     };
 };

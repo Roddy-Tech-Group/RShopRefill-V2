@@ -20,10 +20,9 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
          link uses). The radio group is bound to window.setTheme via Alpine so
          it persists through reloads, exactly like the old flux variant did. --}}
     <div
-        x-data="{ theme: window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'), softDark: window.pureDarkOn ? ! window.pureDarkOn() : false }"
+        x-data="{ theme: window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system')}"
         x-init="
             $watch('theme', v => window.setTheme(v));
-            $watch('softDark', v => { window.setPureDark(! v); if (v && ! window.themeIsDark()) theme = 'dark'; });
         "
         class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none"
     >
@@ -60,26 +59,5 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             @endforeach
         </div>
 
-        {{-- Soft dark (navy). Dark mode is pure black by default; flipping this on
-             swaps it for the softer navy palette (and switches to dark right away
-             so the change is visible). Saved locally via window.setPureDark, which
-             stores the inverse - the theme engine drops `.pure-dark` from <html>. --}}
-        <div class="mt-5 flex items-center justify-between gap-4 border-t border-zinc-200 pt-5 dark:border-zinc-700">
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-black dark:text-white">Soft dark</p>
-                <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Use the softer navy palette instead of pure black. Dark mode is pure black by default.</p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                @click="softDark = ! softDark"
-                :aria-checked="softDark.toString()"
-                aria-label="Soft dark"
-                :class="softDark ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'"
-                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 ring-black/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:ring-white/10"
-            >
-                <span :class="softDark ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
-            </button>
-        </div>
     </div>
 </div>

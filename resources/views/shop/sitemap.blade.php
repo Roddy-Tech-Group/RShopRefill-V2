@@ -3,7 +3,7 @@
     $columns = [
         // GoMarket stays out of the index until its feature flag is on.
         'Shop' => array_values(array_filter([
-            ['Buy Gift Cards', route('shop.gift-cards')],
+            ['Gift Cards', route('shop.gift-cards')],
             \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('shop.gomarket')] : null,
             ['eSIMs', route('shop.esims')],
             ['Mobile top up', route('shop.topups')],

@@ -82,13 +82,10 @@
         {{-- Bank transfer. No country flag: the rail is offered per settlement
              currency, not per country. --}}
         <span class="flex items-center gap-2 text-zinc-700 dark:text-zinc-200">
-            <svg class="h-7 w-7 shrink-0" viewBox="0 0 34 30" fill="currentColor" aria-hidden="true">
-                <path d="M17 1 32 9 2 9 Z"/>
-                <rect x="5" y="12" width="4" height="11"/>
-                <rect x="12" y="12" width="4" height="11"/>
-                <rect x="19" y="12" width="4" height="11"/>
-                <rect x="26" y="12" width="4" height="11"/>
-                <rect x="2" y="26" width="30" height="4"/>
+            <svg class="h-7 w-7 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3.25 9.5 12 4.25l8.75 5.25"/>
+                <path d="M5.5 9.75v8M9.833 9.75v8M14.167 9.75v8M18.5 9.75v8"/>
+                <path d="M3 20.25h18"/>
             </svg>
             <span class="text-[12px] font-bold leading-[1.15]">Bank<br>transfer</span>
         </span>
@@ -100,13 +97,12 @@
              it from a plain transfer, and with no region chip - the rail is
              offered for NGN as well as EUR/GBP. --}}
         <span class="flex items-center gap-2 text-zinc-700 dark:text-zinc-200">
-            <svg class="h-7 w-7 shrink-0" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                <rect x="2" y="4" width="24" height="20" rx="2.5"/>
-                <path d="M2 9h24" stroke-linecap="round"/>
-                <path d="M14 12 20 15 8 15 Z" fill="currentColor" stroke="none"/>
-                <rect x="9.5" y="16.5" width="1.8" height="4" fill="currentColor" stroke="none"/>
-                <rect x="13.1" y="16.5" width="1.8" height="4" fill="currentColor" stroke="none"/>
-                <rect x="16.7" y="16.5" width="1.8" height="4" fill="currentColor" stroke="none"/>
+            <svg class="h-7 w-7 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2.5" y="3.75" width="19" height="16.5" rx="2.5"/>
+                <path d="M2.5 8.25h19"/>
+                <path d="M5.5 5.9h.01M8 5.9h.01"/>
+                <path d="M8 15.75 12 13.25l4 2.5"/>
+                <path d="M9.25 16v1.75M12 16v1.75M14.75 16v1.75"/>
             </svg>
             <span class="text-[12px] font-bold leading-[1.15]">Pay with<br>bank</span>
         </span>
@@ -117,36 +113,36 @@
              and so on are bank-specific): Flutterwave's hosted USSD page lets
              the customer pick their own bank and issues that bank's code. --}}
         <span class="flex items-center gap-2">
-            <span class="rounded-[8px] bg-zinc-900 px-2.5 py-2 font-mono text-[15px] font-bold leading-none text-white dark:bg-white dark:text-zinc-900">*###</span>
+            <svg class="h-7 w-7 shrink-0 text-zinc-700 dark:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4.25" y="2.25" width="15.5" height="19.5" rx="3"/>
+                <path d="M8.5 7.5h.01M12 7.5h.01M15.5 7.5h.01M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01" stroke-width="2.3"/>
+                <path d="M10.25 18.5h3.5"/>
+            </svg>
             <span class="text-[12px] font-bold leading-none text-zinc-700 dark:text-zinc-200">USSD</span>
         </span>
         @break
 
     @case('bank_qr')
         <span class="flex items-center gap-2">
-            <svg class="h-7 w-7 shrink-0" viewBox="0 0 30 30" aria-hidden="true">
-                <rect x="1" y="1" width="11" height="11" rx="2" fill="none" stroke="#00AA4F" stroke-width="2.4"/>
-                <rect x="4.5" y="4.5" width="4" height="4" fill="#00AA4F"/>
-                <rect x="18" y="1" width="11" height="11" rx="2" fill="none" stroke="#00AA4F" stroke-width="2.4"/>
-                <rect x="21.5" y="4.5" width="4" height="4" fill="#00AA4F"/>
-                <rect x="1" y="18" width="11" height="11" rx="2" fill="none" stroke="#00AA4F" stroke-width="2.4"/>
-                <rect x="4.5" y="21.5" width="4" height="4" fill="#00AA4F"/>
-                <rect x="18" y="18" width="4" height="4" fill="#00AA4F"/>
-                <rect x="25" y="18" width="4" height="4" fill="#00AA4F"/>
-                <rect x="21.5" y="21.5" width="4" height="4" fill="#00AA4F"/>
-                <rect x="18" y="25" width="4" height="4" fill="#00AA4F"/>
-                <rect x="25" y="25" width="4" height="4" fill="#00AA4F"/>
+            <svg class="h-7 w-7 shrink-0 text-zinc-700 dark:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="2"/>
+                <rect x="14" y="3" width="7" height="7" rx="2"/>
+                <rect x="3" y="14" width="7" height="7" rx="2"/>
+                <path d="M6.5 6.5h.01M17.5 6.5h.01M6.5 17.5h.01" stroke-width="2.3"/>
+                <path d="M14 14h3v3h-3z"/>
+                <path d="M20.5 14h.01M14 20.5h.01M17.5 20.5h.01M20.5 17.5h.01M20.5 20.5h.01" stroke-width="2.3"/>
             </svg>
-            <span class="text-[13px] font-bold leading-none text-zinc-900 dark:text-white">Bank QR</span>
+            <span class="text-[12px] font-bold leading-none text-zinc-700 dark:text-zinc-200">Bank QR</span>
         </span>
         @break
 
     @case('mobile_wallet')
         <span class="flex items-center gap-2 text-zinc-700 dark:text-zinc-200">
-            <svg class="h-7 w-7 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                <rect x="6" y="2.5" width="12" height="19" rx="2.5"/>
-                <path stroke-linecap="round" d="M10.5 18.5h3"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.5h6M9 12h4"/>
+            <svg class="h-7 w-7 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 8.75A2.75 2.75 0 0 1 5.75 6H18a3 3 0 0 1 3 3v7.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/>
+                <path d="M3 8.75V7.5A2.5 2.5 0 0 1 5.5 5h9.75"/>
+                <path d="M21 11.5h-3.25a1.75 1.75 0 0 0 0 3.5H21"/>
+                <path d="M17.9 13.25h.01" stroke-width="2.3"/>
             </svg>
             <span class="text-[12px] font-bold leading-[1.15]">Mobile<br>wallet</span>
         </span>

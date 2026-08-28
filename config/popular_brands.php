@@ -13,6 +13,44 @@
  */
 
 return [
+
+    /*
+    |-----------------------------------------------------------------------
+    | Featured row
+    |-----------------------------------------------------------------------
+    |
+    | The curated section that opens the gift-card listing, in this exact
+    | order - it is a shop window, not an alphabetical index, so the order is
+    | the point. Keys are brand_key values; anything the catalogue does not
+    | carry, or that the visitor's country filter removes, is skipped rather
+    | than left as a gap in the row.
+    |
+    */
+
+    'featured' => [
+        'Apple',
+        'Amazon',
+        'Steam',
+        'PlayStation',
+        'GooglePlay',
+        'Xbox',
+        'Netflix',
+        'RazerGold',
+        'Roblox',
+        'Nintendo',
+        'Airbnb',
+        'eBay',
+        'Adidas',
+        'UberEats',
+        'Uber',
+        'Visa',
+        'DiscordNitro',
+        'FreeFire',
+        'EAPlay',
+        'MobileLegends',
+        'Airalo',
+    ],
+
     /*
      * Gaming brands pinned to the very top of the gift cards listing, in this
      * exact order. Everything else in Gaming & Entertainment follows, then the

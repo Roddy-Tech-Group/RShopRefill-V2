@@ -183,10 +183,12 @@
 
 <x-shop.layout :title="'Mobile Top-up | '.$siteName">
 
-    <section class="min-h-full rounded-[15px] bg-[#eff6ff]">
+    {{-- No radius: this is the page slab, edge to edge, not a card. Rounded
+         corners on it left the page ground showing through above and below. --}}
+    <section class="min-h-full bg-[#eff6ff]">
         <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr] lg:gap-8">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[268px_1fr] lg:gap-8">
 
                 {{-- Shared category sidebar — same component on every storefront. --}}
                 <x-shop.category-sidebar active="mobile-airtime" :sub-items="$sidebarSubItems" />
@@ -264,7 +266,7 @@
                     {{-- Operator grid. Same card treatment as the gift-card listing. --}}
                     <div>
                         @if ($products->isNotEmpty())
-                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
                                 @foreach ($products as $product)
                                     @php
                                         $variants   = $product->variants;
@@ -323,10 +325,10 @@
                                                  tile; the styled tile already shows the name) + amount range. --}}
                                             <div class="mt-2 px-0.5">
                                                 @if ($logoSrc)
-                                                    <p class="truncate text-[13px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $opName }}</p>
+                                                    <p class="truncate text-[16px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $opName }}</p>
                                                 @endif
                                                 @if ($priceLabel)
-                                                    <p class="mt-0.5 truncate text-[14px] text-zinc-600">{{ $priceLabel }}</p>
+                                                    <p class="mt-0.5 truncate text-[14px] font-bold text-zinc-900 dark:text-white">{{ $priceLabel }}</p>
                                                 @endif
                                                 @if ($badges->isNotEmpty())
                                                     {{-- What this network offers: Credit / Data / Bundle. --}}

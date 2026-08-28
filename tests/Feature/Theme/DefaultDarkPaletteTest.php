@@ -34,13 +34,21 @@ class DefaultDarkPaletteTest extends TestCase
             ->assertSee(self::HEAD_PURE_DARK, false);
     }
 
-    public function test_customer_can_opt_into_soft_navy_dark(): void
+    /**
+     * Soft navy dark is retired. There is a single dark palette, so the first
+     * paint no longer reads a second cookie to pick a ramp: .pure-dark rides
+     * along with .dark wherever dark resolves.
+     *
+     * The old opt-out cookie is asserted explicitly - a browser that still
+     * carries theme_web_puredark=0 from before must get the one palette like
+     * everyone else, not a half-applied ramp.
+     */
+    public function test_the_retired_soft_dark_cookie_no_longer_changes_the_palette(): void
     {
-        // Soft dark opt-in writes the pure-dark cookie '0' → navy, no pure-dark class.
         $this->withUnencryptedCookies(['theme_web_dark' => '1', 'theme_web_puredark' => '0'])
             ->get('/')
             ->assertOk()
-            ->assertDontSee(self::HEAD_PURE_DARK, false);
+            ->assertSee(self::HEAD_PURE_DARK, false);
     }
 
     public function test_pure_black_is_not_applied_in_light_mode(): void

@@ -21,10 +21,42 @@
     // dashboard's left rail) it overflows its neighbours, so pass :bleed="false"
     // to keep the track contained to its own width.
     'bleed' => true,
+    // How many rows deep the carousel track runs from `sm` up. 1 (the
+    // default) is the single scrolling line every row has always been; 2
+    // stacks the cards two-deep and pages sideways, so a screenful shows
+    // twice as many brands without taking twice the scroll.
+    'rows' => 1,
+    // The same, below `sm`. Separate because a phone card is 160px against
+    // the desktop's 280px, so the two breakpoints do not want the same
+    // depth: three short rows read as a block on a phone, where three tall
+    // ones on a desktop would push everything under them off the fold.
+    'mobileRows' => 1,
+    // Fit exactly this many columns across the visible track, from `sm` up.
+    // 0 (the default) keeps the fixed per-breakpoint card width.
+    //
+    // A fixed width cannot answer "three per line" inside a column whose
+    // width the viewport does not tell you: the dashboard's row lives in an
+    // 8-of-12 grid column, so the 280px card that shows four across the
+    // storefront shows barely two there. This measures the track instead.
+    'perView' => 0,
 ])
 
 @php
     // Explicit class strings so Tailwind's JIT picks them up.
+    // Track depth. grid-flow-col fills top-to-bottom then starts a new
+    // column, so the cards stay in reading order as the track scrolls.
+    //
+    // Written out per value rather than interpolated: Tailwind scans source
+    // text, so a built-up class name is a class that never gets generated.
+    $rowsClass = fn (int $n, string $prefix = '') => match (max(1, min(4, $n))) {
+        4 => $prefix.'grid-rows-[repeat(4,auto)]',
+        3 => $prefix.'grid-rows-[repeat(3,auto)]',
+        2 => $prefix.'grid-rows-[repeat(2,auto)]',
+        default => $prefix.'grid-rows-[repeat(1,auto)]',
+    };
+
+    $trackRows = $rowsClass((int) $mobileRows).' '.$rowsClass((int) $rows, 'sm:');
+
     $gridCols = match ((int) $cols) {
         5 => 'lg:grid-cols-5',
         7 => 'lg:grid-cols-7',
@@ -80,7 +112,26 @@
             };
             apply();
             setTimeout(apply, 700);
-            const cardW = window.innerWidth >= 1024 ? 280 : window.innerWidth >= 640 ? 200 : 160;
+            // Card width. perView measures the track and divides it; otherwise
+            // the fixed per-breakpoint widths stand.
+            //
+            // Measured AFTER apply(), because apply() is what sets the list's
+            // padding-left - reading the padding before it runs would divide
+            // the wrong width and land a column short.
+            //
+            // Phones are excluded at any setting: three-per-line on a 390px
+            // screen is a 120px card, which is smaller than the artwork.
+            const perView = {{ (int) $perView }};
+            let cardW;
+            if (perView > 0 && window.innerWidth >= 640) {
+                const cs   = getComputedStyle(list);
+                const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+                const gap  = 20;
+                const room = Math.max(0, t.clientWidth - padX);
+                cardW = Math.max(120, Math.floor((room - gap * (perView - 1)) / perView));
+            } else {
+                cardW = window.innerWidth >= 1024 ? 280 : window.innerWidth >= 640 ? 200 : 160;
+            }
             list.style.setProperty('--card-w', cardW + 'px');
             this.$nextTick(() => this.refresh());
         },
@@ -118,7 +169,10 @@
                 @endif{{ $title }}
             </h2>
             @if ($subtitle)
-                <p class="mt-0.5 text-base text-zinc-600 dark:text-zinc-400">{{ $subtitle }}</p>
+                {{-- One step up in ink from the zinc-600/400 it was: this is the line
+                     that says what the category holds, and at 16px in the lightest
+                     grey on the page it read as decoration. --}}
+                <p class="mt-0.5 text-base text-zinc-700 dark:text-zinc-300">{{ $subtitle }}</p>
             @endif
         </div>
 
@@ -165,7 +219,7 @@
     </div>
 
     @if ($carousel)
-        {{-- Full-bleed carousel: the track spans 100vw via mx-[calc(50%-50vw)],
+        {{-- Full-bleed carousel: the track spans the viewport via .full-bleed,
              breaking out of the max-w container. JS sets padding-left = the
              section's distance from the viewport left, so the first card lines
              up with the content column on load. On scroll, cards pass through
@@ -180,7 +234,7 @@
                  the -webkit-overflow-scrolling momentum and make the swipe feel
                  catchy/sluggish instead of gliding freely. The arrow buttons still
                  animate via nudge()'s explicit scrollBy({ behavior: 'smooth' }). --}}
-            class="{{ $bleed ? 'mx-[calc(50%-50vw)] w-screen' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
+            class="{{ $bleed ? 'full-bleed' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
         >
             {{-- pl-* / --card-w fallbacks: setup() overrides paddingLeft and sets
                  --card-w inline at runtime; these keep a sane layout pre-JS. --}}
@@ -191,7 +245,7 @@
                 x-ref="list"
                 data-reveal-group
                 style="--card-w: 160px;"
-                class="carousel-list flex w-max gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0"
+                class="carousel-list grid w-max grid-flow-col {{ $trackRows }} gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0"
             >
                 {{ $slot }}
             </ul>

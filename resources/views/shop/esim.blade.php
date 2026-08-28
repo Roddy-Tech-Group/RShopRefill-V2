@@ -570,87 +570,105 @@
                                 type="button"
                                 @click="selectedId = p.id"
                                 :class="selectedId === p.id ? 'border-2 border-blue-600 dark:border-blue-500' : 'border border-zinc-200 hover:border-zinc-300 dark:border-[#24364f] dark:hover:border-white'"
-                                class="esim-tile flex h-full w-[70vw]! min-w-[70vw]! flex-col rounded-[14px] bg-transparent px-4 py-4 text-left transition-colors focus:outline-none sm:w-60! sm:min-w-60!"
+                                class="esim-tile relative isolate flex h-full w-[70vw]! min-w-[70vw]! flex-col overflow-hidden rounded-[14px] bg-transparent px-5 pb-5 pt-[22px] text-left transition-colors focus:outline-none sm:w-[274px]! sm:min-w-[274px]!"
                             >
-                                {{-- Type badge ("Data only" / "Voice") plus an optional tier
-                                     chip. The tier (TRIP/EXPLORER/ADVENTURER/NOMAD) is shown
-                                     ONLY on voice plans: on data plans it was a variable-length
-                                     chip that wrapped to a 2nd line on long names (ADVENTURER)
-                                     and made those cards taller, so data plans now carry the
-                                     single "Data only" badge - every data card is one height. --}}
-                                <div class="flex flex-nowrap items-center gap-1">
-                                    <span x-show="p.is_voice && tiers[idx % 4] !== 'TRIP'" class="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
-                                        <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="tierDotClasses[idx % 4]"></span>
-                                        <span class="truncate" x-text="tiers[idx % 4]"></span>
+                                {{-- Accent hairline on the top edge. An absolute bar rather than
+                                     a border-top: the border utilities here are already driven by
+                                     :class for the selected state, and a colour utility on top of
+                                     that would fight it. Blue reads as voice, green as data-only -
+                                     the same pairing the badges use. --}}
+                                <span aria-hidden="true" class="absolute inset-x-0 top-0 z-10 h-px" :class="p.is_voice ? 'bg-[#7dc4ff]/60' : 'bg-[#8fe3a8]/60'"></span>
+
+                                {{-- SIM watermark. `isolate` on the card makes it the stacking
+                                     context, so -z-10 keeps this behind the copy but still above
+                                     the card's own background - it can never veil the content. --}}
+                                <svg viewBox="0 0 120 100" class="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[167px] w-[200px] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.05] dark:text-white/[0.05]" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                                    <path d="M22 6h58l18 18v70a6 6 0 0 1-6 6H22a6 6 0 0 1-6-6V12a6 6 0 0 1 6-6Z"/>
+                                    <path d="M78 6v14a4 4 0 0 0 4 4h15"/>
+                                    <rect x="34" y="34" width="44" height="34" rx="5"/>
+                                    <path d="M34 45h44M34 57h44M48 34v34M64 34v34"/>
+                                </svg>
+
+                                {{-- Country plate, tilted off the top-right corner. --}}
+                                <span aria-hidden="true" class="esim-plate pointer-events-none absolute -right-6 -top-4 -z-10 flex h-[88px] w-[132px] -rotate-[14deg] items-end justify-center rounded-[9px] border border-zinc-200 pb-2 dark:border-white/15">
+                                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-white/55">{{ $cc }}</span>
+                                </span>
+
+                                {{-- What the plan actually carries. Voice plans get a real phone
+                                     number, data plans do not - that is the one difference buyers
+                                     ask about, so it leads. --}}
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="om-glow">
+                                        <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-emerald-600 dark:text-[#8fe3a8]">Data</span>
                                     </span>
-                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider leading-none text-zinc-700 ring-1 ring-zinc-200 dark:text-zinc-200 dark:ring-[#24364f]">
-                                        <span class="h-1.5 w-1.5 shrink-0 rounded-full" :class="p.is_voice ? 'bg-blue-500' : 'bg-zinc-400'"></span>
-                                        <span x-text="p.is_voice ? 'Voice' : 'Data only'"></span>
-                                    </span>
+                                    <template x-if="p.is_voice">
+                                        <span class="om-glow">
+                                            <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-blue-600 dark:text-[#bcd6ff]">Phone number</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="! p.is_voice">
+                                        <span class="om-glow">
+                                            <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-zinc-500 dark:text-white/60">Data only</span>
+                                        </span>
+                                    </template>
                                 </div>
 
-                                <p class="mt-3 text-lg font-bold" :class="selectedId === p.id ? 'text-blue-700 dark:text-white' : 'text-zinc-900 dark:text-white'">
-                                    <span x-text="p.data"></span> <span x-text="p.days + ' Days'"></span>
-                                </p>
+                                {{-- The allowance as one large figure. Unlimited plans carry a word
+                                     rather than a number in data_num, so they step down a size or
+                                     they run off the card. --}}
+                                <div class="mt-11 flex items-baseline gap-[7px]">
+                                    <span
+                                        class="font-bold leading-[0.85] tracking-[-0.05em] text-zinc-900 dark:text-white"
+                                        :class="p.is_unlimited ? 'text-[30px]' : 'text-[58px]'"
+                                        x-text="p.data_num"
+                                    ></span>
+                                    <span x-show="p.data_unit" class="text-[17px] font-medium text-zinc-500 dark:text-white/50" x-text="p.data_unit"></span>
+                                </div>
+                                <p class="mt-2.5 text-[13.5px] uppercase tracking-[0.12em] text-zinc-500 dark:text-white/50" x-text="p.days + ' Days'"></p>
 
-                                <div class="my-3 h-px bg-zinc-200 dark:bg-zinc-700"></div>
+                                <div class="my-[18px] h-px bg-zinc-200 dark:bg-white/10"></div>
 
-                                <ul class="space-y-2 text-sm text-zinc-900 dark:text-white">
-                                    <li class="flex items-center gap-2">
-                                        <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
-                                        <span x-text="p.data + ' of data'"></span>
-                                    </li>
-                                    <li class="flex items-center gap-2">
-                                        <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        <span x-text="p.days + ' day validity'"></span>
-                                    </li>
-                                    <template x-if="p.is_voice && p.voice">
-                                        <li class="flex items-center gap-2">
-                                            <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
-                                            <span x-text="p.voice"></span>
-                                        </li>
+                                {{-- Voice plans have six lines and pair up two to a row; data plans
+                                     have two and stay in a single column. --}}
+                                <div
+                                    class="grid flex-1 content-start gap-x-3.5 gap-y-3 text-[15px] leading-[1.35] text-zinc-700 dark:text-white/70"
+                                    :class="p.is_voice ? 'grid-cols-2' : 'grid-cols-1'"
+                                >
+                                    <div x-text="p.data + ' of data'"></div>
+                                    <div x-text="p.days + ' day validity'"></div>
+                                    <template x-if="p.is_voice && p.voice"><div x-text="p.voice"></div></template>
+                                    <template x-if="p.is_voice && p.sms"><div x-text="p.sms"></div></template>
+                                    <template x-if="p.is_voice"><div>Unlimited iMessage</div></template>
+                                    <template x-if="p.is_voice"><div>FaceTime</div></template>
+                                    <template x-if="p.note">
+                                        <div class="col-span-full text-[13px] text-zinc-500 dark:text-white/50" x-text="p.note"></div>
                                     </template>
-                                    <template x-if="p.is_voice && p.sms">
-                                        <li class="flex items-center gap-2">
-                                            <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg>
-                                            <span x-text="p.sms"></span>
-                                        </li>
-                                    </template>
-                                    <template x-if="p.is_voice">
-                                        <li class="flex items-center gap-2">
-                                            <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
-                                            <span>Unlimited iMessage</span>
-                                        </li>
-                                    </template>
-                                    <template x-if="p.is_voice">
-                                        <li class="flex items-center gap-2">
-                                            <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>
-                                            <span>FaceTime</span>
-                                        </li>
-                                    </template>
-                                </ul>
-
-                                <template x-if="p.note">
-                                    <p class="mt-3 text-xs text-zinc-700 dark:text-white" x-text="p.note"></p>
-                                </template>
-
-                                {{-- See more (left) + price (right) share one row, pinned to the
-                                     card bottom so every card lines up regardless of feature count. --}}
-                                <div class="mt-auto flex items-center justify-between gap-2 pt-3">
-                                    <span @click.stop="detailsId = p.id; showDetails = true" @keydown.enter.stop="detailsId = p.id; showDetails = true" role="button" tabindex="0" class="inline-flex cursor-pointer items-center {{ $inDash ? 'rounded-md px-1.5 text-[10px]' : 'rounded-[8px] px-2 text-[11px]' }} bg-blue-50 py-0.5 font-semibold text-blue-600 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30 dark:hover:bg-blue-500/25">See more</span>
-                                    <p class="text-lg font-bold tabular-nums text-zinc-900 dark:text-white" x-text="rowPrice(p)"></p>
                                 </div>
 
-                                {{-- Get eSIM CTA - selects this plan and goes straight to
-                                     checkout. span[role=button] because the card itself is a
-                                     <button> (nested buttons are invalid HTML - same trick as
-                                     "See more" above). --}}
+                                <div class="mt-[22px] h-px bg-zinc-200 dark:bg-white/10"></div>
+
+                                <div class="mb-4 mt-[14px] flex items-baseline justify-between gap-2">
+                                    <span class="text-[11px] uppercase tracking-[0.16em] text-zinc-500 dark:text-white/45">Total</span>
+                                    <span class="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums text-zinc-900 dark:text-white" x-text="rowPrice(p)"></span>
+                                </div>
+
+                                {{-- role=button, not <button>: the card itself is a <button> and
+                                     nesting them is invalid HTML. `dark:bg-white` rather than
+                                     `bg-white` on purpose - the plain class is remapped to the
+                                     card surface in dark, which would erase the CTA. --}}
                                 <span
                                     @click.stop="selectedId = p.id; buyNow()"
                                     @keydown.enter.stop="selectedId = p.id; buyNow()"
                                     role="button" tabindex="0"
-                                    class="mt-3 inline-flex w-full cursor-pointer items-center justify-center rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                    class="inline-flex w-full cursor-pointer items-center justify-center rounded-[9px] bg-zinc-900 px-4 py-[15px] text-[15.5px] font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-blue-600 dark:hover:text-white"
                                 >Get eSIM</span>
+
+                                <span
+                                    @click.stop="detailsId = p.id; showDetails = true"
+                                    @keydown.enter.stop="detailsId = p.id; showDetails = true"
+                                    role="button" tabindex="0"
+                                    class="mt-3 inline-flex w-full cursor-pointer items-center justify-center text-[13px] font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                                >See more</span>
                             </button>
                         </template>
                         </x-home.brand-row>
@@ -910,21 +928,10 @@
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 -translate-y-6"
-                {{-- Drops in BELOW the sticky nav, never over/behind it: the
-                     offset tracks the live header height (it changes across
-                     breakpoints and when the primary row collapses). --}}
-                x-data="{ navH: 0 }"
-                x-init="
-                    const nav = document.querySelector('header.sticky');
-                    if (nav) {
-                        const sync = () => navH = Math.round(nav.getBoundingClientRect().height);
-                        sync();
-                        new ResizeObserver(sync).observe(nav);
-                    }
-                "
-                {{-- Object syntax: a string :style would REPLACE the whole
-                     style attribute and wipe the display x-show manages. --}}
-                :style="{ top: (navH + 12) + 'px' }"
+                {{-- A plain 12px from the top. It used to track the live
+                     header height to sit below the pinned nav; the header is
+                     not sticky any more, so there is nothing to clear. --}}
+                style="top: 12px"
                 style="display:none;"
                 class="fixed inset-x-0 z-[100] px-3 sm:px-5"
             >
