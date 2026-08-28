@@ -11,10 +11,14 @@ use Illuminate\View\View;
  * of being hardcoded across the layouts, nav, footer and emails.
  *
  * Bound to '*', so `$siteName` is available in storefront, dashboard, admin,
- * auth and mail views alike. The read goes through SiteSetting::get, which is
- * already cache-backed and busted by SiteSetting::put - so no extra memo here:
- * a per-process cache would otherwise serve a stale name to long-running queue
- * workers until they restarted.
+ * auth and mail views alike - which also means it runs for EVERY view
+ * rendered: a listing page renders ~1,800 of them. The name is therefore
+ * resolved once per request and memoized on the request instance; on the
+ * database cache driver the unmemoized read was ~1,800 cache-table queries
+ * per page. The memo key carries a 60-second time bucket so a long-running
+ * queue worker (whose base request object lives for the process) picks up a
+ * renamed brand within a minute rather than at restart - the staleness that
+ * kept this composer memo-free before.
  */
 class SiteIdentityComposer
 {
@@ -31,10 +35,17 @@ class SiteIdentityComposer
      */
     private function siteName(): string
     {
-        try {
-            return (string) SiteSetting::get('site.name', 'RshopRefills');
-        } catch (\Throwable $e) {
-            return 'RshopRefills';
+        $memoKey = 'memo:site_identity:name:'.intdiv(time(), 60);
+        $attributes = request()->attributes;
+
+        if (! $attributes->has($memoKey)) {
+            try {
+                $attributes->set($memoKey, (string) SiteSetting::get('site.name', 'RshopRefills'));
+            } catch (\Throwable $e) {
+                return 'RshopRefills';
+            }
         }
+
+        return $attributes->get($memoKey);
     }
 }
