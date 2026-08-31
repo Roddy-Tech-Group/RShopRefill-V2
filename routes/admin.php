@@ -196,6 +196,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // and send a direct (email + dashboard) message.
         Route::patch('customers/{user}', [AdminCustomerController::class, 'update'])->name('customer.update');
         Route::post('customers/{user}/ban', [AdminCustomerController::class, 'toggleBan'])->name('customer.ban');
+        Route::post('customers/{user}/close', [AdminCustomerController::class, 'toggleClosure'])->name('customer.close');
         Route::post('customers/{user}/suspend', [AdminCustomerController::class, 'toggleSuspend'])->name('customer.suspend');
         Route::post('customers/{user}/restrict', [AdminCustomerController::class, 'toggleRestrict'])->name('customer.restrict');
         Route::post('customers/{user}/funds', [AdminCustomerController::class, 'toggleFunds'])->name('customer.funds');

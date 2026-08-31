@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Domain\Communication\Mail\Security\EmailChangedMail;
+use App\Domain\Communication\Mail\Security\VerifyEmailMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ProfileUpdateTest extends TestCase
@@ -172,6 +176,39 @@ class ProfileUpdateTest extends TestCase
             ->assertHasErrors('country');
     }
 
+    public function test_changing_the_email_verifies_the_new_address_and_warns_the_old_one(): void
+    {
+        $sent = [];
+        $this->mock(CommunicationManager::class, function (MockInterface $mock) use (&$sent): void {
+            $mock->shouldReceive('send')->andReturnUsing(function (...$args) use (&$sent): void {
+                $sent[] = $args;
+            });
+        });
+
+        $user = User::factory()->create(['email' => 'old@example.test', 'name' => 'Ada Okafor']);
+        $this->actingAs($user);
+
+        Volt::test('settings.profile')
+            ->set('name', 'Ada Okafor')
+            ->set('email', 'new@example.test')
+            ->call('updateProfileInformation')
+            ->assertHasNoErrors();
+
+        $user->refresh();
+        $this->assertSame('new@example.test', $user->email);
+        $this->assertNull($user->email_verified_at);
+
+        // Verification link to the new address.
+        $verification = collect($sent)->first(fn (array $args) => ($args[4] ?? null) instanceof VerifyEmailMail);
+        $this->assertNotNull($verification);
+
+        // Security notice to the old address, naming the new one only in masked form.
+        $notice = collect($sent)->first(fn (array $args) => ($args[4] ?? null) instanceof EmailChangedMail);
+        $this->assertNotNull($notice);
+        $this->assertSame('old@example.test', $notice[9]);
+        $this->assertSame('ne**@example.test', $notice[4]->newEmailMasked);
+    }
+
     public function test_email_verification_status_is_unchanged_when_email_address_is_unchanged(): void
     {
         $user = User::factory()->create();
@@ -188,7 +225,7 @@ class ProfileUpdateTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_user_can_close_their_account(): void
     {
         $user = User::factory()->create();
 
@@ -196,17 +233,20 @@ class ProfileUpdateTest extends TestCase
 
         $response = Volt::test('settings.delete-user-form')
             ->set('password', 'password')
-            ->call('deleteUser');
+            ->call('closeAccount');
 
         $response
             ->assertHasNoErrors()
-            ->assertRedirect('/');
+            ->assertRedirect(route('login'));
 
-        $this->assertNull($user->fresh());
+        // Closure never deletes the row: the account is marked and anonymised
+        // after the grace period (see AccountClosureTest).
+        $this->assertNotNull($user->fresh());
+        $this->assertTrue($user->fresh()->hasRequestedClosure());
         $this->assertFalse(auth()->check());
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_correct_password_must_be_provided_to_close_account(): void
     {
         $user = User::factory()->create();
 
@@ -214,10 +254,10 @@ class ProfileUpdateTest extends TestCase
 
         $response = Volt::test('settings.delete-user-form')
             ->set('password', 'wrong-password')
-            ->call('deleteUser');
+            ->call('closeAccount');
 
         $response->assertHasErrors(['password']);
 
-        $this->assertNotNull($user->fresh());
+        $this->assertFalse($user->fresh()->hasRequestedClosure());
     }
 }

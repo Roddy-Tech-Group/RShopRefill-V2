@@ -41,6 +41,11 @@ Schedule::command('risk:prune')->dailyAt('02:30')->name('risk:prune-daily');
 // Audit retention: archive-then-delete rows past the two-year window
 // (config/audit.php). Monthly is plenty - the window moves a day at a time.
 Schedule::command('audit:prune')->monthlyOn(1, '02:45')->name('audit:prune-monthly');
+
+// Account closures: once the grace period in config/retention.php has run out,
+// anonymise the customer's personal details while keeping the financial rows.
+Schedule::command('retention:close-accounts')->dailyAt('03:15')->name('retention:close-accounts-daily');
+Schedule::command('retention:enforce')->dailyAt('03:30')->name('retention:enforce-daily');
 Schedule::job(new SyncExchangeRatesJob)->hourly()->sentryMonitor('sync-exchange-rates');
 Schedule::job(new ReconcilePendingFundingsJob)->hourly()->sentryMonitor('reconcile-pending-fundings');
 

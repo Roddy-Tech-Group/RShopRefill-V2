@@ -18,14 +18,29 @@ class EnsureAccountActive
         $user = $request->user();
 
         if ($user && $user->banned_at !== null) {
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            $this->signOut($request);
 
             return redirect()->route('login')
                 ->withErrors(['email' => 'Your account has been banned. Please contact support.']);
         }
 
+        // A closed (anonymised) account has no password, no Google link and a
+        // replaced email, so it cannot sign in again; this catches a session
+        // that was still alive when the closure completed.
+        if ($user && $user->anonymised_at !== null) {
+            $this->signOut($request);
+
+            return redirect()->route('login')
+                ->withErrors(['email' => 'This account has been closed.']);
+        }
+
         return $next($request);
+    }
+
+    private function signOut(Request $request): void
+    {
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
     }
 }

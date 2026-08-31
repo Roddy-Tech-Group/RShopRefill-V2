@@ -4,6 +4,8 @@
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">
         @if($context === 'recovery')
             You are attempting to recover your Protected Mode account.
+        @elseif($context === 'data_export')
+            You asked to download a copy of the personal data we hold about you. Enter this code to confirm it is you.
         @else
             You are attempting to sign in from a new or unrecognized device.
         @endif
