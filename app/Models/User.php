@@ -19,6 +19,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use LogicException;
 
 /**
  * Represents a platform user.
@@ -83,6 +84,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'restricted_at',
         'suspension_reason',
         'suspension_review_requested_at',
+        'closure_requested_at',
+        'anonymised_at',
+        'financial_records_purged_at',
         'transaction_pin',
         'transaction_pin_set_at',
         'transaction_pin_attempts',
@@ -106,6 +110,20 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
+     * A user row is never hard-deleted. Orders, payments, the wallet ledger
+     * and identity records hang off it and must be kept for years after the
+     * relationship ends, so the only supported exit is account closure, which
+     * anonymises the row (see AccountClosureService). MySQL enforces the same
+     * rule with RESTRICT foreign keys; this guard covers every other driver.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (): never {
+            throw new LogicException('Users are never hard-deleted. Use AccountClosureService to close an account.');
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -121,6 +139,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'suspended_at' => 'datetime',
             'restricted_at' => 'datetime',
             'suspension_review_requested_at' => 'datetime',
+            'closure_requested_at' => 'datetime',
+            'anonymised_at' => 'datetime',
+            'financial_records_purged_at' => 'datetime',
             'password' => 'hashed',
             'transaction_pin_set_at' => 'datetime',
             'transaction_pin_locked_until' => 'datetime',
@@ -212,6 +233,37 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasRequestedSuspensionReview(): bool
     {
         return $this->suspension_review_requested_at !== null;
+    }
+
+    /**
+     * Whether the customer has asked to close the account and is inside the
+     * grace period. Signing in again cancels it (CancelAccountClosureOnLogin).
+     */
+    public function hasRequestedClosure(): bool
+    {
+        return $this->closure_requested_at !== null && $this->anonymised_at === null;
+    }
+
+    /**
+     * Whether the account has been closed and its personal details anonymised.
+     * The row is kept as a pseudonymous holder for the financial records that
+     * must outlive the relationship; it can never sign in again.
+     */
+    public function isClosed(): bool
+    {
+        return $this->anonymised_at !== null;
+    }
+
+    /**
+     * The day the grace period ends and the account is anonymised.
+     */
+    public function closesOn(): ?Carbon
+    {
+        if (! $this->hasRequestedClosure()) {
+            return null;
+        }
+
+        return $this->closure_requested_at->copy()->addDays((int) config('retention.account_closure_grace_days', 30));
     }
 
     /**

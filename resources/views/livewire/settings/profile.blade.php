@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\EmailChangedMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\User;
 use App\Support\PhoneCountries;
 use Illuminate\Support\Facades\Auth;
@@ -137,7 +140,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $user->fill($validated);
         $user->phone = $phoneE164;
 
-        if ($user->isDirty('email')) {
+        $previousEmail = $user->getOriginal('email');
+        $emailChanged = $user->isDirty('email');
+
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
 
@@ -147,7 +153,34 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         // what was actually stored rather than what they typed.
         $this->phone = $phoneE164;
 
+        if ($emailChanged) {
+            // The new address must prove itself before it counts, and the old
+            // one is told, so a hijacked session cannot quietly move the
+            // account to an inbox the owner does not control.
+            $user->sendEmailVerificationNotification();
+
+            app(CommunicationManager::class)->send(
+                recipient: $user,
+                category: CommunicationCategory::EmailChange,
+                title: 'Your account email was changed',
+                message: 'The email address on your account was changed. If this was not you, contact support straight away.',
+                mailable: new EmailChangedMail($user->name, $this->maskEmail($user->email)),
+                correlationId: 'email_changed_'.$user->id.'_'.now()->timestamp,
+                overrideEmail: $previousEmail,
+            );
+
+            Session::flash('status', 'verification-link-sent');
+        }
+
         $this->dispatch('profile-updated', name: $user->name);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+        $visible = mb_substr($local, 0, min(2, mb_strlen($local)));
+
+        return $visible.str_repeat('*', max(2, mb_strlen($local) - mb_strlen($visible))).'@'.$domain;
     }
 
     /**
@@ -842,6 +875,33 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     </svg>
                 </button>
             </form>
+
+            {{-- Download a copy of your data (NDPA right of access). Emailed one-time code + audit log. --}}
+            <a
+                href="{{ route('privacy.export') }}"
+                class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left sm:px-6"
+            >
+                    <span class="flex items-center gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="block text-sm font-semibold text-black">Download your data</span>
+                            <span class="block text-[13px] text-zinc-600">A copy of everything we hold about you</span>
+                        </span>
+                    </span>
+                    <svg class="h-5 w-5 shrink-0 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                    </svg>
+            </a>
+            @if (session('data_export_ready'))
+                {{-- Verification just succeeded: start the PDF on its own, with a fallback link. --}}
+                <div x-data x-init="setTimeout(() => { window.location.href = '{{ route('privacy.export.file') }}' }, 600)" class="px-5 pb-4 text-xs text-zinc-600 sm:px-6">
+                    Your PDF is downloading. <a href="{{ route('privacy.export.file') }}" class="font-semibold text-blue-600 hover:underline">Click here if it did not start.</a>
+                </div>
+            @endif
 
             {{-- Delete account — subtle entry point, opens the existing modal flow --}}
             <div class="px-5 py-4 sm:px-6">

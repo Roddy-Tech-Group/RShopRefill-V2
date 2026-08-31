@@ -6,6 +6,8 @@ use App\Domain\Admin\Services\MonitoringSnapshotService;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The CTO alert fleet: evaluates every signal the Monitoring page shows and
@@ -37,6 +39,15 @@ class MonitorOperationsCommand extends Command
 
     /** Provider float at or below this fails orders like an outage would. */
     private const BALANCE_FLOOR = 250.0;
+
+    /** Each crossing alerts immediately; sitting inside a tier only reminds. */
+    private const BALANCE_TIERS = [250.0, 200.0, 150.0, 100.0];
+
+    /** At or below this the alert escalates to SEV-1 (Telegram + mail). */
+    private const BALANCE_CRITICAL_TIER = 100.0;
+
+    /** How often to repeat a standing low-float alert (twice a day). */
+    private const BALANCE_REMINDER_HOURS = 12;
 
     /** FX snapshots older than this misprice the whole catalog. */
     private const FX_STALE_HOURS = 26.0;
@@ -310,32 +321,109 @@ class MonitorOperationsCommand extends Command
         return $sent;
     }
 
-    /** @param array<string, ?array{balance: float, currency: string}> $balances */
+    /**
+     * Provider float alerts are a state machine, not a threshold check.
+     *
+     * A plain "below floor" check re-fires every throttle window for as long
+     * as the float stays low, which after a day is noise nobody reads; yet
+     * the one thing it must never do is go quiet while the float keeps
+     * falling. So: crossing a tier (250 → 200 → 150 → 100) alerts at once,
+     * every time; sitting inside a tier only earns a reminder twice a day;
+     * climbing back above the floor sends one recovery message and clears
+     * the state so the next dip starts fresh. The check itself still runs
+     * every five minutes.
+     *
+     * @param  array<string, ?array{balance: float, currency: string}>  $balances
+     */
     private function checkBalances(array $balances): int
     {
         $sent = 0;
 
         foreach ($balances as $name => $balance) {
-            if ($balance === null || $balance['balance'] > self::BALANCE_FLOOR) {
+            if ($balance === null) {
                 continue;
             }
 
+            $stateKey = "monitor:balance:{$name}";
+            /** @var ?array{tier: float, since: string, reminded_at: string} $state */
+            $state = Cache::get($stateKey);
+            $amount = $balance['balance'];
+
+            if ($amount > self::BALANCE_FLOOR) {
+                if ($state !== null) {
+                    Cache::forget($stateKey);
+                    $sent += (int) $this->alerter->send(
+                        severity: AlertSeverity::Sev2,
+                        key: "provider:{$name}:balance:recovered",
+                        title: "Provider float recovered: {$name}",
+                        message: sprintf(
+                            '%s balance is back to %s %.2f (floor %.0f) after %s below it.',
+                            ucfirst($name),
+                            $balance['currency'],
+                            $amount,
+                            self::BALANCE_FLOOR,
+                            Carbon::parse($state['since'])->diffForHumans(now(), ['syntax' => Carbon::DIFF_ABSOLUTE]),
+                        ),
+                        context: ['provider' => $name] + $balance,
+                    );
+                }
+
+                continue;
+            }
+
+            $tier = $this->balanceTier($amount);
+            $crossedNewTier = $state === null || $tier < $state['tier'];
+            $reminderDue = ! $crossedNewTier
+                && Carbon::parse($state['reminded_at'])->addHours(self::BALANCE_REMINDER_HOURS)->lte(now());
+
+            if (! $crossedNewTier && ! $reminderDue) {
+                continue;
+            }
+
+            $since = $state['since'] ?? now()->toIso8601String();
+            Cache::put($stateKey, [
+                'tier' => $tier,
+                'since' => $since,
+                'reminded_at' => now()->toIso8601String(),
+            ], now()->addDays(30));
+
             $sent += (int) $this->alerter->send(
-                severity: AlertSeverity::Sev2,
-                key: "provider:{$name}:balance",
-                title: "Provider float low: {$name}",
+                // The bottom tier fans out to mail as well: orders are about to fail.
+                severity: $tier <= self::BALANCE_CRITICAL_TIER ? AlertSeverity::Sev1 : AlertSeverity::Sev2,
+                key: $crossedNewTier
+                    ? "provider:{$name}:balance:{$tier}"
+                    : "provider:{$name}:balance:reminder",
+                title: $crossedNewTier
+                    ? "Provider float low: {$name} under {$balance['currency']} ".number_format($tier)
+                    : "Provider float still low: {$name}",
                 message: sprintf(
-                    '%s balance is %s %.2f (floor %.0f). An empty float fails orders exactly like an outage; top up before it runs dry.',
+                    '%s balance is %s %.2f (floor %.0f%s). An empty float fails orders exactly like an outage; top up before it runs dry.',
                     ucfirst($name),
                     $balance['currency'],
-                    $balance['balance'],
+                    $amount,
                     self::BALANCE_FLOOR,
+                    $crossedNewTier ? '' : ', low since '.Carbon::parse($since)->toDayDateTimeString(),
                 ),
-                context: ['provider' => $name] + $balance,
+                context: ['provider' => $name, 'tier' => $tier] + $balance,
                 runbook: 'docs/runbooks/fulfillment-provider-outage.md',
             );
         }
 
         return $sent;
+    }
+
+    /**
+     * The deepest tier the balance has fallen through; 100 for anything at
+     * or below the critical tier.
+     */
+    private function balanceTier(float $amount): float
+    {
+        foreach (self::BALANCE_TIERS as $tier) {
+            if ($amount <= $tier) {
+                $deepest = $tier;
+            }
+        }
+
+        return $deepest ?? self::BALANCE_CRITICAL_TIER;
     }
 }

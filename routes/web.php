@@ -12,6 +12,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CartWebController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\EmailPreviewController;
 use App\Http\Controllers\EsimStoreController;
 use App\Http\Controllers\EsimTopupController;
@@ -838,6 +839,12 @@ Route::middleware(['auth'])->group(function () {
 
     // KYC identity-verification submission (documents stored on the private disk).
     Route::post('dashboard/kyc', [KycController::class, 'store'])->name('kyc.submit');
+    // Right of access: a PDF copy of the customer's data, gated by an emailed
+    // one-time code rather than the password (see DataExportController).
+    Route::get('dashboard/privacy/export', [DataExportController::class, 'show'])->name('privacy.export');
+    Route::post('dashboard/privacy/export/send', [DataExportController::class, 'send'])->name('privacy.export.send');
+    Route::post('dashboard/privacy/export', [DataExportController::class, 'verify'])->name('privacy.export.verify');
+    Route::get('dashboard/privacy/export/file', [DataExportController::class, 'file'])->name('privacy.export.file');
 
     // Suspension review request - submitted from the banner the customer
     // sees on their dashboard when their account is suspended. Lands in the

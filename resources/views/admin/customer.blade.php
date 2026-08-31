@@ -91,6 +91,8 @@
         {{-- Admin actions: edit, notify, verify email/KYC, suspend, hold funds, ban --}}
         @php
             $isBanned = $user->banned_at !== null;
+            $closureRequested = $user->hasRequestedClosure();
+            $isClosed = $user->isClosed();
             $isSuspended = $user->isSuspended();
             $isRestricted = $user->isRestricted();
             $fundsHeld = $user->wallets->isNotEmpty() && $user->wallets->where('is_active', true)->isEmpty();
@@ -250,6 +252,20 @@
                         </button>
                     </form>
 
+                    @unless ($isClosed)
+                    <form method="POST" action="{{ route('admin.customer.close', $user) }}"
+                          data-confirm="{{ $closureRequested ? 'Cancel the pending closure? The customer keeps their account.' : 'Request closure for this customer? They are signed out and their details are anonymised after the grace period unless they sign in again.' }}"
+                          data-confirm-title="{{ $closureRequested ? 'Cancel closure' : 'Close account' }}"
+                          data-confirm-text="{{ $closureRequested ? 'Cancel closure' : 'Close account' }}"
+                          data-confirm-tone="{{ $closureRequested ? 'success' : 'danger' }}">
+                        @csrf
+                        <button type="submit" class="{{ $btn }} {{ $closureRequested ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100' : 'bg-zinc-100 text-zinc-800 ring-1 ring-zinc-300 hover:bg-zinc-200' }}">
+                            {{ $closureRequested ? 'Cancel closure' : 'Close account' }}
+                        </button>
+                    </form>
+                    @endunless
+                    @error('closure')<p class="basis-full text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+
                     {{-- Reset transaction PIN - only when one is set. Clears it so
                          the customer is prompted to set a fresh PIN. --}}
                     @if ($user->hasTransactionPin())
@@ -398,8 +414,13 @@
                 // close to the divider above instead of floating in dead space.
                 $badgeBase = 'inline-flex items-center gap-1 rounded-[12px] px-2 py-0.5 text-[11px] font-medium ring-1';
             @endphp
-            @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || ! $emailVerified || ! $kycVerified)
+            @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || $closureRequested || $isClosed || ! $emailVerified || ! $kycVerified)
                 <div class="flex flex-wrap gap-1.5 px-5 py-2">
+                    @if ($isClosed)
+                        <span class="{{ $badgeBase }} bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:ring-zinc-700/60">Closed and anonymised on {{ $fmtDate($user->anonymised_at) }}</span>
+                    @elseif ($closureRequested)
+                        <span class="{{ $badgeBase }} bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">Closure requested, anonymises on {{ $fmtDate($user->closesOn()) }}</span>
+                    @endif
                     @if ($isBanned)
                         <span class="{{ $badgeBase }} bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">Banned{{ $user->banned_at ? ' on '.$fmtDate($user->banned_at) : '' }}</span>
                     @endif

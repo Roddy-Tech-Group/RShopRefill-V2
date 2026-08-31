@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Audit\Services\AuditLogService;
+use App\Domain\Auth\Exceptions\AccountClosureException;
+use App\Domain\Auth\Services\AccountClosureService;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
@@ -173,6 +175,35 @@ class AdminCustomerController extends Controller
         return back()->with('status', $banned
             ? 'Customer unbanned.'
             : 'Customer banned. They have been blocked from signing in.');
+    }
+
+    /**
+     * Close (or un-close) an account on the customer's behalf: the written
+     * deletion-request path for someone who cannot sign in. Same rules as the
+     * self-serve flow, so a wallet balance or an in-flight order refuses it.
+     */
+    public function toggleClosure(User $user, AccountClosureService $closures, AuditLogService $audit): RedirectResponse
+    {
+        if ($user->isClosed()) {
+            return back()->withErrors(['closure' => 'This account is already closed and anonymised.']);
+        }
+
+        if ($user->hasRequestedClosure()) {
+            $closures->cancel($user);
+            $audit->log(action: 'admin.account_closure_cancelled', model: $user);
+
+            return back()->with('status', 'Account closure cancelled. The customer keeps their account.');
+        }
+
+        try {
+            $closures->request($user);
+        } catch (AccountClosureException $e) {
+            return back()->withErrors(['closure' => $e->getMessage()]);
+        }
+
+        $audit->log(action: 'admin.account_closure_requested', model: $user, metadata: ['closes_on' => $user->fresh()->closesOn()?->toDateString()]);
+
+        return back()->with('status', 'Closure requested on the customer\'s behalf. Their details are anonymised after the grace period unless they sign in.');
     }
 
     /**
