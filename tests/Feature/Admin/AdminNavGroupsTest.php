@@ -16,9 +16,9 @@ class AdminNavGroupsTest extends TestCase
     {
         $blade = file_get_contents(resource_path('views/components/layouts/admin.blade.php'));
 
-        // All three groups re-sync on navigation. Must use x-on:livewire:navigated
+        // All four groups re-sync on navigation. Must use x-on:livewire:navigated
         // (NOT @livewire:navigated, which Blade parses as the @livewire directive).
-        $this->assertSame(3, substr_count($blade, 'x-on:livewire:navigated.window="sync()"'));
+        $this->assertSame(4, substr_count($blade, 'x-on:livewire:navigated.window="sync()"'));
         $this->assertStringNotContainsString('@livewire:navigated', $blade);
 
         // Open state is derived from the live URL per group.
@@ -26,6 +26,8 @@ class AdminNavGroupsTest extends TestCase
         $this->assertStringContainsString("window.location.pathname.includes('/admin/content')", $blade);
         // Management opens for its own pages AND the Payment Insights page it hosts.
         $this->assertStringContainsString("['/admin/management', '/admin/payment-insights']", $blade);
+        // User Management opens for the customers list and every users.* page.
+        $this->assertStringContainsString("['/admin/customers', '/admin/users']", $blade);
 
         // The old fragile per-group state that could stay stuck open is gone.
         $this->assertStringNotContainsString('x-show="expanded"', $blade);

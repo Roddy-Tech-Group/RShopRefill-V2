@@ -11,11 +11,8 @@ Deadlines below are the ones we hold ourselves to. NDPA 2023 sets response deadl
 **By email.** If the customer cannot sign in:
 
 1. Reply the same day acknowledging the request and asking them to confirm from the email address on the account (this is the identity check; never send data to a different address).
-2. Once confirmed, open the customer in the admin panel to verify the address matches.
-3. Ask an engineer to run the export for that user and send the PDF to the account email only:
-   `php artisan tinker --execute 'echo json_encode(app(App\Domain\Auth\Services\DataExportService::class)->build(App\Models\User::find(ID)));'` gives the raw data; the PDF template is `dashboard/data-export-pdf`.
-4. Record the fulfilment in the audit log if it was done outside the app (an engineer can log `user.data_exported` with a metadata note).
-5. Target: 7 days from the request.
+2. Once confirmed, open the customer in the admin panel, verify the address matches, and click **Send data export**. The PDF goes to the address on the account only, and the click is audited as `admin.data_export_sent`.
+3. Target: 7 days from the request.
 
 ## 2. Correction request
 
