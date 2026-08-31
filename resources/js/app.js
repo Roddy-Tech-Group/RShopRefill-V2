@@ -1905,7 +1905,8 @@ window.newUsersChart = function (series) {
  * `dark` boolean (typically `document.documentElement.classList.contains('dark')`)
  * so colours adapt.
  */
-function buildGlassTooltipRenderer(dark) {
+function buildGlassTooltipRenderer(dark, valueFormatter) {
+    const formatValue = valueFormatter || ((v) => `USD ${Number(v).toFixed(2)}`);
     // Inverted glass: dark mode shows a WHITE-tinted frosted panel; light mode
     // shows a DARK-tinted frosted panel. Both keep light text so legibility
     // stays consistent regardless of the chart area behind the tooltip.
@@ -1947,7 +1948,7 @@ function buildGlassTooltipRenderer(dark) {
                 <div style="display:flex;align-items:center;gap:7px;padding:1px 0;">
                     <span style="height:6px;width:6px;border-radius:9999px;background:${colour};box-shadow:0 0 0 2px ${colour}30;display:inline-block;flex-shrink:0;"></span>
                     <span style="font-size:10px;font-weight:500;color:${labelColor};letter-spacing:0.01em;">${name}</span>
-                    <span style="font-size:11px;font-weight:700;color:${valueColor};margin-left:10px;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;">USD ${Number(value).toFixed(2)}</span>
+                    <span style="font-size:11px;font-weight:700;color:${valueColor};margin-left:10px;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;">${formatValue(value)}</span>
                 </div>`;
         }).join('');
 
@@ -2370,3 +2371,145 @@ window.reportChart = function (series, chartType) {
         dispatch(btn, btn);
     }, true);
 })();
+
+/**
+ * User Management charts (admin/users/insights) — the /admin/reports look:
+ * rounded bars, smooth gradient areas, dashed y-grid only, and the shared
+ * frosted-glass tooltip. Lazy-imported like every other admin chart.
+ *
+ * Palette note: categorical hue order is FIXED (validated for CVD + contrast
+ * on both surfaces); series are assigned in order and never cycled. Magnitude
+ * charts (one measure across countries) use the single brand hue.
+ *
+ *   x-data="umBarChart({ labels, values, name, prefix, horizontal, height })"
+ *   x-data="umAreaChart({ categories, series, height })"
+ */
+const UM_CATEGORICAL_LIGHT = ['#2563eb', '#ea580c', '#0d9488', '#7c3aed', '#db2777', '#a16207'];
+const UM_CATEGORICAL_DARK = ['#3b82f6', '#ea580c', '#0d9488', '#8b5cf6', '#ec4899', '#d97706'];
+
+function umAxisStyle(dark) {
+    return {
+        gridColor: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb',
+        textColor: dark ? '#94a3b8' : '#52525b',
+    };
+}
+
+window.umBarChart = function (payload) {
+    return {
+        chart: null,
+
+        async init() {
+            if (!this.$refs.canvas) { return; }
+            const { default: ApexCharts } = await import('apexcharts');
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            this.$refs.canvas.innerHTML = '';
+
+            const dark = document.documentElement.classList.contains('dark');
+            const { gridColor, textColor } = umAxisStyle(dark);
+            const prefix = payload.prefix || '';
+            const fmt = (v) => prefix + Number(v).toLocaleString(undefined, prefix ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {});
+
+            // The /admin/reports bar look, verbatim: rounded columns, flat
+            // brand colour, dashed y-grid only, glass tooltip.
+            this.chart = new ApexCharts(this.$refs.canvas, {
+                chart: {
+                    type: 'bar', height: payload.height || 320, toolbar: { show: false }, zoom: { enabled: false },
+                    fontFamily: 'inherit', background: 'transparent', parentHeightOffset: 0,
+                    animations: { speed: 450, easing: 'easeout' },
+                },
+                series: [{ name: payload.name || 'Value', data: payload.values || [] }],
+                colors: [dark ? '#3b82f6' : '#2563eb'],
+                plotOptions: { bar: { borderRadius: 6, borderRadiusApplication: 'end', columnWidth: '55%' } },
+                stroke: { show: false, width: 0 },
+                dataLabels: { enabled: false },
+                xaxis: {
+                    categories: payload.labels || [],
+                    labels: { style: { colors: textColor, fontSize: '11px', fontWeight: 500 }, rotate: -35, rotateAlways: (payload.labels || []).length > 6, hideOverlappingLabels: false, trim: true },
+                    axisBorder: { show: false }, axisTicks: { show: false },
+                    tooltip: { enabled: false },
+                },
+                yaxis: { labels: { style: { colors: textColor, fontSize: '11px', fontWeight: 500 }, formatter: (v) => fmt(v) } },
+                grid: {
+                    borderColor: gridColor, strokeDashArray: 4,
+                    xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } },
+                    padding: { left: 0, right: 12, top: 0, bottom: 0 },
+                },
+                legend: { show: false },
+                tooltip: {
+                    theme: dark ? 'dark' : 'light', shared: false, intersect: true,
+                    custom: buildGlassTooltipRenderer(dark, fmt),
+                },
+            });
+            await this.chart.render();
+        },
+
+        destroy() {
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            if (this.$refs.canvas) { this.$refs.canvas.innerHTML = ''; }
+        },
+    };
+};
+
+window.umAreaChart = function (payload) {
+    return {
+        chart: null,
+
+        async init() {
+            if (!this.$refs.canvas) { return; }
+            const { default: ApexCharts } = await import('apexcharts');
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            this.$refs.canvas.innerHTML = '';
+
+            const dark = document.documentElement.classList.contains('dark');
+            const { gridColor, textColor } = umAxisStyle(dark);
+            const fmt = (v) => Number(v).toLocaleString();
+
+            this.chart = new ApexCharts(this.$refs.canvas, {
+                chart: {
+                    type: 'area', height: payload.height || 320, stacked: true, toolbar: { show: false }, zoom: { enabled: false },
+                    fontFamily: 'inherit', background: 'transparent', parentHeightOffset: 0,
+                    animations: { speed: 450, easing: 'easeout' },
+                },
+                series: payload.series || [],
+                colors: dark ? UM_CATEGORICAL_DARK : UM_CATEGORICAL_LIGHT,
+                stroke: { curve: 'smooth', width: 2, lineCap: 'round' },
+                fill: {
+                    type: 'gradient',
+                    gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.02, stops: [0, 90, 100] },
+                },
+                markers: {
+                    size: 0, strokeWidth: 2,
+                    strokeColors: dark ? '#1d3252' : '#ffffff',
+                    hover: { size: 5, sizeOffset: 2 },
+                },
+                dataLabels: { enabled: false },
+                xaxis: {
+                    categories: payload.categories || [],
+                    labels: { style: { colors: textColor, fontSize: '11px', fontWeight: 500 } },
+                    axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false },
+                },
+                yaxis: { labels: { style: { colors: textColor, fontSize: '11px', fontWeight: 500 }, formatter: (v) => fmt(v) } },
+                grid: {
+                    borderColor: gridColor, strokeDashArray: 4,
+                    xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } },
+                    padding: { left: 0, right: 12, top: 0, bottom: 0 },
+                },
+                legend: {
+                    show: true, position: 'top', horizontalAlign: 'left',
+                    labels: { colors: textColor }, markers: { size: 5, shape: 'circle' },
+                    itemMargin: { horizontal: 10 },
+                },
+                tooltip: {
+                    theme: dark ? 'dark' : 'light', shared: true, intersect: false,
+                    custom: buildGlassTooltipRenderer(dark, fmt),
+                },
+            });
+            await this.chart.render();
+        },
+
+        destroy() {
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            if (this.$refs.canvas) { this.$refs.canvas.innerHTML = ''; }
+        },
+    };
+};

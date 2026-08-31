@@ -69,13 +69,17 @@ class AdminGlobalSearchService
 
         ['label' => 'Orders', 'route' => 'admin.orders', 'group' => 'Commerce', 'keywords' => 'purchases sales fulfillment'],
         ['label' => 'Customers', 'route' => 'admin.customers', 'group' => 'Commerce', 'keywords' => 'users buyers accounts kyc'],
+        ['label' => 'Blocked & Restricted', 'route' => 'admin.users.blocked', 'group' => 'Commerce', 'keywords' => 'banned suspended protected moderation'],
+        ['label' => 'Account Closures', 'route' => 'admin.users.closures', 'group' => 'Commerce', 'keywords' => 'closed deleted anonymised grace'],
+        ['label' => 'Exit Feedback', 'route' => 'admin.users.feedback', 'group' => 'Commerce', 'keywords' => 'churn reasons why leaving'],
+        ['label' => 'Audience Insights', 'route' => 'admin.users.insights', 'group' => 'Commerce', 'keywords' => 'countries demographics marketing growth'],
         ['label' => 'Transactions', 'route' => 'admin.transactions', 'group' => 'Commerce', 'keywords' => 'payments attempts gateway charges'],
         ['label' => 'Wallets', 'route' => 'admin.wallets', 'group' => 'Commerce', 'keywords' => 'balances funding topup ledger'],
         ['label' => 'Payment Insights', 'route' => 'admin.payment-insights', 'group' => 'Commerce', 'keywords' => 'failures conversion gateway analytics'],
 
         ['label' => 'Monitoring', 'route' => 'admin.management.monitoring', 'group' => 'Management', 'keywords' => 'health uptime queues horizon providers'],
         ['label' => 'Finances', 'route' => 'admin.management.finances', 'group' => 'Management', 'keywords' => 'profit revenue margin accounting'],
-        ['label' => 'Leaderboards', 'route' => 'admin.management.leaderboards', 'group' => 'Management', 'keywords' => 'top customers ranking'],
+        ['label' => 'Leaderboards', 'route' => 'admin.users.leaderboards', 'group' => 'Commerce', 'keywords' => 'top customers ranking'],
         ['label' => 'Runbooks', 'route' => 'admin.management.runbooks', 'group' => 'Management', 'keywords' => 'incident playbook procedures'],
         ['label' => 'Reports', 'route' => 'admin.reports', 'group' => 'Management', 'keywords' => 'export csv analytics'],
 

@@ -409,13 +409,53 @@
                 </a>
                 @endif
 
-                {{-- Customers --}}
+                {{-- User Management (expandable group — customers list plus the
+                     account-lifecycle pages: moderation, closures, exit feedback,
+                     country insights, retention health) --}}
                 @if ($can('admin.customers'))
-                @php $active = $isCurrent('admin.customers*'); @endphp
-                <a href="{{ route('admin.customers') }}" wire:navigate data-tip="Customers" class="{{ $navItemClass($active) }}">
-                    <img src="{{ asset('assets/' . rawurlencode('customer.svg')) }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
-                    Customers
-                </a>
+                @php
+                    $usersActive = $isCurrent('admin.customers*', 'admin.users.*');
+                @endphp
+                <div
+                    x-data="{
+                        open: {{ $usersActive ? 'true' : 'false' }},
+                        active() { return ['/admin/customers', '/admin/users'].some(p => window.location.pathname.includes(p)); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
+                    class="nav-group flex flex-col gap-1"
+                >
+                    <button
+                        type="button"
+                        @click.stop="open = ! open"
+                        :aria-expanded="open.toString()"
+                        class="{{ $navItemClass($usersActive) }} w-full justify-between"
+                    >
+                        <span class="flex items-center gap-3">
+                            <img src="{{ asset('assets/' . rawurlencode('customer.svg')) }}" alt="" class="{{ $imgIconClass($usersActive) }}" loading="lazy">
+                            User Management
+                        </span>
+                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $usersActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    @php
+                        $usersSubItemClass = fn (bool $subActive) => $subActive
+                            ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
+                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                    @endphp
+                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
+                        <a href="{{ route('admin.customers') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.customers*')) }}">Customers</a>
+                        <a href="{{ route('admin.users.blocked') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.users.blocked')) }}">Blocked &amp; Restricted</a>
+                        <a href="{{ route('admin.users.closures') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.users.closures')) }}">Closures</a>
+                        <a href="{{ route('admin.users.feedback') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.users.feedback')) }}">Exit Feedback</a>
+                        <a href="{{ route('admin.users.insights') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.users.insights')) }}">Audience Insights</a>
+                        <a href="{{ route('admin.users.leaderboards') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.users.leaderboards')) }}">Leaderboards</a>
+                    </div>
+                </div>
                 @endif
 
                 {{-- Risk (fraud/risk engine: metrics + review queue) --}}
@@ -513,7 +553,6 @@
                         <a href="{{ route('admin.management.monitoring') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.monitoring')) }}">Monitoring</a>
                         <a href="{{ route('admin.payment-insights') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.payment-insights*')) }}">Payment Insights</a>
                         <a href="{{ route('admin.management.finances') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.finances')) }}">Finances</a>
-                        <a href="{{ route('admin.management.leaderboards') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.leaderboards')) }}">Leaderboards</a>
                         <a href="{{ route('admin.management.runbooks') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.runbooks')) }}">Runbooks</a>
                     </div>
                 </div>

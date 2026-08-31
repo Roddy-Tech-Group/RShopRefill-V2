@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Auth\Exceptions\AccountClosureException;
 use App\Domain\Auth\Services\AccountClosureService;
+use App\Domain\Auth\Services\DataExportService;
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\DataExportRequestedByStaffMail;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Shared\Enums\Currency;
@@ -16,12 +18,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\User;
 use App\Support\PhoneCountries;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -204,6 +209,56 @@ class AdminCustomerController extends Controller
         $audit->log(action: 'admin.account_closure_requested', model: $user, metadata: ['closes_on' => $user->fresh()->closesOn()?->toDateString()]);
 
         return back()->with('status', 'Closure requested on the customer\'s behalf. Their details are anonymised after the grace period unless they sign in.');
+    }
+
+    /**
+     * Email the customer a PDF copy of their data, for access requests that
+     * arrive in writing (the customer cannot sign in, so the self-serve OTP
+     * path is closed to them). Goes ONLY to the address on the account, and
+     * both the audit log and the customer's inbox record that it happened.
+     */
+    public function sendDataExport(User $user, DataExportService $export, AuditLogService $audit, CommunicationManager $communications): RedirectResponse
+    {
+        if ($user->isClosed()) {
+            return back()->withErrors(['data_export' => 'This account is closed and anonymised; there is no personal data left to export.']);
+        }
+
+        $pdf = Pdf::loadView('dashboard.data-export-pdf', ['data' => $export->build($user)]);
+
+        $mailable = new DataExportRequestedByStaffMail($user->name);
+        $mailable->attachData($pdf->output(), 'rshoprefill-my-data-'.now()->format('Y-m-d').'.pdf', ['mime' => 'application/pdf']);
+
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::SecurityIncident,
+            title: 'Your data export is attached',
+            message: 'The copy of your personal data you asked for has been sent to your email.',
+            mailable: $mailable,
+            correlationId: 'admin_data_export_'.$user->id.'_'.now()->timestamp,
+        );
+
+        $audit->log(action: 'admin.data_export_sent', model: $user);
+
+        return back()->with('status', 'Data export emailed to the address on the account.');
+    }
+
+    /**
+     * Sign the customer out everywhere: web sessions, the security session
+     * registry, and every remember-me token. The first move after a suspected
+     * compromise, and standard practice right before a ban.
+     */
+    public function revokeSessions(User $user, AuditLogService $audit): RedirectResponse
+    {
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        DB::table('user_sessions')->where('user_id', $user->id)->delete();
+
+        // A rotated token voids every "remember me" cookie out there.
+        $user->setRememberToken(Str::random(60));
+        $user->save();
+
+        $audit->log(action: 'admin.sessions_revoked', model: $user);
+
+        return back()->with('status', 'Customer signed out on every device. Remember-me cookies are now void.');
     }
 
     /**
