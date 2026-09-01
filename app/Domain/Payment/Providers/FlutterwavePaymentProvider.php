@@ -391,7 +391,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             $bankDetails = [
                 'bank_name' => $innerData['transfer_bank'] ?? 'Unknown Bank',
                 'account_number' => $innerData['transfer_account'],
-                'account_name' => 'Roddy Tech Group',
+                'account_name' => 'Roddy Technologies LTD',
                 'amount' => $innerData['transfer_amount'] ?? $attempt->amount,
                 'expires_at' => now()->addMinutes(30)->toIso8601String(),
             ];
