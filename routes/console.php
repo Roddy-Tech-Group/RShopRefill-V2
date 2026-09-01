@@ -78,6 +78,16 @@ Schedule::command('topups:sync')
     ->runInBackground()
     ->name('zendit:sync-topups-6h');
 
+// Re-pin topup pricing after each sync slot: a brand-new Nigerian operator or
+// face-value prepaid product lands on the 8% category default until pinned at
+// its deliberate 2%, so the pinning command re-runs 30 minutes past the sync
+// (idempotent - existing rules are updated in place, never duplicated).
+Schedule::command('pricing:apply-topup-rules')
+    ->cron('30 */6 * * *')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('pricing:apply-topup-rules-6h');
+
 // Split bills out of the gift-cards catalog after the giftcards sync runs.
 // Fires 15 minutes past the hour so it lands AFTER the 6h sync above
 // completes for that slot (gift cards sync typically finishes in <10 min).
