@@ -950,7 +950,7 @@
                                         </div>
                                         <div class="flex justify-between items-center text-xs">
                                             <span class="text-zinc-500 font-medium">Account Name</span>
-                                            <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.account_name || 'Roddy Technologies'"></span>
+                                            <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.account_name || 'Roddy Technologies LTD'"></span>
                                         </div>
                                         <div class="flex justify-between items-center text-xs border-t border-zinc-200 pt-3">
                                             <span class="text-zinc-500 font-medium">Amount</span>
