@@ -489,10 +489,10 @@ class CheckoutService
                 $order->save();
             });
 
-            // Dispatch fulfillment - funds are now fully debited.
-            foreach ($order->items as $item) {
-                FulfillOrderItemJob::dispatch($item);
-            }
+            // Dispatch fulfillment - funds are now fully debited. Identical
+            // offers are staggered so back-to-back duplicate purchases don't
+            // trip the supplier's velocity protection (Zendit error -29).
+            FulfillOrderItemJob::dispatchStaggered($order->items);
         }
 
         return $order->load(['paymentAttempts', 'paymentAttempts.paymentSession']);

@@ -140,6 +140,17 @@ class OrderService
      * cap reads this, so an order that was auto-refunded cannot be refunded a
      * second time by hand - the two families used to keep separate books.
      */
+    /**
+     * Whether a refund has already been recorded on this order under the given
+     * idempotency tag (e.g. "item-{id}" for a per-item reversal, "final-{order}"
+     * for a whole-order one). Read by the retry-fulfillment guards: an item
+     * whose refund tag exists must never be re-fulfilled.
+     */
+    public function hasRefundRecord(Order $order, string $tag): bool
+    {
+        return array_key_exists($tag, (array) (($order->metadata ?? [])['refund_records'] ?? []));
+    }
+
     public function refundedTotalFor(Order $order): float
     {
         return round((float) ($order->metadata['refunded_total'] ?? 0), 2);
