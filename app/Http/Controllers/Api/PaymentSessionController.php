@@ -204,10 +204,9 @@ class PaymentSessionController extends Controller
 
                     PaymentConfirmed::dispatch($attempt->order, $attempt);
 
-                    // Dispatch fulfillment jobs
-                    foreach ($attempt->order->items as $item) {
-                        FulfillOrderItemJob::dispatch($item);
-                    }
+                    // Dispatch fulfillment jobs (staggered per identical offer
+                    // so duplicates don't trip supplier velocity protection).
+                    FulfillOrderItemJob::dispatchStaggered($attempt->order->items);
                 }
                 // If it is wallet funding
                 elseif ($attempt->payable_type === WalletFunding::class) {
@@ -578,9 +577,8 @@ class PaymentSessionController extends Controller
 
                     PaymentConfirmed::dispatch($attempt->order, $attempt);
 
-                    foreach ($attempt->order->items as $item) {
-                        FulfillOrderItemJob::dispatch($item);
-                    }
+                    // Staggered per identical offer (supplier velocity protection).
+                    FulfillOrderItemJob::dispatchStaggered($attempt->order->items);
                 } elseif ($attempt->payable_type === WalletFunding::class) {
                     $funding = $attempt->payable;
                     if ($funding && $funding->status !== FundingStatus::Completed) {

@@ -135,6 +135,18 @@ class AdminCommerceController extends Controller
             return response()->json(['message' => 'This item is already successfully fulfilled.'], 400);
         }
 
+        // A failed item that was already refunded must never be retried: the
+        // customer got their money back, so a successful retry would hand
+        // them goods that were already paid back. Wallet credit + re-order is
+        // the correct path for a customer who still wants the item.
+        $order = $item->order;
+        $orderService = app(OrderService::class);
+        if ($order && ($orderService->hasRefundRecord($order, "item-{$item->id}") || $orderService->hasRefundRecord($order, 'final-'.$order->id))) {
+            return response()->json([
+                'message' => 'This item was already refunded to the customer. Retrying would deliver goods that were paid back; the customer can re-order using their wallet credit instead.',
+            ], 409);
+        }
+
         FulfillOrderItemJob::dispatch($item);
 
         return response()->json(['message' => 'Fulfillment job successfully re-queued.']);

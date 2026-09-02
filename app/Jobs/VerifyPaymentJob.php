@@ -139,9 +139,10 @@ class VerifyPaymentJob implements ShouldQueue
                     DB::afterCommit(function () use ($order, $attempt) {
                         PaymentConfirmed::dispatch($order, $attempt);
 
-                        foreach ($order->items as $item) {
-                            FulfillOrderItemJob::dispatch($item);
-                        }
+                        // Staggered: identical offers are spaced out so
+                        // duplicate purchases don't trip supplier velocity
+                        // protection (Zendit error -29).
+                        FulfillOrderItemJob::dispatchStaggered($order->items);
                     });
                 }
 
