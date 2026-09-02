@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\PricingBasis;
 use App\Models\Category;
 use App\Models\PricingRule;
 use App\Models\Product;
@@ -19,13 +18,17 @@ use Illuminate\Console\Command;
  *                           charges at/above face for NG airtime, so any higher
  *                           markup only widens the gap to local VTU apps; 2% is
  *                           the deliberate convenience margin.
- *   face-basis pins   2%  - product-level rules for face_value-basis products
- *                           (US/Caribbean prepaid priced at printed face by the
- *                           whole market); 8% on face would overshoot visibly.
+ *
+ * Fee-loaded prepaid (US/Caribbean plans whose supplier cost sits at or above
+ * the printed face value) deliberately rides the 8% default too: Maxwell's
+ * call, 2026-09-02. At 2% a $49 plan earned $0.98, which transaction fees
+ * alone can swallow; being visibly above the printed price on a product that
+ * is already above it is the acceptable cost of an actual margin. The enforce
+ * floor guarantees nothing sells below cost regardless.
  *
  * Idempotent: re-running updates the same rows and never duplicates. Re-run
- * after catalog syncs introduce new NG or face-basis topup products, since new
- * products fall to the 8% category default until pinned.
+ * after catalog syncs introduce new Nigerian operators, since new products
+ * fall to the 8% category default until pinned.
  */
 class ApplyTopupPricingRulesCommand extends Command
 {
@@ -35,7 +38,7 @@ class ApplyTopupPricingRulesCommand extends Command
 
     protected $signature = 'pricing:apply-topup-rules {--dry-run : Report what would change without saving}';
 
-    protected $description = 'Apply the mobile-airtime markup structure: 8% category default with 2% pins for Nigerian operators and face-value prepaid products.';
+    protected $description = 'Apply the mobile-airtime markup structure: 8% category default with 2% pins for Nigerian operators.';
 
     public function handle(): int
     {
@@ -51,12 +54,9 @@ class ApplyTopupPricingRulesCommand extends Command
 
         $pinned = Product::query()
             ->where('category_id', $category->id)
-            ->where(function ($query) {
-                $query->where('country_code', 'NG')
-                    ->orWhere('pricing_basis', PricingBasis::FaceValue);
-            })
+            ->where('country_code', 'NG')
             ->orderBy('id')
-            ->get(['id', 'name', 'country_code', 'pricing_basis']);
+            ->get(['id', 'name']);
 
         $categoryRule = PricingRule::whereNull('product_id')
             ->whereNull('subcategory_id')
@@ -70,13 +70,10 @@ class ApplyTopupPricingRulesCommand extends Command
             self::INTERNATIONAL_PERCENT,
         ));
 
-        $nigerian = $pinned->where('country_code', 'NG');
-        $faceBasis = $pinned->where('country_code', '!=', 'NG');
         $this->info(sprintf(
-            'Product pins at %.1f%%: %d Nigerian operators, %d face-basis prepaid products.',
+            'Product pins at %.1f%%: %d Nigerian operators.',
             self::PINNED_PERCENT,
-            $nigerian->count(),
-            $faceBasis->count(),
+            $pinned->count(),
         ));
 
         if ($dryRun) {
@@ -116,7 +113,7 @@ class ApplyTopupPricingRulesCommand extends Command
         }
 
         $this->info('Applied. The pricing cache is busted automatically; prices are live now.');
-        $this->line('Re-run this command after catalog syncs add new NG or face-basis topup products.');
+        $this->line('Re-run this command after catalog syncs add new Nigerian operators.');
 
         return self::SUCCESS;
     }

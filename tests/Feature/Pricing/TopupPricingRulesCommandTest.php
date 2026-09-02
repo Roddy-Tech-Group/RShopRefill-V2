@@ -62,7 +62,7 @@ class TopupPricingRulesCommandTest extends TestCase
         ]);
     }
 
-    public function test_it_writes_the_category_default_and_the_two_pin_sets(): void
+    public function test_it_writes_the_category_default_and_the_nigerian_pins(): void
     {
         $this->artisan('pricing:apply-topup-rules')->assertExitCode(0);
 
@@ -70,13 +70,16 @@ class TopupPricingRulesCommandTest extends TestCase
         $this->assertSame('percentage', $categoryRule->markup_type);
         $this->assertEqualsWithDelta(8.0, (float) $categoryRule->markup_value, 0.0001);
 
-        foreach ([$this->nigerianOperator, $this->faceBasisPrepaid] as $pinnedProduct) {
-            $pin = PricingRule::where('product_id', $pinnedProduct->id)->sole();
-            $this->assertSame('percentage', $pin->markup_type);
-            $this->assertEqualsWithDelta(2.0, (float) $pin->markup_value, 0.0001);
-        }
+        $pin = PricingRule::where('product_id', $this->nigerianOperator->id)->sole();
+        $this->assertSame('percentage', $pin->markup_type);
+        $this->assertEqualsWithDelta(2.0, (float) $pin->markup_value, 0.0001);
 
+        // ONLY Nigeria is pinned. Fee-loaded face-value prepaid deliberately
+        // rides the 8% default (2% on a $49 plan earned $0.98, which the
+        // transaction fees alone can swallow), so the rule table stays small.
         $this->assertDatabaseMissing('pricing_rules', ['product_id' => $this->internationalOperator->id]);
+        $this->assertDatabaseMissing('pricing_rules', ['product_id' => $this->faceBasisPrepaid->id]);
+        $this->assertSame(1, PricingRule::whereNotNull('product_id')->count());
     }
 
     public function test_the_engine_prices_each_tier_as_agreed(): void
@@ -114,8 +117,10 @@ class TopupPricingRulesCommandTest extends TestCase
         // International: supplier cost + the 8% category default.
         $this->assertEqualsWithDelta(3.55 * 1.08, $priceOf($internationalVariant), 0.0001);
 
-        // Face-basis prepaid: printed face value + the pinned 2%, not 8%.
-        $this->assertEqualsWithDelta(35.00 * 1.02, $priceOf($faceBasisVariant), 0.0001);
+        // Face-basis prepaid: no pin, so printed face + the 8% default. The
+        // deliberate margin decision of 2026-09-02; the enforce floor still
+        // guarantees it can never land below cost.
+        $this->assertEqualsWithDelta(35.00 * 1.08, $priceOf($faceBasisVariant), 0.0001);
     }
 
     public function test_it_is_idempotent_and_updates_an_existing_category_rule_in_place(): void
