@@ -100,7 +100,17 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
         // currency). cost_price is the COST block — always USD, our markup base.
         $faceValue = isset($sendBlock['fixed']) ? ((float) $sendBlock['fixed']) / $sendDiv
                      : (isset($priceBlock['fixed']) ? ((float) $priceBlock['fixed']) / $priceDiv : null);
-        $costPrice = isset($costBlock['fixed']) ? ((float) $costBlock['fixed']) / $costDiv : ($faceValue ?? 0.0);
+        // Zendit charges some offers a separate per-unit fee on top of the
+        // fixed cost (STRAIGHTTALK_US_38: fixed 3900 + fee 50 = a real $39.50
+        // wallet deduction; Boost's small denominations carry $1). feePct is a
+        // fraction, like the price block's margin. Both MUST land in
+        // cost_price: it is the markup base and the enforce floor's anchor,
+        // and a fee left out of it is a silent below-cost sale at the floor.
+        $costFee = is_numeric($costBlock['fee'] ?? null) ? ((float) $costBlock['fee']) / $costDiv : 0.0;
+        $costFeePct = is_numeric($costBlock['feePct'] ?? null) ? (float) $costBlock['feePct'] : 0.0;
+        $costPrice = isset($costBlock['fixed'])
+            ? (((float) $costBlock['fixed']) / $costDiv) * (1 + $costFeePct) + $costFee
+            : ($faceValue ?? 0.0);
         $retailPrice = $faceValue ?? $costPrice;
 
         // Variable top-ups expose min/max on the send block. Zendit labels variable

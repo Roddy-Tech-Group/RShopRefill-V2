@@ -14,9 +14,11 @@ use App\Models\ProductVariant;
  *   cost.fx: "the FX rate from the cost to the sent value."
  *   cost.discount: "The discount from the full value of the item to your cost."
  *
- * So cost.fixed / currencyDivisor IS the USD amount deducted from the wallet
- * per unit, and fx is a VALUE ratio (value delivered per unit of cost), not a
- * currency conversion. A both-USD row with fx < 1 is therefore legitimate and
+ * So cost.fixed / currencyDivisor is the USD base deducted from the wallet per
+ * unit — but NOT the whole deduction: cost.fee rides on top (Straight Talk's
+ * $0.50, Boost's $1 on small denominations) and cost.feePct is a fractional
+ * fee like the price block's margin. cost_usd below includes both. fx is a
+ * VALUE ratio (value delivered per unit of cost), not a currency conversion. A both-USD row with fx < 1 is therefore legitimate and
  * means the offer costs MORE than the nominal value it delivers - Straight
  * Talk's $35 plan costing $39, Alfa's $77.28 of airtime costing $136.18
  * (Zendit's suggested retail for it: $161). Any storefront price anchored on
@@ -44,8 +46,8 @@ final class ZenditCostBlocks
      * block is `send` (value credited to the recipient) when present, else
      * `price` (eSIMs carry no send block).
      *
-     * @return array{cost_usd: float, face: float|null, fx: float, discount: float, cost_currency: string|null, counterpart_currency: string|null}|null
-     *                                                                                                                                                  null when the variant carries no usable cost block.
+     * @return array{cost_usd: float, fee_usd: float, fee_pct: float, face: float|null, fx: float, discount: float, cost_currency: string|null, counterpart_currency: string|null}|null
+     *                                                                                                                                                                                  null when the variant carries no usable cost block.
      */
     public static function read(ProductVariant $variant): ?array
     {
@@ -77,8 +79,13 @@ final class ZenditCostBlocks
             ? ((float) ($counterpart['currencyDivisor'] ?? 100) ?: 100.0)
             : 100.0;
 
+        $feeUsd = is_numeric($cost['fee'] ?? null) ? ((float) $cost['fee']) / $divisor : 0.0;
+        $feePct = is_numeric($cost['feePct'] ?? null) ? (float) $cost['feePct'] : 0.0;
+
         return [
-            'cost_usd' => ((float) $cost['fixed']) / $divisor,
+            'cost_usd' => (((float) $cost['fixed']) / $divisor) * (1 + $feePct) + $feeUsd,
+            'fee_usd' => $feeUsd,
+            'fee_pct' => $feePct,
             'face' => $counterFixed !== null ? $counterFixed / $counterDivisor : null,
             'fx' => is_numeric($cost['fx'] ?? null) ? (float) $cost['fx'] : 1.0,
             'discount' => is_numeric($cost['discount'] ?? null) ? (float) $cost['discount'] : 0.0,

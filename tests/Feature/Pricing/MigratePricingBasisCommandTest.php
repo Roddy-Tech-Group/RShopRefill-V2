@@ -109,6 +109,29 @@ class MigratePricingBasisCommandTest extends TestCase
         $this->assertSame(PricingBasis::FaceValue, $pair['discounted']->fresh()->pricing_basis);
     }
 
+    /**
+     * --only-cost-over-face catches the Ultra Mobile shape the below-cost
+     * scope misses: cost above face but the current price technically above
+     * cost (the floor's doing), earning ~1% instead of the real markup. The
+     * discounted product must still keep its face basis.
+     */
+    public function test_only_cost_over_face_scopes_to_fee_loaded_products(): void
+    {
+        $pair = $this->makeAirtimePair();
+
+        $this->artisan('pricing:migrate-basis', [
+            '--category' => 'mobile-airtime',
+            '--to' => 'supplier_cost',
+            '--only-cost-over-face' => true,
+            '--apply' => true,
+        ])
+            ->expectsOutputToContain('1 products in scope')
+            ->assertExitCode(0);
+
+        $this->assertSame(PricingBasis::SupplierCost, $pair['broken']->fresh()->pricing_basis);
+        $this->assertSame(PricingBasis::FaceValue, $pair['discounted']->fresh()->pricing_basis);
+    }
+
     public function test_apply_persists_and_moves_the_engine_price(): void
     {
         $pair = $this->makeAirtimePair();
