@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Catalog\Support\TopupQuickPicks;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Enums\PricingBasis;
 use App\Support\FeatureFlag;
@@ -166,10 +167,65 @@ class Product extends Model
      *
      * @return array{0: float|null, 1: float|null} [min, max]
      */
-    public function priceRange(): array
+    public function priceRange(bool $fixedFacesFirst = false): array
     {
         $min = null;
         $max = null;
+
+        // The topups listing prefers the range of actual DENOMINATIONS over the
+        // custom-amount bounds, and among those, CREDIT denominations over
+        // data/bundle plans: the detail page's amount selector lists credit
+        // faces (plans have their own cards), so the listing must speak the
+        // same range or the two pages contradict each other. MTN NG's smallest
+        // faces (₦350-₦750) are data plans; its credit starts at ₦1,000, and
+        // "₦350 - ₦100,000" next to a selector starting at ₦1,000 reads as a
+        // lie. Falls back to all fixed faces when no credit ones exist, then
+        // to the variable bounds.
+        $isCredit = function ($v): bool {
+            // subtype_hint is the listing's lightweight JSON-extracted alias
+            // (full metadata is too heavy to load for 60 products' variants);
+            // fully-loaded models fall back to the metadata itself. MySQL's
+            // json_extract keeps the quotes, hence the trim.
+            $subType = strtolower(trim((string) ($v->subtype_hint ?? ($v->metadata['subTypes'][0] ?? '')), '" '));
+
+            return ! str_contains($subType, 'data') && ! str_contains($subType, 'bundle');
+        };
+        $fixedFaces = $this->variants->filter(fn ($v) => $v->is_available && ! $v->is_variable && $v->retail_price !== null);
+        $skipVariable = $fixedFacesFirst && $fixedFaces->isNotEmpty();
+        $creditOnly = $fixedFacesFirst && $fixedFaces->contains($isCredit);
+
+        // The listing range derives from the SAME quick-pick plan the detail
+        // page renders (real clean faces, gap-filled or fully synthesized
+        // through the custom range) - one source of truth, two pages that
+        // cannot disagree: "₦1,000 - ₦150,000" on the tile IS the first and
+        // last option in the amount selector.
+        if ($fixedFacesFirst) {
+            $variableVariant = $this->variants->first(fn ($v) => $v->is_available && $v->is_variable);
+            // Clean-face collapsing only applies when a custom amount exists
+            // to carry the dropped faces (mirrors the detail page exactly).
+            $creditFaces = $fixedFaces->filter($isCredit)
+                ->map(fn ($v) => (float) $v->retail_price)
+                ->when($variableVariant !== null, fn ($faces) => $faces->filter(
+                    fn ($face) => TopupQuickPicks::isCleanFace($face),
+                ))
+                ->unique()->sort()->values()->all();
+
+            $faceCurrency = strtoupper((string) ($fixedFaces->first()?->currency ?: ($this->currency_code ?: 'USD')));
+            $faceRate = $faceCurrency === 'USD'
+                ? 1.0
+                : (float) (CurrencyRate::query()->where('code', $faceCurrency)->value('rate_per_usd') ?: 1.0);
+
+            $picks = TopupQuickPicks::plan(
+                $creditFaces,
+                $variableVariant?->min_amount !== null ? (float) $variableVariant->min_amount : null,
+                $variableVariant?->max_amount !== null ? (float) $variableVariant->max_amount : null,
+                $faceRate,
+            );
+
+            if ($picks !== []) {
+                return [$picks[0]['value'], $picks[count($picks) - 1]['value']];
+            }
+        }
 
         foreach ($this->variants as $v) {
             if (! $v->is_available) {
@@ -178,6 +234,9 @@ class Product extends Model
 
             $values = [];
             if ($v->is_variable) {
+                if ($skipVariable) {
+                    continue;
+                }
                 if ($v->min_amount !== null) {
                     $values[] = (float) $v->min_amount;
                 }
@@ -185,6 +244,9 @@ class Product extends Model
                     $values[] = (float) $v->max_amount;
                 }
             } elseif ($v->retail_price !== null) {
+                if ($creditOnly && ! $isCredit($v)) {
+                    continue;
+                }
                 $values[] = (float) $v->retail_price;
             }
 
@@ -201,9 +263,9 @@ class Product extends Model
      * Human-readable price range string, e.g. "$5 - $500" or "$10".
      * Uses this product's currency_code for the symbol.
      */
-    public function priceRangeLabel(): ?string
+    public function priceRangeLabel(bool $fixedFacesFirst = false): ?string
     {
-        [$min, $max] = $this->priceRange();
+        [$min, $max] = $this->priceRange($fixedFacesFirst);
         if ($min === null) {
             return null;
         }
