@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Domain\Catalog\Support\BrandBlocklist;
 use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
@@ -14,6 +15,21 @@ class ZenditNormalizer implements CatalogNormalizerInterface
 {
     public function normalizeAndSave(array $rawItem, string $providerName): void
     {
+        // Brands under a trademark/IP takedown must never (re)enter the
+        // catalog: skip the offer entirely and force-deactivate any rows a
+        // previous sync created, so a manual reactivation cannot outlive the
+        // next sync either.
+        $offerBrandKey = $rawItem['brand'] ?? null;
+
+        if (BrandBlocklist::isBlocked($offerBrandKey)) {
+            Product::query()
+                ->where('brand_key', $offerBrandKey)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
+
+            return;
+        }
+
         // 1. Normalize Subtype. Zendit returns subTypes as an array; pick the first.
         $subTypes = $rawItem['subTypes'] ?? [];
         $subtypeName = is_array($subTypes) && ! empty($subTypes) ? $subTypes[0] : ($rawItem['subtype'] ?? 'Uncategorized');
