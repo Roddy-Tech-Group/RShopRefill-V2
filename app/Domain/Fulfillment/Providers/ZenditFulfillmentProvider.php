@@ -273,15 +273,28 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
      * Build Zendit's `value` object for a variable/custom-amount item, or null
      * for a fixed-denomination item (whose offerId already encodes the value).
      *
-     * Zendit wants the amount in the OFFER's currency, in minor units. We send
-     * `provider_face_value` (the chosen face value captured at checkout in the
-     * offer currency, e.g. USD for a Visa card) - NOT `display_amount`, which is
-     * the display-currency figure. Sending the converted display_amount made
-     * Zendit read a USD card's XAF amount as USD ("value is out of range").
+     * Zendit defines TWO value types for RANGE offers, and the choice is the
+     * currency the number is measured in:
      *
-     * Older items predate the provider_face_value column; back the offer amount
-     * out of display_amount via the order's stored exchange rate so an in-flight
-     * order never sends a converted figure.
+     *   PRICE - price-currency minor units (USD cents), validated against the
+     *           catalog's price block. Correct when the offer's send currency
+     *           IS the price currency (a $5 Visa, a US carrier top-up).
+     *   ZEND  - send-currency minor units (kobo, XAF), validated against the
+     *           send block. The only type that can deliver an exact local
+     *           amount: PRICE moves in $0.01 steps (~N12 of granularity).
+     *
+     * Sending a naira amount under PRICE made Zendit read N500 as $500.00 and
+     * reject it ("INVALID_VALUE: value is out of range", RSR-20260904-SWLQB3);
+     * the pre-fix code sent the USD figure instead, which validated but
+     * delivered the FX-converted approximation rather than the amount the
+     * customer chose. ZEND for cross-currency offers fixes both.
+     *
+     * We send `provider_face_value` (the chosen face value captured at
+     * checkout in the offer's send currency) - NOT `display_amount`, which is
+     * the display-currency figure. Older items predate the provider_face_value
+     * column; back the offer amount out of display_amount via the order's
+     * stored exchange rate so an in-flight order never sends a converted
+     * figure.
      *
      * @return array{type: string, value: int}|null
      */
@@ -291,7 +304,18 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             return null;
         }
 
-        $divisor = (float) ($item->variant_snapshot['metadata']['send']['currencyDivisor'] ?? 100);
+        $meta = $item->variant_snapshot['metadata'] ?? [];
+        $sendCurrency = strtoupper((string) data_get($meta, 'send.currency', ''));
+        $priceCurrency = strtoupper((string) (data_get($meta, 'price.currency') ?: data_get($meta, 'cost.currency', 'USD')));
+
+        // Cross-currency offer (NGN/XAF top-up priced in USD): the local
+        // amount must travel as ZEND. Same-currency (or legacy snapshots
+        // without a send currency, which are all USD vouchers): PRICE.
+        $useZend = $sendCurrency !== '' && $sendCurrency !== $priceCurrency;
+
+        $divisor = $useZend
+            ? (float) (data_get($meta, 'send.currencyDivisor') ?: 100)
+            : (float) (data_get($meta, 'price.currencyDivisor') ?: data_get($meta, 'send.currencyDivisor') ?: 100);
 
         $faceValue = $item->provider_face_value;
         if ($faceValue === null) {
@@ -300,7 +324,7 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
         }
 
         return [
-            'type' => 'PRICE',
+            'type' => $useZend ? 'ZEND' : 'PRICE',
             'value' => (int) round((float) $faceValue * $divisor),
         ];
     }
