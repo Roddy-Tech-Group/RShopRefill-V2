@@ -20,11 +20,13 @@ use App\Domain\Rewards\Services\RewardEngine;
 use App\Domain\Risk\DTOs\RiskContext;
 use App\Domain\Risk\Services\RiskGate;
 use App\Domain\Shared\Enums\Currency;
+use App\Domain\Shared\Support\CharmPrice;
 use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Jobs\FulfillOrderItemJob;
 use App\Models\Cart;
 use App\Models\Coupon;
+use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
@@ -293,6 +295,16 @@ class CheckoutService
             $displayMarkup = round($validatedTotals['total_markup'] * $exchangeRate, 4);
             $displayTotal = round($validatedTotals['total'] * $exchangeRate, 4);
 
+            // Charm-round the CHARGED total for fiat display currencies, UP
+            // only (₦1,056.80 → ₦1,060): the customer pays a number their
+            // currency actually uses, and the platform can only ever gain the
+            // rounding, never lose it. Settlement metadata keeps the exact
+            // USD figures. Crypto display amounts are never charm-rounded.
+            if ($displayCurrency !== 'USD'
+                && CurrencyRate::query()->where('code', $displayCurrency)->value('type') === 'fiat') {
+                $displayTotal = CharmPrice::roundUp($displayTotal, (float) $exchangeRate);
+            }
+
             $order = Order::create([
                 'user_id' => $user->id,
                 'order_number' => $orderNumber,
@@ -337,15 +349,43 @@ class CheckoutService
                 $unitDisplayAmount = round(($item->display_amount / $item->quantity) * $exchangeRate, 4);
                 $unitSubtotal = round(($item->subtotal_snapshot / $item->quantity) * $exchangeRate, 4);
 
-                // Variable/custom-amount items: the cart's display_amount is the chosen
-                // face value in the offer's own currency (cart_items.display_currency =
-                // variant->currency, e.g. USD for a Visa card) and is NOT exchange-converted.
-                // Persist that per-unit offer-currency value so fulfilment sends the right
-                // figure to the provider - sending the converted display_amount made Zendit
-                // see a USD card's XAF amount as USD and reject it ("value is out of range").
-                $unitProviderFaceValue = $item->variant->is_variable
-                    ? round($item->display_amount / $item->quantity, 4)
-                    : null;
+                // Variable/custom-amount items: persist the face value in the OFFER's
+                // own currency so fulfilment sends the provider exactly what the
+                // customer asked for. Derived from provider_cost_usd - the REQUESTED
+                // face in USD, before markup - converted at the same CurrencyRate the
+                // storefront used to convert the typed amount, so the round trip is
+                // exact: ₦1,000 typed → $0.7432 requested → ₦1,000.0000 persisted.
+                //
+                // It was previously derived from display_amount, which by then held
+                // the MARKED-UP USD subtotal: a USD offer over-delivered by the markup
+                // ($5 request sent $5.10), and a non-USD offer sent the tiny USD
+                // figure as local currency (₦1,000 request → "₦0.76" → Zendit
+                // rejects it as out of range and the item dies).
+                $unitProviderFaceValue = null;
+                if ($item->variant->is_variable) {
+                    // First choice: the typed amount captured at full precision
+                    // when the item entered the cart (metadata_snapshot).
+                    $typedNative = (float) (data_get($item->metadata_snapshot, 'requested_native') ?: 0);
+
+                    if ($typedNative > 0) {
+                        $unitProviderFaceValue = $typedNative;
+                    } else {
+                        // Older cart rows: reconstruct from the requested USD
+                        // face (provider_cost_usd, un-marked-up) at the same
+                        // rate the storefront converted with; the 4-decimal
+                        // storage can cost a few minor units of precision.
+                        $offerCurrency = strtoupper((string) ($item->variant->currency ?: 'USD'));
+                        $offerRate = $offerCurrency === 'USD'
+                            ? 1.0
+                            : (float) (CurrencyRate::query()->where('code', $offerCurrency)->value('rate_per_usd') ?: 0.0);
+
+                        $unitProviderFaceValue = $offerRate > 0
+                            ? round((float) $item->provider_cost_usd * $offerRate, 4)
+                            // No rate row for the offer currency: fall back to the
+                            // legacy derivation rather than blocking checkout.
+                            : round($item->display_amount / $item->quantity, 4);
+                    }
+                }
 
                 for ($i = 0; $i < $item->quantity; $i++) {
                     OrderItem::create([
