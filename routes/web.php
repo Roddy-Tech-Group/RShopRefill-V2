@@ -201,33 +201,30 @@ $resolveGiftCardBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("brand_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
-        $p = Product::query()
+    // ID-only cache: a serialized model with hundreds of variants can exceed
+    // MySQL's max_allowed_packet (see the topup resolver below).
+    $productId = TaggedCache::for(['catalog'])->remember("brand_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+        return Product::query()
             ->where('brand_key', $brandKey)
             ->where('country_code', $requested)
             ->where('is_active', true)
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ])
-            ->first();
-
-        if (! $p) {
-            $p = Product::query()
+            ->value('id')
+            ?: Product::query()
                 ->where('brand_key', $brandKey)
                 ->where('is_active', true)
                 ->orderByRaw("country_code = 'US' DESC")
-                ->with([
-                    'subcategory:id,name,slug',
-                    'category:id,name,slug',
-                    'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-                ])
-                ->first();
-        }
-
-        return $p;
+                ->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 
@@ -271,20 +268,30 @@ $resolveTopupBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("topup_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+    // Cache the resolved product ID only, never the model: a serialized
+    // Product with hundreds of metadata-heavy variants (Boost US carries 296)
+    // exceeds MySQL's max_allowed_packet and 500s the page on the cache
+    // write. Resolving the id is the expensive part; loading one product by
+    // id is milliseconds.
+    $productId = TaggedCache::for(['catalog'])->remember("topup_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
         $base = fn () => Product::query()
             ->where('brand_key', $brandKey)
             ->where('is_active', true)
-            ->whereHas('category', fn ($q) => $q->where('slug', 'mobile-airtime'))
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ]);
+            ->whereHas('category', fn ($q) => $q->where('slug', 'mobile-airtime'));
 
-        return $base()->where('country_code', $requested)->first()
-            ?: $base()->orderByRaw("country_code = 'US' DESC")->first();
+        return $base()->where('country_code', $requested)->value('id')
+            ?: $base()->orderByRaw("country_code = 'US' DESC")->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 
@@ -318,20 +325,27 @@ $resolveBillBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("bill_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+    // ID-only cache: a serialized model with hundreds of variants can exceed
+    // MySQL's max_allowed_packet (see the topup resolver above).
+    $productId = TaggedCache::for(['catalog'])->remember("bill_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
         $base = fn () => Product::query()
             ->where('brand_key', $brandKey)
             ->where('is_active', true)
-            ->whereHas('category', fn ($q) => $q->where('slug', 'bill-payments'))
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ]);
+            ->whereHas('category', fn ($q) => $q->where('slug', 'bill-payments'));
 
-        return $base()->where('country_code', $requested)->first()
-            ?: $base()->orderByRaw("country_code = 'US' DESC")->first();
+        return $base()->where('country_code', $requested)->value('id')
+            ?: $base()->orderByRaw("country_code = 'US' DESC")->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 

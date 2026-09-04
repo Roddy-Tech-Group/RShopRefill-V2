@@ -27,6 +27,7 @@ class MigratePricingBasisCommand extends Command
         {--category= : Category slug to migrate (required)}
         {--to= : Target basis: face_value | supplier_cost | provider_retail (required)}
         {--only-below-cost : Only migrate products with at least one variant currently priced below supplier cost}
+        {--only-cost-over-face : Only migrate products with at least one fixed USD variant whose supplier cost exceeds its face value}
         {--apply : Persist the new basis; without this the command is a dry-run delta report}';
 
     protected $description = 'Re-base a category to an explicit pricing basis, with a variant-level price delta report (dry-run by default).';
@@ -63,6 +64,14 @@ class MigratePricingBasisCommand extends Command
             $deltas = $this->variantDeltas($pricing, $product, $target);
 
             if ($this->option('only-below-cost') && ! $deltas['has_below_cost']) {
+                continue;
+            }
+
+            // Fee-loaded prepaid (cost above the printed face): face-basis
+            // pricing lands these at the enforce floor's 1%, never the real
+            // markup, so they are flipped to supplier_cost as a set even when
+            // the floor keeps them technically above cost.
+            if ($this->option('only-cost-over-face') && ! $deltas['has_cost_over_face']) {
                 continue;
             }
 
@@ -120,12 +129,13 @@ class MigratePricingBasisCommand extends Command
      * Per-variant price movement if $product were re-based to $target,
      * simulated in memory — nothing persists here.
      *
-     * @return array{rows: array<int, array<string, mixed>>, has_below_cost: bool}
+     * @return array{rows: array<int, array<string, mixed>>, has_below_cost: bool, has_cost_over_face: bool}
      */
     private function variantDeltas(CartPricingService $pricing, Product $product, PricingBasis $target): array
     {
         $rows = [];
         $hasBelowCost = false;
+        $hasCostOverFace = false;
         $originalBasis = $product->pricing_basis;
 
         foreach ($product->variants as $variant) {
@@ -140,6 +150,13 @@ class MigratePricingBasisCommand extends Command
             $cost = (float) $variant->cost_price;
             if ($cost > 0 && $old < $cost - 0.005) {
                 $hasBelowCost = true;
+            }
+
+            if (! $variant->is_variable
+                && strtoupper((string) ($variant->currency ?? 'USD')) === 'USD'
+                && (float) $variant->face_value > 0
+                && $cost > (float) $variant->face_value + 0.01) {
+                $hasCostOverFace = true;
             }
 
             if (abs($new - $old) > 0.005) {
@@ -157,6 +174,6 @@ class MigratePricingBasisCommand extends Command
 
         $product->pricing_basis = $originalBasis;
 
-        return ['rows' => $rows, 'has_below_cost' => $hasBelowCost];
+        return ['rows' => $rows, 'has_below_cost' => $hasBelowCost, 'has_cost_over_face' => $hasCostOverFace];
     }
 }

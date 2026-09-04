@@ -4,6 +4,8 @@ namespace App\Domain\Cart\Services;
 
 use App\Domain\Rewards\Services\RewardEngine;
 use App\Enums\PricingBasis;
+use App\Models\Category;
+use App\Models\CurrencyRate;
 use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -94,10 +96,10 @@ class CartPricingService
     /**
      * The markup parameters for a product, for client-side price estimation on
      * variable-amount products where the cost is only known once the customer
-     * enters an amount. The consumer must mirror resolveRetailPrice(): apply the
-     * markup, then clamp to the min-margin floor.
+     * enters an amount. The consumer must mirror the server: estimate cost as
+     * face x cost_premium, apply the markup, then clamp to the min-margin floor.
      *
-     * @return array{type: string, value: float, min_margin_percent: float}
+     * @return array{type: string, value: float, min_margin_percent: float, cost_premium: float}
      */
     public function markupDescriptor(?Product $product): array
     {
@@ -113,7 +115,70 @@ class CartPricingService
             'type' => $type,
             'value' => $value,
             'min_margin_percent' => $this->minMarginPercent(),
+            'cost_premium' => $this->variableCostPremium($product),
         ];
+    }
+
+    /**
+     * Estimated supplier-cost premium for VARIABLE topup amounts: what a unit
+     * of face value actually costs us, relative to its official-rate USD
+     * conversion, measured from the SAME operator's fixed denominations.
+     *
+     * Zendit does not sell Nigerian airtime at the official rate - MTN NG's
+     * fixed rows cost ~3.6% above face. Variable amounts have no cost until
+     * purchase, and pricing them as if cost = face/rate quietly sold every
+     * custom amount ~4% under its real cost while the fixed faces beside them
+     * charged the honest price (₦1,000 face at ₦1,060 next to a ₦2,000 custom
+     * at ₦2,040). The premium makes custom amounts consistent AND profitable.
+     *
+     * Median over the operator's fixed rows, clamped to [1.0, 1.25]: never a
+     * discount below the face assumption, never poisoned by one corrupt row.
+     * Topups only; other categories keep the classic face-as-cost behaviour.
+     */
+    public function variableCostPremium(?Product $product): float
+    {
+        if ($product === null) {
+            return 1.0;
+        }
+
+        return (float) Cache::remember("pricing.variable_premium.{$product->id}", 3600, function () use ($product) {
+            $categorySlug = $product->category->slug
+                ?? Category::query()->whereKey($product->category_id)->value('slug');
+
+            if ($categorySlug !== 'mobile-airtime') {
+                return 1.0;
+            }
+
+            $fixedRows = ProductVariant::query()
+                ->where('product_id', $product->id)
+                ->where('is_variable', false)
+                ->where('is_available', true)
+                ->where('cost_price', '>', 0)
+                ->where('face_value', '>', 0)
+                ->get(['currency', 'face_value', 'cost_price']);
+
+            if ($fixedRows->isEmpty()) {
+                return 1.0;
+            }
+
+            $faceCurrency = strtoupper((string) ($fixedRows->first()->currency ?: 'USD'));
+            $ratePerUsd = $faceCurrency === 'USD'
+                ? 1.0
+                : (float) (CurrencyRate::query()->where('code', $faceCurrency)->value('rate_per_usd') ?: 0.0);
+
+            if ($ratePerUsd <= 0) {
+                return 1.0;
+            }
+
+            $ratios = $fixedRows
+                ->map(fn ($v) => ((float) $v->cost_price * $ratePerUsd) / (float) $v->face_value)
+                ->sort()
+                ->values();
+
+            $median = (float) $ratios[(int) floor(($ratios->count() - 1) / 2)];
+
+            return min(1.25, max(1.0, $median));
+        });
     }
 
     /**

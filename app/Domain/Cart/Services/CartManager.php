@@ -5,6 +5,7 @@ namespace App\Domain\Cart\Services;
 use App\Domain\Cart\Events\CartUpdated;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\CurrencyRate;
 use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -58,14 +59,24 @@ class CartManager
             // 1. Validate addition
             $this->validationService->validateAddition($variant, $requestedValue);
 
+            // Variable topups estimate their supplier cost as requested x the
+            // operator's real premium (see variableCostPremium); computed once
+            // here so the dedupe below and the pricing share the same figure.
+            $costPremium = ($variant->is_variable && $requestedValue !== null)
+                ? $this->pricingService->variableCostPremium($variant->product)
+                : 1.0;
+
             // 2. Check for existing identical variant in cart (and matching requested value if variable)
             $existingItems = $cart->items()->where('product_variant_id', $variant->id)->get();
             $existingItem = null;
             foreach ($existingItems as $item) {
                 if ($variant->is_variable && $requestedValue !== null) {
-                    // For variable products, treat the stored provider_cost_usd as the requested face value
-                    // (Or infer it from display_amount/quantity for legacy items if provider_cost_usd is missing/0)
-                    $itemRequestedValue = $item->provider_cost_usd > 0 ? $item->provider_cost_usd : ($item->display_amount / $item->quantity);
+                    // provider_cost_usd stores requested x premium; divide the
+                    // premium back out to compare against the new request.
+                    // (Or infer from display_amount/quantity for legacy items.)
+                    $itemRequestedValue = $item->provider_cost_usd > 0
+                        ? $item->provider_cost_usd / $costPremium
+                        : ($item->display_amount / $item->quantity);
                     if (abs($itemRequestedValue - $requestedValue) < 0.001) {
                         $existingItem = $item;
                         break;
@@ -84,11 +95,15 @@ class CartManager
             // Assuming for now that CartPricingService handles the variant's base configuration.
             // If requestedValue is passed, we overwrite display_amount and subtotal.
             if ($variant->is_variable && $requestedValue !== null) {
-                $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $requestedValue);
+                // Cost estimate = requested x the operator's real premium, so
+                // custom amounts price like the fixed faces beside them and
+                // never quietly undercut the supplier's actual charge.
+                $estimatedCostUsd = $requestedValue * $costPremium;
+                $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $estimatedCostUsd);
                 $subtotalUsd = $unitPriceUsd * $quantity;
 
-                $pricing['provider_cost_usd'] = $requestedValue;
-                $pricing['markup_amount'] = $unitPriceUsd - $requestedValue;
+                $pricing['provider_cost_usd'] = $estimatedCostUsd;
+                $pricing['markup_amount'] = $unitPriceUsd - $estimatedCostUsd;
                 $pricing['unit_price_snapshot'] = $unitPriceUsd;
                 $pricing['subtotal_snapshot'] = $subtotalUsd;
                 $pricing['display_amount'] = $subtotalUsd;
@@ -103,6 +118,22 @@ class CartManager
                 $metadata ?? [],
             ), fn ($v) => $v !== null && $v !== '');
 
+            // The typed amount in the OFFER's own currency, reconstructed at
+            // full float precision BEFORE the 4-decimal provider_cost_usd
+            // column can blur it (₦1,000 → $0.7432 stored → ₦1,000.07 back).
+            // Checkout persists this as provider_face_value so the recipient
+            // is credited exactly what the customer typed.
+            if ($variant->is_variable && $requestedValue !== null) {
+                $offerCurrency = strtoupper((string) ($variant->currency ?: 'USD'));
+                $offerRate = $offerCurrency === 'USD'
+                    ? 1.0
+                    : (float) (CurrencyRate::query()->where('code', $offerCurrency)->value('rate_per_usd') ?: 0.0);
+
+                if ($offerRate > 0) {
+                    $mergedMeta['requested_native'] = round($requestedValue * $offerRate, 4);
+                }
+            }
+
             if ($existingItem) {
                 // Update existing
                 $newQuantity = $existingItem->quantity + $quantity;
@@ -116,11 +147,12 @@ class CartManager
                 $newPricing = $this->pricingService->calculatePricing($variant, $newQuantity);
 
                 if ($variant->is_variable && $requestedValue !== null) {
-                    $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $requestedValue);
+                    $estimatedCostUsd = $requestedValue * $costPremium;
+                    $unitPriceUsd = $this->pricingService->resolveRetailPrice($variant->product, $estimatedCostUsd);
                     $subtotalUsd = $unitPriceUsd * $newQuantity;
 
-                    $newPricing['provider_cost_usd'] = $requestedValue;
-                    $newPricing['markup_amount'] = $unitPriceUsd - $requestedValue;
+                    $newPricing['provider_cost_usd'] = $estimatedCostUsd;
+                    $newPricing['markup_amount'] = $unitPriceUsd - $estimatedCostUsd;
                     $newPricing['unit_price_snapshot'] = $unitPriceUsd;
                     $newPricing['subtotal_snapshot'] = $subtotalUsd;
                     $newPricing['display_amount'] = $subtotalUsd;
