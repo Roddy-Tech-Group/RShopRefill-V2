@@ -82,7 +82,9 @@ class GoogleAuthController extends Controller
                 Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
             }
 
-            if (! Auth::check() || Auth::id() !== $user->id) {
+            // A claimed account just had every session revoked, including
+            // one this browser may hold, so it always logs in afresh.
+            if (! Auth::check() || Auth::id() !== $user->id || $result['claimed']) {
                 session()->regenerate();
                 // Fires the Login event, so MergeGuestCartOnLogin folds any
                 // guest cookie cart into the account here too.
@@ -110,9 +112,15 @@ class GoogleAuthController extends Controller
 
     /**
      * Build the Google driver.
-     * We run statelessly in all environments to prevent `InvalidStateException`
-     * during popup-based auth where session cookies might be dropped by the
-     * browser's cross-site cookie restrictions (SameSite).
+     *
+     * The OAuth `state` round-trip is what stops a login-CSRF / forced
+     * account-linking attack, so it stays ON. The callback is a top-level
+     * navigation (in the popup window too), which SameSite=Lax cookies
+     * accompany, so the session is there to validate it. The usual cause of
+     * an InvalidStateException is starting the flow on one host (localhost)
+     * and returning to another (127.0.0.1): fix the redirect URI, not the
+     * check. GOOGLE_OAUTH_STATELESS=true remains as a local-only escape
+     * hatch and is ignored in production.
      *
      * In local dev, we also disable SSL verification on the Guzzle client
      * (Windows PHP installs often lack a CA bundle, causing cURL error 60).
@@ -120,7 +128,11 @@ class GoogleAuthController extends Controller
     protected function driver()
     {
         /** @var AbstractProvider $driver */
-        $driver = Socialite::driver('google')->stateless();
+        $driver = Socialite::driver('google');
+
+        if (config('services.google.stateless') && ! app()->isProduction()) {
+            $driver = $driver->stateless();
+        }
 
         if (app()->environment('local')) {
             $driver = $driver

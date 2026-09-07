@@ -153,22 +153,14 @@ class DeviceVerificationController extends Controller
         return redirect()->intended(route('dashboard'));
     }
 
+    /**
+     * NO IT WASN'T ME flow. Authenticity and expiry of the link are enforced
+     * by the `signed` middleware on the route, so a request that reaches
+     * here carries a valid, unexpired signature over the device id.
+     */
     public function handleCompromise(Request $request)
     {
-        // NO IT WASN'T ME Flow
-        $deviceId = $request->get('device');
-        $token = $request->get('token');
-
-        if (! $deviceId || ! $token) {
-            abort(400, 'Invalid compromise link.');
-        }
-
-        $expectedToken = hash_hmac('sha256', $deviceId, config('app.key'));
-        if (! hash_equals($expectedToken, $token)) {
-            abort(403, 'Invalid or expired compromise link.');
-        }
-
-        $device = TrustedDevice::findOrFail($deviceId);
+        $device = TrustedDevice::findOrFail($request->integer('device'));
         $user = $device->user;
 
         $incidentId = $this->incidentManager->handleCompromisedAccount(

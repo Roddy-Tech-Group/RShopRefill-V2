@@ -1,10 +1,3 @@
-@php
-$lockUrl = route('security.compromise', [
-    'device' => $device->id,
-    'token' => hash_hmac('sha256', $device->id, config('app.key'))
-]);
-@endphp
-
 <x-emails.layout :mail-message="$message ?? null" title="New device signed into your account" preheader="We noticed a new sign-in to your RShopRefill account.">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">New Device Detected</h1>
 
@@ -29,5 +22,5 @@ $lockUrl = route('security.compromise', [
         <a href="{{ $lockUrl }}" style="display:inline-block; padding:14px 28px; background-color:#ef4444; color:#ffffff; font-size:16px; font-weight:600; text-decoration:none; border-radius:8px;">NO, SECURE MY ACCOUNT</a>
     </div>
 
-    <p style="margin:0 0 16px; font-size:14px; line-height:1.65; color:#71717a;">Clicking the secure link will instantly log out all devices and freeze financial operations on your account.</p>
+    <p style="margin:0 0 16px; font-size:14px; line-height:1.65; color:#71717a;">Clicking the secure link will instantly log out all devices and freeze financial operations on your account. The link works for {{ \App\Domain\Communication\Mail\Security\NewDeviceDetectedMail::LOCK_LINK_HOURS }} hours.</p>
 </x-emails.layout>

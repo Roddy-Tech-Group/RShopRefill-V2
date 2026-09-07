@@ -31,6 +31,7 @@ class ProfileUpdateTest extends TestCase
         $response = Volt::test('settings.profile')
             ->set('name', 'Test User')
             ->set('email', 'test@example.com')
+            ->set('email_change_password', 'password')
             ->call('updateProfileInformation');
 
         $response->assertHasNoErrors();
@@ -191,6 +192,7 @@ class ProfileUpdateTest extends TestCase
         Volt::test('settings.profile')
             ->set('name', 'Ada Okafor')
             ->set('email', 'new@example.test')
+            ->set('email_change_password', 'password')
             ->call('updateProfileInformation')
             ->assertHasNoErrors();
 

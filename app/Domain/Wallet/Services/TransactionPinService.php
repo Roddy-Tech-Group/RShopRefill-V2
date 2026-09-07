@@ -10,14 +10,27 @@ use App\Domain\Wallet\Events\TransactionPinVerificationFailed;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class TransactionPinService
 {
+    /** Consecutive wrong guesses before the PIN pauses for LOCKOUT_MINUTES. */
     private const MAX_ATTEMPTS = 5;
 
     private const LOCKOUT_MINUTES = 15;
+
+    /**
+     * Consecutive wrong guesses before the PIN locks for good. The counter
+     * never resets on its own, so after the first pause every further wrong
+     * guess re-pauses it; two full rounds and the wallet closes until the
+     * customer proves themselves through the password-gated reset. A thief
+     * holding a stolen session gets ten guesses out of ten thousand.
+     */
+    private const HARD_LOCK_ATTEMPTS = 10;
+
+    public const HARD_LOCK_MESSAGE = 'Your PIN is locked after too many incorrect attempts. Use Forgot PIN to set a new one.';
 
     private const WEAK_PINS = [
         '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
@@ -53,12 +66,24 @@ class TransactionPinService
             throw ValidationException::withMessages(['pin' => 'Transaction PIN is not set.']);
         }
 
+        if ($user->pin_status === 'locked') {
+            throw ValidationException::withMessages(['pin' => self::HARD_LOCK_MESSAGE]);
+        }
+
         if ($user->isTransactionPinLocked()) {
             throw ValidationException::withMessages(['pin' => 'Too many failed attempts. Try again later.']);
         }
 
         if (! $user->verifyTransactionPin($pin)) {
             $user->incrementTransactionPinAttempts();
+
+            if ($user->transaction_pin_attempts >= self::HARD_LOCK_ATTEMPTS) {
+                $user->pin_status = 'locked';
+                $user->transaction_pin_locked_until = null;
+                $user->save();
+                event(new TransactionPinLocked($user, permanent: true));
+                throw ValidationException::withMessages(['pin' => self::HARD_LOCK_MESSAGE]);
+            }
 
             if ($user->transaction_pin_attempts >= self::MAX_ATTEMPTS) {
                 $user->lockTransactionPin(self::LOCKOUT_MINUTES);
@@ -130,9 +155,34 @@ class TransactionPinService
 
     /**
      * Request a PIN reset (generates secure token and triggers email).
+     *
+     * The account password is the step-up: a session alone (a stolen cookie,
+     * a shared computer) must not be able to rotate the PIN that guards the
+     * wallet. Accounts without a password (Google-only) rely on the emailed
+     * link itself. Three requests an hour, counted BEFORE the password check
+     * so wrong guesses spend the budget too; every request used to overwrite
+     * the token and send another email with no limit at all.
      */
-    public function requestReset(User $user): void
+    public function requestReset(User $user, ?string $password = null): void
     {
+        $limiterKey = "pin-reset:{$user->id}";
+
+        if (RateLimiter::tooManyAttempts($limiterKey, 3)) {
+            $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
+
+            throw ValidationException::withMessages([
+                'password' => "Too many PIN reset requests. Try again in {$minutes} minutes.",
+            ]);
+        }
+
+        RateLimiter::hit($limiterKey, 3600);
+
+        if ($user->password !== null && ! Hash::check((string) $password, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => 'That password is incorrect. Enter your account password to request a PIN reset.',
+            ]);
+        }
+
         $token = Str::random(60);
 
         Cache::put("pin_reset_{$user->id}", $token, now()->addHours(1));
@@ -162,26 +212,6 @@ class TransactionPinService
         Cache::forget("pin_reset_{$user->id}");
 
         event(new TransactionPinChanged($user));
-    }
-
-    /**
-     * Remove PIN completely (requires password).
-     */
-    public function removePin(User $user, string $password): void
-    {
-        if (! Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages(['password' => 'Invalid password.']);
-        }
-
-        $user->transaction_pin = null;
-        $user->transaction_pin_set_at = null;
-        $user->transaction_pin_attempts = 0;
-        $user->transaction_pin_locked_until = null;
-        $user->pin_status = 'active';
-        $user->last_transaction_pin_used_at = null;
-        $user->save();
-
-        // You could dispatch a TransactionPinRemoved event here if desired.
     }
 
     /**

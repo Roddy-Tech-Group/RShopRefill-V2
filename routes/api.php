@@ -156,9 +156,8 @@ Route::middleware('auth')->group(function () {
             // (first-time) and verify (spending) stay open: a new customer
             // must be able to set a PIN, and paying is never device-gated.
             Route::put('change', [TransactionPinController::class, 'change'])->middleware('device.mature')->name('change');
-            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->middleware('device.mature')->name('reset.request');
+            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->middleware(['device.mature', 'throttle:5,1'])->name('reset.request');
             Route::post('reset/confirm', [TransactionPinController::class, 'confirmReset'])->middleware('device.mature')->name('reset.confirm');
-            Route::delete('remove', [TransactionPinController::class, 'remove'])->middleware('device.mature')->name('remove');
         });
     });
 
@@ -202,6 +201,9 @@ Route::middleware('auth')->group(function () {
         // "never" or revoking the owner's real devices are exactly the moves
         // an account thief makes in their first hour.
         Route::put('preferences', [SecurityController::class, 'updatePreferences'])->middleware('device.mature')->name('preferences.update');
-        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->middleware('device.mature')->name('devices.revoke');
+        // Revoking is gated by the account password instead (see the
+        // controller): a customer on a NEW device must be able to cut a
+        // stolen one loose right now, not after the 24-hour hold.
+        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->name('devices.revoke');
     });
 });

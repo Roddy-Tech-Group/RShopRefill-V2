@@ -808,8 +808,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Rcoin withdrawal request - posts from the form on the rewards page.
     // Admins review at /admin/content/rewards-withdrawals.
+    // Money out waits for the 24-hour new-device hold like every other
+    // security-sensitive action: a thief's first move on a fresh device is
+    // to drain what they can.
     Route::post('dashboard/rewards/withdraw', [RcoinWithdrawalController::class, 'store'])
-        ->middleware('maintenance-guard')->name('dashboard.rewards.withdraw');
+        ->middleware(['maintenance-guard', 'device.mature'])->name('dashboard.rewards.withdraw');
 
     // Instant Rcoin → wallet (USD) conversion. No admin approval. Capped by
     // wallet_conversion_min_usd setting (default $2.00).
@@ -946,9 +949,13 @@ Route::middleware(['auth'])->prefix('security')->name('security.')->group(functi
     Route::post('verify-device/send', [DeviceVerificationController::class, 'sendOtp'])->name('verify-device.send');
     Route::post('verify-device', [DeviceVerificationController::class, 'verifyOtp'])->name('verify-device.verify');
 
-    // Unauthenticated route for the NO IT WASN'T ME flow
+    // Unauthenticated route for the NO IT WASN'T ME flow. The link is a
+    // temporary signed url (see NewDeviceDetectedMail): `signed` rejects a
+    // tampered or expired one before the controller runs, and the throttle
+    // keeps the endpoint from being used to hammer accounts.
     Route::get('compromise', [DeviceVerificationController::class, 'handleCompromise'])
         ->withoutMiddleware(['auth'])
+        ->middleware(['signed', 'throttle:6,1'])
         ->name('compromise');
 
     // Account recovery flow for Protected Mode

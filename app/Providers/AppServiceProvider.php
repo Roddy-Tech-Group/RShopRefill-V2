@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,6 +31,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // The one password policy every form uses (register, reset, change,
+        // admin accounts). NIST-style: length plus a breached-password check
+        // (Have I Been Pwned's k-anonymity range API, which never sees the
+        // password and fails open if unreachable), no composition rules.
+        // The network check runs in production only so tests and local
+        // development stay offline.
+        Password::defaults(fn () => $this->app->isProduction()
+            ? Password::min(8)->uncompromised()
+            : Password::min(8));
 
         // Append security-relevant events to the audit log.
         Event::subscribe(AuditLogListener::class);

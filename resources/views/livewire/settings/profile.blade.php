@@ -21,6 +21,9 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
     public string $name = '';
     public string $email = '';
+
+    /** Account password, required to move the account to a new email. */
+    public string $email_change_password = '';
     public ?string $phone = null;
     public ?string $country = null;
     public ?string $gender = null;
@@ -118,7 +121,19 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
             // Gender enum stored as a short string. Add new values to the migration column and the union here.
             'gender' => ['nullable', 'in:male,female,other'],
-        ]);
+
+            // Moving the account to another inbox is the whole account: a
+            // hijacked session must re-prove the password first. Accounts
+            // without one (Google-only) are covered by the old-address
+            // notice and the re-verification of the new address.
+            'email_change_password' => Rule::when(
+                strtolower(trim((string) $this->email)) !== strtolower((string) $user->email) && $user->password !== null,
+                ['required', 'string', 'current_password'],
+                ['nullable'],
+            ),
+        ], [], ['email_change_password' => 'password']);
+
+        unset($validated['email_change_password']);
 
         // Canonicalise before the uniqueness check: a national-number comparison
         // could not see that 0803... and +234803... are the same line, which is
@@ -171,6 +186,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
             Session::flash('status', 'verification-link-sent');
         }
+
+        $this->reset('email_change_password');
 
         $this->dispatch('profile-updated', name: $user->name);
     }
@@ -577,6 +594,21 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         />
                         @error('email') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
+
+                    @if(auth()->user()->password !== null)
+                        <div x-show="$wire.email.trim().toLowerCase() !== @js(strtolower((string) auth()->user()->email))" x-cloak>
+                            <label for="profile-email-password" class="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Confirm your password to change email</label>
+                            <input
+                                wire:model="email_change_password"
+                                id="profile-email-password"
+                                type="password"
+                                autocomplete="current-password"
+                                class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-[#0c1a36] dark:text-white"
+                                placeholder="Your current password"
+                            />
+                            @error('email_change_password') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
 
                     <div>
                         <label for="profile-phone" class="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Phone number</label>

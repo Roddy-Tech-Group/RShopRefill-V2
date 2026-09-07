@@ -19,7 +19,9 @@ class GoogleAvatarTest extends TestCase
 
     private function googleUser(string $avatar): SocialiteUser
     {
-        return (new SocialiteUser)->map([
+        // Google asserts the address is verified in the raw userinfo payload;
+        // linking and sign-up both require that claim.
+        return (new SocialiteUser)->setRaw(['email_verified' => true])->map([
             'id' => 'google-123',
             'name' => 'Jane Doe',
             'nickname' => null,
