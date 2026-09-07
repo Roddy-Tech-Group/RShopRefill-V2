@@ -17,9 +17,14 @@ class CartController extends Controller
         private CartMergeService $mergeService
     ) {}
 
+    /**
+     * The storefront API authenticates the web session (there is no token
+     * guard); asking a non-existent `sanctum` guard here always answered
+     * null, so a signed-in shopper was silently treated as a guest.
+     */
     private function resolveCart(Request $request)
     {
-        $userId = $request->user('sanctum')?->id;
+        $userId = $request->user()?->id;
         $guestToken = $request->header('X-Guest-Token');
 
         return $this->cartManager->resolveCart($userId, $guestToken);
@@ -99,7 +104,7 @@ class CartController extends Controller
             'guest_token' => ['required', 'string'],
         ]);
 
-        $user = $request->user('sanctum');
+        $user = $request->user();
 
         if (! $user) {
             return response()->json(['message' => 'Unauthenticated.'], Response::HTTP_UNAUTHORIZED);

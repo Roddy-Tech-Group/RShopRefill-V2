@@ -93,7 +93,7 @@ class RetentionEnforceTest extends TestCase
                 'uuid' => (string) Str::uuid(),
                 'user_id' => $user->id,
                 'mail_domain' => 'security',
-                'category' => 'login_alert',
+                'category' => 'new_device',
                 'channel' => 'email',
                 'recipient' => "{$tag}@example.test",
                 'sender' => 'security@rshoprefill.com',

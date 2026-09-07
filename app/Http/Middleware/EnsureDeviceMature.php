@@ -15,8 +15,9 @@ use Symfony\Component\HttpFoundation\Response;
  * trait, but the raw endpoints they sit on (PIN change/reset/remove, device
  * revoke, OTP-preference change) accepted a scripted request from a
  * minutes-old device without question - the exact device an account thief
- * signs in from. Ordering and paying are deliberately NOT behind this hold;
- * only actions that reshape the account's own security are.
+ * signs in from. Money OUT (the Rcoin withdrawal request) sits behind it
+ * too. Ordering and paying are deliberately NOT behind this hold; only
+ * actions that reshape the account's own security, or move money out, are.
  */
 class EnsureDeviceMature
 {
@@ -44,11 +45,18 @@ class EnsureDeviceMature
 
         if ($device && ! $this->policy->isDeviceMature($device)) {
             $hours = config('security.device_restriction_hours', 24);
+            $message = "For your security, this action is restricted on new devices for the first {$hours} hours.";
 
-            return response()->json([
-                'message' => "For your security, this action is restricted on new devices for the first {$hours} hours.",
-                'device_restricted' => true,
-            ], 403);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => $message,
+                    'device_restricted' => true,
+                ], 403);
+            }
+
+            // A web form (the Rcoin withdrawal request) gets its error back
+            // on the page it came from, not a JSON body.
+            return back()->withErrors(['device' => $message]);
         }
 
         return $next($request);
