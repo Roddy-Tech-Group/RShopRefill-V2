@@ -7,9 +7,12 @@ use App\Domain\Auth\Exceptions\AccountClosureException;
 use App\Domain\Auth\Services\AccountClosureService;
 use App\Domain\Auth\Services\DataExportService;
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\AccountBannedMail;
+use App\Domain\Communication\Mail\Security\AccountSuspendedMail;
 use App\Domain\Communication\Mail\Security\DataExportRequestedByStaffMail;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Security\Services\SessionRevocationService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\TransactionPinService;
@@ -22,11 +25,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -169,17 +170,34 @@ class AdminCustomerController extends Controller
     }
 
     /**
-     * Ban or unban the customer. Banning blocks login + access via middleware.
+     * Ban or unban the customer. A ban signs them out on every device at the
+     * same moment (a banned customer used to keep their live sessions until
+     * they happened to load a web page) and tells them what happened and
+     * where to write; the middleware refuses any new sign-in.
      */
-    public function toggleBan(User $user): RedirectResponse
+    public function toggleBan(User $user, SessionRevocationService $sessions, CommunicationManager $communications, AuditLogService $audit): RedirectResponse
     {
-        $banned = $user->banned_at !== null;
+        if ($user->banned_at !== null) {
+            $user->update(['banned_at' => null]);
 
-        $user->update(['banned_at' => $banned ? null : now()]);
+            return back()->with('status', 'Customer unbanned.');
+        }
 
-        return back()->with('status', $banned
-            ? 'Customer unbanned.'
-            : 'Customer banned. They have been blocked from signing in.');
+        $user->update(['banned_at' => now()]);
+
+        $sessions->revokeAll($user);
+        $audit->log(action: 'admin.sessions_revoked', model: $user, metadata: ['reason' => 'ban']);
+
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountRestriction,
+            title: 'Your account has been suspended',
+            message: 'Your account has been suspended and signed out on every device. Write to support if you believe this is a mistake.',
+            mailable: new AccountBannedMail($user->name),
+            correlationId: 'account_banned_'.$user->id.'_'.now()->timestamp,
+        );
+
+        return back()->with('status', 'Customer banned, signed out on every device, and notified by email.');
     }
 
     /**
@@ -247,14 +265,9 @@ class AdminCustomerController extends Controller
      * registry, and every remember-me token. The first move after a suspected
      * compromise, and standard practice right before a ban.
      */
-    public function revokeSessions(User $user, AuditLogService $audit): RedirectResponse
+    public function revokeSessions(User $user, SessionRevocationService $sessions, AuditLogService $audit): RedirectResponse
     {
-        DB::table('sessions')->where('user_id', $user->id)->delete();
-        DB::table('user_sessions')->where('user_id', $user->id)->delete();
-
-        // A rotated token voids every "remember me" cookie out there.
-        $user->setRememberToken(Str::random(60));
-        $user->save();
+        $sessions->revokeAll($user);
 
         $audit->log(action: 'admin.sessions_revoked', model: $user);
 
@@ -268,7 +281,7 @@ class AdminCustomerController extends Controller
      * `not-suspended` middleware. Lifting suspension also clears any pending
      * review request.
      */
-    public function toggleSuspend(Request $request, User $user): RedirectResponse
+    public function toggleSuspend(Request $request, User $user, CommunicationManager $communications): RedirectResponse
     {
         $suspended = $user->suspended_at !== null;
 
@@ -286,13 +299,26 @@ class AdminCustomerController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $reason = $validated['reason'] ?? null;
+
         $user->update([
             'suspended_at' => now(),
-            'suspension_reason' => $validated['reason'] ?? null,
+            'suspension_reason' => $reason,
             'suspension_review_requested_at' => null,
         ]);
 
-        return back()->with('status', 'Customer suspended. They can still sign in but cannot purchase, fund or check out.');
+        // The customer stays signed in by design, so the mail is how they
+        // learn what is paused, why, and how to ask for a review.
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountRestriction,
+            title: 'Your account is under review',
+            message: 'Purchases, funding and checkout are paused while our team reviews your account.',
+            mailable: new AccountSuspendedMail($user->name, $reason),
+            correlationId: 'account_suspended_'.$user->id.'_'.now()->timestamp,
+        );
+
+        return back()->with('status', 'Customer suspended and notified. They can still sign in but cannot purchase, fund or check out.');
     }
 
     /**

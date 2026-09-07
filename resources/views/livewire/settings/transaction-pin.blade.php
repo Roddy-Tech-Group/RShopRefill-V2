@@ -13,8 +13,14 @@ new class extends Component
     /** Whether the customer currently has a transaction PIN configured. */
     public bool $hasPin = false;
 
-    /** Whether the PIN is temporarily locked after too many failed attempts. */
+    /** Whether the PIN is locked after too many failed attempts (paused or for good). */
     public bool $locked = false;
+
+    /** The guess budget is spent: only "Forgot PIN?" reopens the wallet. */
+    public bool $hardLocked = false;
+
+    /** Support cleared the PIN (admin reset): the customer must set a new one. */
+    public bool $resetRequired = false;
 
     // Set-up form (no PIN yet).
     public string $pin = '';
@@ -25,14 +31,16 @@ new class extends Component
     public string $new_pin = '';
     public string $new_pin_confirmation = '';
 
-    // Remove form (PIN exists).
-    public string $remove_password = '';
+    // "Forgot PIN?" (PIN exists): the account password is the step-up.
+    public string $reset_password = '';
 
     public function mount(): void
     {
         $user = Auth::user();
         $this->hasPin = $user->hasTransactionPin();
         $this->locked = $user->isTransactionPinLocked();
+        $this->hardLocked = $user->pin_status === 'locked';
+        $this->resetRequired = $user->pin_status === 'reset_required';
     }
 
     /**
@@ -57,6 +65,7 @@ new class extends Component
 
         $this->reset('pin', 'pin_confirmation');
         $this->hasPin = true;
+        $this->resetRequired = false;
         $this->dispatch('toast', message: 'PIN set successfully.');
     }
 
@@ -87,7 +96,9 @@ new class extends Component
             $pinService->changePin(Auth::user(), $this->old_pin, $this->new_pin);
         } catch (ValidationException $e) {
             $this->addError('old_pin', $e->validator->errors()->first());
-            $this->locked = Auth::user()->fresh()->isTransactionPinLocked();
+            $fresh = Auth::user()->fresh();
+            $this->locked = $fresh->isTransactionPinLocked();
+            $this->hardLocked = $fresh->pin_status === 'locked';
 
             return;
         }
@@ -97,39 +108,33 @@ new class extends Component
     }
 
     /**
-     * Remove the PIN entirely. Requires the account password.
+     * Request a PIN reset via email. Requires the account password (when the
+     * account has one) so a bare session cannot rotate the wallet PIN; the
+     * service also caps requests per hour.
      */
-    public function removePin(TransactionPinService $pinService): void
+    public function requestReset(TransactionPinService $pinService): void
     {
-        $this->enforceDeviceTrust('remove_password');
+        $this->enforceDeviceTrust('reset_password');
 
-        $this->validate([
-            'remove_password' => ['required', 'string'],
-        ]);
+        $user = Auth::user();
+
+        if ($user->password !== null) {
+            $this->validate([
+                'reset_password' => ['required', 'string'],
+            ], [], ['reset_password' => 'password']);
+        }
 
         try {
-            $pinService->removePin(Auth::user(), $this->remove_password);
+            $pinService->requestReset($user, $this->reset_password);
         } catch (ValidationException $e) {
-            $this->addError('remove_password', $e->validator->errors()->first());
+            $this->addError('reset_password', $e->validator->errors()->first());
 
             return;
         }
 
-        $this->reset('remove_password');
-        $this->hasPin = false;
-        $this->locked = false;
-        $this->dispatch('toast', message: 'PIN removed successfully.');
-    }
-
-    /**
-     * Request a PIN reset via email.
-     */
-    public function requestReset(TransactionPinService $pinService): void
-    {
-        $this->enforceDeviceTrust('old_pin');
-
-        $pinService->requestReset(Auth::user());
-        $this->dispatch('toast', message: 'PIN reset requested.');
+        $this->reset('reset_password');
+        $this->dispatch('reset-requested');
+        $this->dispatch('toast', message: 'PIN reset link sent to your email.');
     }
 }; ?>
 
@@ -144,11 +149,26 @@ new class extends Component
             <svg class="mt-0.5 h-4 w-4 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
             </svg>
-            <p class="text-xs font-medium text-red-700">Your PIN is locked after too many incorrect attempts. Please try again later.</p>
+            <p class="text-xs font-medium text-red-700">
+                @if ($hardLocked)
+                    Your PIN is locked after too many incorrect attempts. Use Forgot PIN below to set a new one.
+                @else
+                    Your PIN is locked after too many incorrect attempts. Please try again in 15 minutes.
+                @endif
+            </p>
         </div>
     @endif
 
     @if (! $hasPin)
+        @if ($resetRequired)
+            <div class="mb-5 flex items-start gap-2 rounded-[12px] bg-amber-50 px-3.5 py-3 ring-1 ring-amber-100">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                </svg>
+                <p class="text-xs font-medium text-amber-800">Our support team reset your transaction PIN. Set a new one below before your next wallet payment.</p>
+            </div>
+        @endif
+
         {{-- Set up a new PIN --}}
         <form wire:submit="setupPin" class="space-y-5">
             <div x-data="{ show: false }">
@@ -219,17 +239,32 @@ new class extends Component
             <div x-data="{ show: false }">
                 <div class="mb-1.5 flex items-center justify-between">
                     <label for="pin-old" class="block text-sm font-medium text-zinc-700">Current PIN</label>
-                    <div x-data="{ sent: false }" @reset-requested.window="sent = true; setTimeout(() => sent = false, 3000)">
-                        <button type="button" wire:click="requestReset" wire:loading.attr="disabled" wire:target="requestReset" x-show="!sent" class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:no-underline">
-                            <span wire:loading.remove wire:target="requestReset">Forgot PIN?</span>
-                            <span wire:loading wire:target="requestReset">Sending...</span>
-                        </button>
+                    <div x-data="{ sent: false, confirming: false }" @reset-requested.window="sent = true; confirming = false; setTimeout(() => sent = false, 3000)" class="flex items-center gap-2">
+                        <button type="button" @click="confirming = true" x-show="!sent && !confirming" class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">Forgot PIN?</button>
+                        <div x-show="confirming && !sent" x-cloak class="flex items-center gap-2">
+                            @if(auth()->user()->password !== null)
+                                <input
+                                    type="password"
+                                    wire:model="reset_password"
+                                    autocomplete="current-password"
+                                    placeholder="Account password"
+                                    aria-label="Confirm with your account password"
+                                    class="w-36 rounded-[10px] border border-zinc-300 bg-white px-2.5 py-1 text-xs text-black placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                                />
+                            @endif
+                            <button type="button" wire:click="requestReset" wire:loading.attr="disabled" wire:target="requestReset" class="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:no-underline">
+                                <span wire:loading.remove wire:target="requestReset">Email me a reset link</span>
+                                <span wire:loading wire:target="requestReset">Sending...</span>
+                            </button>
+                            <button type="button" @click="confirming = false; $wire.reset_password = ''" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+                        </div>
                         <span x-show="sent" x-cloak x-transition class="text-xs font-medium text-emerald-600 flex items-center gap-1">
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                             Email sent!
                         </span>
                     </div>
                 </div>
+                @error('reset_password') <p class="mb-1.5 text-xs text-red-600">{{ $message }}</p> @enderror
                 <div class="relative">
                     <input
                         wire:model="old_pin"
@@ -316,34 +351,5 @@ new class extends Component
                 </button>
             </div>
         </form>
-
-        {{-- Remove the PIN (requires the account password) --}}
-        <div x-data="{ open: false }" class="mt-6 border-t border-zinc-100 pt-5">
-            <button type="button" @click="open = !open" class="text-sm font-semibold text-red-600 underline underline-offset-2 transition-colors hover:text-red-700">
-                Remove transaction PIN
-            </button>
-            <div x-show="open" x-collapse x-cloak class="mt-3">
-                <form wire:submit="removePin" class="space-y-3">
-                    <p class="text-xs text-zinc-600">Enter your account password to remove the PIN. Wallet payments will no longer ask for it.</p>
-                    <div>
-                        <input
-                            wire:model="remove_password"
-                            type="password"
-                            autocomplete="current-password"
-                            placeholder="Account password"
-                            class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black placeholder:text-zinc-600 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
-                        />
-                        @error('remove_password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                    </div>
-                    <button type="submit" wire:loading.attr="disabled" class="inline-flex items-center gap-2 rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-75 disabled:cursor-not-allowed">
-                        <svg wire:loading wire:target="removePin" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Remove PIN</span>
-                    </button>
-                </form>
-            </div>
-        </div>
     @endif
 </div>

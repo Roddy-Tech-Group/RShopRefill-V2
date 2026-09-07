@@ -423,7 +423,9 @@ class GoogleSignupCompletionTest extends TestCase
      */
     private function googleUser(string $email, string $id = 'google-123'): SocialiteUser
     {
-        return (new SocialiteUser)->map([
+        // Google asserts the address is verified in the raw userinfo payload;
+        // linking and sign-up both require that claim.
+        return (new SocialiteUser)->setRaw(['email_verified' => true])->map([
             'id' => $id,
             'name' => 'Jane Doe',
             'nickname' => null,
@@ -454,11 +456,13 @@ class GoogleSignupCompletionTest extends TestCase
         $this->actingAs($user->fresh())->get('/dashboard')->assertOk();
     }
 
-    public function test_linking_google_welcomes_an_account_that_never_verified_its_email(): void
+    public function test_linking_google_claims_and_welcomes_an_account_that_never_verified_its_email(): void
     {
         // Registered by password, never clicked the verification link, then
-        // signed in with Google. The link is what proves the address, so it
-        // raises Verified and the welcome they were owed finally lands.
+        // signed in with Google. Google has proven the inbox, so the account
+        // is theirs: verified now, welcomed once, and the unproven password
+        // cleared so a pre-registerer keeps nothing. No signup form either;
+        // the profile was already complete.
         $user = User::factory()->unverified()->create([
             'email' => 'jane@example.com',
             'google_id' => null,
@@ -467,9 +471,13 @@ class GoogleSignupCompletionTest extends TestCase
             'gender' => 'female',
         ]);
 
-        app(GoogleAuthService::class)->findOrCreateUser($this->googleUser('jane@example.com'));
+        $result = app(GoogleAuthService::class)->findOrCreateUser($this->googleUser('jane@example.com'));
 
+        $this->assertTrue($result['claimed']);
         $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertSame('google-123', $user->fresh()->google_id);
+        $this->assertNull($user->fresh()->password);
+        $this->assertFalse($user->fresh()->needsProfileCompletion());
         $this->assertSame(1, CommunicationLog::query()
             ->where('correlation_id', 'welcome_'.$user->getKey())
             ->where('channel', 'email')

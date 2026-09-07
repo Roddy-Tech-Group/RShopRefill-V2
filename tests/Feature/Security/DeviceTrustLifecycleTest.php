@@ -146,9 +146,59 @@ class DeviceTrustLifecycleTest extends TestCase
             ->assertSuccessful();
     }
 
-    public function test_the_api_blocks_device_revocation_from_an_immature_device(): void
+    /**
+     * Device revocation is gated by the account PASSWORD rather than the
+     * maturity hold: an intruder holding a stolen session but not the
+     * password still cannot cut the owner's phone loose, while the owner on
+     * a brand-new laptop can revoke the stolen phone immediately instead of
+     * waiting a day. Accounts with no password (Google-only) keep the hold.
+     */
+    public function test_the_api_gates_device_revocation_on_the_password_not_the_hold(): void
     {
         $user = User::factory()->create();
+
+        TrustedDevice::create([
+            'user_id' => $user->id,
+            'device_uuid' => (string) Str::uuid(),
+            'fingerprint' => hash('sha256', 'this-device'),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Symfony',
+            'trusted_since' => now(),
+            'trust_score' => 40,
+        ]);
+
+        $victim = TrustedDevice::create([
+            'user_id' => $user->id,
+            'device_uuid' => (string) Str::uuid(),
+            'fingerprint' => hash('sha256', 'owners-phone'),
+            'user_agent' => 'iPhone',
+            'trusted_since' => now()->subMonth(),
+            'trust_score' => 40,
+        ]);
+
+        // The intruder has the session but not the password.
+        $this->actingAs($user)
+            ->deleteJson("/api/security/devices/{$victim->id}")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['password']);
+
+        $this->deleteJson("/api/security/devices/{$victim->id}", ['password' => 'not-it'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['password']);
+
+        $this->assertTrue($victim->fresh()->isTrusted(), 'the owner\'s device must survive the intruder\'s revoke attempts');
+
+        // The owner, minutes into a new device, proves the password and is
+        // not made to wait out the hold.
+        $this->deleteJson("/api/security/devices/{$victim->id}", ['password' => 'password'])
+            ->assertOk();
+
+        $this->assertFalse($victim->fresh()->isTrusted());
+    }
+
+    public function test_a_passwordless_account_keeps_the_hold_on_device_revocation(): void
+    {
+        $user = User::factory()->create(['password' => null, 'google_id' => 'g-123']);
 
         TrustedDevice::create([
             'user_id' => $user->id,
@@ -174,7 +224,7 @@ class DeviceTrustLifecycleTest extends TestCase
             ->assertStatus(403)
             ->assertJsonPath('device_restricted', true);
 
-        $this->assertTrue($victim->fresh()->isTrusted(), 'the owner\'s device must survive the intruder\'s revoke attempt');
+        $this->assertTrue($victim->fresh()->isTrusted());
     }
 
     public function test_forgot_password_sends_a_reset_link_to_the_signed_in_user(): void

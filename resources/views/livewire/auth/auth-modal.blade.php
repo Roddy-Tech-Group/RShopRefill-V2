@@ -134,6 +134,23 @@ new class extends Component {
             throw ValidationException::withMessages(['regEmail' => 'New registrations are temporarily closed.']);
         }
 
+        // Five sign-up attempts per IP per ten minutes. Login has had this
+        // limiter all along; registration was the one auth action a script
+        // could hammer freely (Turnstile is a no-op when disabled).
+        $registerKey = 'register:'.request()->ip();
+
+        if (RateLimiter::tooManyAttempts($registerKey, 5)) {
+            $seconds = RateLimiter::availableIn($registerKey);
+
+            $this->dispatch('registration-error', step: 1);
+
+            throw ValidationException::withMessages([
+                'regEmail' => __('auth.throttle', ['seconds' => $seconds, 'minutes' => ceil($seconds / 60)]),
+            ]);
+        }
+
+        RateLimiter::hit($registerKey, 600);
+
         // Validate up-front; on failure tell the wizard which step holds the
         // first error so it can slide back to it (the user submits from step 3
         // but an email / password error lives on an earlier step).

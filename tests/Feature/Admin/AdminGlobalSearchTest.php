@@ -126,8 +126,12 @@ class AdminGlobalSearchTest extends TestCase
             'payment_status' => 'pending',
         ]);
 
+        // One admin for the whole test: AuthenticateSession refuses a session
+        // whose signed-in account silently changes between requests.
+        $admin = $this->admin();
+
         foreach (['idem-key-555', 'purchase-abc-777', 'bc1qexampleaddress0001'] as $needle) {
-            $rows = collect($this->search($this->admin(), $needle));
+            $rows = collect($this->search($admin, $needle));
 
             $this->assertNotNull(
                 $rows->firstWhere('type', 'transaction'),
@@ -248,8 +252,10 @@ class AdminGlobalSearchTest extends TestCase
             'referral_code' => 'REFCODE77',
         ]);
 
+        $admin = $this->admin();
+
         foreach (['670112233', 'REFCODE77'] as $needle) {
-            $hit = collect($this->search($this->admin(), $needle))->firstWhere('type', 'customer');
+            $hit = collect($this->search($admin, $needle))->firstWhere('type', 'customer');
 
             $this->assertNotNull($hit, "Expected a customer row when searching {$needle}.");
             $this->assertSame('Phone Person', $hit['title']);

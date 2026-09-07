@@ -99,13 +99,18 @@ class UserManagementPagesTest extends TestCase
         User::factory()->create(['country' => 'CM']);
         User::factory()->create(['country' => null]);
 
-        $this->actingAs($this->admin(), 'admin')
+        // One admin for both requests: AuthenticateSession ties the session to
+        // the signed-in account's password hash, so a session that silently
+        // swapped to a different admin between requests is (rightly) refused.
+        $admin = $this->admin();
+
+        $this->actingAs($admin, 'admin')
             ->get(route('admin.users.insights'))
             ->assertOk()
             ->assertSee('Nigeria')
             ->assertSee('Unknown');
 
-        $csv = $this->actingAs($this->admin(), 'admin')
+        $csv = $this->actingAs($admin, 'admin')
             ->get(route('admin.users.insights.export'));
 
         $csv->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
@@ -169,7 +174,7 @@ class UserManagementPagesTest extends TestCase
             'uuid' => (string) Str::uuid(),
             'user_id' => $user->id,
             'mail_domain' => 'security',
-            'category' => 'login_alert',
+            'category' => 'new_device',
             'channel' => 'email',
             'recipient' => $user->email,
             'sender' => 'security@rshoprefill.com',

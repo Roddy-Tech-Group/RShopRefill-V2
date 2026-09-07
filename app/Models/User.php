@@ -44,6 +44,7 @@ use LogicException;
  * @property Carbon|null $email_verified_at
  * @property string|null $password
  * @property string|null $remember_token
+ * @property int $session_version Bumped by "sign out everywhere"; sessions carrying an older value are refused
  * @property string|null $transaction_pin
  * @property Carbon|null $transaction_pin_set_at
  * @property int $transaction_pin_attempts
@@ -143,6 +144,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'anonymised_at' => 'datetime',
             'financial_records_purged_at' => 'datetime',
             'password' => 'hashed',
+            'session_version' => 'integer',
             'transaction_pin_set_at' => 'datetime',
             'transaction_pin_locked_until' => 'datetime',
             'last_transaction_pin_used_at' => 'datetime',

@@ -21,15 +21,12 @@ enum CommunicationCategory: string
 
     // ── Security (security@) ──────────────────────────────────────
     case Otp = 'otp';
-    case LoginAlert = 'login_alert';
     case NewDevice = 'new_device';
-    case TrustedDevice = 'trusted_device';
     case PasswordChanged = 'password_changed';
     case PinChanged = 'pin_changed';
     case PinLocked = 'pin_locked';
     case TwoFactor = 'two_factor';
     case AccountRestriction = 'account_restriction';
-    case SuspiciousLogin = 'suspicious_login';
     case DeviceRemoved = 'device_removed';
     case SecurityIncident = 'security_incident';
     case AccountRecovered = 'account_recovered';
@@ -127,15 +124,12 @@ enum CommunicationCategory: string
 
             // Security
             self::Otp,
-            self::LoginAlert,
             self::NewDevice,
-            self::TrustedDevice,
             self::PasswordChanged,
             self::PinChanged,
             self::PinLocked,
             self::TwoFactor,
             self::AccountRestriction,
-            self::SuspiciousLogin,
             self::DeviceRemoved,
             self::SecurityIncident,
             self::AccountRecovered => MailDomain::Security,

@@ -106,8 +106,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         
         $delay = $delays[$attempts];
         
-        $otp = sprintf("%06d", mt_rand(1, 999999));
+        // CSPRNG over the full six-digit space (000000 included); a fresh
+        // code gets a fresh guess budget.
+        $otp = sprintf('%06d', random_int(0, 999999));
         Cache::put('recovery_otp_' . $user->id, $otp, now()->addMinutes(10));
+        Cache::forget('recovery_otp_fails_' . $user->id);
         
         Cache::put($throttleKey, now()->addSeconds($delay)->timestamp, now()->addSeconds($delay));
         Cache::put($attemptsKey, $attempts, now()->addHours(24));
@@ -123,13 +126,28 @@ new #[Layout('components.layouts.auth')] class extends Component {
         
         $user = Auth::user();
         $storedOtp = Cache::get('recovery_otp_' . $user->id);
-        
-        if (!$storedOtp || $storedOtp !== $this->otp) {
+        $failsKey = 'recovery_otp_fails_' . $user->id;
+
+        // This code lifts a fraud restriction, so it gets five guesses, not
+        // a million: the sixth wrong answer burns the code and the customer
+        // must request a fresh one (which the resend backoff paces).
+        if (!$storedOtp || !hash_equals($storedOtp, $this->otp)) {
+            $fails = (int) Cache::get($failsKey, 0) + 1;
+            Cache::put($failsKey, $fails, now()->addMinutes(10));
+
+            if ($fails >= 5) {
+                Cache::forget('recovery_otp_' . $user->id);
+                Cache::forget($failsKey);
+                $this->addError('otp', 'Too many incorrect codes. Request a new code to continue.');
+                return;
+            }
+
             $this->addError('otp', 'Invalid or expired code.');
             return;
         }
-        
+
         Cache::forget('recovery_otp_' . $user->id);
+        Cache::forget($failsKey);
         Cache::forget('recovery_otp_throttle_' . $user->id);
         Cache::forget('recovery_otp_attempts_' . $user->id);
 

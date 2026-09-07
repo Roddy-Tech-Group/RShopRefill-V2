@@ -7,6 +7,7 @@ use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Security\AccountClosedMail;
 use App\Domain\Communication\Mail\Security\AccountClosureRequestedMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Security\Services\SessionRevocationService;
 use App\Domain\Shared\Enums\OrderStatus;
 use App\Models\AccountClosureFeedback;
 use App\Models\ClosedAccountIdentity;
@@ -53,7 +54,10 @@ class AccountClosureService
         'sessions',
     ];
 
-    public function __construct(private readonly CommunicationManager $communications) {}
+    public function __construct(
+        private readonly CommunicationManager $communications,
+        private readonly SessionRevocationService $sessions,
+    ) {}
 
     public function graceDays(): int
     {
@@ -169,6 +173,11 @@ class AccountClosureService
 
         $user->forceFill(['closure_requested_at' => $requestedAt])->save();
 
+        // "The customer is signed out" means on every device, not just the
+        // one that clicked: a session left alive elsewhere would keep the
+        // account in use through the whole grace period.
+        $this->sessions->revokeAll($user);
+
         $reasons = array_values(array_intersect($reasons, array_keys(AccountClosureFeedback::REASONS)));
         $comment = trim((string) $comment) ?: null;
 
@@ -256,6 +265,10 @@ class AccountClosureService
 
         DB::transaction(function () use ($user): void {
             $this->preserveIdentityIfMoneyMoved($user);
+
+            // Any session that survived the grace period dies here on every
+            // driver; the table purge below only reaches the database driver.
+            $this->sessions->revokeAll($user);
 
             $user->forceFill([
                 'name' => 'Closed account',

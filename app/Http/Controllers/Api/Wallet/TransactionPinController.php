@@ -70,7 +70,8 @@ class TransactionPinController extends Controller
             throw ValidationException::withMessages(['pin' => 'You do not have a transaction PIN set.']);
         }
 
-        $this->pinService->requestReset($user);
+        // The service enforces the password step-up and the hourly limit.
+        $this->pinService->requestReset($user, $request->input('password'));
 
         return response()->json([
             'message' => 'If you have a PIN configured, a reset link has been sent to your email.',
@@ -87,21 +88,6 @@ class TransactionPinController extends Controller
 
         return response()->json([
             'message' => 'Transaction PIN successfully reset.',
-        ]);
-    }
-
-    public function remove(Request $request): JsonResponse
-    {
-        $request->validate(['password' => 'required|string']);
-
-        if (! $request->user()->hasTransactionPin()) {
-            throw ValidationException::withMessages(['pin' => 'You do not have a transaction PIN set.']);
-        }
-
-        $this->pinService->removePin($request->user(), $request->input('password'));
-
-        return response()->json([
-            'message' => 'Transaction PIN successfully removed.',
         ]);
     }
 }
