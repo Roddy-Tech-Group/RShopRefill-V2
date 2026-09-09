@@ -253,6 +253,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transactions/{attempt}', [AdminTransactionController::class, 'show'])->whereUuid('attempt')->name('transaction');
         Route::get('transactions/{attempt}/report', [AdminTransactionController::class, 'report'])->whereUuid('attempt')->name('transaction.report');
         Route::get('transactions/{attempt}/report/pdf', [AdminTransactionController::class, 'reportPdf'])->whereUuid('attempt')->name('transaction.report.pdf');
+        // Operator exit for a crypto payment that arrived short: settle with a
+        // stated reason. Money override, so Super Admin only (the controller
+        // enforces it on top of the route-name gate).
+        Route::post('transactions/{attempt}/settle', [AdminTransactionController::class, 'settle'])->whereUuid('attempt')->name('transaction.settle');
         Route::view('wallets', 'admin.wallets')->name('wallets');
         Volt::route('rates', 'admin.rates')->name('rates');
         Volt::route('account', 'admin.account')->name('account');

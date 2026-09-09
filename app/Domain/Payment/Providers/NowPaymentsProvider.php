@@ -30,6 +30,17 @@ class NowPaymentsProvider implements PaymentProviderInterface
         'THB', 'TRY', 'ZAR',
     ];
 
+    /**
+     * Ceiling for a shortfall to be absorbed as dust, in the attempt's price
+     * currency: half a cent. Below it the top-up flow rounds the balance to
+     * 0.00 and cannot charge it, so the choice is between absorbing the
+     * remainder and stranding the order over an amount nobody can pay. At or
+     * above it the zero-tolerance rule applies unchanged. Deliberately a code
+     * constant rather than config: moving it is a business decision that must
+     * land as a reviewed commit, never as an env edit.
+     */
+    public const DUST_CEILING = 0.005;
+
     private string $apiKey;
 
     private string $baseUrl;
@@ -465,21 +476,23 @@ class NowPaymentsProvider implements PaymentProviderInterface
             ]),
         ]);
 
+        // A short payment that the dust rule or an operator already settled
+        // stays settled. The gateway keeps reporting partially_paid for this
+        // payment id forever (it is terminal there), so a replayed IPN or a
+        // reconcile pass must not walk a fulfilled order back to held.
+        if ($attempt->wasSettledShort()
+            && (NowPaymentsStatus::isSettled($status) || NowPaymentsStatus::isUnderpaid($status))) {
+            $attempt->save();
+
+            return true;
+        }
+
         if (NowPaymentsStatus::isSettled($status)) {
             // Zero tolerance, enforced in crypto terms. NOWPayments can report a
             // settled status while actually_paid is short, so the amount is checked
             // here rather than inferred from the status alone.
             if (! $this->isPaidInFull($body)) {
-                Log::warning('NowPayments verify: settled status but short payment — holding', [
-                    'payment_id' => $paymentId,
-                    'pay_amount' => $body['pay_amount'] ?? null,
-                    'actually_paid' => $body['actually_paid'] ?? null,
-                ]);
-
-                $attempt->payment_status = PaymentStatus::PartiallyPaid;
-                $attempt->save();
-
-                return false;
+                return $this->holdOrAbsorbShortfall($attempt, $body, 'settled status but short payment');
             }
 
             $attempt->payment_status = PaymentStatus::Paid;
@@ -490,21 +503,7 @@ class NowPaymentsProvider implements PaymentProviderInterface
         }
 
         if (NowPaymentsStatus::isUnderpaid($status)) {
-            // Deliberate business rule: an underpaid order is NEVER auto-fulfilled,
-            // however small the shortfall. On refill margins a 1% write-off can
-            // exceed the profit on the order. The customer completes it via the
-            // top-up flow, or it is resolved by an operator.
-            Log::warning('NowPayments verify: underpaid, held for top-up', [
-                'payment_id' => $paymentId,
-                'pay_amount' => $body['pay_amount'] ?? null,
-                'actually_paid' => $body['actually_paid'] ?? null,
-                'shortfall' => $this->shortfall($body),
-            ]);
-
-            $attempt->payment_status = PaymentStatus::PartiallyPaid;
-            $attempt->save();
-
-            return false;
+            return $this->holdOrAbsorbShortfall($attempt, $body, 'underpaid');
         }
 
         // Terminal non-settled states now write real state. Previously these all
@@ -601,6 +600,116 @@ class NowPaymentsProvider implements PaymentProviderInterface
         $actuallyPaid = (float) ($body['actually_paid'] ?? 0);
 
         return round(max(0, $payAmount - $actuallyPaid), 8);
+    }
+
+    /**
+     * Hold a short payment for top-up, or absorb it when it is dust.
+     *
+     * Deliberate business rule: an underpaid order is NEVER auto-fulfilled on
+     * a percentage. On refill margins a 1% write-off can exceed the profit on
+     * the order. The customer completes it via the top-up flow, or an operator
+     * settles it with a stated reason (CryptoManualSettlementService).
+     *
+     * The one exception is dust: a shortfall so small that, converted to the
+     * price currency, it is under half a cent. The top-up flow prices the
+     * balance with the same arithmetic and rounds it to 0.00, so it would
+     * refuse to charge it and the customer would be stranded over an amount
+     * nobody can pay. Dust settles as Paid. The negative settlement_delta and
+     * a `crypto.dust_settlement` note keep the record of exactly what was
+     * short, and crypto:settlements reports every one of them.
+     *
+     * Nothing-received is never dust: actually_paid = 0 means not paid yet,
+     * and shortfallInPriceCurrency() returns null for it.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function holdOrAbsorbShortfall(PaymentAttempt $attempt, array $body, string $why): bool
+    {
+        // A price in XAF or NGN needs a live rate to value the shortfall. A
+        // stale or missing rate throws in the rate service, and that must
+        // fail SAFE here: hold the payment as before, never crash the
+        // verification and never absorb an amount we could not value.
+        try {
+            $shortfallFiat = $this->shortfallInPriceCurrency($attempt);
+        } catch (\Throwable $e) {
+            Log::warning('NowPayments verify: could not value the shortfall, holding', [
+                'payment_id' => $attempt->gateway_reference,
+                'currency' => $attempt->currency,
+                'error' => $e->getMessage(),
+            ]);
+            $shortfallFiat = null;
+        }
+
+        if ($shortfallFiat !== null && $shortfallFiat['amount'] < self::DUST_CEILING) {
+            $attempt->payment_status = PaymentStatus::Paid;
+            $attempt->confirmed_at = now();
+            $attempt->metadata = array_merge($attempt->metadata ?? [], [
+                'crypto' => array_merge((array) data_get($attempt->metadata, 'crypto', []), [
+                    'dust_settlement' => [
+                        'shortfall_crypto' => $this->shortfall($body),
+                        'shortfall_fiat' => $shortfallFiat['amount'],
+                        'price_currency' => $shortfallFiat['currency'],
+                        'ceiling' => self::DUST_CEILING,
+                        'gateway_status' => NowPaymentsStatus::normalize($body['payment_status'] ?? null),
+                        'settled_at' => now()->toIso8601String(),
+                    ],
+                ]),
+            ]);
+            $attempt->save();
+
+            Log::info('NowPayments verify: sub-cent shortfall absorbed as dust', [
+                'payment_id' => $attempt->gateway_reference,
+                'pay_amount' => $body['pay_amount'] ?? null,
+                'actually_paid' => $body['actually_paid'] ?? null,
+                'shortfall_crypto' => $this->shortfall($body),
+                'shortfall_fiat' => $shortfallFiat['amount'],
+                'price_currency' => $shortfallFiat['currency'],
+            ]);
+
+            return true;
+        }
+
+        Log::warning("NowPayments verify: {$why}, held for top-up", [
+            'payment_id' => $attempt->gateway_reference,
+            'pay_amount' => $body['pay_amount'] ?? null,
+            'actually_paid' => $body['actually_paid'] ?? null,
+            'shortfall' => $this->shortfall($body),
+            'shortfall_fiat' => $shortfallFiat['amount'] ?? null,
+        ]);
+
+        $attempt->payment_status = PaymentStatus::PartiallyPaid;
+        $attempt->save();
+
+        return false;
+    }
+
+    /**
+     * The outstanding shortfall expressed in the attempt's price currency,
+     * using the same conversion the top-up flow uses to price the balance, so
+     * the dust rule and the top-up can never disagree about whether anything
+     * is still owed.
+     *
+     * Null when nothing has arrived yet (not-paid-yet is not a shortfall) or
+     * when the attempt carries no usable quote.
+     *
+     * @return array{amount: float, currency: string}|null
+     */
+    public function shortfallInPriceCurrency(PaymentAttempt $attempt): ?array
+    {
+        $payAmount = (float) $attempt->pay_amount;
+        $actuallyPaid = (float) $attempt->actually_paid;
+
+        if ($payAmount <= 0 || $actuallyPaid <= 0) {
+            return null;
+        }
+
+        [$price, $priceCurrency] = $this->resolvePrice($attempt);
+        $shortfallRatio = max(0, $payAmount - $actuallyPaid) / $payAmount;
+
+        return [
+            'amount' => round($price * $shortfallRatio, 6),
+            'currency' => $priceCurrency,
+        ];
     }
 
     /**

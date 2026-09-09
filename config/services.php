@@ -128,6 +128,10 @@ return [
         // 1% shortfall can erase the profit on an order. A payment is settled only
         // when actually_paid >= pay_amount, compared in CRYPTO terms. Anything less
         // is held as PartiallyPaid for the top-up flow and is never auto-fulfilled.
+        // The single exception is dust: a shortfall under half a cent in the price
+        // currency, which the top-up flow itself rounds to 0.00 and cannot charge.
+        // See NowPaymentsProvider::DUST_CEILING; it is a code constant, not config,
+        // and there is no percentage tolerance anywhere.
         //
         // Compare in crypto, never fiat: NOWPayments derives partially_paid from the
         // fiat equivalent at settlement, so a customer who sends exactly the right
