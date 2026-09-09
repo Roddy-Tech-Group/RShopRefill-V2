@@ -62,9 +62,11 @@ final class FundingMethodCatalog
                 'enabled' => FeatureFlag::methodEnabled($type, $currency),
             ];
 
+            // From the rail map, so the sheet offers exactly the networks the
+            // charge will accept (and none for the rails that take no network).
             if ($type === 'mobile_money') {
-                $entry['description'] = $currency === 'GHS' ? 'MTN, Vodafone, AirtelTigo Mobile Money' : 'MTN Mobile Money or Orange Money';
-                $entry['supported_networks'] = $currency === 'GHS' ? ['MTN', 'Vodafone', 'AirtelTigo'] : ['MTN', 'Orange'];
+                $entry['description'] = MobileMoneyRail::description($currency);
+                $entry['supported_networks'] = MobileMoneyRail::networkOptions($currency);
             }
 
             // The crypto floor belongs on the tile, so a customer whose amount is
