@@ -30,13 +30,17 @@ Route::middleware(['guest', 'throttle:10,1'])->group(function () {
         ->name('auth.google.callback');
 });
 
+// The verification link works on ANY device, signed in or not. The signed
+// URL and the email hash are the proof; requiring a session here bounced the
+// phone that opened the email to the login page and made it the account's
+// "new device". See VerifyEmailController. It never signs anyone in.
+Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
+    ->middleware(['signed', 'throttle:6,1'])
+    ->name('verification.verify');
+
 Route::middleware('auth')->group(function () {
     Volt::route('verify-email', 'auth.verify-email')
         ->name('verification.notice');
-
-    Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
-        ->name('verification.verify');
 
     // On-demand resend (checkout notice's Resend button). Escalating cooldown +
     // the flat budget are both enforced inside; this throttle is just the
