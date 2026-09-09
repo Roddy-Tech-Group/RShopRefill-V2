@@ -37,14 +37,20 @@ class CryptoSettlementAuditCommand extends Command
             ->orderByDesc('created_at')
             ->get();
 
+        // Held short payments need a human; dust and operator settlements were
+        // fulfilled and are listed so the write-offs stay visible.
         $underpaid = $attempts->filter(fn (PaymentAttempt $a) => $a->isUnderpaid());
         $overpaid = $attempts->filter(fn (PaymentAttempt $a) => $a->isOverpaid());
+        $dust = $attempts->filter(fn (PaymentAttempt $a) => $a->settledAsDust());
+        $manual = $attempts->filter(fn (PaymentAttempt $a) => $a->settledManually());
 
         if ($this->option('json')) {
             $this->line((string) json_encode([
                 'since' => $since->toIso8601String(),
                 'underpaid_count' => $underpaid->count(),
                 'overpaid_count' => $overpaid->count(),
+                'dust_settled_count' => $dust->count(),
+                'manually_settled_count' => $manual->count(),
                 'rows' => $attempts->map(fn (PaymentAttempt $a) => $this->row($a))->values(),
             ], JSON_PRETTY_PRINT));
 
@@ -57,18 +63,25 @@ class CryptoSettlementAuditCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->warn("{$underpaid->count()} underpaid, {$overpaid->count()} overpaid since {$since->toDateString()}.");
+        $this->warn("{$underpaid->count()} underpaid (held), {$dust->count()} dust-settled, {$manual->count()} settled by an operator, {$overpaid->count()} overpaid since {$since->toDateString()}.");
         $this->newLine();
 
         $this->table(
-            ['Attempt', 'Payment ID', 'Coin', 'Invoiced', 'Received', 'Delta', 'Status', 'Created'],
+            ['Attempt', 'Payment ID', 'Coin', 'Invoiced', 'Received', 'Delta', 'Status', 'Resolution', 'Created'],
             $attempts->map(fn (PaymentAttempt $a) => array_values($this->row($a)))->all()
         );
 
         if ($underpaid->isNotEmpty()) {
             $this->newLine();
             $this->comment('Underpaid orders are never auto-fulfilled. Resolve by asking the customer to');
-            $this->comment('top up the shortfall, or by refunding what arrived to their wallet.');
+            $this->comment('top up the shortfall, by settling it with a reason on the transaction page,');
+            $this->comment('or by refunding what arrived to their wallet.');
+        }
+
+        if ($dust->isNotEmpty()) {
+            $this->newLine();
+            $this->comment('Dust settlements were fulfilled: each shortfall was under half a cent in the');
+            $this->comment('price currency, below what a top-up could even charge.');
         }
 
         if ($overpaid->isNotEmpty()) {
@@ -76,8 +89,9 @@ class CryptoSettlementAuditCommand extends Command
             $this->comment('Overpaid orders were fulfilled. The surplus is owed back to the customer.');
         }
 
-        // Non-zero exit so a scheduled run can trip an alert on a non-empty queue.
-        return $attempts->isEmpty() ? self::SUCCESS : self::FAILURE;
+        // Non-zero exit so a scheduled run can trip an alert on a queue that
+        // still needs a human. Dust and operator settlements are closed.
+        return $underpaid->isEmpty() && $overpaid->isEmpty() ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -95,6 +109,13 @@ class CryptoSettlementAuditCommand extends Command
             'received' => $this->trim($attempt->actually_paid),
             'delta' => ($delta > 0 ? '+' : '').$this->trim($delta),
             'status' => $attempt->payment_status?->value ?? PaymentStatus::Pending->value,
+            'resolution' => match (true) {
+                $attempt->settledAsDust() => 'dust',
+                $attempt->settledManually() => 'operator',
+                $attempt->isUnderpaid() => 'held',
+                $attempt->isOverpaid() => 'surplus owed',
+                default => '-',
+            },
             'created' => $attempt->created_at?->toDateTimeString(),
         ];
     }

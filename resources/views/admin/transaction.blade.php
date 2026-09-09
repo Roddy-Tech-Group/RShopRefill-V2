@@ -131,6 +131,81 @@
                         </dl>
                     </div>
                 @endif
+
+                {{-- Operator exit for a crypto payment that arrived short.
+                     Offered only to a Super Admin, only while the attempt is
+                     partially paid with real money against it. --}}
+                @if ($settleable)
+                    @php
+                        $trimCoin = fn ($v) => rtrim(rtrim(number_format((float) $v, 8, '.', ''), '0'), '.') ?: '0';
+                        $coin = strtoupper((string) $attempt->pay_currency);
+                        $shortCoin = $trimCoin(max(0, (float) $attempt->pay_amount - (float) $attempt->actually_paid));
+                        $shortFiatLabel = $shortfallFiat
+                            ? number_format((float) $shortfallFiat['amount'], 4).' '.$shortfallFiat['currency']
+                            : null;
+                    @endphp
+                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-amber-200 dark:bg-[#1d3252] dark:ring-amber-500/30">
+                        <div class="border-b border-amber-100 px-5 py-4 dark:border-amber-500/20">
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Settle short payment</h3>
+                            <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                Received {{ $trimCoin($attempt->actually_paid) }} of {{ $trimCoin($attempt->pay_amount) }} {{ $coin }}.
+                                Short by {{ $shortCoin }} {{ $coin }}@if ($shortFiatLabel), about {{ $shortFiatLabel }}@endif.
+                            </p>
+                        </div>
+                        <div class="px-5 py-4 text-xs">
+                            <p class="text-zinc-600 dark:text-zinc-300">
+                                Settling marks this payment paid and runs the normal settlement chain: order paid, receipt, fulfilment.
+                                The shortfall stays on record against the attempt. Use it when the balance was paid another way or the business has decided to forgive it.
+                            </p>
+                            <form
+                                method="POST"
+                                action="{{ route('admin.transaction.settle', $attempt) }}"
+                                class="mt-3"
+                                data-confirm="Settle this payment {{ $shortCoin }} {{ $coin }} short and fulfil the order? This is final."
+                                data-confirm-tone="danger"
+                                data-confirm-text="Settle"
+                            >
+                                @csrf
+                                <textarea name="reason" rows="3" required minlength="10" maxlength="280" placeholder="Reason (audit log) - e.g. 'Customer paid the 0.37 USDT balance to support by hand, ticket #1234' or 'Returning customer, shortfall forgiven'" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5 dark:text-white">{{ old('reason') }}</textarea>
+                                @error('reason')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+                                @error('settle')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+                                <button type="submit" class="mt-2 w-full rounded-[12px] bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700">Settle and fulfil</button>
+                            </form>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- The record of a short payment that was settled anyway. --}}
+                @if ($attempt->wasSettledShort())
+                    @php
+                        $dust = data_get($attempt->metadata, 'crypto.dust_settlement');
+                        $manual = data_get($attempt->metadata, 'crypto.manual_settlement');
+                        $note = $manual ?? $dust;
+                        $fmtShort = fn ($v) => $v === null ? null : rtrim(rtrim(number_format((float) $v, 8, '.', ''), '0'), '.');
+                    @endphp
+                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+                        <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Settled short</h3>
+                        </div>
+                        <dl class="px-5 py-4 text-xs">
+                            @foreach ([
+                                'How' => $manual ? 'Settled by an operator' : 'Dust rule (under half a cent)',
+                                'Shortfall' => $fmtShort($note['shortfall_crypto'] ?? null).' '.strtoupper((string) $attempt->pay_currency),
+                                'In price currency' => isset($note['shortfall_fiat']) ? number_format((float) $note['shortfall_fiat'], 4).' '.($note['price_currency'] ?? '') : null,
+                                'Reason' => $manual['reason'] ?? null,
+                                'By' => $manual['admin_email'] ?? null,
+                                'At' => isset($note['settled_at']) ? $fmtDate(\Illuminate\Support\Carbon::parse($note['settled_at'])) : null,
+                            ] as $label => $value)
+                                @if ($value !== null && $value !== '')
+                                    <div class="flex items-start justify-between gap-4 border-b border-zinc-50 py-2 last:border-0 dark:border-white/5">
+                                        <dt class="shrink-0 text-zinc-500 dark:text-zinc-400">{{ $label }}</dt>
+                                        <dd class="break-words text-right font-medium text-zinc-800 dark:text-zinc-200">{{ $value }}</dd>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </dl>
+                    </div>
+                @endif
             </div>
         </div>
 
