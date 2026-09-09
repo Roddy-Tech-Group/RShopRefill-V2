@@ -605,7 +605,7 @@ new class extends Component
             } else if (method.type === 'bank_transfer') {
                 this.paySession('bank_transfer');
             } else if (method.type === 'mobile_money') {
-                this.momoDetails.network = method.supported_networks ? method.supported_networks[0] : 'MTN';
+                this.momoDetails.network = (method.supported_networks ?? [])[0] ?? '';
                 this.paymentState = 'momo_input';
             } else if (method.type === 'apple_pay') {
                 this.paySession('apple_pay', {});
@@ -1427,7 +1427,7 @@ new class extends Component
                             <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                         </div>
 
-                        <div>
+                        <div x-show="(selectedMethod?.supported_networks ?? []).length > 0">
                             <label class="block text-xs font-semibold text-zinc-700">Network</label>
                             <div class="relative mt-1.5">
                                 <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">

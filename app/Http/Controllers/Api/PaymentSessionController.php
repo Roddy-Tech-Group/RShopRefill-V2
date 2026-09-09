@@ -14,6 +14,7 @@ use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
@@ -461,10 +462,28 @@ class PaymentSessionController extends Controller
             } elseif ($method === 'mobile_money') {
                 $request->validate([
                     'details.phone_number' => 'required|string',
-                    'details.network' => 'required|string',
+                    'details.network' => 'nullable|string',
                 ]);
+
+                // Checked against the rail here, not at the gateway: a network
+                // the market does not have is a stale screen, and answering it
+                // with a failed order would turn a display bug into a lost sale.
+                if (MobileMoneyRail::requiresNetwork($currency)
+                    && MobileMoneyRail::gatewayNetwork($currency, $details['network'] ?? null) === null) {
+                    return response()->json([
+                        'message' => "Choose a mobile money network available in {$currency}.",
+                    ], 422);
+                }
+
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $result = $flwProvider->chargeMobileMoney($attempt, $details['phone_number'], $details['network']);
+                $result = $flwProvider->chargeMobileMoney(
+                    $attempt,
+                    $details['phone_number'],
+                    $details['network'] ?? null,
+                    // Rails that answer with their own authorization page send
+                    // the customer back through the hosted return leg.
+                    route('shop.checkout.return', ['session' => $session->id]),
+                );
             } elseif ($method === 'crypto') {
                 $request->validate([
                     'details.pay_currency' => 'required|string',
