@@ -134,6 +134,13 @@ class FailureReasonClassifier
         ['gateway unavailable', FailureCategory::Provider, 'provider_error', true],
         ['provider error', FailureCategory::Provider, 'provider_error', true],
         ['currency not supported', FailureCategory::System, 'gateway_config_error', false],
+        // The gateway refusing a method/currency pairing we offered. This is
+        // how every Ghana mobile-money attempt failed for weeks (2026-09-09)
+        // while grading as "unknown": our integration asked for something the
+        // rail does not do, and no customer retry can ever change that.
+        ['not allowed for your currency', FailureCategory::System, 'gateway_config_error', false],
+        ['payment option is not allowed', FailureCategory::System, 'gateway_config_error', false],
+        ['invalid currency', FailureCategory::System, 'gateway_config_error', false],
         ['invalid api key', FailureCategory::System, 'gateway_config_error', false],
         ['authorization required', FailureCategory::System, 'gateway_config_error', false],
 
@@ -191,6 +198,7 @@ class FailureReasonClassifier
         'network_offline' => 'Customer went offline',
         'network_timeout' => 'Customer network timed out',
         'slow_network' => 'Customer network too slow',
+        'unrecognised_gateway_message' => 'Gateway message not recognised yet (add a rule)',
         'unknown_error' => 'Unknown (no diagnostic captured)',
     ];
 
@@ -263,8 +271,16 @@ class FailureReasonClassifier
             }
         }
 
-        // 5 · Genuinely unknown — after the pipeline above, this bucket is
-        // finally allowed to mean what it says.
+        // 5 · Nothing matched. Two very different situations used to share one
+        // bucket here: the gateway told us exactly what happened in words this
+        // table has no rule for yet, and we captured nothing at all. The first
+        // is a to-do item for whoever reads the dashboard (add the rule, run
+        // insights:reclassify); the second is a diagnostic gap. Labelling both
+        // "no diagnostic captured" hid the Ghana rail failure in plain sight.
+        if ($providerMessage !== null || $providerCode !== null) {
+            return $this->verdict(FailureCategory::System, $stage, 'unrecognised_gateway_message', true, $failure);
+        }
+
         return $this->verdict(FailureCategory::System, $stage, 'unknown_error', true, $failure);
     }
 

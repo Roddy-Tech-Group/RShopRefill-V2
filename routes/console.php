@@ -126,6 +126,18 @@ Schedule::job(new ExpireStaleRecoveriesJob)->hourly()->sentryMonitor('expire-sta
 // risks emailing someone at 3am in their own timezone.
 Schedule::job(new SendRecoveryRemindersJob)->hourly()->sentryMonitor('send-recovery-reminders');
 
+// Payment failures that need a human now, not at the next dashboard visit:
+// platform-side faults (a rail we asked for that the gateway refuses), one
+// customer failing repeatedly, and a reason code spiking against its own
+// baseline. SEV-2, so Telegram only; the alerter's throttle keeps a standing
+// fault to one message an hour.
+Schedule::command('insights:alert-failures')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('insights:alert-failures-10m')
+    ->sentryMonitor('insights-alert-failures');
+
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.
 Artisan::command('payments:expire-stale', function () {

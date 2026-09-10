@@ -2,6 +2,8 @@
 
 namespace App\Domain\PaymentInsights\Support;
 
+use App\Domain\PaymentInsights\Enums\ProductLine;
+
 /**
  * Turns a classified failure reason into the words the customer reads.
  *
@@ -94,29 +96,32 @@ final class RecoveryCopy
             'guidance' => 'The payment network has a minimum for this coin and the amount fell below it, so the payment could not be created.',
             'hint' => 'A larger amount, or a different coin with a lower minimum, will go through.',
         ],
+        // The gateway-side family. This email arrives about twenty minutes
+        // after the failure, so "it clears within minutes" is already stale
+        // by the time it is read; say where things stand now instead.
         'provider_timeout' => [
             'subject' => 'That payment attempt did not go through',
             'headline' => 'Our payment partner timed out',
             'guidance' => 'This one was not your fault. The payment network did not answer in time and the attempt was stopped safely, with nothing charged.',
-            'hint' => 'It normally clears within minutes.',
+            'hint' => 'By now it should be working again.',
         ],
         'provider_unreachable' => [
             'subject' => 'That payment attempt did not go through',
             'headline' => 'We could not reach our payment partner',
             'guidance' => 'This one was not your fault. The payment network was unreachable when you tried, and the attempt was stopped safely with nothing charged.',
-            'hint' => 'It normally clears within minutes.',
+            'hint' => 'By now it should be working again.',
         ],
         'provider_error' => [
             'subject' => 'That payment attempt did not go through',
             'headline' => 'Our payment partner had a problem',
             'guidance' => 'This one was not your fault. The payment network returned an error and the attempt was stopped safely, with nothing charged.',
-            'hint' => 'It normally clears quickly.',
+            'hint' => 'By now it should be working again.',
         ],
         'provider_rate_limited' => [
             'subject' => 'That payment attempt did not go through',
             'headline' => 'The payment network was busy',
             'guidance' => 'This one was not your fault. Traffic to the payment network was throttled at that moment and the attempt was stopped safely, with nothing charged.',
-            'hint' => 'A minute or two is usually all it takes.',
+            'hint' => 'By now the network should have calmed down.',
         ],
         'system_error' => [
             'subject' => 'That payment attempt did not go through',
@@ -124,10 +129,14 @@ final class RecoveryCopy
             'guidance' => 'This one was on us, not you. The payment was stopped before any money moved, and the problem has been logged for our team.',
             'hint' => null,
         ],
+        // A swept session: the gateway never gave a final answer, which means
+        // the customer MAY have paid. This copy never claims nothing was
+        // charged and never asks them to pay again; the eligibility service
+        // keeps it out of the automated sequence altogether.
         'orphaned_timeout' => [
-            'subject' => 'Your payment was not completed',
-            'headline' => 'That payment was left hanging',
-            'guidance' => 'The payment never reached a final answer, so we closed it out rather than leave it in limbo. Nothing was charged.',
+            'subject' => 'About your recent payment',
+            'headline' => 'Your payment did not get a final answer',
+            'guidance' => 'The payment network never confirmed or declined this payment, so we closed it out rather than leave it hanging. If your bank or wallet shows a charge, it will be confirmed or refunded automatically, and you do not need to pay again.',
             'hint' => null,
         ],
         'popup_blocked' => [
@@ -195,15 +204,67 @@ final class RecoveryCopy
     private const FALLBACK = [
         'subject' => 'Your payment was not completed',
         'headline' => 'Your payment was not completed',
-        'guidance' => 'Your recent payment attempt did not go through, and nothing was charged.',
-        'hint' => null,
+        'guidance' => 'Your recent payment attempt did not go through, and nothing was charged. Your items are still saved.',
+        'hint' => 'A different card, or your wallet balance, usually works.',
+    ];
+
+    /**
+     * Wallet top-ups read the same table, with the sentences that talk about
+     * "your order", "your items" or paying "from your wallet balance" (which
+     * is what they were trying to fill) replaced. Keys not listed here read
+     * the checkout copy unchanged because it never mentions the order.
+     *
+     * @var array<string, array{subject?: string, headline?: string, guidance?: string, hint?: ?string}>
+     */
+    private const FUNDING_OVERRIDES = [
+        'insufficient_funds' => [
+            'hint' => 'You can also try a different card or another payment method.',
+        ],
+        'do_not_honor' => [
+            'hint' => 'Approving the transaction with your bank, or using a different card, normally clears it.',
+        ],
+        'bank_declined' => [
+            'hint' => 'Trying a different card, or another payment method, usually works.',
+        ],
+        'limit_exceeded' => [
+            'hint' => 'A smaller top-up, or a different card, will get around it.',
+        ],
+        'crypto_quote_expired' => [
+            'guidance' => 'Crypto quotes are only held for a short window because rates move. Yours expired before the transfer confirmed, so the top-up was not completed.',
+        ],
+        'crypto_underpaid' => [
+            'hint' => 'You can top up the difference to complete the deposit.',
+        ],
+        'session_expired' => [
+            'subject' => 'Your wallet top-up is still waiting',
+            'headline' => 'Your top-up timed out',
+            'guidance' => 'The payment window closed before the top-up was finished, so nothing was charged and your wallet is unchanged.',
+        ],
+        'user_cancelled' => [
+            'subject' => 'Your wallet top-up is still waiting',
+            'headline' => 'You left before finishing',
+            'guidance' => 'The top-up was cancelled before it completed, so nothing was charged and your wallet is unchanged.',
+        ],
+    ];
+
+    private const FUNDING_FALLBACK = [
+        'subject' => 'Your wallet top-up was not completed',
+        'headline' => 'Your top-up was not completed',
+        'guidance' => 'Your recent top-up did not go through, and nothing was charged. Your wallet is unchanged.',
+        'hint' => 'A different card, or another payment method, usually works.',
     ];
 
     /**
      * @return array{subject: string, headline: string, guidance: string, hint: ?string}
      */
-    public static function for(?string $reasonCode): array
+    public static function for(?string $reasonCode, ?ProductLine $productLine = null): array
     {
+        if ($productLine === ProductLine::WalletFunding) {
+            $base = self::COPY[$reasonCode] ?? self::FUNDING_FALLBACK;
+
+            return array_merge($base, self::FUNDING_OVERRIDES[$reasonCode] ?? []);
+        }
+
         return self::COPY[$reasonCode] ?? self::FALLBACK;
     }
 
@@ -212,12 +273,33 @@ final class RecoveryCopy
      * time we have written about the same failure, and a nag reads worse
      * than a nudge.
      */
-    public static function reminderSubject(?string $reasonCode): string
+    public static function reminderSubject(?string $reasonCode, ?ProductLine $productLine = null): string
     {
+        $funding = $productLine === ProductLine::WalletFunding;
+
         return match ($reasonCode) {
-            'insufficient_funds', 'do_not_honor', 'bank_declined', 'limit_exceeded' => 'Still want to complete your order?',
+            'insufficient_funds', 'do_not_honor', 'bank_declined', 'limit_exceeded' => $funding
+                ? 'Still want to top up your wallet?'
+                : 'Still want to complete your order?',
             'crypto_quote_expired', 'crypto_underpaid', 'below_minimum_amount' => 'Your crypto payment is still unfinished',
-            default => 'Your order is still waiting for you',
+            default => $funding
+                ? 'Your wallet top-up is still waiting for you'
+                : 'Your order is still waiting for you',
         };
+    }
+
+    /** The noun for what is waiting, for templates that name it. */
+    public static function subjectNoun(?ProductLine $productLine): string
+    {
+        return $productLine === ProductLine::WalletFunding ? 'wallet top-up' : 'order';
+    }
+
+    /**
+     * Whether the money may already have moved. Such a customer must never be
+     * shown a "complete your payment" button.
+     */
+    public static function outcomeUncertain(?string $reasonCode): bool
+    {
+        return $reasonCode === 'orphaned_timeout';
     }
 }

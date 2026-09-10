@@ -11,6 +11,9 @@
     // social links below) so it is certain in every mail-render scope without
     // depending on a view composer firing. Falls back to the literal brand.
     $siteName = \App\Models\SiteSetting::get('site.name', 'RshopRefills');
+    // Same setting the contact page and support widgets use, so changing the
+    // support number in admin changes it in every email too.
+    $supportWhatsApp = preg_replace('/\D+/', '', (string) \App\Models\SiteSetting::get('contact.whatsapp_number', '19402386229')) ?: '19402386229';
 @endphp
 {{--
     Shared branded email shell. Table-based + inline styles for broad email-client
@@ -97,7 +100,7 @@
                                 <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Instagram</a>
                             </p>
                             <p style="margin:0 0 6px; color:#a1a1aa;">{{ $siteName }}, your digital marketplace for gift cards, eSIMs, top-ups and bills.</p>
-                            <p style="margin:0 0 6px;">Need a hand? <a href="https://wa.me/19402386229" style="color:#2563eb; text-decoration:none;">Chat with support</a></p>
+                            <p style="margin:0 0 6px;">Need a hand? <a href="https://wa.me/{{ $supportWhatsApp }}" style="color:#2563eb; text-decoration:none;">Chat with support</a></p>
                             <p style="margin:0; color:#a1a1aa;">&copy; {{ date('Y') }} {{ $siteName }}. All rights reserved.</p>
                         </td>
                     </tr>

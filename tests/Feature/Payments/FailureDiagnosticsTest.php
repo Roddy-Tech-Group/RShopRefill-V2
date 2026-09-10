@@ -68,6 +68,47 @@ class FailureDiagnosticsTest extends TestCase
         $this->assertSame('Insufficient Funds', $outcome->metadata['failure_details']['provider_message']);
     }
 
+    public function test_the_outcome_carries_the_payment_method_the_attempt_recorded(): void
+    {
+        $user = User::factory()->create();
+        $session = $this->makeSession($user);
+        $session->paymentAttempt->recordPaymentMethod('mobile_money');
+
+        app(PaymentSessionService::class)->failSession($session, 'Transaction could not be completed', ['status' => 'failed']);
+
+        $outcome = PaymentOutcome::where('payment_session_id', $session->id)->firstOrFail();
+
+        // Read from the attempt, not a session payload key nothing writes;
+        // the "By Payment Method" table was empty for as long as it did.
+        $this->assertSame('mobile_money', $outcome->payment_method);
+
+        $methods = app(PaymentInsightsMetrics::class)->byPaymentMethod();
+        $this->assertSame('mobile_money', $methods->first()?->payment_method);
+    }
+
+    public function test_reclassify_backfills_methodless_outcomes_from_their_attempts(): void
+    {
+        $user = User::factory()->create();
+        $session = $this->makeSession($user);
+        $session->paymentAttempt->recordPaymentMethod('card');
+
+        // A confirmed outcome as the old recorder wrote it: no method.
+        $outcome = PaymentOutcome::create([
+            'payment_session_id' => $session->id,
+            'user_id' => $user->id,
+            'outcome' => 'confirmed',
+            'product_line' => 'checkout',
+            'provider' => 'flutterwave',
+            'consecutive_failure_count' => 0,
+        ]);
+
+        $this->artisan('insights:reclassify --dry-run')->assertExitCode(0);
+        $this->assertNull($outcome->fresh()->payment_method, 'a dry run must not write');
+
+        $this->artisan('insights:reclassify')->assertExitCode(0);
+        $this->assertSame('card', $outcome->fresh()->payment_method);
+    }
+
     public function test_non_retryable_verdicts_are_flagged_for_recovery_logic(): void
     {
         $user = User::factory()->create();

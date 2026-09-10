@@ -39,6 +39,15 @@ new class extends Component
     /** Trigger style: 'full' (desktop wallet card) or 'compact' (mobile hero). */
     public string $variant = 'full';
 
+    /**
+     * Open the sheet on page load. Set when the page was reached through a
+     * deep link for this wallet's currency (?fund=USD&amount=50), which is
+     * how the payment-recovery email resumes a failed top-up: the customer
+     * lands with the sheet open and the amount filled in, not on a bare
+     * dashboard wondering where to click.
+     */
+    public bool $openOnLoad = false;
+
     public function mount(string $currency = 'USD', string $variant = 'full'): void
     {
         // RCOIN is a reward ledger - it's earned, not topped up. If the parent
@@ -48,6 +57,17 @@ new class extends Component
         $resolved = Currency::tryFrom(strtoupper($currency))?->value ?? 'USD';
         $this->currency = $resolved === 'RCOIN' ? 'USD' : $resolved;
         $this->variant = $variant;
+
+        $requested = strtoupper(trim((string) request()->query('fund', '')));
+
+        if ($requested !== '' && $requested === $this->currency) {
+            $this->openOnLoad = true;
+
+            $amount = (float) request()->query('amount', 0);
+            if ($amount > 0) {
+                $this->amount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+            }
+        }
     }
 
     /**
@@ -347,7 +367,7 @@ new class extends Component
 
 <div
     x-data="{
-        open: false,
+        open: @js($openOnLoad),
         ccyOpen: false,
         session: null,
         // Session-less method list from prepare(): the sheet shows tiles off

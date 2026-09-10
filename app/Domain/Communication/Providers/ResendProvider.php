@@ -58,11 +58,15 @@ class ResendProvider implements MailProviderInterface
             $payload['attachments'] = $rendered['attachments'];
         }
 
-        // Add marketing headers if requested
-        if (isset($metadata['is_marketing']) && $metadata['is_marketing']) {
-            $unsubscribeUrl = url('/account/notifications');
-            $payload['headers']['List-Unsubscribe'] = "<{$unsubscribeUrl}>";
+        // Optional mail advertises its way out. A caller that minted a signed
+        // one-click link (UnsubscribeLink) gets the full RFC 8058 pair; the
+        // legacy marketing flag points at the settings page, which needs a
+        // login and so cannot honestly claim one-click.
+        if (! empty($metadata['list_unsubscribe'])) {
+            $payload['headers']['List-Unsubscribe'] = "<{$metadata['list_unsubscribe']}>";
             $payload['headers']['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+        } elseif (! empty($metadata['is_marketing'])) {
+            $payload['headers']['List-Unsubscribe'] = '<'.route('dashboard.notifications').'>';
         }
 
         // Account-wide throughput gate (Resend allows 10 req/s). Waits for a
