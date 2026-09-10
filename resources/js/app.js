@@ -2131,6 +2131,171 @@ window.salesCostChart = function (series) {
 };
 
 /**
+ * Payment Insights daily trend — paid / declined / walked-away counts per day
+ * as three smooth lines, ApexCharts lazy-imported like salesCostChart. The
+ * day's payment success rate rides in the tooltip rather than on a second
+ * axis, so one scale tells the truth. Series accepts the dailyTrend() shape:
+ * `[{ date, confirmed, failed, abandoned, authorizationRate }, …]`.
+ *
+ * The card carries wire:key="…{{ $timeframe }}", so a period change replaces
+ * the element and Alpine mounts a fresh chart with the new series.
+ *
+ *   x-data="paymentTrendChart(@js($trend))"
+ */
+window.paymentTrendChart = function (series) {
+    const PAID_COLOR     = '#34d399'; // emerald-400
+    const DECLINED_COLOR = '#f87171'; // red-400
+    const WALKED_COLOR   = '#fbbf24'; // amber-400
+
+    return {
+        chart: null,
+        series: series || [],
+
+        async init() {
+            const { default: ApexCharts } = await import('apexcharts');
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            if (this.$refs.canvas) { this.$refs.canvas.innerHTML = ''; }
+            this.chart = new ApexCharts(this.$refs.canvas, this._options());
+            await this.chart.render();
+        },
+
+        destroy() {
+            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            if (this.$refs.canvas) { this.$refs.canvas.innerHTML = ''; }
+        },
+
+        isEmpty() {
+            return !this.series
+                || this.series.length === 0
+                || this.series.every((d) => !Number(d.confirmed) && !Number(d.failed) && !Number(d.abandoned));
+        },
+
+        // Dates are 'YYYY-MM-DD' day buckets; parsed as UTC midnight to match
+        // Apex's default UTC datetime axis, so no day shifts by timezone.
+        _points(key) {
+            return this.series.map((d) => [new Date(`${d.date}T00:00:00Z`).getTime(), Number(d[key] || 0)]);
+        },
+
+        _options() {
+            const dark = document.documentElement.classList.contains('dark');
+            const gridColor = dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+            const textColor = dark ? '#94a3b8' : '#52525b';
+            const panelBg = dark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(15, 23, 42, 0.22)';
+            const panelBorder = dark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.28)';
+            const insetHighlight = dark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.18)';
+            const days = this.series;
+
+            // Same frosted panel as the other admin charts, plus one extra row
+            // the shared renderer cannot produce: the day's success rate.
+            const renderTooltip = ({ series: values, dataPointIndex, w }) => {
+                const day = days[dataPointIndex] || {};
+                let header = '';
+                try {
+                    header = new Date(`${day.date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                } catch (e) { header = day.date || ''; }
+
+                const rows = w.globals.seriesNames.map((name, idx) => {
+                    const colour = w.globals.colors[idx];
+                    const value = values[idx]?.[dataPointIndex];
+                    if (value === undefined || value === null) { return ''; }
+                    return `
+                        <div style="display:flex;align-items:center;gap:7px;padding:1px 0;">
+                            <span style="height:6px;width:6px;border-radius:9999px;background:${colour};box-shadow:0 0 0 2px ${colour}30;display:inline-block;flex-shrink:0;"></span>
+                            <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.72);letter-spacing:0.01em;">${name}</span>
+                            <span style="font-size:11px;font-weight:700;color:#ffffff;margin-left:auto;padding-left:12px;font-variant-numeric:tabular-nums;">${Number(value)}</span>
+                        </div>`;
+                }).join('');
+
+                const rate = day.authorizationRate === null || day.authorizationRate === undefined
+                    ? 'no payments submitted'
+                    : `${Math.round(day.authorizationRate)}% payment success`;
+
+                return `<div style="
+                    min-width:168px;
+                    padding:7px 9px;
+                    border-radius:10px;
+                    background:${panelBg};
+                    backdrop-filter:blur(16px) saturate(180%);
+                    -webkit-backdrop-filter:blur(16px) saturate(180%);
+                    border:1px solid ${panelBorder};
+                    box-shadow:0 8px 20px rgba(0, 0, 0, 0.32), inset 0 1px 0 ${insetHighlight};
+                ">
+                    <p style="margin:0 0 4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.55);">${header}</p>
+                    ${rows}
+                    <p style="margin:5px 0 0;padding-top:5px;border-top:1px solid rgba(255,255,255,0.14);font-size:10px;font-weight:600;color:rgba(255,255,255,0.85);">${rate}</p>
+                </div>`;
+            };
+
+            return {
+                chart: {
+                    type: 'line',
+                    height: 280,
+                    toolbar: { show: false },
+                    zoom: { enabled: false },
+                    fontFamily: 'inherit',
+                    background: 'transparent',
+                    animations: { speed: 450, easing: 'easeout' },
+                    parentHeightOffset: 0,
+                },
+                series: [
+                    { name: 'Paid',        data: this._points('confirmed') },
+                    { name: 'Declined',    data: this._points('failed') },
+                    { name: 'Walked away', data: this._points('abandoned') },
+                ],
+                colors: [PAID_COLOR, DECLINED_COLOR, WALKED_COLOR],
+                stroke: { curve: 'smooth', width: 2.5, lineCap: 'round' },
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        style: { colors: textColor, fontSize: '11px', fontWeight: 500 },
+                        datetimeFormatter: { day: 'MMM dd', hour: 'MMM dd', minute: 'MMM dd' },
+                    },
+                    axisBorder: { show: false },
+                    axisTicks: { show: false },
+                    crosshairs: {
+                        show: true,
+                        width: 1,
+                        position: 'back',
+                        stroke: { color: dark ? '#475569' : '#94a3b8', width: 1, dashArray: 0 },
+                    },
+                    tooltip: { enabled: false },
+                },
+                yaxis: {
+                    min: 0,
+                    forceNiceScale: true,
+                    labels: {
+                        style: { colors: textColor, fontSize: '11px', fontWeight: 500 },
+                        formatter: (v) => String(Math.round(v)),
+                    },
+                },
+                grid: {
+                    borderColor: gridColor,
+                    strokeDashArray: 4,
+                    xaxis: { lines: { show: false } },
+                    yaxis: { lines: { show: true } },
+                    padding: { left: 0, right: 12, top: 0, bottom: 0 },
+                },
+                dataLabels: { enabled: false },
+                legend: { show: false },
+                tooltip: {
+                    theme: dark ? 'dark' : 'light',
+                    shared: true,
+                    intersect: false,
+                    followCursor: false,
+                    custom: renderTooltip,
+                },
+                markers: {
+                    size: 0,
+                    strokeWidth: 2,
+                    strokeColors: dark ? '#1d3252' : '#ffffff',
+                    hover: { size: 6, sizeOffset: 2 },
+                },
+            };
+        },
+    };
+};
+
+/**
  * Global confirm-modal wiring. Two pieces:
  *
  * 1. `confirmModal()` — Alpine factory bound to <x-confirm-modal />, owns the

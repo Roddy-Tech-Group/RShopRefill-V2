@@ -56,8 +56,9 @@ class ValidatePaymentPlatformTest extends TestCase
             ->assertSee('Daily Trend')
             ->assertSee('By Payment Method')
             ->assertSee('Recent Lost Payments')
+            // With no browser-side failures the panel collapses to one line,
+            // so only its title is guaranteed here.
             ->assertSee('Frontend Failures')
-            ->assertSee('Environment Signals')
             ->assertSee('Transaction Recovery')
             ->assertSee('Provider Success Rate')
             ->assertSee('Recovery Skips')

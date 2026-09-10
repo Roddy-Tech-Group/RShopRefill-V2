@@ -130,6 +130,37 @@ class FailureReasonClassifierTest extends TestCase
         $this->assertTrue($result['retryable']);
     }
 
+    public function test_a_gateway_message_with_no_rule_is_graded_as_unrecognised_not_unknown(): void
+    {
+        // The gateway spoke; we simply have no rule for what it said. That is
+        // a different situation from capturing nothing, and the dashboard
+        // must show it as work to do rather than as a diagnostic gap.
+        $result = $this->classifier->classify('flutterwave', 'Transaction could not be completed', 'processing', [
+            'provider_code' => null,
+            'provider_message' => 'Merchant velocity ceiling reached for BIN range',
+            'http_status' => 400,
+        ]);
+
+        $this->assertSame('unrecognised_gateway_message', $result['code']);
+        $this->assertSame(FailureCategory::System, $result['category']);
+        $this->assertTrue($result['retryable'], 'an unrecognised verdict is not yet proof that a retry cannot work');
+    }
+
+    public function test_a_method_the_gateway_does_not_allow_for_the_currency_is_our_configuration_error(): void
+    {
+        // Verbatim: the answer every Ghana mobile-money attempt received while
+        // the provider was charging on the Francophone rail.
+        $result = $this->classifier->classify('flutterwave', 'Failed to initialize mobile money: This payment option is not allowed for your currency', 'awaiting_method', [
+            'provider_code' => null,
+            'provider_message' => 'This payment option is not allowed for your currency',
+            'http_status' => 400,
+        ]);
+
+        $this->assertSame('gateway_config_error', $result['code']);
+        $this->assertSame(FailureCategory::System, $result['category']);
+        $this->assertFalse($result['retryable'], 'no customer retry can fix a pairing the rail refuses');
+    }
+
     public function test_every_emittable_code_has_a_human_label(): void
     {
         // A new taxonomy code without a display name would render as raw
@@ -139,7 +170,7 @@ class FailureReasonClassifierTest extends TestCase
             ->merge(collect($reflection->getConstant('CLIENT_CODES'))->pluck(1))
             ->merge(collect($reflection->getConstant('INTERNAL_CODES'))->pluck(1))
             ->merge(collect($reflection->getConstant('NOWPAYMENTS_CODES'))->pluck(1))
-            ->merge(['frontend_issue', 'provider_rate_limited', 'unknown_error'])
+            ->merge(['frontend_issue', 'provider_rate_limited', 'unrecognised_gateway_message', 'unknown_error'])
             ->unique();
 
         foreach ($emittable as $code) {
