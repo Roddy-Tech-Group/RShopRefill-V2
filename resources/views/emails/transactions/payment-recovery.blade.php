@@ -1,8 +1,10 @@
 <x-emails.layout :mail-message="$message ?? null" :title="$headline" :preheader="$guidance">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">{{ $headline }}</h1>
 
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hi {{ $name }},</p>
+
     @if ($isReminder)
-        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Just a quick nudge, your order is still saved and waiting.</p>
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Just a quick nudge, your {{ $noun }} is still waiting.</p>
     @endif
 
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">{{ $guidance }}</p>
@@ -19,6 +21,8 @@
                 <td style="padding:16px 18px;">
                     @if ($orderNumber)
                         <p style="margin:0 0 6px; font-size:13px; line-height:1.5; color:#71717a;">Order {{ $orderNumber }}</p>
+                    @elseif ($isFunding)
+                        <p style="margin:0 0 6px; font-size:13px; line-height:1.5; color:#71717a;">Wallet top-up</p>
                     @endif
                     @if (count($itemNames))
                         <p style="margin:0 0 6px; font-size:15px; line-height:1.5; font-weight:600; color:#0c1a2e;">
@@ -35,9 +39,19 @@
         </table>
     @endif
 
-    <x-emails.button :url="$resumeUrl" align="center">Complete your payment</x-emails.button>
+    @if ($uncertain)
+        {{-- No "complete your payment" here: the money may already have moved. --}}
+        <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">You do not need to do anything now. If you want to check on it, reply to this email and we will look it up for you.</p>
+    @else
+        <x-emails.button :url="$resumeUrl" align="center">{{ $isFunding ? 'Complete your top-up' : 'Complete your payment' }}</x-emails.button>
 
-    <p style="margin:16px 0 0; font-size:14px; line-height:1.65; color:#71717a;">
-        This link works until {{ $expiresAt?->format('D j M, g:ia') }}. If you have already paid, nothing more is needed and you can ignore this email.
+        <p style="margin:16px 0 0; font-size:14px; line-height:1.65; color:#71717a;">
+            {{ $expiryLine }} If you have already paid, nothing more is needed and you can ignore this email.
+        </p>
+    @endif
+
+    <p style="margin:22px 0 0; font-size:12px; line-height:1.7; color:#a1a1aa;">
+        You are receiving this because a payment on your account did not complete.
+        <a href="{{ $manageUrl }}" style="color:#71717a;">Manage payment emails</a>@if ($unsubscribeUrl) or <a href="{{ $unsubscribeUrl }}" style="color:#71717a;">unsubscribe</a>@endif.
     </p>
 </x-emails.layout>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CheckoutApiController;
 use App\Http\Controllers\Api\CryptoQrController;
+use App\Http\Controllers\Api\EmailUnsubscribeController;
 use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\KycStatusController;
 use App\Http\Controllers\Api\NewsletterApiController;
@@ -99,6 +100,14 @@ Route::prefix('storefront')->name('api.storefront.')->group(function () {
 // Newsletter Subscriptions (Public)
 Route::post('newsletter/subscribe', [NewsletterApiController::class, 'subscribe'])->name('newsletter.subscribe');
 Route::get('newsletter/unsubscribe', [NewsletterApiController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
+
+// One-click unsubscribe for optional email (RFC 8058). POST is the mail
+// client's own Unsubscribe button, GET the footer link. Signed, so a link only
+// ever acts on the customer it was minted for; under /api so the client's
+// POST never meets a CSRF check.
+Route::match(['get', 'post'], 'email/unsubscribe/{user}/{category}', EmailUnsubscribeController::class)
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('email.unsubscribe');
 
 // Push notification interaction tracking (Public + throttled). The service worker
 // fires this on `notificationclick`, which can happen with no active session and

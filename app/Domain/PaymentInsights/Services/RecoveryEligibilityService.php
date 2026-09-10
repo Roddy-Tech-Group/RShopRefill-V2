@@ -6,6 +6,7 @@ use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Enums\CommunicationChannel;
 use App\Domain\Communication\Services\PreferenceManager;
 use App\Domain\PaymentInsights\Enums\IneligibilityReason;
+use App\Domain\PaymentInsights\Support\RecoveryCopy;
 use App\Models\EmailSuppression;
 use App\Models\PaymentOutcome;
 use App\Models\PaymentSession;
@@ -22,6 +23,16 @@ class RecoveryEligibilityService
 {
     /** Failure reasons that must never be invited to retry. */
     private const RISK_REASONS = ['risk_rejected', 'fraud_detected', 'high_risk'];
+
+    /**
+     * Failures that were our fault. An automated "try again" to someone we
+     * just failed is the wrong voice: it implies they can fix it, and on
+     * 2026-09-09 it sent a Ghana customer back into the same broken rail. These
+     * raise a SEV-2 instead (insights:alert-failures) and a person writes.
+     *
+     * @var list<string>
+     */
+    private const PLATFORM_FAULT_CODES = ['gateway_config_error', 'system_error'];
 
     /** At most one recovery email per customer per rolling day. */
     private const COOLDOWN_HOURS = 24;
@@ -60,6 +71,20 @@ class RecoveryEligibilityService
             if (str_contains($rawReason, $riskReason)) {
                 return $this->skip(IneligibilityReason::NotApplicable);
             }
+        }
+
+        // Checked before the retryable gate so the analytics say WHY the robot
+        // stayed quiet: not "could not succeed" but "was ours to fix".
+        if (in_array((string) $outcome->failure_reason_code, self::PLATFORM_FAULT_CODES, true)) {
+            return $this->skip(IneligibilityReason::PlatformFault);
+        }
+
+        // A swept session never got a final answer from the gateway: the
+        // customer may have paid. "Complete your payment" to that person is
+        // an invitation to pay twice, so the sequence leaves them alone and
+        // the webhook-loss alert brings a human to it instead.
+        if (RecoveryCopy::outcomeUncertain($outcome->failure_reason_code)) {
+            return $this->skip(IneligibilityReason::OutcomeUncertain);
         }
 
         // The classifier's verdict: a non-retryable failure (stolen card,

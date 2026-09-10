@@ -100,7 +100,7 @@ class RecoveryFlowTest extends TestCase
         $this->assertTrue($recovery->expires_at->equalTo($originalExpiry), 'expires_at changed on status update');
     }
 
-    public function test_retry_marks_retrying_resets_backoff_and_redirects_to_the_order(): void
+    public function test_retry_marks_retrying_resets_backoff_and_redirects_to_checkout(): void
     {
         [$user, $recovery] = $this->makeRecovery();
 
@@ -115,8 +115,9 @@ class RecoveryFlowTest extends TestCase
             RecoveryAttempt::where('transaction_recovery_id', $recovery->id)->where('action', 'retried_payment')->exists()
         );
 
-        $order = $recovery->paymentSession->order;
-        $response->assertRedirect(route('shop.order', ['orderNumber' => $order->order_number]));
+        // Checkout, not the order page: the cart survives until a payment
+        // confirms, and the order page had no way to pay a failed order.
+        $response->assertRedirect(route('shop.checkout'));
 
         // Backoff cache marker set — the manager must report a clean slate.
         $status = app(PaymentBackoffManager::class)->getBackoffStatus($user, 'checkout', '127.0.0.1');
@@ -199,8 +200,10 @@ class RecoveryFlowTest extends TestCase
             'expires_at' => now()->addDay(),
         ]);
 
+        // The wallet, with the sheet told to open for this currency and the
+        // failed amount filled in, instead of a bare dashboard.
         $this->post(route('recovery.retry', $recovery->token))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('dashboard', ['fund' => 'USD', 'amount' => '50.0000']));
 
         // The reset watermark must land in the wallet_funding bucket (key
         // format mirrors PaymentBackoffManager::resetBackoff).

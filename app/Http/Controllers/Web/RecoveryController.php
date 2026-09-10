@@ -33,7 +33,7 @@ class RecoveryController extends Controller
 
         return view('recovery.show', [
             'recovery' => $recovery,
-            'copy' => RecoveryCopy::for($recovery->failure_reason_code),
+            'copy' => RecoveryCopy::for($recovery->failure_reason_code, $recovery->productLine()),
         ]);
     }
 
@@ -93,16 +93,23 @@ class RecoveryController extends Controller
             $recovery->paymentSession->device_uuid
         );
 
-        // Redirect to the original order status page (it offers retry for unpaid
-        // orders) or the dashboard for wallet funding. The order hangs off the
-        // session via paymentAttempt (hasOneThrough) — payment_sessions has no
-        // order_id column.
-        $order = $recovery->paymentSession->order;
-        if ($order) {
-            return redirect()->route('shop.order', ['orderNumber' => $order->order_number]);
+        // Land where the customer can actually pay. The old target was the
+        // order page, whose "Complete payment" button only rendered for a
+        // pending order, so a declined (Failed) or swept (Cancelled) order was
+        // a dead end at the exact moment the email had promised a way back.
+        // Checkout keeps the cart until a payment confirms, so it resumes the
+        // same purchase; a top-up lands on the wallet with the sheet open and
+        // the amount filled in.
+        $session = $recovery->paymentSession;
+
+        if ($session->order) {
+            return redirect()->route('shop.checkout');
         }
 
-        return redirect()->route('dashboard'); // They can open the funding modal again
+        return redirect()->route('dashboard', [
+            'fund' => strtoupper((string) ($session->display_currency ?: $session->currency)),
+            'amount' => $session->amount,
+        ]);
     }
 
     public function thanks()

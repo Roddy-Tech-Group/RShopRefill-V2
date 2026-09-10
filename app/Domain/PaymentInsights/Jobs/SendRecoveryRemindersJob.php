@@ -108,14 +108,16 @@ class SendRecoveryRemindersJob implements ShouldQueue
                 continue;
             }
 
-            $copy = RecoveryCopy::for($recovery->failure_reason_code);
+            $productLine = $recovery->productLine();
+            $copy = RecoveryCopy::for($recovery->failure_reason_code, $productLine);
+            $mailable = new PaymentRecoveryMail($recovery, isReminder: true);
 
             $communications->send(
                 recipient: $recovery->user,
                 category: CommunicationCategory::PaymentRecovery,
-                title: RecoveryCopy::reminderSubject($recovery->failure_reason_code),
+                title: RecoveryCopy::reminderSubject($recovery->failure_reason_code, $productLine),
                 message: $copy['guidance'],
-                mailable: new PaymentRecoveryMail($recovery, isReminder: true),
+                mailable: $mailable,
                 correlationId: 'payment_recovery_reminder_'.$recovery->id,
                 overrideEmail: strtolower($recovery->customer_email) !== strtolower((string) $recovery->user->email)
                     ? $recovery->customer_email
@@ -125,6 +127,7 @@ class SendRecoveryRemindersJob implements ShouldQueue
                     'payment_session_id' => $recovery->payment_session_id,
                     'failure_reason_code' => $recovery->failure_reason_code,
                     'touch' => 'reminder',
+                    'list_unsubscribe' => $mailable->unsubscribeUrl(),
                 ]
             );
 

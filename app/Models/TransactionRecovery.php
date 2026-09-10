@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Enums\RecoveryStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -56,5 +57,17 @@ class TransactionRecovery extends Model
     {
         return in_array($this->status->value, RecoveryStatus::openValues(), true)
             && $this->expires_at?->isFuture();
+    }
+
+    /**
+     * What the customer was paying for. From the attempt's target, never the
+     * session type: a wallet top-up paid by card is still a top-up, and the
+     * copy has to say "your top-up", not "your order".
+     */
+    public function productLine(): ProductLine
+    {
+        return $this->paymentSession?->paymentAttempt?->order_id
+            ? ProductLine::Checkout
+            : ProductLine::WalletFunding;
     }
 }

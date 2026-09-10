@@ -16,6 +16,11 @@
     $awaitingPayment = $status->value === 'pending' && $paymentValue === 'unpaid' && ! $moneyInFlight;
     // Sweeper-cancelled, never paid: an expired checkout, not a cancelled order.
     $expiredCheckout = $status->value === 'cancelled' && $paymentValue !== 'paid';
+    // A declined payment on an order nobody paid for. The cart survives until a
+    // payment confirms, so checkout resumes the same purchase; this page used
+    // to say "you can try checking out again" and offer no way to do it, which
+    // is where the recovery email's retry link landed.
+    $declinedUnpaid = $status->value === 'failed' && $paymentValue !== 'paid';
 
     // Status-driven hero copy + colour. The order is `pending` straight after
     // checkout while payment is verified, then moves through the fulfillment engine.
@@ -446,10 +451,10 @@
         {{-- The unpaid checkout's way back in. The cart survives until payment
              confirms and checkout re-entry is idempotent, so this lands the
              customer on the same live session rather than a duplicate order. --}}
-        @if ($awaitingPayment)
+        @if ($awaitingPayment || $expiredCheckout || $declinedUnpaid)
             <a href="{{ $shopRoute('checkout') }}"
                 class="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
-                Complete payment
+                {{ $awaitingPayment ? 'Complete payment' : 'Try again' }}
             </a>
         @endif
 

@@ -796,7 +796,9 @@ class ValidatePaymentPlatformCommand extends Command
             $this->ensure($recovery->fresh()->status === RecoveryStatus::Retrying, 'retry did not mark retrying');
             $this->ensure($recovery->fresh()->retried_at !== null, 'retried_at not stamped');
             $this->ensure(RecoveryAttempt::where('transaction_recovery_id', $recovery->id)->where('action', 'retried_payment')->exists(), 'retried_payment not tracked');
-            $this->ensure(str_contains($redirect->getTargetUrl(), '/order/'), "redirected to {$redirect->getTargetUrl()}");
+            // Checkout, not the order page: the cart survives until a payment
+            // confirms, and a failed order's page had no way to pay it.
+            $this->ensure(str_contains($redirect->getTargetUrl(), '/checkout'), "redirected to {$redirect->getTargetUrl()}");
         });
     }
 
