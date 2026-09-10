@@ -146,7 +146,7 @@ class FailureReasonClassifierTest extends TestCase
         $this->assertTrue($result['retryable'], 'an unrecognised verdict is not yet proof that a retry cannot work');
     }
 
-    public function test_a_gateway_compliance_block_is_graded_as_a_method_we_have_not_been_enabled_for(): void
+    public function test_a_gateway_compliance_block_is_graded_as_ours(): void
     {
         // The answer every production Apple Pay attempt received.
         $result = $this->classifier->classify('flutterwave', 'Payment could not be started', 'awaiting_method', [
