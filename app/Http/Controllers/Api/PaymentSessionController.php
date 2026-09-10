@@ -458,7 +458,11 @@ class PaymentSessionController extends Controller
                 $result = $flwProvider->chargeBankTransfer($attempt);
             } elseif ($method === 'apple_pay') {
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $result = $flwProvider->chargeApplePay($attempt, $details);
+                $result = $flwProvider->chargeApplePay(
+                    $attempt,
+                    $details,
+                    route('shop.checkout.return', ['session' => $session->id]),
+                );
             } elseif ($method === 'mobile_money') {
                 $request->validate([
                     'details.phone_number' => 'required|string',

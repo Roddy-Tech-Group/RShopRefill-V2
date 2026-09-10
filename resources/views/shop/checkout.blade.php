@@ -1365,19 +1365,22 @@
                     //   - Nigeria (NGN) → Bank Transfer first (most-used FW method)
                     //   - Ghana / Kenya / Uganda / Rwanda → Mobile money first
                     //   - US / EU / UK → Card first, crypto for the savvy users
+                    // Apple Pay only in USD, GBP and NGN: the gateway refuses
+                    // it in every other currency before looking at anything
+                    // else (mirrors SupportedPaymentMethods).
                     const mapping = {
                         'USD': ['card', 'crypto', 'apple_pay', 'wallet'],
-                        'EUR': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
+                        'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
                         'GBP': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
                         'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'apple_pay', 'crypto', 'wallet'],
-                        'GHS': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'XAF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'XOF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'KES': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'UGX': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'RWF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
+                        'GHS': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'XAF': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'XOF': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'KES': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'UGX': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'RWF': ['mobile_money', 'card', 'crypto', 'wallet'],
                     };
-                    const allowedKeys = mapping[currency] || ['card', 'apple_pay', 'crypto'];
+                    const allowedKeys = mapping[currency] || ['card', 'crypto'];
                     return this.allMethods.filter(m => {
                         if (m.key === 'wallet' && !this.isLoggedIn) {
                             return false;

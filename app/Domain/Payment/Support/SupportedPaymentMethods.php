@@ -24,23 +24,27 @@ final class SupportedPaymentMethods
      * @var array<string, list<string>>
      */
     private const BY_CURRENCY = [
+        // Apple Pay only where the gateway collects it: USD, GBP and NGN.
+        // Every other currency answers "Currency not supported for Apple Pay"
+        // before the merchant is even looked at (sandbox-verified 2026-09-10),
+        // so offering the tile there was a guaranteed failure.
         'USD' => ['card', 'apple_pay', 'crypto', 'wallet'],
-        'EUR' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
+        'EUR' => ['card', 'crypto', 'wallet', 'pay_with_bank'],
         'GBP' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
         'NGN' => ['card', 'apple_pay', 'bank_transfer', 'crypto', 'wallet', 'ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'],
-        'GHS' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'XAF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'XOF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'KES' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'UGX' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'RWF' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
+        'GHS' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'XAF' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'XOF' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'KES' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'UGX' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'RWF' => ['card', 'mobile_money', 'crypto', 'wallet'],
     ];
 
     /**
      * Currencies without an explicit entry only get the globally available
      * methods.
      */
-    private const FALLBACK = ['card', 'apple_pay'];
+    private const FALLBACK = ['card'];
 
     /**
      * @return list<string>

@@ -586,7 +586,14 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         return "Dial your mobile money menu and approve the payment prompt sent to {$phoneNumber} to confirm. Keep this window open - it updates automatically once you approve.";
     }
 
-    public function chargeApplePay(PaymentAttempt $attempt, array $details = []): array
+    /**
+     * Apple Pay through Flutterwave's hosted sheet. The charge carries the
+     * customer's full name, phone and country alongside the amount: the
+     * gateway's compliance step wants to know who is paying, and a charge
+     * that named nobody was refused with "Transaction failed compliance
+     * checks" on every production attempt (twelve of twelve by 2026-09-10).
+     */
+    public function chargeApplePay(PaymentAttempt $attempt, array $details = [], ?string $returnUrl = null): array
     {
         if (str_contains($this->secretKey, 'MOCK')) {
             $attempt->gateway_reference = 'FLW-MOCK-APPLE-'.uniqid();
@@ -601,16 +608,41 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             ];
         }
 
+        $user = $attempt->user;
+
+        $payload = [
+            'amount' => (float) $attempt->amount,
+            'currency' => strtoupper($attempt->currency),
+            'email' => $user->email,
+            'fullname' => trim((string) $user->name) ?: 'Customer',
+            'tx_ref' => $attempt->idempotency_key,
+        ];
+
+        if ($returnUrl !== null) {
+            $payload['redirect_url'] = $returnUrl;
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) $user->phone);
+        if ($phone !== '') {
+            $payload['phone_number'] = $phone;
+        }
+
+        if (filled($user->country)) {
+            $payload['billing_country'] = strtoupper((string) $user->country);
+        }
+
         try {
             $response = Http::withToken($this->secretKey)
-                ->post("{$this->baseUrl}/charges?type=applepay", [
-                    'amount' => (float) $attempt->amount,
-                    'currency' => strtoupper($attempt->currency),
-                    'email' => $attempt->user->email,
-                    'tx_ref' => $attempt->idempotency_key,
-                ]);
+                ->post("{$this->baseUrl}/charges?type=applepay", $payload);
 
             if ($response->failed()) {
+                Log::warning('Flutterwave Apple Pay charge refused', [
+                    'tx_ref' => $attempt->idempotency_key,
+                    'currency' => $payload['currency'],
+                    'http_status' => $response->status(),
+                    'message' => $response->json('message'),
+                ]);
+
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize Apple Pay: '.($response->json('message') ?? 'Unknown error'),
