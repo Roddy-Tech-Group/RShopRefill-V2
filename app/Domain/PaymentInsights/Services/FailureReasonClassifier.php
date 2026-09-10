@@ -141,6 +141,14 @@ class FailureReasonClassifier
         ['not allowed for your currency', FailureCategory::System, 'gateway_config_error', false],
         ['payment option is not allowed', FailureCategory::System, 'gateway_config_error', false],
         ['invalid currency', FailureCategory::System, 'gateway_config_error', false],
+        // "Transaction failed compliance checks": every Apple Pay attempt in
+        // production got this (11 of 11 by 2026-09-10), which is a method the
+        // merchant account has not been enabled for, not eleven risky
+        // customers. Graded as ours so it alerts and never invites a retry;
+        // a genuine per-customer block would arrive as a decline, not here.
+        ['failed compliance check', FailureCategory::System, 'gateway_compliance_block', false],
+        // A hosted-checkout init that returned a body with no message at all.
+        ['unknown error', FailureCategory::Provider, 'provider_error', true],
         ['invalid api key', FailureCategory::System, 'gateway_config_error', false],
         ['authorization required', FailureCategory::System, 'gateway_config_error', false],
 
@@ -186,6 +194,7 @@ class FailureReasonClassifier
         'provider_error' => 'Gateway error',
         'provider_rate_limited' => 'Gateway rate-limited us',
         'gateway_config_error' => 'Gateway configuration error (ours)',
+        'gateway_compliance_block' => 'Gateway compliance block (method not enabled on our account?)',
         'orphaned_timeout' => 'Stuck session swept (webhook loss?)',
         'system_error' => 'Platform error',
         'no_outstanding_balance' => 'No outstanding balance',
