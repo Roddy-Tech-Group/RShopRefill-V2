@@ -136,10 +136,7 @@ class extends Component {
 <div class="space-y-6 max-w-7xl mx-auto -mt-2">
     {{-- ── Month picker ──────────────────────────────────────────── --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-[12px] text-zinc-500 dark:text-zinc-400">
-            All figures USD (converted at each order's exchange-rate snapshot). Profit is <span class="font-semibold">gross</span>,
-            supplier cost only; gateway fees and opex are not deducted.
-        </p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">Monthly revenue, supplier cost and gross profit, by provider and category.</p>
         @php $isLaunchMonth = $this->selectedMonth()->equalTo($this->launchMonth()); @endphp
         <div class="flex items-center gap-2">
             <button type="button" wire:click="stepMonth(-1)" @disabled($isLaunchMonth) class="rounded-[10px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Previous month">
@@ -188,7 +185,10 @@ class extends Component {
         @php
             $headlines = [
                 ['label' => 'Revenue', 'money' => $totals['revenue_usd'], 'delta' => $delta($totals['revenue_usd'], $previous['revenue_usd'])],
-                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'delta' => $delta($totals['cost_usd'], $previous['cost_usd']), 'downGood' => true],
+                // Up is green here like every other headline: supplier cost
+                // rises with sales, so a bigger number is more business, not
+                // a problem. Marking it "down is good" painted growth red.
+                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'delta' => $delta($totals['cost_usd'], $previous['cost_usd'])],
                 ['label' => 'Gross profit', 'money' => $totals['profit_usd'], 'delta' => $delta($totals['profit_usd'], $previous['profit_usd'])],
                 ['label' => 'Gross margin', 'value' => number_format($totals['margin_pct'], 2).'%', 'delta' => $delta($totals['margin_pct'], $previous['margin_pct'])],
                 ['label' => 'Completed orders', 'value' => number_format($totals['orders']), 'delta' => $delta((float) $totals['orders'], (float) $previous['orders'])],
