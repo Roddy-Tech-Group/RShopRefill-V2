@@ -32,7 +32,7 @@ class RecoveryEligibilityService
      *
      * @var list<string>
      */
-    private const PLATFORM_FAULT_CODES = ['gateway_config_error', 'system_error'];
+    private const PLATFORM_FAULT_CODES = ['gateway_config_error', 'gateway_compliance_block', 'system_error'];
 
     /** At most one recovery email per customer per rolling day. */
     private const COOLDOWN_HOURS = 24;

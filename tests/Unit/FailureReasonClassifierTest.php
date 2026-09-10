@@ -146,6 +146,29 @@ class FailureReasonClassifierTest extends TestCase
         $this->assertTrue($result['retryable'], 'an unrecognised verdict is not yet proof that a retry cannot work');
     }
 
+    public function test_a_gateway_compliance_block_is_graded_as_a_method_we_have_not_been_enabled_for(): void
+    {
+        // The answer every production Apple Pay attempt received.
+        $result = $this->classifier->classify('flutterwave', 'Payment could not be started', 'awaiting_method', [
+            'provider_code' => null,
+            'provider_message' => 'Transaction failed compliance checks. Please try again later or use a different payment method.',
+            'http_status' => 400,
+        ]);
+
+        $this->assertSame('gateway_compliance_block', $result['code']);
+        $this->assertSame(FailureCategory::System, $result['category']);
+        $this->assertFalse($result['retryable']);
+    }
+
+    public function test_a_hosted_init_that_answered_with_no_message_is_a_provider_error(): void
+    {
+        $result = $this->classifier->classify('flutterwave', 'Failed to initialise payment: Unknown error', 'awaiting_method');
+
+        $this->assertSame('provider_error', $result['code']);
+        $this->assertSame(FailureCategory::Provider, $result['category']);
+        $this->assertTrue($result['retryable']);
+    }
+
     public function test_a_method_the_gateway_does_not_allow_for_the_currency_is_our_configuration_error(): void
     {
         // Verbatim: the answer every Ghana mobile-money attempt received while
