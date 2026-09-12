@@ -6,6 +6,14 @@
 --}}
 <x-emails.layout :mail-message="$message ?? null" :title="$subjectLine">
 
+    {{-- Campaign banner. Linked, not embedded: a CID attachment would be copied
+         into every message of a bulk broadcast. 520px is the content width of
+         the shell (600px card less 40px padding each side); width="" plus the
+         inline max-width keeps Outlook and mobile clients both honest. --}}
+    @if (($imageUrl ?? '') !== '')
+        <img src="{{ $imageUrl }}" alt="" width="520" style="width:100%; max-width:520px; height:auto; display:block; margin:0 0 24px 0; border:0; border-radius:12px; outline:none; text-decoration:none;">
+    @endif
+
     @if ($isHtml)
         {!! $bodyContent !!}
     @else

@@ -34,6 +34,7 @@ class SendNewsletterBroadcastJob implements ShouldQueue
         public string $subjectLine,
         public string $bodyContent,
         public bool $isHtml = false,
+        public string $imageUrl = '',
     ) {
         // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
         $this->onQueue('comm-marketing');
@@ -61,6 +62,7 @@ class SendNewsletterBroadcastJob implements ShouldQueue
                                 subjectLine: $this->subjectLine,
                                 bodyContent: $this->bodyContent,
                                 isHtml: $this->isHtml,
+                                imageUrl: $this->imageUrl,
                             ),
                             metadata: [
                                 'is_marketing' => true,
