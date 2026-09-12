@@ -813,7 +813,10 @@
             <div
                 x-show="open"
                 x-cloak
-                x-on:keydown.escape.window="closeModal()"
+                {{-- Only a real Escape keypress closes the wizard. app.js fires a
+                     synthetic Escape on page scroll to collapse dropdowns, and an
+                     untrusted one must never abort a payment in flight. --}}
+                x-on:keydown.escape.window="$event.isTrusted && open && closeModal()"
                 class="fixed inset-0 z-[80] flex items-center justify-center p-4"
             >
                 <!-- Backdrop -->
@@ -1458,6 +1461,24 @@
                     // immediately, rather than at the moment the server rejects them.
                     this.$watch('couponDiscountUsd', () => this.enforceCoinMinimum());
                     this.$watch('$store.cart.subtotalUsd', () => this.enforceCoinMinimum());
+
+                    // Freeze the page behind the payment wizard, like every other
+                    // modal in the app. This is more than cosmetic: body{position:fixed}
+                    // is the signal two global handlers use to stand down while a
+                    // dialog is open - the scroll-driven dropdown auto-close in
+                    // resources/js/app.js and the installed PWA's pull-to-refresh.
+                    // Unlocked, the on-screen keyboard that opens on the wallet
+                    // transaction-PIN step scrolls the page behind the modal, and
+                    // those handlers close it (or reload the page) mid-payment.
+                    // $watch only fires on a real change, so lock/unlock stay
+                    // balanced against the shared reference counter.
+                    this.$watch('open', (isOpen) => {
+                        if (isOpen) {
+                            window.rshopScrollLock?.lock();
+                        } else {
+                            window.rshopScrollLock?.unlock();
+                        }
+                    });
                 },
 
                 /**

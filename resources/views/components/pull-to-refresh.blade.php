@@ -72,6 +72,19 @@
         const isLocked = () => document.body.style.position === 'fixed';
         const el = () => document.getElementById('rshop-ptr');
 
+        // A drag that starts inside an open dialog is the user reaching for a
+        // field, not asking for a refresh - reloading there would throw away a
+        // half-finished form (or a live payment session). Same for a drag while
+        // the on-screen keyboard is up: that gesture belongs to the field.
+        // These back up isLocked() for dialogs that don't take the scroll lock.
+        const inDialog = (node) => !! (node && typeof node.closest === 'function'
+            && node.closest('[role="dialog"], [aria-modal="true"]'));
+        const isTyping = () => {
+            const a = document.activeElement;
+            return !! a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'
+                || a.tagName === 'SELECT' || a.isContentEditable);
+        };
+
         // Batch DOM writes to one per animation frame so the spinner tracks the
         // finger buttery-smooth even on rapid touchmove bursts (no layout thrash).
         function render(px) {
@@ -103,7 +116,8 @@
         }
 
         window.addEventListener('touchstart', (ev) => {
-            if (refreshing || isLocked() || scroller().scrollTop > 0 || ev.touches.length !== 1) {
+            if (refreshing || isLocked() || isTyping() || inDialog(ev.target)
+                || scroller().scrollTop > 0 || ev.touches.length !== 1) {
                 pulling = false;
                 return;
             }
@@ -115,7 +129,7 @@
         window.addEventListener('touchmove', (ev) => {
             if (! pulling) { return; }
             const delta = ev.touches[0].clientY - startY;
-            if (delta <= 0 || scroller().scrollTop > 0 || isLocked()) {
+            if (delta <= 0 || scroller().scrollTop > 0 || isLocked() || isTyping()) {
                 pulling = false;
                 snapBack();
                 return;
