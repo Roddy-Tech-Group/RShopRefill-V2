@@ -13,6 +13,7 @@ use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\EnsureProfileCompleted;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
+use App\Http\Middleware\RejectMalformedInput;
 use App\Http\Middleware\ResolveRegion;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
@@ -103,6 +104,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // (PIN change/reset/remove, device revoke, OTP preference).
             'device.mature' => EnsureDeviceMature::class,
         ]);
+
+        // Refuses malformed-UTF-8 and oversized input with 422 before any
+        // controller runs. Global, not per-group: an endpoint that echoes a
+        // parameter into a JSON response 500s on bad encoding wherever it
+        // lives, and web and api both do that.
+        $middleware->prepend(RejectMalformedInput::class);
 
         $middleware->append(TraceRequestMiddleware::class);
 

@@ -616,11 +616,14 @@ Route::get('cart', [CartWebController::class, 'page'])->name('shop.cart');
 // Storefront cart - web routes (session-authenticated) wrapping the backend CartManager.
 // Returns compact JSON the Alpine cart store consumes. See CartWebController.
 Route::prefix('cart')->name('cart.')->group(function () {
-    Route::get('data', [CartWebController::class, 'show'])->name('data');
+    // Throttled: these are the only unauthenticated write routes on the
+    // storefront, and a scanner found them. See the cart-read / cart-write
+    // limiters in AppServiceProvider for the keying.
+    Route::get('data', [CartWebController::class, 'show'])->middleware('throttle:cart-read')->name('data');
     // not-suspended is a no-op for guests; only kicks in for an authenticated suspended user.
-    Route::post('items', [CartWebController::class, 'add'])->middleware(['not-suspended', 'maintenance-guard'])->name('items.add');
-    Route::patch('items/{item}', [CartWebController::class, 'update'])->middleware(['not-suspended', 'maintenance-guard'])->name('items.update');
-    Route::delete('items/{item}', [CartWebController::class, 'remove'])->middleware(['not-suspended', 'maintenance-guard'])->name('items.remove');
+    Route::post('items', [CartWebController::class, 'add'])->middleware(['not-suspended', 'maintenance-guard', 'throttle:cart-write'])->name('items.add');
+    Route::patch('items/{item}', [CartWebController::class, 'update'])->middleware(['not-suspended', 'maintenance-guard', 'throttle:cart-write'])->name('items.update');
+    Route::delete('items/{item}', [CartWebController::class, 'remove'])->middleware(['not-suspended', 'maintenance-guard', 'throttle:cart-write'])->name('items.remove');
 });
 
 // Checkout. Resolves the active cart (CartManager - same path the global CartComposer uses)

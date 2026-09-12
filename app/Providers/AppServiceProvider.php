@@ -89,6 +89,18 @@ class AppServiceProvider extends ServiceProvider
      */
     private function configureRateLimiters(): void
     {
+        // The storefront cart. /cart/data is hydrated on every page load and
+        // re-read after every mutation, so the read ceiling is generous; the
+        // writes are capped tighter because each one is a database write on a
+        // route a guest can reach without authenticating.
+        //
+        // Keyed by user, then the guest cart cookie, then IP. The cookie step
+        // matters: without it every guest behind one corporate NAT or mobile
+        // carrier egress shares a bucket and a busy office locks itself out.
+        RateLimiter::for('cart-read', fn (Request $request) => Limit::perMinute(240)->by('cart:r:'.$this->cartKey($request)));
+
+        RateLimiter::for('cart-write', fn (Request $request) => Limit::perMinute(60)->by('cart:w:'.$this->cartKey($request)));
+
         RateLimiter::for('payment-session-poll', function (Request $request) {
             $userKey = (string) ($request->user()?->id ?? $request->ip());
             $sessionId = (string) $request->route('id');
@@ -108,5 +120,17 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(10)->by('psa:us:'.$userKey.':'.$sessionId),
             ];
         });
+    }
+
+    /**
+     * Identity for cart rate limiting: the authenticated user if there is one,
+     * otherwise the guest cart cookie, otherwise the IP. Mirrors how
+     * CartWebController itself resolves whose cart a request is touching.
+     */
+    private function cartKey(Request $request): string
+    {
+        return (string) ($request->user()?->id
+            ?? $request->cookie('guest_token')
+            ?? $request->ip());
     }
 }
