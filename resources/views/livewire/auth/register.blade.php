@@ -18,7 +18,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.auth')] class extends Component {
-    public string $name = '';
+    public string $first_name = '';
+
+    public string $last_name = '';
 
     public string $email = '';
 
@@ -55,8 +57,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         
         $this->ensureIsNotRateLimited();
 
+        // max:100 a part, not 255: users.name holds both plus a space, and two
+        // 255s would overflow the column at the insert rather than at the form.
         $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
             'terms' => ['accepted'],
@@ -67,6 +72,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
         // Consent is recorded by the act of registering; it is not a column on
         // users, so it must not reach User::create().
         unset($validated['terms']);
+
+        // The split is a form concern only. users.name is still the single
+        // column every screen reads to greet a customer, so the two fields are
+        // joined back into it here rather than pushing the split onto the
+        // schema and every caller of $user->name.
+        $validated['name'] = trim($validated['first_name'].' '.$validated['last_name']);
+        unset($validated['first_name'], $validated['last_name']);
 
         $validated['password'] = Hash::make($validated['password']);
 
@@ -199,23 +211,46 @@ new #[Layout('components.layouts.auth')] class extends Component {
         {{-- Registration form --}}
         <form wire:submit="register" class="flex flex-col gap-3 sm:gap-4">
 
-            {{-- Name --}}
-            <div>
-                <label for="name" class="mb-2 block text-sm font-medium text-zinc-700">Full Name</label>
-                <div class="relative">
-                    <input
-                        wire:model="name"
-                        id="name"
-                        name="name"
-                        type="text"
-                        required
-                        autofocus
-                        autocomplete="name"
-                        placeholder="Enter your full name"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                    />
+            {{-- Name. Two fields, not one: given-name / family-name is what
+                 browsers and password managers autofill against, and it is the
+                 shape every later step wants a name in. One row at every width,
+                 phones included - they are two halves of one answer, and
+                 stacking them read as two unrelated questions. --}}
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="first_name" class="mb-2 block text-sm font-medium text-zinc-700">First Name</label>
+                    <div class="relative">
+                        <input
+                            wire:model="first_name"
+                            id="first_name"
+                            name="first_name"
+                            type="text"
+                            required
+                            autofocus
+                            autocomplete="given-name"
+                            placeholder="First name"
+                            class="w-full rounded-[12px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        />
+                    </div>
+                    @error('first_name') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
-                @error('name') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+
+                <div>
+                    <label for="last_name" class="mb-2 block text-sm font-medium text-zinc-700">Last Name</label>
+                    <div class="relative">
+                        <input
+                            wire:model="last_name"
+                            id="last_name"
+                            name="last_name"
+                            type="text"
+                            required
+                            autocomplete="family-name"
+                            placeholder="Last name"
+                            class="w-full rounded-[12px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        />
+                    </div>
+                    @error('last_name') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
             </div>
 
             {{-- Email --}}
