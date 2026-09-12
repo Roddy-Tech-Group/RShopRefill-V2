@@ -26,42 +26,37 @@ class AuthPagesTest extends TestCase
     }
 
     /**
-     * Standalone: the storefront nav is stripped on purpose - one job per page.
-     * The trade is that a bookmark landing here must not be a dead end, so the
-     * layout carries a logo that links home.
+     * Standalone, and now standalone all the way: the storefront nav is
+     * stripped on purpose - one job per page - and so is everything that used
+     * to sit above the card. The card is the whole page.
      */
-    public function test_they_are_standalone_but_never_a_dead_end(): void
+    public function test_they_are_standalone(): void
     {
         foreach (['/login', '/register'] as $url) {
             $this->withoutVite()->get($url)
                 ->assertOk()
                 ->assertDontSee('Product categories', false)
-                ->assertDontSee('Shopping cart', false)
-                ->assertSee('home', false);
+                ->assertDontSee('Shopping cart', false);
         }
 
         $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
 
-        // At every width: the brand card that carried the logo beside the form
-        // on desktop is gone, so this header is the only brand mark and the
-        // only exit on the page.
-        $this->assertStringContainsString('<header>', $layout);
-        $this->assertStringNotContainsString('<header class="lg:hidden">', $layout);
-        $this->assertStringContainsString("route('home')", $layout);
+        // No header row at any width, and no logo in it - it was a second brand
+        // mark on a page that already says where you are.
+        $this->assertStringNotContainsString('<header', $layout);
+        $this->assertStringNotContainsString('Rshoprefillslogo', $layout);
     }
 
-    public function test_the_layout_leaves_room_for_that_header(): void
+    public function test_the_card_wrapper_never_stacks_a_second_viewport_minimum(): void
     {
-        // The card wrapper was min-h-screen while it was the only child. With a
-        // header as a sibling, a full-viewport minimum pushes the card off the
-        // bottom by exactly the header's height.
+        // The body owns the viewport minimum and the wrapper grows into what is
+        // left. A second min-h-screen here stacks with it rather than sharing
+        // it, which pushed the card off the bottom the last time anything sat
+        // above it.
         $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
 
         $this->assertStringContainsString('<body class="flex min-h-screen flex-col', $layout);
         $this->assertStringContainsString('<div class="flex flex-1 items-center justify-center p-4', $layout);
-
-        // Whatever the cards look like, a second full-viewport minimum here is
-        // always the bug - it stacks with the header rather than sharing it.
         $this->assertStringNotContainsString('<div class="flex min-h-screen items-', $layout);
     }
 
@@ -115,8 +110,14 @@ class AuthPagesTest extends TestCase
     {
         $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
 
-        // The form card, on its own and unstacked.
-        $this->assertStringContainsString('flex w-full max-w-xl flex-col rounded-[20px] bg-[#ffffff]', $layout);
+        // The form card, on its own and unstacked. max-w-md: at max-w-xl the
+        // fields ran wider than anything typed into them.
+        $this->assertStringContainsString('flex w-full max-w-md flex-col rounded-[20px] bg-[#ffffff]', $layout);
+        $this->assertStringNotContainsString(
+            'max-w-xl',
+            preg_replace('/\{\{--.*?--\}\}/s', '', $layout),
+            'the comment above the card may name the old width; the markup may not.'
+        );
 
         // The brand card and every trace of the overlap that carried it.
         foreach ([
@@ -213,29 +214,23 @@ class AuthPagesTest extends TestCase
     }
 
     /**
-     * A way out of auth without using the browser back button.
+     * There is no "Back to website" control on the auth pages.
      *
-     * It has moved twice: pinned to the single card's corner, then into the
-     * brand panel's corner when the layout became two cards. With that panel
-     * gone it lives in the header, at every width, beside the logo.
+     * It moved four times looking for a home - the single card's corner, the
+     * brand panel's corner, a header row beside the logo, the card's top right
+     * - and was dropped instead. The browser's own back is the way out; the
+     * card carries nothing but the form.
+     *
+     * Asserted at the source, so none of the four old placements can quietly
+     * come back with it.
      */
-    public function test_both_pages_offer_a_way_back_to_the_site(): void
+    public function test_the_pages_carry_no_back_to_website_control(): void
     {
         $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
 
-        $this->assertStringContainsString("__('common.back_to_website')", $layout);
-
-        // A labelled pill in the header, not pinned inside a card that no
-        // longer exists.
-        $this->assertStringContainsString('inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#ffffff]', $layout);
+        $this->assertStringNotContainsString('common.back_to_website', $layout);
         $this->assertStringNotContainsString('absolute left-6 top-6 inline-flex items-center gap-1.5', $layout);
-
-        foreach (['/login', '/register'] as $url) {
-            $html = $this->withoutVite()->get($url)->assertOk()->getContent();
-
-            $this->assertStringContainsString('Back to website', $html);
-            $this->assertStringContainsString('href="'.route('home').'"', $html);
-        }
+        $this->assertStringNotContainsString('<div class="mb-5 flex justify-end">', $layout);
     }
 
     /**
@@ -285,23 +280,17 @@ class AuthPagesTest extends TestCase
     }
 
     /**
-     * Exactly one way back, shown at every width.
-     *
-     * There were two while the brand panel existed: its own corner link on
-     * desktop and the lg:hidden header's below. With the panel gone a second
-     * copy would be the bug - two "Back to website" links on one screen.
+     * And nothing renders it either - the source check above cannot see a copy
+     * that reaches the page from a partial or a shared component.
      */
-    public function test_there_is_exactly_one_way_back_at_every_width(): void
+    public function test_no_back_to_website_link_renders_on_either_page(): void
     {
-        $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
+        foreach (['/login', '/register'] as $url) {
+            $html = $this->withoutVite()->get($url)->assertOk()->getContent();
 
-        // Blade comments stripped - they name the link in prose.
-        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $layout);
-        $this->assertSame(1, substr_count($markup, "__('common.back_to_website')"));
-        $this->assertStringContainsString('<header>', $layout);
-
-        $html = $this->withoutVite()->get('/login')->assertOk()->getContent();
-        $this->assertSame(1, substr_count($html, 'Back to website'));
+            $this->assertStringNotContainsString('Back to website', $html);
+            $this->assertStringNotContainsString(__('common.back_to_website'), $html);
+        }
     }
 
     /** Neither submit button carries the hand glyph any more. */

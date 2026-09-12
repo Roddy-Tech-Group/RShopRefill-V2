@@ -46,53 +46,20 @@
              handed an English form at the one step that asks them to type. --}}
         @include("partials.translate-engine")
 
-        {{-- The only way back to the shop from an auth page. Standalone screens
-             strip the nav on purpose - one job per page - but a bookmark that
-             lands here should not be a dead end.
+        {{-- The form card alone, centered on the page tone. Nothing sits
+             above it any more: the logo was a second brand mark on a page that
+             already says where you are, and the "Back to website" pill went
+             with it. The card has one job and shows one thing.
 
-             All widths: the brand card that used to carry the logo and a home
-             link beside the form on desktop is gone, so this row is the only
-             brand mark and the only exit at every size. --}}
-        <header>
-            <div class="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
-                <a
-                    href="{{ route('home') }}"
-                    wire:navigate
-                    class="flex h-8 items-center rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                    aria-label="{{ $siteName }} home"
-                >
-                    <img
-                        src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                        alt="{{ $siteName }}"
-                        class="h-full w-auto object-contain dark:brightness-0 dark:invert"
-                    />
-                </a>
-
-                {{-- A labelled way back, because the logo alone is a way back
-                     only if you already know it is one. --}}
-                <a
-                    href="{{ route('home') }}"
-                    wire:navigate
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#ffffff] px-3.5 py-2 text-[13px] font-semibold text-zinc-700 shadow-sm ring-1 ring-[#dee3e1] transition-colors hover:text-zinc-900 hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10 dark:hover:text-white"
-                >
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
-                    </svg>
-                    {{ __('common.back_to_website') }}
-                </a>
-            </div>
-        </header>
-
-        {{-- The form card alone, centered on the page tone. A brand identity
-             card used to sit offset to its left; it was dropped so the form is
-             the only surface on the page.
-
-             flex-1, not min-h-screen: the header above is a sibling, and a
-             full-viewport minimum here would push the card off the bottom by
-             exactly the header's height. --}}
+             flex-1 on a flex-column body, not min-h-screen: with nothing
+             stacked above it either fills the viewport, and flex-1 stays
+             correct if a sibling is ever added back. --}}
         <div class="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-10">
-            {{-- Form card --}}
-            <main class="flex w-full max-w-xl flex-col rounded-[20px] bg-[#ffffff] px-6 py-6 shadow-2xl shadow-zinc-900/15 sm:px-10 dark:bg-[#0c1a36] dark:ring-1 dark:ring-white/10">
+            {{-- Form card. max-w-md, not max-w-xl: at 576px the fields ran
+                 wider than anything typed into them and the card read as a page
+                 rather than a form. The page tone underneath stays the
+                 storefront's. --}}
+            <main class="flex w-full max-w-md flex-col rounded-[20px] bg-[#ffffff] px-6 py-6 shadow-2xl shadow-zinc-900/15 sm:px-8 dark:bg-[#0c1a36] dark:ring-1 dark:ring-white/10">
 
                 {{-- Sign In / Sign Up. Links, not a client-side toggle: the
                      two are separate Livewire components on separate routes,
