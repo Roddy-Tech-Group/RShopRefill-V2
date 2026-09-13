@@ -95,10 +95,7 @@ class extends Component {
 @endphp
 
 <div class="space-y-6 max-w-7xl mx-auto -mt-2">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-[12px] text-zinc-500 dark:text-zinc-400">
-            Guest checkout accounts are excluded. The window applies to activity boards; Newest, Dormant and Wallet Balance are always current.
-        </p>
+    <div class="flex flex-wrap items-center justify-end gap-3">
         <div class="inline-flex flex-wrap items-center gap-0.5 rounded-[12px] bg-zinc-100 p-0.5 dark:bg-[#26416b]">
             @foreach ($this->periods() as $key => $periodLabel)
                 <button

@@ -4,6 +4,7 @@ namespace App\Domain\Fulfillment\Console;
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Services\FulfillmentProviderFactory;
+use App\Domain\Order\Services\OrderService;
 use App\Jobs\FulfillOrderItemJob;
 use App\Jobs\PollPendingFulfillmentJob;
 use App\Models\OrderItem;
@@ -67,6 +68,17 @@ class RetryFulfillmentCommand extends Command
      */
     private function retryItem(OrderItem $item, FulfillmentProviderFactory $providerFactory): void
     {
+        // Refunded items are off limits: the customer already got their money
+        // back for this item, so completing or re-buying it now would hand
+        // over goods that were paid back. Same guard as the admin endpoint.
+        $order = $item->order;
+        $orderService = app(OrderService::class);
+        if ($order && ($orderService->hasRefundRecord($order, "item-{$item->id}") || $orderService->hasRefundRecord($order, 'final-'.$order->id))) {
+            $this->warn("Item {$item->id}: already refunded to the customer - refusing to retry. They can re-order with their wallet credit.");
+
+            return;
+        }
+
         $reference = (string) ($item->fulfillment_reference ?? '');
 
         if ($reference !== '' && ! str_starts_with($reference, 'PENDING-')) {

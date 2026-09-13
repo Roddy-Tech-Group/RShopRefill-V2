@@ -72,7 +72,12 @@ class ManagementPagesTest extends TestCase
     {
         $this->withoutVite()->asSuperAdmin();
 
+        // Leaderboards now lives under User Management; the old management URL
+        // redirects so bookmarks keep working.
         $this->get(route('admin.management.leaderboards'))
+            ->assertRedirect(url('admin/users/leaderboards'));
+
+        $this->get(route('admin.users.leaderboards'))
             ->assertOk()
             ->assertSee('Top Customers')
             ->assertSee('Most Failed Transactions')
@@ -147,7 +152,7 @@ class ManagementPagesTest extends TestCase
     {
         $this->get(route('admin.management.monitoring'))->assertNotFound();
         $this->get(route('admin.management.finances'))->assertNotFound();
-        $this->get(route('admin.management.leaderboards'))->assertNotFound();
+        $this->get(route('admin.users.leaderboards'))->assertNotFound();
         $this->get(route('admin.management.runbooks'))->assertNotFound();
         $this->get(route('admin.management.runbooks.doc', 'risk-and-fraud-engine'))->assertNotFound();
     }
@@ -179,7 +184,27 @@ class ManagementPagesTest extends TestCase
         );
         $this->actingAs($admin, 'admin');
 
-        $this->get(route('admin.management.leaderboards'))->assertOk();
         $this->get(route('admin.payment-insights'))->assertOk();
+    }
+
+    public function test_leaderboards_now_follows_the_customers_grant(): void
+    {
+        // The move to User Management shifts the grant: a customers-scoped
+        // admin (the support profile) can open it, a management-only admin
+        // reaches the redirect but not the page itself.
+        $this->withoutVite()->seed(AdminSeeder::class);
+        $admin = Admin::firstOrCreate(
+            ['email' => 'customers-granted@example.test'],
+            [
+                'name' => 'Customers Granted',
+                'password' => 'password',
+                'role' => AdminRole::Admin,
+                'is_active' => true,
+                'permissions' => ['customers'],
+            ],
+        );
+        $this->actingAs($admin, 'admin');
+
+        $this->get(route('admin.users.leaderboards'))->assertOk()->assertSee('Top Customers');
     }
 }

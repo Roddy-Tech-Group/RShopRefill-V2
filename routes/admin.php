@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Admin\Services\AudienceInsightsService;
 use App\Http\Controllers\Admin\AdminCatalogController;
 use App\Http\Controllers\Admin\AdminCommerceController;
 use App\Http\Controllers\Admin\AdminCustomerController;
@@ -174,6 +175,37 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ]);
         })->name('customer');
 
+        // ── User Management group (shares the `customers` section grant) ──
+        Route::view('users/blocked', 'admin.users.blocked')->name('users.blocked');
+        Volt::route('users/leaderboards', 'admin.management.leaderboards')->name('users.leaderboards');
+        Route::view('users/closures', 'admin.users.closures')->name('users.closures');
+        Route::view('users/feedback', 'admin.users.feedback')->name('users.feedback');
+
+        Route::get('users/insights', function () {
+            $window = request()->query('window');
+            $windowDays = in_array($window, ['30', '90'], true) ? (int) $window : null;
+
+            return view('admin.users.insights', [
+                'insights' => app(AudienceInsightsService::class)->build($windowDays),
+                'window' => $windowDays,
+            ]);
+        })->name('users.insights');
+
+        Route::get('users/insights/export.csv', function () {
+            $window = request()->query('window');
+            $windowDays = in_array($window, ['30', '90'], true) ? (int) $window : null;
+            $table = app(AudienceInsightsService::class)->build($windowDays)['table'];
+
+            return response()->streamDownload(function () use ($table) {
+                $out = fopen('php://output', 'w');
+                fputcsv($out, ['Country', 'Users', 'Orders', 'Revenue USD', 'Avg order USD', 'Verified %']);
+                foreach ($table as $row) {
+                    fputcsv($out, [$row['label'], $row['users'], $row['orders'], $row['revenue_usd'], $row['aov_usd'], $row['verified_pct']]);
+                }
+                fclose($out);
+            }, 'audience-insights-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
+        })->name('users.insights.export');
+
         // KYC review - serve documents from the private disk + approve / reject
         // (legacy manual submissions), plus the provider-era reconciliation:
         // ask Smile's job-status API about a pending attempt whose webhook has
@@ -196,6 +228,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // and send a direct (email + dashboard) message.
         Route::patch('customers/{user}', [AdminCustomerController::class, 'update'])->name('customer.update');
         Route::post('customers/{user}/ban', [AdminCustomerController::class, 'toggleBan'])->name('customer.ban');
+        Route::post('customers/{user}/close', [AdminCustomerController::class, 'toggleClosure'])->name('customer.close');
+        Route::post('customers/{user}/send-data-export', [AdminCustomerController::class, 'sendDataExport'])->name('customer.send-data-export');
+        Route::post('customers/{user}/revoke-sessions', [AdminCustomerController::class, 'revokeSessions'])->name('customer.revoke-sessions');
         Route::post('customers/{user}/suspend', [AdminCustomerController::class, 'toggleSuspend'])->name('customer.suspend');
         Route::post('customers/{user}/restrict', [AdminCustomerController::class, 'toggleRestrict'])->name('customer.restrict');
         Route::post('customers/{user}/funds', [AdminCustomerController::class, 'toggleFunds'])->name('customer.funds');
@@ -218,6 +253,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transactions/{attempt}', [AdminTransactionController::class, 'show'])->whereUuid('attempt')->name('transaction');
         Route::get('transactions/{attempt}/report', [AdminTransactionController::class, 'report'])->whereUuid('attempt')->name('transaction.report');
         Route::get('transactions/{attempt}/report/pdf', [AdminTransactionController::class, 'reportPdf'])->whereUuid('attempt')->name('transaction.report.pdf');
+        // Operator exit for a crypto payment that arrived short: settle with a
+        // stated reason. Money override, so Super Admin only (the controller
+        // enforces it on top of the route-name gate).
+        Route::post('transactions/{attempt}/settle', [AdminTransactionController::class, 'settle'])->whereUuid('attempt')->name('transaction.settle');
         Route::view('wallets', 'admin.wallets')->name('wallets');
         Volt::route('rates', 'admin.rates')->name('rates');
         Volt::route('account', 'admin.account')->name('account');
@@ -229,7 +268,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('management')->name('management.')->group(function () {
             Volt::route('monitoring', 'admin.management.monitoring')->name('monitoring');
             Volt::route('finances', 'admin.management.finances')->name('finances');
-            Volt::route('leaderboards', 'admin.management.leaderboards')->name('leaderboards');
+            // Leaderboards moved to User Management (it is customer analytics);
+            // the old URL and route name live on as a redirect so bookmarks
+            // and old links keep working.
+            Route::redirect('leaderboards', 'admin/users/leaderboards')->name('leaderboards');
             // Self-contained HTML reference docs (e.g. the Fraud & Risk Engine
             // handbook) served as authored; two segments, so no clash with the
             // one-segment Volt wildcard below.

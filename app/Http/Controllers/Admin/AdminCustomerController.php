@@ -3,9 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Audit\Services\AuditLogService;
+use App\Domain\Auth\Exceptions\AccountClosureException;
+use App\Domain\Auth\Services\AccountClosureService;
+use App\Domain\Auth\Services\DataExportService;
 use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\AccountBannedMail;
+use App\Domain\Communication\Mail\Security\AccountSuspendedMail;
+use App\Domain\Communication\Mail\Security\DataExportRequestedByStaffMail;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Security\Services\SessionRevocationService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\TransactionPinService;
@@ -13,6 +20,8 @@ use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\User;
+use App\Support\PhoneCountries;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,7 +46,10 @@ class AdminCustomerController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
-            'country' => ['nullable', 'string', Rule::in(array_keys(config('countries.codes', [])))],
+            // ISO 3166-1 alpha-2, the one shape users.country holds. Storing the
+            // display name here (as this rule used to accept) put a second
+            // format in the column that no ISO-comparing reader could match.
+            'country' => ['nullable', 'string', Rule::in(PhoneCountries::isoCodes())],
             'gender' => ['nullable', 'in:male,female,other'],
         ]);
 
@@ -158,17 +170,108 @@ class AdminCustomerController extends Controller
     }
 
     /**
-     * Ban or unban the customer. Banning blocks login + access via middleware.
+     * Ban or unban the customer. A ban signs them out on every device at the
+     * same moment (a banned customer used to keep their live sessions until
+     * they happened to load a web page) and tells them what happened and
+     * where to write; the middleware refuses any new sign-in.
      */
-    public function toggleBan(User $user): RedirectResponse
+    public function toggleBan(User $user, SessionRevocationService $sessions, CommunicationManager $communications, AuditLogService $audit): RedirectResponse
     {
-        $banned = $user->banned_at !== null;
+        if ($user->banned_at !== null) {
+            $user->update(['banned_at' => null]);
 
-        $user->update(['banned_at' => $banned ? null : now()]);
+            return back()->with('status', 'Customer unbanned.');
+        }
 
-        return back()->with('status', $banned
-            ? 'Customer unbanned.'
-            : 'Customer banned. They have been blocked from signing in.');
+        $user->update(['banned_at' => now()]);
+
+        $sessions->revokeAll($user);
+        $audit->log(action: 'admin.sessions_revoked', model: $user, metadata: ['reason' => 'ban']);
+
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountRestriction,
+            title: 'Your account has been suspended',
+            message: 'Your account has been suspended and signed out on every device. Write to support if you believe this is a mistake.',
+            mailable: new AccountBannedMail($user->name),
+            correlationId: 'account_banned_'.$user->id.'_'.now()->timestamp,
+        );
+
+        return back()->with('status', 'Customer banned, signed out on every device, and notified by email.');
+    }
+
+    /**
+     * Close (or un-close) an account on the customer's behalf: the written
+     * deletion-request path for someone who cannot sign in. Same rules as the
+     * self-serve flow, so a wallet balance or an in-flight order refuses it.
+     */
+    public function toggleClosure(User $user, AccountClosureService $closures, AuditLogService $audit): RedirectResponse
+    {
+        if ($user->isClosed()) {
+            return back()->withErrors(['closure' => 'This account is already closed and anonymised.']);
+        }
+
+        if ($user->hasRequestedClosure()) {
+            $closures->cancel($user);
+            $audit->log(action: 'admin.account_closure_cancelled', model: $user);
+
+            return back()->with('status', 'Account closure cancelled. The customer keeps their account.');
+        }
+
+        try {
+            $closures->request($user);
+        } catch (AccountClosureException $e) {
+            return back()->withErrors(['closure' => $e->getMessage()]);
+        }
+
+        $audit->log(action: 'admin.account_closure_requested', model: $user, metadata: ['closes_on' => $user->fresh()->closesOn()?->toDateString()]);
+
+        return back()->with('status', 'Closure requested on the customer\'s behalf. Their details are anonymised after the grace period unless they sign in.');
+    }
+
+    /**
+     * Email the customer a PDF copy of their data, for access requests that
+     * arrive in writing (the customer cannot sign in, so the self-serve OTP
+     * path is closed to them). Goes ONLY to the address on the account, and
+     * both the audit log and the customer's inbox record that it happened.
+     */
+    public function sendDataExport(User $user, DataExportService $export, AuditLogService $audit, CommunicationManager $communications): RedirectResponse
+    {
+        if ($user->isClosed()) {
+            return back()->withErrors(['data_export' => 'This account is closed and anonymised; there is no personal data left to export.']);
+        }
+
+        $pdf = Pdf::loadView('dashboard.data-export-pdf', ['data' => $export->build($user)]);
+
+        $mailable = new DataExportRequestedByStaffMail($user->name);
+        $mailable->attachData($pdf->output(), 'rshoprefill-my-data-'.now()->format('Y-m-d').'.pdf', ['mime' => 'application/pdf']);
+
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::SecurityIncident,
+            title: 'Your data export is attached',
+            message: 'The copy of your personal data you asked for has been sent to your email.',
+            mailable: $mailable,
+            correlationId: 'admin_data_export_'.$user->id.'_'.now()->timestamp,
+        );
+
+        $audit->log(action: 'admin.data_export_sent', model: $user);
+
+        return back()->with('status', 'Data export emailed to the address on the account.');
+    }
+
+    /**
+     * Sign the customer out everywhere: web sessions, the security session
+     * registry, and every remember-me token. The first move after a suspected
+     * compromise, and standard practice right before a ban.
+     */
+    public function revokeSessions(User $user, SessionRevocationService $sessions, AuditLogService $audit): RedirectResponse
+    {
+        $sessions->revokeAll($user);
+
+        $audit->log(action: 'admin.sessions_revoked', model: $user);
+
+        return back()->with('status', 'Customer signed out on every device. Remember-me cookies are now void.');
     }
 
     /**
@@ -178,7 +281,7 @@ class AdminCustomerController extends Controller
      * `not-suspended` middleware. Lifting suspension also clears any pending
      * review request.
      */
-    public function toggleSuspend(Request $request, User $user): RedirectResponse
+    public function toggleSuspend(Request $request, User $user, CommunicationManager $communications): RedirectResponse
     {
         $suspended = $user->suspended_at !== null;
 
@@ -196,13 +299,26 @@ class AdminCustomerController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $reason = $validated['reason'] ?? null;
+
         $user->update([
             'suspended_at' => now(),
-            'suspension_reason' => $validated['reason'] ?? null,
+            'suspension_reason' => $reason,
             'suspension_review_requested_at' => null,
         ]);
 
-        return back()->with('status', 'Customer suspended. They can still sign in but cannot purchase, fund or check out.');
+        // The customer stays signed in by design, so the mail is how they
+        // learn what is paused, why, and how to ask for a review.
+        $communications->send(
+            recipient: $user,
+            category: CommunicationCategory::AccountRestriction,
+            title: 'Your account is under review',
+            message: 'Purchases, funding and checkout are paused while our team reviews your account.',
+            mailable: new AccountSuspendedMail($user->name, $reason),
+            correlationId: 'account_suspended_'.$user->id.'_'.now()->timestamp,
+        );
+
+        return back()->with('status', 'Customer suspended and notified. They can still sign in but cannot purchase, fund or check out.');
     }
 
     /**

@@ -119,7 +119,11 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 'user_id' => $attempt?->user_id ?? $attempt?->order?->user_id ?? $session->walletFunding?->user_id,
                 'product_line' => $productLine->value,
                 'provider' => $session->provider,
-                'payment_method' => $session->payment_payload['payment_method'] ?? null,
+                // The attempt is where the method is recorded (at pay time, and
+                // at order placement for a chosen method). This used to read a
+                // session payload key nothing ever wrote, so every outcome was
+                // methodless and the "By Payment Method" table stayed empty.
+                'payment_method' => $attempt?->payment_method ?? $session->payment_payload['payment_method'] ?? null,
                 'failure_stage' => $classification['stage']->value,
                 'failure_category' => $classification['category']->value,
                 'failure_reason_code' => $classification['code'],

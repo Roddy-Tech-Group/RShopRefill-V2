@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Security\Services\SessionRevocationService;
 use App\Models\TrustedDevice;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -18,7 +19,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     public string $current_password = '';
     public string $password = '';
     public string $password_confirmation = '';
-    
+
+    /** Account password typed to confirm a device revocation (the step-up). */
+    public string $revoke_password = '';
+
     public string $emailOtpPreference = '';
 
     public function mount(): void
@@ -47,6 +51,11 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         Auth::user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        // Every OTHER session is signed out (AuthenticateSession enforces it
+        // on their next request) and every remember-me cookie is voided;
+        // this device stays signed in, as the page promises.
+        Auth::logoutOtherDevices($validated['password']);
 
         $this->reset('current_password', 'password', 'password_confirmation');
 
@@ -91,16 +100,34 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->dispatch('toast', message: 'Preferences updated.');
     }
 
+    /**
+     * Sign a device out and withdraw its trust. The account password is the
+     * step-up: it lets a customer on a brand-new device cut a stolen one
+     * loose right now instead of waiting out the 24-hour hold (which used to
+     * leave the thief signed in for a day). Google-only accounts have no
+     * password to prove, so they keep the maturity hold.
+     */
     public function revokeDevice($deviceId): void
     {
-        $this->enforceDeviceTrust('device-' . $deviceId);
+        $user = Auth::user();
 
-        $device = TrustedDevice::where('id', $deviceId)->where('user_id', Auth::id())->first();
-        if ($device) {
-            $device->sessions()->update(['revoked_at' => now()]);
-            $device->trusted_since = null;
-            $device->save();
+        if ($user->password !== null) {
+            $this->validate([
+                'revoke_password' => ['required', 'string', 'current_password'],
+            ], [], ['revoke_password' => 'password']);
+        } else {
+            $this->enforceDeviceTrust('revoke_password');
         }
+
+        $device = TrustedDevice::where('id', $deviceId)->where('user_id', $user->id)->first();
+
+        if ($device) {
+            app(SessionRevocationService::class)->revokeDevice($device);
+        }
+
+        $this->reset('revoke_password');
+
+        $this->dispatch('toast', message: 'Device signed out and removed.');
     }
     
     public function with(): array
@@ -365,12 +392,29 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                 @if($device->id === $currentDeviceId)
                                     <span class="inline-flex items-center rounded-[8px] bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">Current Device</span>
                                 @else
-                                    <button type="button" wire:click="revokeDevice({{ $device->id }})" class="rounded-[8px] px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">Revoke</button>
+                                    <div x-data="{ confirming: false }" class="flex items-center justify-end gap-2">
+                                        <button x-show="!confirming" type="button" @click="confirming = true" class="rounded-[8px] px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10">Revoke</button>
+                                        <div x-show="confirming" x-cloak class="flex items-center gap-2">
+                                            @if(auth()->user()->password !== null)
+                                                <input
+                                                    type="password"
+                                                    wire:model="revoke_password"
+                                                    autocomplete="current-password"
+                                                    placeholder="Your password"
+                                                    aria-label="Confirm with your account password"
+                                                    class="w-40 rounded-[10px] border border-zinc-300 bg-white px-3 py-1.5 text-xs text-black placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#1d3252] dark:text-white dark:placeholder:text-zinc-400"
+                                                />
+                                            @endif
+                                            <button type="button" wire:click="revokeDevice({{ $device->id }})" wire:loading.attr="disabled" class="rounded-[8px] bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60">Sign out</button>
+                                            <button type="button" @click="confirming = false; $wire.revoke_password = ''" class="rounded-[8px] px-2 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">Cancel</button>
+                                        </div>
+                                    </div>
                                 @endif
                             </div>
                         </li>
                     @endforeach
                 </ul>
+                @error('revoke_password') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
                 @if($devices->count() >= $deviceLimit)
                     <p class="mt-4 text-[11px] text-zinc-400">Showing your {{ $deviceLimit }} most recently used devices.</p>

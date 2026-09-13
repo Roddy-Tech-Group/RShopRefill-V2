@@ -114,7 +114,8 @@ class EvaluateRecoveryJob implements ShouldQueue
 
         // The email is redirected to the checkout email when it differs from
         // the account email (e.g. an order placed with an alternate address).
-        $copy = RecoveryCopy::for($recovery->failure_reason_code);
+        $copy = RecoveryCopy::for($recovery->failure_reason_code, $recovery->productLine());
+        $mailable = new PaymentRecoveryMail($recovery);
 
         $communications->send(
             recipient: $user,
@@ -124,7 +125,7 @@ class EvaluateRecoveryJob implements ShouldQueue
             // this path. The headline still opens the email body.
             title: $copy['subject'],
             message: $copy['guidance'],
-            mailable: new PaymentRecoveryMail($recovery),
+            mailable: $mailable,
             correlationId: 'payment_recovery_'.$recovery->id,
             overrideEmail: strtolower($session->customer_email) !== strtolower((string) $user->email)
                 ? $session->customer_email
@@ -135,6 +136,8 @@ class EvaluateRecoveryJob implements ShouldQueue
                 'payment_outcome_id' => $outcome->id,
                 'failure_reason_code' => $outcome->failure_reason_code,
                 'failure_reason' => $outcome->metadata['raw_reason'] ?? null,
+                // Optional mail: the API provider sets List-Unsubscribe from this.
+                'list_unsubscribe' => $mailable->unsubscribeUrl(),
             ]
         );
     }

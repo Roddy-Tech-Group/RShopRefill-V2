@@ -33,6 +33,8 @@ class UserAuditObserver
         'banned_at',
         'suspended_at',
         'restricted_at',
+        'closure_requested_at',
+        'anonymised_at',
         'rcoin_multiplier',
         'is_guest',
     ];

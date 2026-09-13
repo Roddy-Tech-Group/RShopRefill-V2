@@ -41,17 +41,25 @@ Schedule::command('risk:prune')->dailyAt('02:30')->name('risk:prune-daily');
 // Audit retention: archive-then-delete rows past the two-year window
 // (config/audit.php). Monthly is plenty - the window moves a day at a time.
 Schedule::command('audit:prune')->monthlyOn(1, '02:45')->name('audit:prune-monthly');
+
+// Account closures: once the grace period in config/retention.php has run out,
+// anonymise the customer's personal details while keeping the financial rows.
+Schedule::command('retention:close-accounts')->dailyAt('03:15')->name('retention:close-accounts-daily');
+Schedule::command('retention:enforce')->dailyAt('03:30')->name('retention:enforce-daily');
 Schedule::job(new SyncExchangeRatesJob)->hourly()->sentryMonitor('sync-exchange-rates');
 Schedule::job(new ReconcilePendingFundingsJob)->hourly()->sentryMonitor('reconcile-pending-fundings');
 
 // Airalo requires syncing GET /v2/packages at least once every 60 minutes
 // or they email warning the catalog may be stale. withoutOverlapping prevents
 // a slow sync from doubling up; runInBackground so cron isn't blocked while
-// the API call is paginating. Logs go to storage/logs/laravel.log.
+// the API call is paginating. Command output is appended to
+// storage/logs/airalo-sync.log; without that, a background run only
+// ever surfaces as "exited with code 1".
 Schedule::command('airalo:sync-esims')
     ->hourlyAt(17)
     ->withoutOverlapping(60)
     ->runInBackground()
+    ->appendOutputTo(storage_path('logs/airalo-sync.log'))
     ->name('airalo:sync-esims-hourly');
 
 // Zendit catalog syncs - keep gift cards, top-ups and bills fresh without
@@ -69,6 +77,16 @@ Schedule::command('topups:sync')
     ->withoutOverlapping(120)
     ->runInBackground()
     ->name('zendit:sync-topups-6h');
+
+// Re-pin topup pricing after each sync slot: a brand-new Nigerian operator
+// lands on the 8% category default until pinned at its deliberate 2%, so the
+// pinning command re-runs 30 minutes past the sync (idempotent - existing
+// rules are updated in place, never duplicated).
+Schedule::command('pricing:apply-topup-rules')
+    ->cron('30 */6 * * *')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('pricing:apply-topup-rules-6h');
 
 // Split bills out of the gift-cards catalog after the giftcards sync runs.
 // Fires 15 minutes past the hour so it lands AFTER the 6h sync above
@@ -107,6 +125,18 @@ Schedule::job(new ExpireStaleRecoveriesJob)->hourly()->sentryMonitor('expire-sta
 // ~20h after the failure, so precision beyond an hour buys nothing and only
 // risks emailing someone at 3am in their own timezone.
 Schedule::job(new SendRecoveryRemindersJob)->hourly()->sentryMonitor('send-recovery-reminders');
+
+// Payment failures that need a human now, not at the next dashboard visit:
+// platform-side faults (a rail we asked for that the gateway refuses), one
+// customer failing repeatedly, and a reason code spiking against its own
+// baseline. SEV-2, so Telegram only; the alerter's throttle keeps a standing
+// fault to one message an hour.
+Schedule::command('insights:alert-failures')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('insights:alert-failures-10m')
+    ->sentryMonitor('insights-alert-failures');
 
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.

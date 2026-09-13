@@ -6,9 +6,11 @@ use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Jobs\VerifyPaymentJob;
+use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
 use Illuminate\Bus\Queueable;
@@ -107,6 +109,16 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
      */
     private const MINIMUM_GATEWAY_LIFETIME_MINUTES = 30;
 
+    /**
+     * How far a session is pushed out each time the gateway reports the
+     * customer's coins still confirming. Re-checked every pass, so a payment
+     * that finally fails at the gateway is caught within one interval.
+     */
+    private const IN_FLIGHT_EXTENSION_MINUTES = 30;
+
+    /** The longest an in-flight crypto session is kept open by extension. */
+    private const IN_FLIGHT_MAX_HOURS = 24;
+
     public function handle(
         PaymentSessionService $paymentSessionService,
         OrderService $orderService
@@ -182,6 +194,28 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
 
                         continue; // payment was genuine: confirmed + fulfilling
                     }
+
+                    // 1b. MONEY IN FLIGHT. A crypto payment the gateway reports as
+                    //     `confirming` (coins seen on-chain, confirmations still
+                    //     accruing), or that already has coins against it, or that
+                    //     settled short, is NOT abandoned. Bitcoin routinely needs
+                    //     longer than this sweep's floor to confirm; failing the
+                    //     funding here told the customer their top-up died while
+                    //     their coins were on the way, and then every recovery path
+                    //     refused the money when it landed. Push the window out and
+                    //     look again next pass; the gateway decides, not the clock.
+                    if ($this->cryptoMoneyInFlight($attempt, $session)) {
+                        $session->expires_at = now()->addMinutes(self::IN_FLIGHT_EXTENSION_MINUTES);
+                        $session->save();
+
+                        Log::info('ExpireStalePaymentSessionsJob: crypto payment still in flight on session '.$session->id.' - window extended, not expired.', [
+                            'attempt_id' => $attempt->id,
+                            'gateway_status' => data_get($attempt->metadata, 'crypto.status'),
+                            'actually_paid' => $attempt->actually_paid,
+                        ]);
+
+                        continue;
+                    }
                 }
 
                 // 2. Expire the session itself - the existing state-machine method,
@@ -225,7 +259,19 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                     }
                 } elseif ($attempt->payable_type === WalletFunding::class) {
                     $funding = $attempt->payable;
-                    if ($funding && ! in_array($funding->status, [FundingStatus::Completed, FundingStatus::Failed, FundingStatus::Cancelled], true)) {
+
+                    // Coins arrived (fully, still settling, or short): the
+                    // window may close but the funding is NOT failed. Failing it
+                    // told the customer their deposit died with their money at
+                    // the gateway, and made the later credit fight the Failed
+                    // state. It stays Pending for the reconcile / top-up path.
+                    if ($funding && $this->cryptoMoneyHeld($attempt)) {
+                        Log::info('ExpireStalePaymentSessionsJob: session '.$session->id.' closed but funding '.$funding->reference.' kept open - coins are held at the gateway.', [
+                            'attempt_id' => $attempt->id,
+                            'payment_status' => $attempt->payment_status?->value,
+                            'actually_paid' => $attempt->actually_paid,
+                        ]);
+                    } elseif ($funding && ! in_array($funding->status, [FundingStatus::Completed, FundingStatus::Failed, FundingStatus::Cancelled], true)) {
                         // Through the service, not a bare update: the direct
                         // status write skipped the FundingFailed event, so the
                         // customer never heard their top-up died, and the
@@ -248,5 +294,45 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         if ($expired > 0) {
             Log::info("ExpireStalePaymentSessionsJob: expired {$expired} stale session(s).");
         }
+    }
+
+    /**
+     * Whether a crypto attempt has customer money against it that the clock
+     * must not overrule. Read straight after the last-chance verification,
+     * which refreshes the gateway status onto the attempt.
+     *
+     * `waiting` with nothing paid is the one state that IS abandonment: no
+     * deposit has been seen, so the window may close.
+     */
+    private function cryptoMoneyInFlight(PaymentAttempt $attempt, PaymentSession $session): bool
+    {
+        if (! $this->cryptoMoneyHeld($attempt)
+            && NowPaymentsStatus::normalize(data_get($attempt->metadata, 'crypto.status')) !== 'confirming') {
+            return false;
+        }
+
+        // Bounded: no chain takes a day to confirm. Past this the session is
+        // allowed to close (the customer's screen goes stale), but see the
+        // cascade guard - a funding with coins against it is still never
+        // failed, and the reopened verify path credits it if the gateway
+        // finishes later.
+        return $session->created_at !== null
+            && $session->created_at->gt(now()->subHours(self::IN_FLIGHT_MAX_HOURS));
+    }
+
+    /**
+     * Coins have physically arrived against this crypto attempt, in full or in
+     * part. Such a funding must never be marked Failed by the clock: the money
+     * is real, and it is either credited by the reopened verify path or resolved
+     * by an operator, never written off as abandoned.
+     */
+    private function cryptoMoneyHeld(PaymentAttempt $attempt): bool
+    {
+        if (! in_array($attempt->gateway, ['nowpayments', 'crypto'], true)) {
+            return false;
+        }
+
+        return $attempt->payment_status === PaymentStatus::PartiallyPaid
+            || (float) $attempt->actually_paid > 0;
     }
 }

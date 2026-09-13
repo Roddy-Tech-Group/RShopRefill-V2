@@ -15,7 +15,8 @@ class TransactionPinLockedMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public function __construct(
-        public User $user
+        public User $user,
+        public bool $permanent = false,
     ) {
         // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
         $this->onQueue('comm-critical');

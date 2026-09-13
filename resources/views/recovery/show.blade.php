@@ -2,9 +2,10 @@
     $session = $recovery->paymentSession;
     $order = $session?->order;
     $items = $order?->items ?? collect();
+    $isFunding = $recovery->productLine() === \App\Domain\PaymentInsights\Enums\ProductLine::WalletFunding;
 @endphp
 
-<x-layouts.app.header title="Complete your payment">
+<x-layouts.app.header :title="$isFunding ? 'Complete your top-up' : 'Complete your payment'">
     <div class="flex min-h-screen items-center justify-center bg-zinc-50 py-12 px-4 sm:px-6 lg:px-8">
         <div class="w-full max-w-md space-y-6 bg-white p-8 rounded-2xl shadow-xl">
             <div>
@@ -21,6 +22,8 @@
                 <div class="rounded-xl bg-zinc-50 p-4">
                     @if ($order)
                         <p class="text-xs text-zinc-500">Order {{ $order->order_number }}</p>
+                    @elseif ($isFunding)
+                        <p class="text-xs text-zinc-500">Wallet top-up</p>
                     @endif
                     @if ($items->isNotEmpty())
                         <ul class="mt-1 space-y-0.5">
@@ -45,11 +48,11 @@
                     <form method="POST" action="{{ route('recovery.retry', $recovery->token) }}">
                         @csrf
                         <button type="submit" class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-3 px-4 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            Complete your payment
+                            {{ $isFunding ? 'Complete your top-up' : 'Complete your payment' }}
                         </button>
                     </form>
                     <p class="mt-2 text-center text-xs text-zinc-500">
-                        This takes you back to checkout. Nothing has been charged.
+                        {{ $isFunding ? 'This takes you back to your wallet with the amount filled in.' : 'This takes you back to checkout with your items still in the cart.' }} Nothing has been charged.
                     </p>
                 </div>
 

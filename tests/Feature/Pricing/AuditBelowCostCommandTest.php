@@ -3,6 +3,7 @@
 namespace Tests\Feature\Pricing;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Enums\PricingBasis;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -287,6 +288,45 @@ class AuditBelowCostCommandTest extends TestCase
         $this->artisan('pricing:audit-below-cost')
             ->expectsOutputToContain('1 paid order units below cost')
             ->assertExitCode(0); // catalog itself is healthy
+    }
+
+    /**
+     * The 2026-09-02 false-alarm incident: the command's partial eager-load
+     * dropped products.pricing_basis, so a supplier_cost product with a USD
+     * face was priced on the face heuristic and reported as below cost while
+     * checkout, pricing off cost, was comfortably above it. The audit must
+     * price exactly like checkout does.
+     */
+    public function test_supplier_cost_basis_products_are_audited_on_cost_not_face(): void
+    {
+        $variant = $this->makeVariant('Straight Talk US'); // face 45, cost 46.35
+        $variant->product->update(['pricing_basis' => PricingBasis::SupplierCost]);
+
+        // Checkout charges cost 46.35 x 1.02 = 47.28 — above cost, no leak.
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('0 BELOW-COST')
+            ->assertExitCode(0);
+    }
+
+    /**
+     * On an environment already running the enforce floor, the BELOW-COST
+     * section must describe what is actually charged (the floored price), not
+     * the counterfactual legacy price — otherwise a healthy enforce
+     * environment pages a daily margin-leak alert about losses the floor
+     * already fixed.
+     */
+    public function test_enforce_mode_audits_the_floored_price_not_the_legacy_one(): void
+    {
+        config(['pricing.floor_mode' => 'enforce']);
+
+        // Legacy would charge face 45 x 1.02 = 45.90 (below cost 46.35);
+        // enforce charges max(45.90, 46.35 x 1.01) = 46.81 — no leak.
+        $this->makeVariant('Straight Talk US');
+
+        $this->artisan('pricing:audit-below-cost')
+            ->expectsOutputToContain('floor mode: enforce')
+            ->expectsOutputToContain('0 BELOW-COST')
+            ->assertExitCode(0);
     }
 
     public function test_unavailable_variants_are_skipped_unless_all_flag(): void

@@ -13,4 +13,10 @@ enum IneligibilityReason: string
     case NotApplicable = 'not_applicable';
     case InternalWalletPayment = 'internal_wallet_payment';
     case NonRetryableFailure = 'non_retryable_failure';
+
+    /** The failure was ours. We alert on it and a human writes; the robot stays quiet. */
+    case PlatformFault = 'platform_fault';
+
+    /** The gateway never answered, so the customer may have paid. Never invite a second payment. */
+    case OutcomeUncertain = 'outcome_uncertain';
 }

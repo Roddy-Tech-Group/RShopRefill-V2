@@ -20,6 +20,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use LogicException;
 
 /**
  * Represents a platform user.
@@ -44,6 +45,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $email_verified_at
  * @property string|null $password
  * @property string|null $remember_token
+ * @property int $session_version Bumped by "sign out everywhere"; sessions carrying an older value are refused
  * @property string|null $transaction_pin
  * @property Carbon|null $transaction_pin_set_at
  * @property int $transaction_pin_attempts
@@ -68,6 +70,7 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         'phone',
         'phone_verified_at',
         'country',
+        'profile_completed_at',
         'gender',
         'referral_code',
         'password',
@@ -84,6 +87,9 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         'restricted_at',
         'suspension_reason',
         'suspension_review_requested_at',
+        'closure_requested_at',
+        'anonymised_at',
+        'financial_records_purged_at',
         'transaction_pin',
         'transaction_pin_set_at',
         'transaction_pin_attempts',
@@ -105,6 +111,20 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         'remember_token',
         'transaction_pin',
     ];
+
+    /**
+     * A user row is never hard-deleted. Orders, payments, the wallet ledger
+     * and identity records hang off it and must be kept for years after the
+     * relationship ends, so the only supported exit is account closure, which
+     * anonymises the row (see AccountClosureService). MySQL enforces the same
+     * rule with RESTRICT foreign keys; this guard covers every other driver.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (): never {
+            throw new LogicException('Users are never hard-deleted. Use AccountClosureService to close an account.');
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -135,18 +155,38 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'profile_completed_at' => 'datetime',
             'rcoin_multiplier' => 'decimal:2',
             'banned_at' => 'datetime',
             'suspended_at' => 'datetime',
             'restricted_at' => 'datetime',
             'suspension_review_requested_at' => 'datetime',
+            'closure_requested_at' => 'datetime',
+            'anonymised_at' => 'datetime',
+            'financial_records_purged_at' => 'datetime',
             'password' => 'hashed',
+            'session_version' => 'integer',
             'transaction_pin_set_at' => 'datetime',
             'transaction_pin_locked_until' => 'datetime',
             'last_transaction_pin_used_at' => 'datetime',
             'is_guest' => 'boolean',
             'guest_claim_last_sent_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Does this account still owe us the details every customer needs (country,
+     * phone, gender, terms)?
+     *
+     * Only a Google sign-up can answer true: the register wizard collects all of
+     * it up front, and every account that predates the completion step was
+     * backfilled by its migration. Legacy guest shadow accounts are exempt for
+     * the same reason they skip the email gate - they are claimed, not
+     * registered.
+     */
+    public function needsProfileCompletion(): bool
+    {
+        return ! $this->is_guest && $this->profile_completed_at === null;
     }
 
     /**
@@ -216,6 +256,37 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     public function hasRequestedSuspensionReview(): bool
     {
         return $this->suspension_review_requested_at !== null;
+    }
+
+    /**
+     * Whether the customer has asked to close the account and is inside the
+     * grace period. Signing in again cancels it (CancelAccountClosureOnLogin).
+     */
+    public function hasRequestedClosure(): bool
+    {
+        return $this->closure_requested_at !== null && $this->anonymised_at === null;
+    }
+
+    /**
+     * Whether the account has been closed and its personal details anonymised.
+     * The row is kept as a pseudonymous holder for the financial records that
+     * must outlive the relationship; it can never sign in again.
+     */
+    public function isClosed(): bool
+    {
+        return $this->anonymised_at !== null;
+    }
+
+    /**
+     * The day the grace period ends and the account is anonymised.
+     */
+    public function closesOn(): ?Carbon
+    {
+        if (! $this->hasRequestedClosure()) {
+            return null;
+        }
+
+        return $this->closure_requested_at->copy()->addDays((int) config('retention.account_closure_grace_days', 30));
     }
 
     /**

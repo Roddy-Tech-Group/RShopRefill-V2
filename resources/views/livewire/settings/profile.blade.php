@@ -1,19 +1,29 @@
 <?php
 
+use App\Domain\Communication\Enums\CommunicationCategory;
+use App\Domain\Communication\Mail\Security\EmailChangedMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Models\User;
+use App\Support\PhoneCountries;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 new #[Layout('components.layouts.dashboard')] class extends Component {
     use WithFileUploads;
 
     public string $name = '';
     public string $email = '';
+
+    /** Account password, required to move the account to a new email. */
+    public string $email_change_password = '';
     public ?string $phone = null;
     public ?string $country = null;
     public ?string $gender = null;
@@ -65,6 +75,23 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     {
         $user = Auth::user();
 
+        $phoneInput = trim((string) $this->phone);
+        $isInternational = str_starts_with($phoneInput, '+');
+
+        // Phone rules match the register wizard's: libphonenumber decides, and
+        // the stored value is E.164. A number typed in international form is
+        // validated on its own dial code so an account whose declared country
+        // differs from its line's country (diaspora, a travel SIM) still saves;
+        // a national number needs the country to say which numbering plan it
+        // belongs to.
+        $phoneRules = ['nullable', 'string', 'max:32'];
+
+        if ($phoneInput !== '') {
+            $phoneRules[] = $isInternational
+                ? (new Phone)->international()
+                : (new Phone)->countryField('country');
+        }
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
 
@@ -77,28 +104,100 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 Rule::unique(User::class)->ignore($user->id)
             ],
 
-            // Phone: free-form for now, allows + and digits and spaces. Backend can swap in a stricter rule
-            // (libphonenumber, country-aware) once a phone library ships.
-            'phone'  => ['nullable', 'string', 'max:32', 'regex:/^[\d\s\+\-\(\)]+$/'],
+            'phone' => $phoneRules,
 
             // Account country - the user's declared country (profile attribute,
-            // shown in their info and to admins). Constrained to the known
-            // country list so junk can't be stored. NOT the shopping region.
-            'country' => ['nullable', 'string', Rule::in(array_keys(config('countries.codes', [])))],
+            // shown in their info and to admins). Stored as the ISO 3166-1
+            // alpha-2 code, the same shape registration writes, so every reader
+            // (Smile ID's per-country routing above all) sees one format.
+            // Required alongside a national phone number, which cannot be
+            // validated without knowing its country.
+            'country' => array_filter([
+                'nullable',
+                $phoneInput !== '' && ! $isInternational ? 'required_with:phone' : null,
+                'string',
+                Rule::in(PhoneCountries::isoCodes()),
+            ]),
 
             // Gender enum stored as a short string. Add new values to the migration column and the union here.
             'gender' => ['nullable', 'in:male,female,other'],
-        ]);
+
+            // Moving the account to another inbox is the whole account: a
+            // hijacked session must re-prove the password first. Accounts
+            // without one (Google-only) are covered by the old-address
+            // notice and the re-verification of the new address.
+            'email_change_password' => Rule::when(
+                strtolower(trim((string) $this->email)) !== strtolower((string) $user->email) && $user->password !== null,
+                ['required', 'string', 'current_password'],
+                ['nullable'],
+            ),
+        ], [], ['email_change_password' => 'password']);
+
+        unset($validated['email_change_password']);
+
+        // Canonicalise before the uniqueness check: a national-number comparison
+        // could not see that 0803... and +234803... are the same line, which is
+        // how this page used to let two accounts claim one number.
+        $phoneE164 = null;
+
+        if ($phoneInput !== '') {
+            $phoneE164 = $isInternational
+                ? (new PhoneNumber($phoneInput))->formatE164()
+                : (new PhoneNumber($phoneInput, [$validated['country']]))->formatE164();
+
+            if (User::where('phone', $phoneE164)->whereKeyNot($user->getKey())->exists()) {
+                throw ValidationException::withMessages([
+                    'phone' => 'This phone number is already registered to another account.',
+                ]);
+            }
+        }
 
         $user->fill($validated);
+        $user->phone = $phoneE164;
 
-        if ($user->isDirty('email')) {
+        $previousEmail = $user->getOriginal('email');
+        $emailChanged = $user->isDirty('email');
+
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
 
         $user->save();
 
+        // Reflect the canonical value back into the form so the customer sees
+        // what was actually stored rather than what they typed.
+        $this->phone = $phoneE164;
+
+        if ($emailChanged) {
+            // The new address must prove itself before it counts, and the old
+            // one is told, so a hijacked session cannot quietly move the
+            // account to an inbox the owner does not control.
+            $user->sendEmailVerificationNotification();
+
+            app(CommunicationManager::class)->send(
+                recipient: $user,
+                category: CommunicationCategory::EmailChange,
+                title: 'Your account email was changed',
+                message: 'The email address on your account was changed. If this was not you, contact support straight away.',
+                mailable: new EmailChangedMail($user->name, $this->maskEmail($user->email)),
+                correlationId: 'email_changed_'.$user->id.'_'.now()->timestamp,
+                overrideEmail: $previousEmail,
+            );
+
+            Session::flash('status', 'verification-link-sent');
+        }
+
+        $this->reset('email_change_password');
+
         $this->dispatch('profile-updated', name: $user->name);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+        $visible = mb_substr($local, 0, min(2, mb_strlen($local)));
+
+        return $visible.str_repeat('*', max(2, mb_strlen($local) - mb_strlen($visible))).'@'.$domain;
     }
 
     /**
@@ -441,11 +540,18 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Country</p>
                         <p class="mt-0.5 flex items-center gap-2 text-sm font-medium text-black dark:text-white">
-                            @php $profileCc = strtolower((string) (config('countries.codes')[$country] ?? '')); @endphp
+                            @php
+                                // country holds the ISO code; resolve it back to a
+                                // display name (and flag) for the reader.
+                                $profileCc = $country ? strtolower($country) : '';
+                                $profileCountryName = $country
+                                    ? (array_search(strtoupper($country), config('countries.codes', []), true) ?: $country)
+                                    : '';
+                            @endphp
                             @if ($profileCc)
                                 <img src="https://flagcdn.com/w40/{{ $profileCc }}.png" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200">
                             @endif
-                            <span>{{ $country ?: 'Not set' }}</span>
+                            <span>{{ $profileCountryName ?: 'Not set' }}</span>
                         </p>
                     </div>
                 </div>
@@ -488,6 +594,21 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         @error('email') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
+                    @if(auth()->user()->password !== null)
+                        <div x-show="$wire.email.trim().toLowerCase() !== @js(strtolower((string) auth()->user()->email))" x-cloak>
+                            <label for="profile-email-password" class="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Confirm your password to change email</label>
+                            <input
+                                wire:model="email_change_password"
+                                id="profile-email-password"
+                                type="password"
+                                autocomplete="current-password"
+                                class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-black outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-[#0c1a36] dark:text-white"
+                                placeholder="Your current password"
+                            />
+                            @error('email_change_password') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
+
                     <div>
                         <label for="profile-phone" class="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Phone number</label>
                         <input
@@ -505,8 +626,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     @php
                         // Same option shape the KYC dropdown consumes, so the country
                         // field reuses the shared kycSelect modern dropdown component.
-                        $countryOptions = collect(array_keys(config('countries.codes', [])))
-                            ->map(fn ($cName) => ['value' => $cName, 'label' => $cName])
+                        // Value is the ISO code we store; the label stays the
+                        // country name the customer recognises.
+                        $countryOptions = collect(App\Support\PhoneCountries::all())
+                            ->map(fn (array $c) => ['value' => $c['iso'], 'label' => $c['name']])
                             ->values();
                     @endphp
                     <div>
@@ -783,6 +906,33 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     </svg>
                 </button>
             </form>
+
+            {{-- Download a copy of your data (NDPA right of access). Emailed one-time code + audit log. --}}
+            <a
+                href="{{ route('privacy.export') }}"
+                class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left sm:px-6"
+            >
+                    <span class="flex items-center gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="block text-sm font-semibold text-black">Download your data</span>
+                            <span class="block text-[13px] text-zinc-600">A copy of everything we hold about you</span>
+                        </span>
+                    </span>
+                    <svg class="h-5 w-5 shrink-0 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                    </svg>
+            </a>
+            @if (session('data_export_ready'))
+                {{-- Verification just succeeded: start the PDF on its own, with a fallback link. --}}
+                <div x-data x-init="setTimeout(() => { window.location.href = '{{ route('privacy.export.file') }}' }, 600)" class="px-5 pb-4 text-xs text-zinc-600 sm:px-6">
+                    Your PDF is downloading. <a href="{{ route('privacy.export.file') }}" class="font-semibold text-blue-600 hover:underline">Click here if it did not start.</a>
+                </div>
+            @endif
 
             {{-- Delete account — subtle entry point, opens the existing modal flow --}}
             <div class="px-5 py-4 sm:px-6">

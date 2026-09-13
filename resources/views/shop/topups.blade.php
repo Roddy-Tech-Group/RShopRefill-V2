@@ -77,7 +77,14 @@
 
     $productsQuery = Product::query()
         ->whereIn('id', $representativeIds)
-        ->with(['variants:id,product_id,currency,retail_price,cost_price,face_value,min_amount,max_amount,is_variable,is_available']);
+        ->with(['variants' => fn ($q) => $q
+            ->select('id', 'product_id', 'currency', 'retail_price', 'cost_price', 'face_value', 'min_amount', 'max_amount', 'is_variable', 'is_available')
+            // The credit/data split lives in metadata.subTypes, and the range
+            // label must range over CREDIT faces only. Loading full metadata
+            // for every variant on the listing is too heavy, so extract just
+            // the subtype (works on MySQL and SQLite; MySQL keeps the JSON
+            // quotes, which Product::priceRange() trims).
+            ->selectRaw("json_extract(metadata, '$.subTypes[0]') as subtype_hint")]);
 
     if ($sort === 'name-asc') {
         $productsQuery->orderBy('name');
@@ -274,7 +281,7 @@
                                         $isOut      = $variants->isNotEmpty() && $available->isEmpty();
                                         $outOfStock = $isOut || $product->is_out_of_stock;
                                         $notBuyable = ! $categoryEnabled || $outOfStock;
-                                        $priceLabel = $product->priceRangeLabel();
+                                        $priceLabel = $product->priceRangeLabel(fixedFacesFirst: true);
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                         $opName     = Product::brandDisplayName($product->brand_key);
                                         $tileColor  = Product::tileColor($product->brand_key);

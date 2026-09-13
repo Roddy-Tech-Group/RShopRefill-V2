@@ -93,22 +93,37 @@
     $pricing = app(CartPricingService::class);
 
     // Country-locked denomination range for the placeholder text ("$15 - 500").
-    // Priced through CartPricingService, not read off retail_price: the raw
-    // column is the pre-markup base, so the hint used to advertise a floor
-    // ("Between $35.00 and $55.00") that the plan cards themselves contradicted.
     $availableVariants = $variants->where('is_available', true);
-    $pricedRange = $availableVariants
-        ->map(function ($v) use ($pricing, $product) {
-            $v->setRelation('product', $product);
 
-            return round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
-        })
-        ->filter();
-    $rangeMin = $pricedRange->min();
-    $rangeMax = $pricedRange->max();
-    if ((! $rangeMin || ! $rangeMax) && $variable) {
-        $rangeMin = $variable->min_amount;
-        $rangeMax = $variable->max_amount;
+    if (($product->category?->slug ?? '') === 'mobile-airtime') {
+        // Topups: the range speaks FACE VALUES in the operator's own currency,
+        // merged with the custom-amount bounds - the same language as the
+        // /topups listing and the face-labeled amount selector. This line once
+        // rendered USD engine prices behind the operator's symbol
+        // ("Between ₦0.28 and ₦78.56" on MTN NG); the real charge belongs in
+        // Estimated price, never here.
+        $faceRange = $availableVariants->where('is_variable', false)
+            ->map(fn ($v) => (float) ($v->face_value ?? $v->retail_price))
+            ->filter(fn ($v) => $v > 0);
+        $rangeMin = collect([$faceRange->min(), $variable?->min_amount])->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v)->min();
+        $rangeMax = collect([$faceRange->max(), $variable?->max_amount])->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v)->max();
+    } else {
+        // Priced through CartPricingService, not read off retail_price: the raw
+        // column is the pre-markup base, so the hint used to advertise a floor
+        // ("Between $35.00 and $55.00") that the plan cards themselves contradicted.
+        $pricedRange = $availableVariants
+            ->map(function ($v) use ($pricing, $product) {
+                $v->setRelation('product', $product);
+
+                return round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
+            })
+            ->filter();
+        $rangeMin = $pricedRange->min();
+        $rangeMax = $pricedRange->max();
+        if ((! $rangeMin || ! $rangeMax) && $variable) {
+            $rangeMin = $variable->min_amount;
+            $rangeMax = $variable->max_amount;
+        }
     }
     // Same conversion as the tile label that led here - see DisplayCurrency.
     [$rangeMinDisplay, $rangeCurrency] = \App\Support\DisplayCurrency::convert((float) $rangeMin, $currency);
@@ -220,6 +235,19 @@
         ? (float) (CurrencyRate::where('code', $customCurrency)->value('rate_per_usd') ?: 1.0)
         : 1.0;
 
+    // What the custom input ADVERTISES as its minimum. For NGN/XAF-class
+    // topups this is the ₦500 presentation floor - the supplier accepts less
+    // (Zendit sells ₦5 of airtime) but advertising that reads as a joke.
+    $customDisplayMin = ($isTopup && $variable)
+        ? \App\Domain\Catalog\Support\TopupQuickPicks::presentationMin((float) $variable->min_amount, $customRate)
+        : ($variable ? (float) $variable->min_amount : 0.0);
+
+    // ...and as its maximum: the supplier max when nice, otherwise the round
+    // step under it (Glo's ₦73,950 advertises - and validates - as ₦70,000).
+    $customDisplayMax = ($isTopup && $variable)
+        ? \App\Domain\Catalog\Support\TopupQuickPicks::presentationMax((float) $variable->max_amount)
+        : ($variable ? (float) $variable->max_amount : 0.0);
+
     // Compact variant payload for Alpine. `price_usd` is the marked-up USD price
     // for a FIXED denomination; variable variants are priced client-side from
     // the typed amount, so their price_usd is unused.
@@ -244,6 +272,10 @@
     // synced metadata; a missing field just drops that chip.
     $topupGroups = ['credit' => [], 'data' => [], 'bundle' => []];
     if ($isTopup) {
+        // Converts engine USD prices into the operator's own currency for the
+        // plan cards, so a ₦-symbol never fronts a USD figure. USD operators
+        // resolve to 1.0 and are untouched.
+        $operatorRate = (float) (CurrencyRate::where('code', $currency)->value('rate_per_usd') ?: 1.0);
         // Zendit's subTypes IS the classification and is the only thing trusted
         // here. Its catalogue defines three separate product categories - Mobile
         // Top Up (airtime credit), Mobile Data (data plans) and Mobile Bundles
@@ -273,8 +305,18 @@
             $val = round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
             $topupGroups[$topupKindOf($v)][] = [
                 'id' => $v->id,
+                // The denomination's printed face value, in the operator's own
+                // currency - what the /topups listing range advertises and what
+                // the amount selector labels. The charged price stays in
+                // 'price'/price_usd and surfaces in the Estimated price field,
+                // exactly like the gift-card flow.
+                'face' => round((float) $v->face_value, 2),
                 'disp' => round($val * $displayRate, 2),
-                'price' => $conv($val),
+                // The plan card headlines the printed FACE VALUE in the
+                // operator's own currency (₦350 for MTN NG's 0.5GB, matching
+                // what the market calls the product); the engine's charge
+                // reaches the customer through the Estimated price field.
+                'price' => $conv((float) ($v->face_value ?? $v->retail_price)),
                 // The offer name ("1GB/day + Call (30d)") carries nuance the GB total
                 // misses, so it headlines the card.
                 'name' => $m['notes'] ?? null,
@@ -305,8 +347,65 @@
     $topupDefaultTab = ($topupPlanScope === 'bundles' && $topupHasPlans)
         ? (! empty($topupGroups['bundle']) ? 'bundle' : 'data')
         : (array_key_first($topupTabs) ?: 'credit');
-    // Credit denominations feed the amount selector's dropdown.
-    $topupCreditPlans = collect($topupGroups['credit'] ?? []);
+    // Credit denominations feed the amount selector's dropdown. Operators like
+    // MTN NG sync 150+ denominations including supplier FX artifacts with odd
+    // faces (₦1,729, ₦2,161.25). When a custom amount covers the whole range
+    // anyway, a wall of options is worse UX than a curated few: keep at most
+    // five clean, evenly spread faces and let the custom input carry the rest.
+    // Operators without a custom option (US prepaid's 3 plans) are untouched.
+    // The quick-pick ladder: real faces where the catalog has clean ones,
+    // synthesized custom amounts where it doesn't (MTN NG's missing ₦2,000 and
+    // ₦2,500; all of Airtel NG). TopupQuickPicks::plan() is the ONE source the
+    // /topups listing range derives from too, so the pages cannot disagree.
+    $topupCreditPlansAll = collect($topupGroups['credit'] ?? []);
+    $topupCreditPlans = collect(); // legacy loop stays empty; the picks loop renders
+    $topupPicks = collect();
+
+    if ($isTopup) {
+        $facePlansByValue = $topupCreditPlansAll->keyBy(fn ($p) => (string) round((float) $p['face'], 4));
+        // Collapse to clean faces ONLY when a custom amount exists to carry
+        // the dropped ones; a fixed-only operator (Koodo CA, US prepaid)
+        // keeps every real face, junk-looking conversions included, because
+        // a dropped face there is simply unpurchasable.
+        $planFaces = $topupCreditPlansAll->map(fn ($p) => (float) $p['face'])
+            ->when($variable !== null, fn ($faces) => $faces->filter(
+                fn ($f) => \App\Domain\Catalog\Support\TopupQuickPicks::isCleanFace($f),
+            ))
+            ->unique()->sort()->values()->all();
+
+        $topupPicks = collect(\App\Domain\Catalog\Support\TopupQuickPicks::plan(
+            $planFaces,
+            $variable !== null ? (float) $variable->min_amount : null,
+            $variable !== null ? (float) $variable->max_amount : null,
+            $operatorRate,
+        ))->map(function ($pick) use ($facePlansByValue) {
+            if ($pick['type'] === 'face') {
+                $plan = $facePlansByValue[(string) round($pick['value'], 4)] ?? null;
+
+                return $plan !== null ? ['plan' => $plan] : null;
+            }
+
+            return ['amount' => $pick['value']];
+        })->filter()->values();
+
+        // Operators whose clean faces exist but never anchored a ladder (no
+        // variable, tiny catalogs) fall back to every credit plan they have.
+        if ($topupPicks->isEmpty() && $topupCreditPlansAll->isNotEmpty()) {
+            $topupPicks = $topupCreditPlansAll->sortBy('face')->values()->map(fn ($p) => ['plan' => $p]);
+        }
+
+        // The advertised range IS the picks' ends - "Between ₦500 and
+        // ₦150,000" states exactly what the selector offers, presentation
+        // floor included, instead of the supplier's raw ₦5 minimum.
+        if ($topupPicks->isNotEmpty()) {
+            $pickValue = fn ($pick) => isset($pick['plan']) ? (float) $pick['plan']['face'] : (float) $pick['amount'];
+            $rangeMin = $pickValue($topupPicks->first());
+            $rangeMax = $pickValue($topupPicks->last());
+            $rangeText = $sym($currency).rtrim(rtrim(number_format((float) $rangeMin, 2), '0'), '.')
+                .' - '
+                .rtrim(rtrim(number_format((float) $rangeMax, 2), '0'), '.');
+        }
+    }
 
     // Similar brands in same subcategory + same country.
     $similarIds = Product::query()
@@ -503,8 +602,8 @@
             defaultCrypto: @js($defaultCrypto),
             markup: @js($markup),
             customRate: @js($customRate),
-            customMin: @js($variable ? (float) $variable->min_amount : 0),
-            customMax: @js($variable ? (float) $variable->max_amount : 0),
+            customMin: @js($customDisplayMin),
+            customMax: @js($customDisplayMax),
             requiresRecipientPhone: @js($isTopup),
             defaultDialCode: @js($dialCode),
             requiresAccountId: @js($isBill),
@@ -672,7 +771,7 @@
                                         @endphp
                                         <button
                                             type="button"
-                                            @click="amount = {{ $plan['disp'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; window.innerWidth < 1024 && setTimeout(() => document.getElementById('topup-recipient')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 140)"
+                                            @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; window.innerWidth < 1024 && setTimeout(() => document.getElementById('topup-recipient')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 140)"
                                             :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-[#24364f] dark:hover:border-blue-400/50'"
                                             class="esim-tile flex h-full flex-col rounded-[14px] border bg-[#eff6ff] px-4 py-4 text-left transition-colors"
                                         >
@@ -759,16 +858,50 @@
                                 >
                                     @if ($isTopup)
                                         {{-- Credit selector: airtime-credit denominations only (Data/Bundle
-                                             are chosen from their cards above). --}}
+                                             are chosen from their cards above). Labeled by FACE VALUE (the
+                                             $35 the listing advertises and the carrier prints), not the
+                                             charged price - the charge shows in Estimated price, mirroring
+                                             the gift-card flow. Selection is carried by the variant id, so
+                                             the card and the cart still can never disagree. --}}
+                                        @foreach ($topupPicks as $pick)
+                                            @if (isset($pick['plan']))
+                                                @php $plan = $pick['plan']; @endphp
+                                                <button
+                                                    type="button"
+                                                    @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
+                                                    :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                                >
+                                                    <span class="flex min-w-0 flex-col">
+                                                        <span class="font-bold">{{ $conv($plan['face']) }}</span>
+                                                        @php $pickNote = trim((string) ($plan['summary'] ?? '')); @endphp
+                                                        @if ($pickNote !== '')
+                                                            <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $pickNote }}</span>
+                                                        @endif
+                                                    </span>
+                                                </button>
+                                            @else
+                                                {{-- Synthesized round amount served through the custom-amount
+                                                     variant - this slot has no clean face in the catalog. --}}
+                                                <button
+                                                    type="button"
+                                                    @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = {{ $pick['amount'] }}; open = false"
+                                                    :class="(customMode && Number(amount) === {{ $pick['amount'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                                >
+                                                    <span class="font-bold">{{ $conv($pick['amount']) }}</span>
+                                                </button>
+                                            @endif
+                                        @endforeach
                                         @foreach ($topupCreditPlans as $plan)
                                             <button
                                                 type="button"
-                                                @click="amount = {{ $plan['disp'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
-                                                :class="(! customMode && Number(amount) === {{ $plan['disp'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                                @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
+                                                :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
                                                 class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                                             >
                                                 <span class="flex min-w-0 flex-col">
-                                                    <span class="font-bold">{{ $plan['price'] }}</span>
+                                                    <span class="font-bold">{{ $conv($plan['face']) }}</span>
                                                     @php $creditNote = trim((string) ($plan['summary'] ?? '')); @endphp
                                                     @if ($creditNote !== '')
                                                         {{-- The supplier's own description, verbatim. Deliberately NOT
@@ -785,10 +918,10 @@
                                                 type="button"
                                                 @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
                                                 :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                                class="flex w-full items-center justify-between rounded-[12px] {{ $topupCreditPlans->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                                                class="flex w-full items-center justify-between rounded-[12px] {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                                             >
                                                 <span class="font-bold">Custom amount</span>
-                                                <span class="text-xs text-zinc-500">{{ $customMoney($variable->min_amount) }} - {{ $customMoney($variable->max_amount) }}</span>
+                                                <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
                                             </button>
                                         @endif
                                     @else
@@ -817,7 +950,7 @@
                                             class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                                         >
                                             <span class="font-bold">Custom amount</span>
-                                            <span class="text-xs text-zinc-500">{{ $customMoney($variable->min_amount) }} - {{ $customMoney($variable->max_amount) }}</span>
+                                            <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
                                         </button>
                                     @endif
                                     @endif
@@ -836,10 +969,10 @@
                                             type="number"
                                             inputmode="decimal"
                                             x-model="amount"
-                                            min="{{ (float) $variable->min_amount }}"
-                                            max="{{ (float) $variable->max_amount }}"
+                                            min="{{ (float) $customDisplayMin }}"
+                                            max="{{ (float) $customDisplayMax }}"
                                             step="any"
-                                            placeholder="{{ rtrim(rtrim(number_format((float) $variable->min_amount, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $variable->max_amount, 2), '0'), '.') }}"
+                                            placeholder="{{ rtrim(rtrim(number_format((float) $customDisplayMin, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $customDisplayMax, 2), '0'), '.') }}"
                                             class="w-full rounded-[12px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
                                             :class="(amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)) ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-[color:var(--brand)]'"
                                         />
@@ -849,7 +982,7 @@
                                         x-cloak
                                         class="mt-1.5 text-xs font-medium text-red-600"
                                     >
-                                        Enter an amount between {{ $customMoney($variable->min_amount) }} and {{ $customMoney($variable->max_amount) }}.
+                                        Enter an amount between {{ $customMoney($customDisplayMin) }} and {{ $customMoney($customDisplayMax) }}.
                                     </p>
                                 </div>
                             @endif
@@ -1488,9 +1621,10 @@
                     }
                     if (variant.is_variable) {
                         // The entered amount is the face value in the card's currency.
-                        // Convert to USD, then apply markup (same as backend).
+                        // Convert to USD, estimate the real supplier cost via the
+                        // operator's premium, then apply markup (same as backend).
                         const faceUsd = Number(this.amount || 0) / (this.customRate || 1);
-                        return this.applyMarkup(faceUsd);
+                        return this.applyMarkup(faceUsd * (this.markup.cost_premium || 1));
                     }
                     return variant.price_usd || 0;
                 },
@@ -1527,7 +1661,15 @@
                 formatCryptoFor(code) {
                     const meta = this.cryptos[code];
                     if (! meta) return '0 ' + code;
-                    const value = this.totalUsd() * meta.perUsd;
+                    let value = this.totalUsd() * meta.perUsd;
+                    // Charm rounding for fiat, mirroring CharmPrice::roundUp -
+                    // UP only, to the step the currency's people pay in
+                    // (₦1,056.80 → ₦1,060). Crypto amounts stay exact.
+                    if (meta.type !== 'crypto' && meta.perUsd >= 3) {
+                        const step = meta.perUsd >= 100 ? 10 : 1;
+                        value = Math.ceil(Number((value / step).toFixed(6))) * step;
+                        return value.toLocaleString('en-US') + ' ' + code;
+                    }
                     return value.toFixed(meta.decimals) + ' ' + code;
                 },
             };

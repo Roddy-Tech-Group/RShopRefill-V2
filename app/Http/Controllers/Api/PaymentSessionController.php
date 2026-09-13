@@ -12,18 +12,18 @@ use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
-use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\FulfillOrderItemJob;
-use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
@@ -205,10 +205,9 @@ class PaymentSessionController extends Controller
 
                     PaymentConfirmed::dispatch($attempt->order, $attempt);
 
-                    // Dispatch fulfillment jobs
-                    foreach ($attempt->order->items as $item) {
-                        FulfillOrderItemJob::dispatch($item);
-                    }
+                    // Dispatch fulfillment jobs (staggered per identical offer
+                    // so duplicates don't trip supplier velocity protection).
+                    FulfillOrderItemJob::dispatchStaggered($attempt->order->items);
                 }
                 // If it is wallet funding
                 elseif ($attempt->payable_type === WalletFunding::class) {
@@ -459,14 +458,36 @@ class PaymentSessionController extends Controller
                 $result = $flwProvider->chargeBankTransfer($attempt);
             } elseif ($method === 'apple_pay') {
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $result = $flwProvider->chargeApplePay($attempt, $details);
+                $result = $flwProvider->chargeApplePay(
+                    $attempt,
+                    $details,
+                    route('shop.checkout.return', ['session' => $session->id]),
+                );
             } elseif ($method === 'mobile_money') {
                 $request->validate([
                     'details.phone_number' => 'required|string',
-                    'details.network' => 'required|string',
+                    'details.network' => 'nullable|string',
                 ]);
+
+                // Checked against the rail here, not at the gateway: a network
+                // the market does not have is a stale screen, and answering it
+                // with a failed order would turn a display bug into a lost sale.
+                if (MobileMoneyRail::requiresNetwork($currency)
+                    && MobileMoneyRail::gatewayNetwork($currency, $details['network'] ?? null) === null) {
+                    return response()->json([
+                        'message' => "Choose a mobile money network available in {$currency}.",
+                    ], 422);
+                }
+
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $result = $flwProvider->chargeMobileMoney($attempt, $details['phone_number'], $details['network']);
+                $result = $flwProvider->chargeMobileMoney(
+                    $attempt,
+                    $details['phone_number'],
+                    $details['network'] ?? null,
+                    // Rails that answer with their own authorization page send
+                    // the customer back through the hosted return leg.
+                    route('shop.checkout.return', ['session' => $session->id]),
+                );
             } elseif ($method === 'crypto') {
                 $request->validate([
                     'details.pay_currency' => 'required|string',
@@ -579,9 +600,8 @@ class PaymentSessionController extends Controller
 
                     PaymentConfirmed::dispatch($attempt->order, $attempt);
 
-                    foreach ($attempt->order->items as $item) {
-                        FulfillOrderItemJob::dispatch($item);
-                    }
+                    // Staggered per identical offer (supplier velocity protection).
+                    FulfillOrderItemJob::dispatchStaggered($attempt->order->items);
                 } elseif ($attempt->payable_type === WalletFunding::class) {
                     $funding = $attempt->payable;
                     if ($funding && $funding->status !== FundingStatus::Completed) {
@@ -739,60 +759,11 @@ class PaymentSessionController extends Controller
      */
     private function rejectUnusableCoin(PaymentAttempt $attempt, string $payCurrency): ?string
     {
-        $coin = CurrencyRate::query()
-            ->crypto()
-            ->where('code', strtoupper(trim($payCurrency)))
-            ->first();
-
-        if (! $coin) {
-            return 'That cryptocurrency is not available. Please choose another coin.';
-        }
-
-        if (! $coin->is_active || ! $coin->is_payable) {
-            return "{$coin->name} is temporarily unavailable. Please choose another coin.";
-        }
-
-        // Fails open on an unsynced minimum — see CurrencyRate::acceptsOrderValue.
-        $usd = $this->attemptValueInUsd($attempt);
-
-        if ($usd !== null && ! $coin->acceptsOrderValue($usd)) {
-            $minimum = '$'.number_format((float) $coin->min_amount_usd, 2);
-
-            return "Orders paid with {$coin->name} must be at least {$minimum}. Please choose another coin or add more to your order.";
-        }
-
-        return null;
-    }
-
-    /**
-     * The attempt's value in USD, or null when it cannot be established.
-     *
-     * Null means "do not gate" rather than "reject": a rate lookup failure must not
-     * block a payment the gateway would have accepted.
-     */
-    private function attemptValueInUsd(PaymentAttempt $attempt): ?float
-    {
-        $currency = strtoupper((string) $attempt->currency);
-        $amount = (float) $attempt->amount;
-
-        if ($amount <= 0) {
-            return null;
-        }
-
-        if ($currency === 'USD') {
-            return $amount;
-        }
-
-        try {
-            return $amount * app(CurrencyRateService::class)->resolveRate($currency, 'USD');
-        } catch (\Throwable $e) {
-            Log::warning('Could not resolve order value in USD for crypto minimum check', [
-                'attempt_id' => $attempt->id,
-                'currency' => $currency,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
+        // One gate for checkout and wallet funding - see CryptoCoinGate.
+        return app(CryptoCoinGate::class)->rejection(
+            $payCurrency,
+            (float) $attempt->amount,
+            (string) $attempt->currency,
+        );
     }
 }

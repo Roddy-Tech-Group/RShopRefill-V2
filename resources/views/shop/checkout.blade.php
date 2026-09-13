@@ -36,8 +36,10 @@
         'minUsd' => $c->min_amount_usd !== null ? (float) $c->min_amount_usd : null,
     ]]);
 
-    // Mobile-money networks. Static for now.
-    $momoNetworks = ['MTN', 'Orange'];
+    // Mobile-money networks per currency, from the same map the charge reads,
+    // so the picker follows the live checkout currency and never offers a
+    // network the market's rail will refuse.
+    $momoNetworksByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::networksByCurrency();
 
     // Customer's wallet balances keyed by currency code. The wallet panel reads
     // the balance for the active display currency directly from this array.
@@ -524,12 +526,20 @@
                     </div>
 
                     {{-- Mobile money --}}
-                    <div x-show="method === 'mobile_money'" x-collapse x-cloak class="mt-5 space-y-3">
-                        {{-- Network — custom glass dropdown (replaces the native <select>). --}}
-                        <div>
+                    <div
+                        x-show="method === 'mobile_money'"
+                        x-collapse
+                        x-cloak
+                        x-data="{ networksByCurrency: @js($momoNetworksByCurrency), get momoNetworks() { return this.networksByCurrency[this.$store.cart.currency] ?? []; } }"
+                        class="mt-5 space-y-3"
+                    >
+                        {{-- Network — custom glass dropdown (replaces the native <select>).
+                             Hidden for rails that take the phone number alone (M-Pesa, Rwanda). --}}
+                        <div x-show="momoNetworks.length > 0">
                             <label class="text-sm font-semibold text-zinc-900 dark:text-white">Network</label>
                             <div
-                                x-data="{ open: false, value: @js($momoNetworks[0]) }"
+                                x-data="{ open: false, value: '' }"
+                                x-init="value = momoNetworks[0] ?? ''; $watch('momoNetworks', list => value = list[0] ?? '')"
                                 @click.outside="open = false"
                                 @keydown.escape="open = false"
                                 class="relative mt-1.5"
@@ -557,19 +567,19 @@
                                     class="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-[12px] border border-zinc-200 bg-white/80 p-1 shadow-xl shadow-zinc-900/10 backdrop-blur-xl"
                                     role="listbox"
                                 >
-                                    @foreach ($momoNetworks as $net)
+                                    <template x-for="net in momoNetworks" :key="net">
                                         <button
                                             type="button"
-                                            @click="value = @js($net); open = false"
-                                            :class="value === @js($net) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                            @click="value = net; open = false"
+                                            :class="value === net ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
                                             class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium transition-colors"
                                         >
-                                            {{ $net }}
-                                            <svg x-show="value === @js($net)" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                            <span x-text="net"></span>
+                                            <svg x-show="value === net" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                                             </svg>
                                         </button>
-                                    @endforeach
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -953,7 +963,7 @@
                                         </div>
                                         <div class="flex justify-between items-center text-xs">
                                             <span class="text-zinc-500 font-medium">Account Name</span>
-                                            <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.account_name || 'Roddy Technologies'"></span>
+                                            <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.account_name || 'Roddy Technologies LTD'"></span>
                                         </div>
                                         <div class="flex justify-between items-center text-xs border-t border-zinc-200 pt-3">
                                             <span class="text-zinc-500 font-medium">Amount</span>
@@ -1327,7 +1337,7 @@
 
                 allMethods: [
                     { key: 'card',          label: 'Card',          desc: 'Visa, Mastercard',           icon: '/assets/credit%20card%20payment.webp' },
-                    { key: 'mobile_money',  label: 'Mobile Money',  desc: 'MTN, Orange, Vodafone',      icon: '/assets/MOMO.svg' },
+                    { key: 'mobile_money',  label: 'Mobile Money',  desc: 'MTN, Orange, Vodafone, M-Pesa', icon: '/assets/MOMO.svg' },
                     { key: 'bank_transfer', label: 'Bank Transfer', desc: 'Pay via virtual account',    icon: '/assets/Bank%20transfer.webp' },
                     // New: covers Flutterwave's "Pay With Bank" (internet banking
                     // redirect) for NGN / GBP / EUR.
@@ -1358,19 +1368,22 @@
                     //   - Nigeria (NGN) → Bank Transfer first (most-used FW method)
                     //   - Ghana / Kenya / Uganda / Rwanda → Mobile money first
                     //   - US / EU / UK → Card first, crypto for the savvy users
+                    // Apple Pay only in USD, GBP and NGN: the gateway refuses
+                    // it in every other currency before looking at anything
+                    // else (mirrors SupportedPaymentMethods).
                     const mapping = {
                         'USD': ['card', 'crypto', 'apple_pay', 'wallet'],
-                        'EUR': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
+                        'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
                         'GBP': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
                         'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'apple_pay', 'crypto', 'wallet'],
-                        'GHS': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'XAF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'XOF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'KES': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'UGX': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
-                        'RWF': ['mobile_money', 'card', 'apple_pay', 'crypto', 'wallet'],
+                        'GHS': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'XAF': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'XOF': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'KES': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'UGX': ['mobile_money', 'card', 'crypto', 'wallet'],
+                        'RWF': ['mobile_money', 'card', 'crypto', 'wallet'],
                     };
-                    const allowedKeys = mapping[currency] || ['card', 'apple_pay', 'crypto'];
+                    const allowedKeys = mapping[currency] || ['card', 'crypto'];
                     return this.allMethods.filter(m => {
                         if (m.key === 'wallet' && !this.isLoggedIn) {
                             return false;
@@ -1932,7 +1945,9 @@
                                 await this.paySession('card', {});
                             }
                         } else if (this.method === 'mobile_money') {
-                            const networkInput = document.querySelector('input[name="momo_network"]')?.value || 'MTN';
+                            // Empty for rails that take no network (M-Pesa, Rwanda); the
+                            // server validates against the market's rail, never a default.
+                            const networkInput = document.querySelector('input[name="momo_network"]')?.value || '';
                             const phoneInput = document.getElementById('momo_phone')?.value || '';
 
                             this.momoDetails = {

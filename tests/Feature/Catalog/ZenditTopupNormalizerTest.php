@@ -4,6 +4,7 @@ namespace Tests\Feature\Catalog;
 
 use App\Domain\Catalog\Services\ZenditTopupNormalizer;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -32,6 +33,43 @@ class ZenditTopupNormalizerTest extends TestCase
             'price' => ['currency' => 'USD', 'currencyDivisor' => 100, 'fixed' => 350],
             'cost' => ['currency' => 'USD', 'currencyDivisor' => 100, 'fixed' => 330],
         ];
+    }
+
+    /**
+     * STRAIGHTTALK_US_38's shape: cost fixed 3900 plus a separate fee of 50
+     * minor units. The wallet is debited $39.50, so cost_price must store
+     * $39.50 — a fee left out of the markup base is a silent below-cost sale
+     * once the floor prices the row. feePct (a fraction) must scale the base.
+     */
+    public function test_cost_fee_and_fee_pct_land_in_cost_price(): void
+    {
+        Queue::fake();
+
+        $normalizer = app(ZenditTopupNormalizer::class);
+
+        $feeOffer = $this->bundleOffer();
+        $feeOffer['offerId'] = 'straighttalk-us-38';
+        $feeOffer['brand'] = 'StraightTalk';
+        $feeOffer['country'] = 'US';
+        $feeOffer['send'] = ['currency' => 'USD', 'currencyDivisor' => 100, 'fixed' => 3500];
+        $feeOffer['cost'] = ['currency' => 'USD', 'currencyDivisor' => 100, 'fixed' => 3900, 'fee' => 50, 'feePct' => 0];
+        $normalizer->normalizeAndSave($feeOffer, 'zendit');
+
+        $pctOffer = $feeOffer;
+        $pctOffer['offerId'] = 'straighttalk-us-48';
+        $pctOffer['cost'] = ['currency' => 'USD', 'currencyDivisor' => 100, 'fixed' => 4000, 'fee' => 0, 'feePct' => 0.05];
+        $normalizer->normalizeAndSave($pctOffer, 'zendit');
+
+        $this->assertEqualsWithDelta(
+            39.50,
+            (float) ProductVariant::where('provider_offer_id', 'straighttalk-us-38')->value('cost_price'),
+            0.0001,
+        );
+        $this->assertEqualsWithDelta(
+            42.00,
+            (float) ProductVariant::where('provider_offer_id', 'straighttalk-us-48')->value('cost_price'),
+            0.0001,
+        );
     }
 
     public function test_offer_bundle_notes_do_not_become_the_product_description(): void

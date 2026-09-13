@@ -1332,6 +1332,12 @@
                         @endif
                     @endauth
 
+                    @if (session('account_closure_cancelled'))
+                        <div class="mb-4 rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200" role="status">
+                            {{ session('account_closure_cancelled') }}
+                        </div>
+                    @endif
+
                     {{ $slot }}
                 </div>
 

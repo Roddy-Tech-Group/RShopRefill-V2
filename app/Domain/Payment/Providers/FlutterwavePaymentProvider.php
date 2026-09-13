@@ -5,6 +5,7 @@ namespace App\Domain\Payment\Providers;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\MockMode;
 use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
@@ -391,7 +392,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             $bankDetails = [
                 'bank_name' => $innerData['transfer_bank'] ?? 'Unknown Bank',
                 'account_number' => $innerData['transfer_account'],
-                'account_name' => 'Roddy Tech Group',
+                'account_name' => 'Roddy Technologies LTD',
                 'amount' => $innerData['transfer_amount'] ?? $attempt->amount,
                 'expires_at' => now()->addMinutes(30)->toIso8601String(),
             ];
@@ -409,8 +410,47 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
     }
 
-    public function chargeMobileMoney(PaymentAttempt $attempt, string $phoneNumber, string $network): array
+    /**
+     * Charge a mobile-money wallet on the rail that serves the attempt's
+     * currency (see MobileMoneyRail). Two outcomes short of failure:
+     *
+     *  - awaiting_confirmation: the rail pushed a prompt to the handset (the
+     *    Francophone operators, M-Pesa) and the customer approves it there;
+     *  - awaiting_redirect: the rail answered with an authorization page of
+     *    its own (Ghana, Uganda, Rwanda), so the customer is sent there and
+     *    comes back through the hosted return leg, which verifies by tx_ref.
+     *
+     * The network and the phone are checked against the rail BEFORE anything
+     * leaves the building: a label the rail does not know is a client bug and
+     * must not become a failed order.
+     */
+    public function chargeMobileMoney(PaymentAttempt $attempt, string $phoneNumber, ?string $network = null, ?string $returnUrl = null): array
     {
+        $currency = strtoupper($attempt->currency);
+        $phone = MobileMoneyRail::normalisePhone($phoneNumber);
+
+        if (! MobileMoneyRail::supports($currency)) {
+            return [
+                'status' => 'failed',
+                'message' => "Mobile money is not available in {$currency}.",
+                'failure' => GatewayFailure::internal('mobile_money_unsupported_currency', "No mobile money rail serves {$currency}"),
+            ];
+        }
+
+        $gatewayNetwork = null;
+
+        if (MobileMoneyRail::requiresNetwork($currency)) {
+            $gatewayNetwork = MobileMoneyRail::gatewayNetwork($currency, $network);
+
+            if ($gatewayNetwork === null) {
+                return [
+                    'status' => 'failed',
+                    'message' => "Choose a mobile money network available in {$currency}.",
+                    'failure' => GatewayFailure::internal('mobile_money_unknown_network', "Network '{$network}' is not offered on the {$currency} rail"),
+                ];
+            }
+        }
+
         if (str_contains($this->secretKey, 'MOCK')) {
             return [
                 'status' => 'awaiting_confirmation',
@@ -418,19 +458,41 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             ];
         }
 
+        $payload = [
+            'amount' => (float) $attempt->amount,
+            'currency' => $currency,
+            'email' => $attempt->user->email,
+            'phone_number' => $phone,
+            'tx_ref' => $attempt->idempotency_key,
+        ];
+
+        if ($gatewayNetwork !== null) {
+            $payload['network'] = $gatewayNetwork;
+        }
+
+        if (($country = MobileMoneyRail::countryFor($currency, $phone)) !== null) {
+            $payload['country'] = $country;
+        }
+
+        if ($returnUrl !== null) {
+            $payload['redirect_url'] = $returnUrl;
+        }
+
+        $chargeType = MobileMoneyRail::chargeType($currency);
+
         try {
             $response = Http::withToken($this->secretKey)
-                ->post("{$this->baseUrl}/charges?type=mobile_money_franco", [
-                    'amount' => (float) $attempt->amount,
-                    'currency' => strtoupper($attempt->currency),
-                    'email' => $attempt->user->email,
-                    'phone_number' => $phoneNumber,
-                    'tx_ref' => $attempt->idempotency_key,
-                    'country' => 'CM',
-                    'network' => strtoupper($network),
-                ]);
+                ->post("{$this->baseUrl}/charges?type={$chargeType}", $payload);
 
             if ($response->failed()) {
+                Log::warning('Flutterwave mobile money charge refused', [
+                    'tx_ref' => $attempt->idempotency_key,
+                    'rail' => $chargeType,
+                    'currency' => $currency,
+                    'http_status' => $response->status(),
+                    'message' => $response->json('message'),
+                ]);
+
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize mobile money: '.($response->json('message') ?? 'Unknown error'),
@@ -442,6 +504,14 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             $status = $data['status'] ?? 'error';
 
             if ($status === 'success') {
+                if (($redirect = $this->mobileMoneyRedirect($data)) !== null) {
+                    return [
+                        'status' => 'awaiting_redirect',
+                        'redirect_url' => $redirect,
+                        'method' => 'mobile_money',
+                    ];
+                }
+
                 return [
                     'status' => 'awaiting_confirmation',
                     'message' => $this->mobileMoneyInstruction($data, $phoneNumber),
@@ -472,6 +542,25 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
      *
      * @param  array<string, mixed>  $data  Decoded Flutterwave charge response.
      */
+    /**
+     * The rail's own authorization page, when it answers with one. Ghana,
+     * Uganda and Rwanda do; the push-prompt rails leave it out.
+     */
+    private function mobileMoneyRedirect(array $data): ?string
+    {
+        $auth = $data['meta']['authorization']
+            ?? $data['data']['meta']['authorization']
+            ?? [];
+
+        if (($auth['mode'] ?? null) !== 'redirect') {
+            return null;
+        }
+
+        $redirect = $auth['redirect'] ?? null;
+
+        return is_string($redirect) && str_starts_with($redirect, 'https://') ? $redirect : null;
+    }
+
     private function mobileMoneyInstruction(array $data, string $phoneNumber): string
     {
         $auth = $data['meta']['authorization']
@@ -497,7 +586,14 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         return "Dial your mobile money menu and approve the payment prompt sent to {$phoneNumber} to confirm. Keep this window open - it updates automatically once you approve.";
     }
 
-    public function chargeApplePay(PaymentAttempt $attempt, array $details = []): array
+    /**
+     * Apple Pay through Flutterwave's hosted sheet. The charge carries the
+     * customer's full name, phone and country alongside the amount: the
+     * gateway's compliance step wants to know who is paying, and a charge
+     * that named nobody was refused with "Transaction failed compliance
+     * checks" on every production attempt (twelve of twelve by 2026-09-10).
+     */
+    public function chargeApplePay(PaymentAttempt $attempt, array $details = [], ?string $returnUrl = null): array
     {
         if (str_contains($this->secretKey, 'MOCK')) {
             $attempt->gateway_reference = 'FLW-MOCK-APPLE-'.uniqid();
@@ -512,16 +608,41 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             ];
         }
 
+        $user = $attempt->user;
+
+        $payload = [
+            'amount' => (float) $attempt->amount,
+            'currency' => strtoupper($attempt->currency),
+            'email' => $user->email,
+            'fullname' => trim((string) $user->name) ?: 'Customer',
+            'tx_ref' => $attempt->idempotency_key,
+        ];
+
+        if ($returnUrl !== null) {
+            $payload['redirect_url'] = $returnUrl;
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) $user->phone);
+        if ($phone !== '') {
+            $payload['phone_number'] = $phone;
+        }
+
+        if (filled($user->country)) {
+            $payload['billing_country'] = strtoupper((string) $user->country);
+        }
+
         try {
             $response = Http::withToken($this->secretKey)
-                ->post("{$this->baseUrl}/charges?type=applepay", [
-                    'amount' => (float) $attempt->amount,
-                    'currency' => strtoupper($attempt->currency),
-                    'email' => $attempt->user->email,
-                    'tx_ref' => $attempt->idempotency_key,
-                ]);
+                ->post("{$this->baseUrl}/charges?type=applepay", $payload);
 
             if ($response->failed()) {
+                Log::warning('Flutterwave Apple Pay charge refused', [
+                    'tx_ref' => $attempt->idempotency_key,
+                    'currency' => $payload['currency'],
+                    'http_status' => $response->status(),
+                    'message' => $response->json('message'),
+                ]);
+
                 return [
                     'status' => 'failed',
                     'message' => 'Failed to initialize Apple Pay: '.($response->json('message') ?? 'Unknown error'),

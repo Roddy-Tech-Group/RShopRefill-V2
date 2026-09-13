@@ -14,8 +14,12 @@ use Illuminate\Auth\Events\Verified;
  * Sends the welcome email once the address is PROVEN, not at signup: a fresh
  * registration gets the verification email alone, and the welcome follows the
  * moment the customer clicks the link (Verified event). Accounts created with an
- * already-verified email (Google sign-in) are welcomed immediately on Registered,
- * since there is no verification step for them to complete.
+ * already-verified email (Google sign-in) are welcomed without a verification
+ * step - but only once they have finished signing up, since a Google account
+ * arrives half-registered and is held on the completion form. Welcoming someone
+ * to an account they cannot yet use contradicts the page they are looking at,
+ * and would greet an abandoned signup that never became a customer. The
+ * completion page calls this listener itself when it lifts the hold.
  *
  * Guest shadow accounts never get a welcome, and the correlation id makes the
  * welcome once-per-account for life, so re-verification flows can never send a
@@ -38,6 +42,12 @@ class WelcomeListener
         // On Registered, only a pre-verified account (Google) is welcomed;
         // everyone else's welcome waits for the Verified event.
         if ($event instanceof Registered && ! $user->hasVerifiedEmail()) {
+            return;
+        }
+
+        // Still owing the completion form: the welcome waits until they submit
+        // it, which is where this listener gets called again.
+        if ($user->needsProfileCompletion()) {
             return;
         }
 

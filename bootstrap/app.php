@@ -3,7 +3,6 @@
 use App\Http\Middleware\AdminAuth;
 use App\Http\Middleware\AdvertiseDiscoveryLinks;
 use App\Http\Middleware\CaptureReferralCookie;
-use App\Http\Middleware\EnforceDeviceTrustRestrictions;
 use App\Http\Middleware\EnforceDeviceVerification;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
@@ -11,6 +10,7 @@ use App\Http\Middleware\EnsureAccountNotSuspended;
 use App\Http\Middleware\EnsureDeviceMature;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\EnsureProfileCompleted;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\ResolveDisplayCurrency;
@@ -25,6 +25,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Log;
 use Livewire\Exceptions\MethodNotFoundException;
@@ -83,7 +84,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => AdminAuth::class,
-            'device.trust' => EnforceDeviceTrustRestrictions::class,
             // Selectively applied to write routes (checkout, cart writes,
             // wallet funding). Suspended users stay logged in so they can
             // see the banner + request a review - only the action is refused.
@@ -139,10 +139,23 @@ return Application::configure(basePath: dirname(__DIR__))
             // and every request fell back to English.
             SetLocale::class,
             ResolveRegion::class,
+            // Ties every web session to the password hash it signed in with:
+            // a password change or reset signs every OTHER session out on its
+            // next request, on any session driver. Without it, a thief who
+            // was already logged in survived the victim changing the password.
+            AuthenticateSession::class,
+            // Display currency is read from the query string and a cookie only,
+            // never from auth state, so it is independent of the line above and
+            // sits after it for no reason beyond matching how sessions settle
+            // before anything renders a price.
             ResolveDisplayCurrency::class,
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
             EnforceDeviceVerification::class,
+            // Holds a brand-new Google sign-up on the completion step until it
+            // supplies the country / phone / gender / terms the register wizard
+            // collects. Inert for every other account.
+            EnsureProfileCompleted::class,
             // Order matters on the response unwind: AdvertiseDiscoveryLinks runs
             // first (while the body is still HTML) so it can set the Link header,
             // then NegotiateMarkdown converts the body for agents while keeping it.
@@ -150,10 +163,15 @@ return Application::configure(basePath: dirname(__DIR__))
             AdvertiseDiscoveryLinks::class,
         ]);
 
-        // Enable stateful sessions for API routes so AJAX requests can resolve the authenticated user
+        // Enable stateful sessions for API routes so AJAX requests can resolve
+        // the authenticated user. The same ban / closure / revoked-session
+        // check as the web group runs here too: these routes authenticate the
+        // very same session cookie, so a banned customer must not keep
+        // working /api endpoints just because they never load a web page.
         $middleware->api(append: [
             EncryptCookies::class,
             StartSession::class,
+            EnsureAccountActive::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));

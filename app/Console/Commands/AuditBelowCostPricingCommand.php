@@ -16,8 +16,12 @@ use Illuminate\Support\Str;
  * Read-only, catalog-wide margin audit — the Stage 0 gate for the cost-anchored
  * floor rollout (config/pricing.php `floor_mode`). Four sections:
  *
- *   BELOW-COST   variants whose CURRENT (legacy) charged price is under the
- *                supplier's USD cost — actively losing money on every sale.
+ *   BELOW-COST   variants whose CURRENT charged price — computed under the
+ *                floor mode this environment actually runs — is under the
+ *                supplier's USD cost: actively losing money on every sale.
+ *                (Historically this section priced in legacy mode regardless
+ *                of PRICING_FLOOR_MODE, so on an enforce environment it
+ *                reported phantom losses the floor had already fixed.)
  *   WOULD-RAISE  variants the cost-anchored floor would reprice upward, with
  *                the delta. Small raises are the fix working; raises above
  *                --suspect-pct almost always mean corrupt cost data (e.g. a
@@ -46,6 +50,16 @@ class AuditBelowCostPricingCommand extends Command
     {
         $legacyPricing = $pricing->withFloorMode('legacy');
         $enforcePricing = $pricing->withFloorMode('enforce');
+
+        // The BELOW-COST section must describe reality, so it prices under the
+        // mode this environment actually runs. withFloorMode() is used even
+        // when that mode is the config default: the explicit override also
+        // suppresses the engine's per-variant floor_enforced logging, which a
+        // 24k-variant scan would otherwise spam.
+        $activeFloorMode = in_array(config('pricing.floor_mode'), ['shadow', 'enforce'], true)
+            ? (string) config('pricing.floor_mode')
+            : 'legacy';
+        $currentPricing = $pricing->withFloorMode($activeFloorMode);
         $suspectPct = (float) $this->option('suspect-pct');
 
         $belowCost = [];
@@ -55,14 +69,19 @@ class AuditBelowCostPricingCommand extends Command
         $variableAmount = 0;
         $scanned = 0;
 
-        $query = ProductVariant::query()->with('product:id,name,provider_name,category_id');
+        // pricing_basis MUST ride along in the partial select: the engine reads
+        // product->pricing_basis to pick the markup base, and a missing column
+        // silently reads as NULL, which sends every supplier_cost product with
+        // a USD face down the legacy face heuristic and reports phantom
+        // below-cost rows (the 2026-09-02 false-alarm incident).
+        $query = ProductVariant::query()->with('product:id,name,provider_name,category_id,pricing_basis');
         if (! $this->option('all')) {
             $query->where('is_available', true)
                 ->whereHas('product', fn ($q) => $q->where('is_active', true));
         }
 
         $query->orderBy('id')->chunk(500, function ($variants) use (
-            $legacyPricing, $enforcePricing, $suspectPct,
+            $legacyPricing, $enforcePricing, $currentPricing, $suspectPct,
             &$belowCost, &$wouldRaise, &$overrides, &$noCostData, &$variableAmount, &$scanned
         ) {
             foreach ($variants as $variant) {
@@ -86,6 +105,7 @@ class AuditBelowCostPricingCommand extends Command
 
                 $legacy = (float) $legacyPricing->calculatePricing($variant, 1)['unit_price_snapshot'];
                 $enforced = (float) $enforcePricing->calculatePricing($variant, 1)['unit_price_snapshot'];
+                $current = (float) $currentPricing->calculatePricing($variant, 1)['unit_price_snapshot'];
 
                 // Two Zendit-specific annotations, per Zendit's documented
                 // semantics (see ZenditCostBlocks). BAD-CCY marks a cost block
@@ -99,12 +119,12 @@ class AuditBelowCostPricingCommand extends Command
                 $badCurrency = ZenditCostBlocks::hasWalletCurrencyViolation($variant);
                 $costOverFace = ZenditCostBlocks::costExceedsFace($variant);
 
-                if ($legacy < $cost - 0.005) {
+                if ($current < $cost - 0.005) {
                     $belowCost[] = [
                         'variant' => $variant,
                         'cost' => $cost,
-                        'price' => $legacy,
-                        'loss' => $cost - $legacy,
+                        'price' => $current,
+                        'loss' => $cost - $current,
                         'bad_currency' => $badCurrency,
                         'cost_over_face' => $costOverFace,
                     ];
@@ -138,7 +158,7 @@ class AuditBelowCostPricingCommand extends Command
             }
         });
 
-        $this->renderBelowCost($belowCost);
+        $this->renderBelowCost($belowCost, $activeFloorMode);
         $this->renderWouldRaise($wouldRaise);
         $this->renderOverrides($overrides);
         $orderUnits = $this->renderOrderBleed((int) $this->option('orders-days'));
@@ -204,9 +224,9 @@ class AuditBelowCostPricingCommand extends Command
     }
 
     /** @param array<int, array<string, mixed>> $rows */
-    private function renderBelowCost(array $rows): void
+    private function renderBelowCost(array $rows, string $floorMode): void
     {
-        $this->section('SELLING BELOW COST (current price under supplier cost)', $rows, function (array $r) {
+        $this->section("SELLING BELOW COST (charged price under supplier cost, floor mode: {$floorMode})", $rows, function (array $r) {
             return [
                 $r['variant']->id,
                 Str::limit($r['variant']->product?->name ?? '-', 34),

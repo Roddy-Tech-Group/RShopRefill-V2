@@ -289,6 +289,10 @@ class NowPaymentsWebhookTest extends TestCase
      * only cents, so absorbing even a fraction of a percent can erase the profit on
      * an order. This previously asserted the opposite — that a sub-1% shortfall was
      * accepted as fully paid — and that behaviour has been removed.
+     *
+     * The only exception is dust (see CryptoDustSettlementTest): a gap under half
+     * a cent in the price currency. On this $25 order the gap below is $0.0051,
+     * just over the line, and is held.
      */
     public function test_verify_payment_never_accepts_a_short_payment(): void
     {

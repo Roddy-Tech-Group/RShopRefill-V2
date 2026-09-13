@@ -34,8 +34,10 @@ class PinEventListener
             recipient: $event->user,
             category: CommunicationCategory::PinLocked,
             title: 'Transaction PIN Locked',
-            message: 'Your transaction PIN has been locked due to too many failed attempts.',
-            mailable: new TransactionPinLockedMail($event->user)
+            message: $event->permanent
+                ? 'Your transaction PIN has been locked after repeated failed attempts. Reset it to use your wallet again.'
+                : 'Your transaction PIN has been locked due to too many failed attempts.',
+            mailable: new TransactionPinLockedMail($event->user, $event->permanent)
         );
     }
 

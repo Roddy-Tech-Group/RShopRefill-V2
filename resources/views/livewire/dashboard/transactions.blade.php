@@ -222,8 +222,19 @@ class extends Component {
         // Non-completed funding attempts. A completed deposit already appears in
         // the ledger below as a credit, so here we surface only the in-flight and
         // failed ones so the customer can see a deposit is still pending or failed.
+        // A failed funding is only shown when it actually reached a gateway
+        // (its attempt holds a gateway reference). One that never did was
+        // never a deposit: an amount typed and abandoned before any address or
+        // charge existed, which the sweeper later marked failed. Telling the
+        // customer that "failed" reads as a deposit they never made going wrong.
         $recentDeposits = WalletFunding::where('user_id', Auth::id())
-            ->whereIn('status', [FundingStatus::Pending, FundingStatus::Processing, FundingStatus::Failed])
+            ->where(function ($query) {
+                $query->whereIn('status', [FundingStatus::Pending, FundingStatus::Processing])
+                    ->orWhere(function ($failed) {
+                        $failed->where('status', FundingStatus::Failed)
+                            ->whereHas('paymentAttempt', fn ($attempt) => $attempt->whereNotNull('gateway_reference'));
+                    });
+            })
             ->latest()
             ->limit(4)
             ->get();

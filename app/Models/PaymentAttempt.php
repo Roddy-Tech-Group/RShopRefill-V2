@@ -101,16 +101,44 @@ class PaymentAttempt extends Model
     }
 
     /**
-     * Customer sent less than invoiced. Never fulfilled automatically — however
-     * small the shortfall, absorbing it can erase the margin on a refill order.
+     * Customer sent less than invoiced and the shortfall is still outstanding.
+     * Never fulfilled automatically — however small the shortfall, absorbing
+     * it can erase the margin on a refill order.
      *
      * Requires funds to have actually arrived. An unpaid payment reports
      * actually_paid = 0, and treating that as a shortfall told customers their
      * payment was short before they had made one.
+     *
+     * A short payment that has since been settled (see wasSettledShort()) is
+     * not underpaid any more: the customer owes nothing, the order fulfils,
+     * and no top-up may be offered against it.
      */
     public function isUnderpaid(): bool
     {
-        return $this->hasSettled() && (float) $this->settlement_delta < 0;
+        return $this->hasSettled()
+            && (float) $this->settlement_delta < 0
+            && $this->payment_status !== PaymentStatus::Paid;
+    }
+
+    /**
+     * Paid despite a recorded shortfall: either the dust rule absorbed a
+     * sub-cent remainder, or an operator settled it with a stated reason.
+     * The negative settlement_delta is kept as the record of what was short.
+     */
+    public function wasSettledShort(): bool
+    {
+        return $this->payment_status === PaymentStatus::Paid
+            && ($this->settledAsDust() || $this->settledManually());
+    }
+
+    public function settledAsDust(): bool
+    {
+        return data_get($this->metadata, 'crypto.dust_settlement') !== null;
+    }
+
+    public function settledManually(): bool
+    {
+        return data_get($this->metadata, 'crypto.manual_settlement') !== null;
     }
 
     /**

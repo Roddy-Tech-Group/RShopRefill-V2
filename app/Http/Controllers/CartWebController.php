@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
+use App\Domain\Shared\Support\CharmPrice;
 use App\Domain\Wallet\Exceptions\StaleRateException;
 use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Models\Cart;
+use App\Models\CurrencyRate;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\FeatureFlag;
@@ -183,11 +185,22 @@ class CartWebController extends Controller
             $rateStale = true;
         }
 
+        // Charm rounding for fiat display currencies: every converted price the
+        // popup shows rounds UP to the currency's step (₦1,056.80 → ₦1,060),
+        // so the cart, the estimated price and the charged total all speak
+        // clean numbers. Up-only, so the display can never understate what
+        // checkout will charge by more than checkout's own aggregate rounding.
+        $displayIsFiat = $resolvedCurrency !== 'USD'
+            && CurrencyRate::query()->where('code', $resolvedCurrency)->value('type') === 'fiat';
+        $charm = fn (float $amount): float => $displayIsFiat
+            ? CharmPrice::roundUp($amount, (float) $exchangeRate)
+            : round($amount, 2);
+
         // ISO -> country name, for human labels next to flags ("US" reads as
         // "United States", "WW" as "Global").
         $countryNames = array_flip(config('countries.codes', []));
 
-        $items = $cart->items->map(function ($item) use ($exchangeRate, $countryNames) {
+        $items = $cart->items->map(function ($item) use ($exchangeRate, $countryNames, $charm) {
             $product = $item->product;
             $variant = $item->variant;
             // eSIM products carry no brand_key, so brandDisplayName comes back
@@ -215,9 +228,9 @@ class CartWebController extends Controller
                 'face_label' => $this->faceLabel($variant),
                 'quantity' => (int) $item->quantity,
                 'unit_price_usd' => round($unitUsd, 2),
-                'unit_price' => round($unitUsd * $exchangeRate, 2),
+                'unit_price' => $charm($unitUsd * $exchangeRate),
                 'line_total_usd' => round($lineUsd, 2),
-                'line_total' => round($lineUsd * $exchangeRate, 2),
+                'line_total' => $charm($lineUsd * $exchangeRate),
                 // Category drives per-item copy on the cart + checkout pages
                 // (gift-card region notice, top-up phone hint, eSIM QR hint).
                 'category_slug' => $product?->category?->slug,
@@ -234,7 +247,7 @@ class CartWebController extends Controller
             'rate' => $exchangeRate,
             'rate_stale' => $rateStale,
             'subtotal_usd' => round($subtotalUsd, 2),
-            'subtotal' => round($subtotalUsd * $exchangeRate, 2),
+            'subtotal' => $charm($subtotalUsd * $exchangeRate),
             'estimated_rcoin_reward' => (int) ($totals['estimated_rcoin_reward'] ?? 0),
             'items' => $items,
         ]);

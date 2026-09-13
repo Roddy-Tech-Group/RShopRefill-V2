@@ -132,6 +132,66 @@ class TransactionPinTest extends TestCase
         $response = $this->actingAs($this->user)->postJson('/api/wallets/pin/verify', ['pin' => '9482']);
         $response->assertStatus(422)
             ->assertJsonPath('errors.pin.0', 'Too many failed attempts. Try again later.');
+
+        Event::assertDispatched(fn (TransactionPinLocked $event) => $event->permanent === false);
+    }
+
+    public function test_the_tenth_wrong_guess_locks_the_pin_for_good(): void
+    {
+        Event::fake([TransactionPinLocked::class]);
+        $this->user->transaction_pin = Hash::make('9482');
+        $this->user->save();
+
+        // Five wrong guesses: the 15-minute pause. Wait it out.
+        for ($i = 0; $i < 5; $i++) {
+            $this->actingAs($this->user)->postJson('/api/wallets/pin/verify', ['pin' => '1112']);
+        }
+        $this->travel(16)->minutes();
+
+        // The counter never reset, so guesses six to nine each re-pause the PIN.
+        for ($i = 0; $i < 4; $i++) {
+            $this->actingAs($this->user)->postJson('/api/wallets/pin/verify', ['pin' => '1112'])
+                ->assertJsonPath('errors.pin.0', 'Too many failed attempts. PIN locked for 15 minutes.');
+            $this->travel(16)->minutes();
+        }
+
+        // The tenth closes the wallet until a password-gated reset.
+        $this->actingAs($this->user)->postJson('/api/wallets/pin/verify', ['pin' => '1112'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.pin.0', TransactionPinService::HARD_LOCK_MESSAGE);
+
+        $this->assertSame('locked', $this->user->fresh()->pin_status);
+        Event::assertDispatched(fn (TransactionPinLocked $event) => $event->permanent === true);
+
+        // Time does not reopen it, and neither does the right PIN.
+        $this->travel(2)->days();
+        $this->actingAs($this->user)->postJson('/api/wallets/pin/verify', ['pin' => '9482'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.pin.0', TransactionPinService::HARD_LOCK_MESSAGE);
+    }
+
+    public function test_a_hard_locked_pin_is_reopened_only_by_the_reset_flow(): void
+    {
+        $this->user->forceFill([
+            'transaction_pin' => Hash::make('9482'),
+            'transaction_pin_attempts' => 10,
+            'pin_status' => 'locked',
+        ])->save();
+
+        $service = app(TransactionPinService::class);
+
+        // Requesting the reset still works while locked (it needs the password).
+        $service->requestReset($this->user, 'password123');
+        $token = Cache::get("pin_reset_{$this->user->id}");
+        $this->assertNotNull($token);
+
+        $service->confirmReset($this->user, $token, '7391');
+
+        $fresh = $this->user->fresh();
+        $this->assertSame('active', $fresh->pin_status);
+        $this->assertSame(0, $fresh->transaction_pin_attempts);
+        $this->assertFalse($fresh->isTransactionPinLocked());
+        $this->assertIsString($service->verifyPin($fresh, '7391'));
     }
 
     public function test_wallet_payment_flow_requires_pin()

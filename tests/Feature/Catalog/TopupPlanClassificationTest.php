@@ -133,19 +133,20 @@ class TopupPlanClassificationTest extends TestCase
     }
 
     /**
-     * The plan cards used to print retail_price straight off the column, which
-     * is the PRE-markup base. A $35 card therefore advertised "$35" while the
-     * cart charged the marked-up, cost-floored price. Whatever the page shows
-     * must be what CartPricingService would charge, or the customer is quoted
-     * one number and billed another.
+     * The amount selector speaks FACE VALUES (the "$35" the carrier prints and
+     * the listing advertises) - the 2026-09 reversal of the earlier fix that
+     * labeled denominations with the charged price. The engine's charge must
+     * STILL reach the page, because it feeds the Estimated price field: the
+     * customer sees the printed amount and the real price side by side, and
+     * the cart can never disagree with either.
      */
-    public function test_prices_shown_are_the_price_the_cart_will_actually_charge(): void
+    public function test_face_values_label_the_selector_while_the_real_charge_still_reaches_the_page(): void
     {
         $this->withoutVite();
         $product = $this->topupProduct();
 
-        // Cost above face: the floor has to lift this, so a page still reading
-        // the raw column would visibly disagree with the cart.
+        // Cost above face: the floor has to lift this, so face and charge are
+        // guaranteed to be different figures.
         $variant = $this->variant($product, ['subTypes' => ['Mobile Top Up']], 35);
         $variant->update(['cost_price' => 39.00]);
 
@@ -156,7 +157,9 @@ class TopupPlanClassificationTest extends TestCase
 
         $html = $this->get(route('shop.topup', 'straight-talk'))->assertOk()->getContent();
 
-        $this->assertStringContainsString(number_format($charged, 2), $html);
-        $this->assertStringNotContainsString('$35.00', $html);
+        // The selector labels the printed face...
+        $this->assertStringContainsString('$35.00', $html);
+        // ...and the engine's charge is on the page for the Estimated price field.
+        $this->assertStringContainsString((string) $charged, $html);
     }
 }

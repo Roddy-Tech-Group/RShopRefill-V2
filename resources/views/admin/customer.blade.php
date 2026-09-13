@@ -74,7 +74,8 @@
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Country</dt>
-                    <dd class="mt-1 font-medium text-zinc-700">{{ $user->country ?: '-' }}</dd>
+                    {{-- Stored as the ISO code; show the operator the name. --}}
+                    <dd class="mt-1 font-medium text-zinc-700">{{ $user->country ? (array_search(strtoupper($user->country), config('countries.codes', []), true) ?: $user->country) : '-' }}</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Sign-in</dt>
@@ -90,6 +91,8 @@
         {{-- Admin actions: edit, notify, verify email/KYC, suspend, hold funds, ban --}}
         @php
             $isBanned = $user->banned_at !== null;
+            $closureRequested = $user->hasRequestedClosure();
+            $isClosed = $user->isClosed();
             $isSuspended = $user->isSuspended();
             $isRestricted = $user->isRestricted();
             $fundsHeld = $user->wallets->isNotEmpty() && $user->wallets->where('is_active', true)->isEmpty();
@@ -249,6 +252,45 @@
                         </button>
                     </form>
 
+                    @unless ($isClosed)
+                    <form method="POST" action="{{ route('admin.customer.close', $user) }}"
+                          data-confirm="{{ $closureRequested ? 'Cancel the pending closure? The customer keeps their account.' : 'Request closure for this customer? They are signed out and their details are anonymised after the grace period unless they sign in again.' }}"
+                          data-confirm-title="{{ $closureRequested ? 'Cancel closure' : 'Close account' }}"
+                          data-confirm-text="{{ $closureRequested ? 'Cancel closure' : 'Close account' }}"
+                          data-confirm-tone="{{ $closureRequested ? 'success' : 'danger' }}">
+                        @csrf
+                        <button type="submit" class="{{ $btn }} {{ $closureRequested ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100' : 'bg-zinc-100 text-zinc-800 ring-1 ring-zinc-300 hover:bg-zinc-200' }}">
+                            {{ $closureRequested ? 'Cancel closure' : 'Close account' }}
+                        </button>
+                    </form>
+                    @endunless
+                    @error('closure')<p class="basis-full text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+
+                    @unless ($isClosed)
+                    <form method="POST" action="{{ route('admin.customer.send-data-export', $user) }}"
+                          data-confirm="Email this customer a PDF copy of their personal data? It goes only to the address on the account."
+                          data-confirm-title="Send data export"
+                          data-confirm-text="Send export"
+                          data-confirm-tone="success">
+                        @csrf
+                        <button type="submit" class="{{ $btn }} bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100">
+                            Send data export
+                        </button>
+                    </form>
+                    @endunless
+                    @error('data_export')<p class="basis-full text-xs font-medium text-red-600">{{ $message }}</p>@enderror
+
+                    <form method="POST" action="{{ route('admin.customer.revoke-sessions', $user) }}"
+                          data-confirm="Sign this customer out on every device and void their remember-me cookies? They keep their account and can sign in again."
+                          data-confirm-title="Sign out everywhere"
+                          data-confirm-text="Sign out everywhere"
+                          data-confirm-tone="danger">
+                        @csrf
+                        <button type="submit" class="{{ $btn }} bg-zinc-100 text-zinc-800 ring-1 ring-zinc-300 hover:bg-zinc-200">
+                            Sign out everywhere
+                        </button>
+                    </form>
+
                     {{-- Reset transaction PIN - only when one is set. Clears it so
                          the customer is prompted to set a fresh PIN. --}}
                     @if ($user->hasTransactionPin())
@@ -397,8 +439,13 @@
                 // close to the divider above instead of floating in dead space.
                 $badgeBase = 'inline-flex items-center gap-1 rounded-[12px] px-2 py-0.5 text-[11px] font-medium ring-1';
             @endphp
-            @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || ! $emailVerified || ! $kycVerified)
+            @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || $closureRequested || $isClosed || ! $emailVerified || ! $kycVerified)
                 <div class="flex flex-wrap gap-1.5 px-5 py-2">
+                    @if ($isClosed)
+                        <span class="{{ $badgeBase }} bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:ring-zinc-700/60">Closed and anonymised on {{ $fmtDate($user->anonymised_at) }}</span>
+                    @elseif ($closureRequested)
+                        <span class="{{ $badgeBase }} bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">Closure requested, anonymises on {{ $fmtDate($user->closesOn()) }}</span>
+                    @endif
                     @if ($isBanned)
                         <span class="{{ $badgeBase }} bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">Banned{{ $user->banned_at ? ' on '.$fmtDate($user->banned_at) : '' }}</span>
                     @endif
@@ -458,8 +505,10 @@
                         <div class="relative mt-1.5">
                             <select name="country" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <option value="">Not set</option>
-                                @foreach (array_keys(config('countries.codes', [])) as $cName)
-                                    <option value="{{ $cName }}" @selected(old('country', $user->country) === $cName)>{{ $cName }}</option>
+                                {{-- Value is the ISO code the column stores; the
+                                     label stays the readable country name. --}}
+                                @foreach (App\Support\PhoneCountries::all() as $cRow)
+                                    <option value="{{ $cRow['iso'] }}" @selected(old('country', $user->country) === $cRow['iso'])>{{ $cRow['name'] }}</option>
                                 @endforeach
                             </select>
                             <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -1096,6 +1145,110 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        {{-- Recent emails sent — did the verification / receipt actually land?
+             Short on purpose; the full log lives in communication_logs. --}}
+        @php
+            $recentEmails = \App\Models\CommunicationLog::query()
+                ->where('user_id', $user->id)
+                ->where('channel', 'email')
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get();
+
+            $emailTone = function ($status): array {
+                $value = is_object($status) ? $status->value : (string) $status;
+
+                return match ($value) {
+                    'delivered', 'opened', 'clicked' => ['Delivered', 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
+                    'bounced', 'failed', 'complained', 'suppressed' => [ucfirst($value), 'bg-red-50 text-red-700 ring-red-200'],
+                    default => [ucfirst($value), 'bg-zinc-100 text-zinc-700 ring-zinc-200'],
+                };
+            };
+        @endphp
+        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="border-b border-zinc-100 px-5 py-4">
+                <h3 class="text-sm font-bold text-zinc-900">Recent emails sent</h3>
+            </div>
+            <div class="divide-y divide-zinc-100">
+                @forelse ($recentEmails as $index => $email)
+                    @php [$statusLabel, $statusTone] = $emailTone($email->status); @endphp
+                    <div @if ($index >= 5) x-show="expanded" x-cloak @endif class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                        <div class="min-w-0">
+                            <p class="truncate text-[13px] font-semibold text-zinc-900">{{ $email->subject ?: ucfirst(str_replace('_', ' ', is_object($email->category) ? $email->category->value : $email->category)) }}</p>
+                            <p class="mt-0.5 text-[11px] text-zinc-500">{{ $fmtDate($email->sent_at ?? $email->created_at) }}</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $statusTone }}">{{ $statusLabel }}</span>
+                    </div>
+                @empty
+                    <div class="px-5 py-8 text-center text-sm text-zinc-600">No emails on record for this customer.</div>
+                @endforelse
+            </div>
+            @if ($recentEmails->count() > 5)
+                <button type="button" @click="expanded = ! expanded" class="flex w-full items-center justify-center gap-1 border-t border-zinc-100 px-5 py-2 text-[11px] font-semibold text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-600">
+                    <span x-show="! expanded">Show more</span>
+                    <span x-show="expanded" x-cloak>Show less</span>
+                    <svg :class="expanded && 'rotate-180'" class="h-3 w-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+            @endif
+        </div>
+
+        {{-- History — every audited change on this account: admin actions,
+             sensitive field changes, exports, closures. Read-only by design. --}}
+        @php
+            $history = \App\Domain\Audit\Models\AuditLog::query()
+                ->where('model_type', \App\Models\User::class)
+                ->where('model_id', $user->id)
+                ->orderByDesc('id')
+                ->limit(20)
+                ->get();
+
+            $historyActor = function ($log) use ($user): string {
+                if (($log->metadata['actor_type'] ?? null) === \App\Models\Admin::class) {
+                    return $log->metadata['actor_name'] ?? $log->metadata['actor_email'] ?? 'Admin';
+                }
+                if ($log->actor_id === $user->id) {
+                    return 'The customer';
+                }
+
+                return $log->actor_id ? 'User #'.$log->actor_id : 'System';
+            };
+        @endphp
+        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="border-b border-zinc-100 px-5 py-4">
+                <h3 class="text-sm font-bold text-zinc-900">History</h3>
+            </div>
+            <div class="divide-y divide-zinc-100">
+                @forelse ($history as $index => $log)
+                    <div @if ($index >= 5) x-show="expanded" x-cloak @endif class="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
+                        <div class="min-w-0">
+                            <p class="text-[13px] font-semibold text-zinc-900">
+                                {{ ucfirst(str_replace(['.', '_'], [': ', ' '], $log->action)) }}
+                            </p>
+                            <p class="mt-0.5 text-[11px] text-zinc-500">
+                                by {{ $historyActor($log) }}
+                                @if (! empty($log->metadata['fields']))
+                                    · changed: {{ implode(', ', (array) $log->metadata['fields']) }}
+                                @endif
+                                @if (! empty($log->metadata['reason']))
+                                    · {{ $log->metadata['reason'] }}
+                                @endif
+                            </p>
+                        </div>
+                        <span class="shrink-0 text-[11px] text-zinc-500">{{ $fmtDate($log->created_at) }}</span>
+                    </div>
+                @empty
+                    <div class="px-5 py-8 text-center text-sm text-zinc-600">Nothing audited on this account yet.</div>
+                @endforelse
+            </div>
+            @if ($history->count() > 5)
+                <button type="button" @click="expanded = ! expanded" class="flex w-full items-center justify-center gap-1 border-t border-zinc-100 px-5 py-2 text-[11px] font-semibold text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-600">
+                    <span x-show="! expanded">Show more</span>
+                    <span x-show="expanded" x-cloak>Show less</span>
+                    <svg :class="expanded && 'rotate-180'" class="h-3 w-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+            @endif
         </div>
 
     </div>

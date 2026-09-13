@@ -22,10 +22,9 @@ use Illuminate\Support\Facades\Cache;
  *     chargeable today. PaymentSession's supported_brands array is display
  *     copy, not a gate.
  *   - mobile-money networks are per the owner's confirmation of the gateway
- *     account (2026-07-30). NOTE: the charge rail itself still needs the
- *     per-market endpoints (chargeMobileMoney is hardwired to the francophone
- *     rail) - that work is queued, and until it lands the non-franco networks
- *     are accepted by the gateway but not yet chargeable through checkout.
+ *     account (2026-07-30). Each market charges on its own Flutterwave rail
+ *     (see MobileMoneyRail); the charge used to be hardwired to the
+ *     francophone rail, which refused every non-XAF/XOF attempt.
  *   - the bank / USSD / QR / wallet rails are drawn generically, because the
  *     customer picks their own bank, short code or wallet on the gateway's
  *     page and we cannot know which one they will use.

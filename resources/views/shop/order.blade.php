@@ -16,6 +16,11 @@
     $awaitingPayment = $status->value === 'pending' && $paymentValue === 'unpaid' && ! $moneyInFlight;
     // Sweeper-cancelled, never paid: an expired checkout, not a cancelled order.
     $expiredCheckout = $status->value === 'cancelled' && $paymentValue !== 'paid';
+    // A declined payment on an order nobody paid for. The cart survives until a
+    // payment confirms, so checkout resumes the same purchase; this page used
+    // to say "you can try checking out again" and offer no way to do it, which
+    // is where the recovery email's retry link landed.
+    $declinedUnpaid = $status->value === 'failed' && $paymentValue !== 'paid';
 
     // Status-driven hero copy + colour. The order is `pending` straight after
     // checkout while payment is verified, then moves through the fulfillment engine.
@@ -446,10 +451,10 @@
         {{-- The unpaid checkout's way back in. The cart survives until payment
              confirms and checkout re-entry is idempotent, so this lands the
              customer on the same live session rather than a duplicate order. --}}
-        @if ($awaitingPayment)
+        @if ($awaitingPayment || $expiredCheckout || $declinedUnpaid)
             <a href="{{ $shopRoute('checkout') }}"
                 class="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
-                Complete payment
+                {{ $awaitingPayment ? 'Complete payment' : 'Try again' }}
             </a>
         @endif
 
@@ -550,7 +555,7 @@
                     } else if (method.type === 'bank_transfer') {
                         this.paySession('bank_transfer');
                     } else if (method.type === 'mobile_money') {
-                        this.momoDetails.network = method.supported_networks ? method.supported_networks[0] : 'MTN';
+                        this.momoDetails.network = (method.supported_networks ?? [])[0] ?? '';
                         this.paymentState = 'momo_input';
                     } else if (method.type === 'crypto') {
                         this.cryptoDetails.pay_currency = method.coin || 'usdt';
@@ -787,7 +792,7 @@
                         <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                     </div>
 
-                    <div>
+                    <div x-show="(selectedMethod?.supported_networks ?? []).length > 0">
                         <label class="block text-xs font-semibold text-zinc-700">Network</label>
                         <div class="relative mt-1.5">
                             <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">

@@ -5,6 +5,7 @@ namespace Tests\Feature\Operations;
 use App\Domain\Admin\Services\MonitoringSnapshotService;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -44,14 +45,27 @@ class MonitorOperationsCommandTest extends TestCase
         $this->app->instance(OperationalAlerter::class, $this->alerter);
     }
 
+    /** @var array<string, mixed> */
+    private array $snapshot = [];
+
+    /**
+     * Artisan resolves a command once per process, so the snapshot service
+     * is mocked once and reads whatever the current test has bound; a test
+     * can then run the command several times against changing snapshots.
+     */
     private function bindSnapshot(array $overrides = []): void
     {
-        $snapshot = array_replace_recursive($this->healthySnapshot(), $overrides);
+        $this->snapshot = array_replace_recursive($this->healthySnapshot(), $overrides);
 
-        $this->mock(MonitoringSnapshotService::class)
-            ->shouldReceive('snapshot')
-            ->andReturn($snapshot);
+        if (! $this->snapshotMocked) {
+            $this->snapshotMocked = true;
+            $this->mock(MonitoringSnapshotService::class)
+                ->shouldReceive('snapshot')
+                ->andReturnUsing(fn () => $this->snapshot);
+        }
     }
+
+    private bool $snapshotMocked = false;
 
     private function healthySnapshot(): array
     {
@@ -194,7 +208,98 @@ class MonitorOperationsCommandTest extends TestCase
         $keys = $this->sentKeys();
         $this->assertContains('provider:zendit:breaker', $keys);
         $this->assertContains('provider:zendit:success-rate', $keys);
-        $this->assertContains('provider:airalo:balance', $keys);
+        $this->assertContains('provider:airalo:balance:150', $keys);
+    }
+
+    private function runWithZenditBalance(float $balance): void
+    {
+        $this->bindSnapshot(['zendit_balance' => ['balance' => $balance, 'currency' => 'USD']]);
+        $this->artisan('monitor:operations')->assertExitCode(0);
+    }
+
+    /** @return array<int, string> */
+    private function zenditBalanceKeys(): array
+    {
+        return array_values(array_filter($this->sentKeys(), fn (string $key) => str_starts_with($key, 'provider:zendit:balance')));
+    }
+
+    public function test_low_float_alerts_once_on_crossing_and_stays_quiet_inside_the_tier(): void
+    {
+        Carbon::setTestNow('2026-08-27 10:00:00');
+
+        $this->runWithZenditBalance(247.05);
+        $this->assertSame(['provider:zendit:balance:250'], $this->zenditBalanceKeys());
+
+        // Same tier, every five minutes for the next six hours: nothing new.
+        foreach (range(1, 72) as $run) {
+            Carbon::setTestNow(now()->addMinutes(5));
+            $this->runWithZenditBalance(247.05 - $run * 0.1);
+        }
+        $this->assertSame(['provider:zendit:balance:250'], $this->zenditBalanceKeys());
+    }
+
+    public function test_falling_through_a_lower_tier_alerts_immediately(): void
+    {
+        Carbon::setTestNow('2026-08-27 10:00:00');
+        $this->runWithZenditBalance(247.05);
+
+        Carbon::setTestNow('2026-08-27 10:05:00');
+        $this->runWithZenditBalance(199.0);
+
+        Carbon::setTestNow('2026-08-27 10:10:00');
+        $this->runWithZenditBalance(60.0);
+
+        $this->assertSame([
+            'provider:zendit:balance:250',
+            'provider:zendit:balance:200',
+            'provider:zendit:balance:100',
+        ], $this->zenditBalanceKeys());
+
+        // The bottom tier fans out to mail too: orders are about to fail.
+        $severities = array_column($this->alerter->sent, 'severity', 'key');
+        $this->assertSame(AlertSeverity::Sev2, $severities['provider:zendit:balance:250']);
+        $this->assertSame(AlertSeverity::Sev1, $severities['provider:zendit:balance:100']);
+    }
+
+    public function test_a_standing_low_float_is_reminded_twice_a_day(): void
+    {
+        Carbon::setTestNow('2026-08-27 10:00:00');
+        $this->runWithZenditBalance(247.05);
+
+        Carbon::setTestNow('2026-08-27 21:55:00');
+        $this->runWithZenditBalance(247.05);
+        $this->assertCount(1, $this->zenditBalanceKeys());
+
+        Carbon::setTestNow('2026-08-27 22:00:00');
+        $this->runWithZenditBalance(247.05);
+        $this->assertSame(['provider:zendit:balance:250', 'provider:zendit:balance:reminder'], $this->zenditBalanceKeys());
+
+        Carbon::setTestNow('2026-08-28 10:00:00');
+        $this->runWithZenditBalance(247.05);
+        $this->assertCount(3, $this->zenditBalanceKeys());
+    }
+
+    public function test_recovery_above_the_floor_sends_one_message_and_resets_the_state(): void
+    {
+        Carbon::setTestNow('2026-08-27 10:00:00');
+        $this->runWithZenditBalance(247.05);
+
+        Carbon::setTestNow('2026-08-27 12:00:00');
+        $this->runWithZenditBalance(900.0);
+        $this->runWithZenditBalance(900.0);
+        $this->assertSame(['provider:zendit:balance:250', 'provider:zendit:balance:recovered'], $this->zenditBalanceKeys());
+
+        // A later dip is a new incident and alerts again at once.
+        Carbon::setTestNow('2026-08-27 13:00:00');
+        $this->runWithZenditBalance(240.0);
+        $this->assertSame('provider:zendit:balance:250', end($this->alerter->sent)['key']);
+    }
+
+    public function test_a_healthy_float_that_was_never_low_sends_no_recovery(): void
+    {
+        $this->runWithZenditBalance(900.0);
+
+        $this->assertSame([], $this->zenditBalanceKeys());
     }
 
     public function test_a_thin_sample_does_not_alert_on_success_rate(): void

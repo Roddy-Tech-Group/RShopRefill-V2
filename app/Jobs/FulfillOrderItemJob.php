@@ -31,9 +31,52 @@ class FulfillOrderItemJob implements ShouldQueue
 
     public int $backoff = 30;
 
+    /**
+     * Seconds between fulfillment dispatches for IDENTICAL offers on one
+     * order. Two back-to-back purchases of the same offer (a qty-2 gift card
+     * order explodes into two API calls milliseconds apart) trip the
+     * supplier's duplicate/velocity protection - observed as Zendit error -29
+     * on the second of two identical Apple US cards. Spacing them out makes
+     * each purchase look like what it is: a deliberate repeat, not a
+     * double-submit.
+     */
+    public const SIBLING_STAGGER_SECONDS = 30;
+
+    /** Upper bound so a qty-100 order still finishes in minutes, not an hour. */
+    public const SIBLING_STAGGER_CAP_SECONDS = 300;
+
     public function __construct(protected OrderItem $item)
     {
         $this->onQueue('fulfillment');
+    }
+
+    /**
+     * Dispatch fulfillment for a paid order's items, spacing identical offers
+     * SIBLING_STAGGER_SECONDS apart. The first item of every offer dispatches
+     * immediately, so single-item orders (and multi-product carts with no
+     * duplicates) behave exactly as before. Delayed duplicates are safe by
+     * construction: handle() opens with a row-locked idempotency guard, and
+     * the fallback sweeper's own re-dispatches pass through the same guard.
+     *
+     * @param  iterable<int, OrderItem>  $items
+     */
+    public static function dispatchStaggered(iterable $items): void
+    {
+        $dispatchedPerOffer = [];
+
+        foreach ($items as $item) {
+            $offerKey = (string) ($item->provider_offer_id ?: $item->id);
+            $position = $dispatchedPerOffer[$offerKey] ?? 0;
+            $dispatchedPerOffer[$offerKey] = $position + 1;
+
+            $delaySeconds = min($position * self::SIBLING_STAGGER_SECONDS, self::SIBLING_STAGGER_CAP_SECONDS);
+
+            if ($delaySeconds > 0) {
+                static::dispatch($item)->delay($delaySeconds);
+            } else {
+                static::dispatch($item);
+            }
+        }
     }
 
     public function handle(

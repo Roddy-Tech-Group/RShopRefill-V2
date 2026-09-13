@@ -47,7 +47,10 @@ class EmailChannel implements ChannelInterface
                 replyTo: $payload->replyTo(),
                 subject: $payload->title,
                 mailable: $payload->mailable,
-                metadata: $payload->metadata
+                // The log's idempotency key rides along so the provider can
+                // tell Resend "this exact email, once": an HTTP retry or a
+                // job retry after a lost response can never deliver it twice.
+                metadata: $payload->metadata + ['idempotency_key' => $payload->idempotencyKey]
             );
 
             // Resend returns an array with 'id' on success

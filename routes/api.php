@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CheckoutApiController;
 use App\Http\Controllers\Api\CryptoQrController;
+use App\Http\Controllers\Api\EmailUnsubscribeController;
 use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\KycStatusController;
 use App\Http\Controllers\Api\NewsletterApiController;
@@ -100,6 +101,14 @@ Route::prefix('storefront')->name('api.storefront.')->group(function () {
 Route::post('newsletter/subscribe', [NewsletterApiController::class, 'subscribe'])->name('newsletter.subscribe');
 Route::get('newsletter/unsubscribe', [NewsletterApiController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
+// One-click unsubscribe for optional email (RFC 8058). POST is the mail
+// client's own Unsubscribe button, GET the footer link. Signed, so a link only
+// ever acts on the customer it was minted for; under /api so the client's
+// POST never meets a CSRF check.
+Route::match(['get', 'post'], 'email/unsubscribe/{user}/{category}', EmailUnsubscribeController::class)
+    ->middleware(['signed', 'throttle:20,1'])
+    ->name('email.unsubscribe');
+
 // Push notification interaction tracking (Public + throttled). The service worker
 // fires this on `notificationclick`, which can happen with no active session and
 // from a context that carries no auth — so it must NOT sit behind auth or clicks
@@ -156,9 +165,8 @@ Route::middleware('auth')->group(function () {
             // (first-time) and verify (spending) stay open: a new customer
             // must be able to set a PIN, and paying is never device-gated.
             Route::put('change', [TransactionPinController::class, 'change'])->middleware('device.mature')->name('change');
-            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->middleware('device.mature')->name('reset.request');
+            Route::post('reset/request', [TransactionPinController::class, 'requestReset'])->middleware(['device.mature', 'throttle:5,1'])->name('reset.request');
             Route::post('reset/confirm', [TransactionPinController::class, 'confirmReset'])->middleware('device.mature')->name('reset.confirm');
-            Route::delete('remove', [TransactionPinController::class, 'remove'])->middleware('device.mature')->name('remove');
         });
     });
 
@@ -202,6 +210,9 @@ Route::middleware('auth')->group(function () {
         // "never" or revoking the owner's real devices are exactly the moves
         // an account thief makes in their first hour.
         Route::put('preferences', [SecurityController::class, 'updatePreferences'])->middleware('device.mature')->name('preferences.update');
-        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->middleware('device.mature')->name('devices.revoke');
+        // Revoking is gated by the account password instead (see the
+        // controller): a customer on a NEW device must be able to cut a
+        // stolen one loose right now, not after the 24-hour hold.
+        Route::delete('devices/{device}', [SecurityController::class, 'revokeDevice'])->name('devices.revoke');
     });
 });

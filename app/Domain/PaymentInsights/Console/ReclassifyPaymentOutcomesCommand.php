@@ -32,6 +32,8 @@ class ReclassifyPaymentOutcomesCommand extends Command
         $dryRun = (bool) $this->option('dry-run');
         $days = $this->option('days') !== null ? max(1, (int) $this->option('days')) : null;
 
+        $this->backfillPaymentMethods($dryRun, $days);
+
         $query = PaymentOutcome::query()
             ->whereIn('outcome', [OutcomeType::Failed->value, OutcomeType::Expired->value, OutcomeType::Cancelled->value])
             ->when($days, fn ($q) => $q->where('created_at', '>=', now()->subDays($days)))
@@ -137,5 +139,43 @@ class ReclassifyPaymentOutcomesCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Outcomes recorded before the method was read from the attempt carry a
+     * null payment_method, which left the "By Payment Method" table empty for
+     * as long as the platform has run. The attempt still knows; copy it over.
+     * Every outcome, confirmed ones included, since the table measures both.
+     */
+    private function backfillPaymentMethods(bool $dryRun, ?int $days): void
+    {
+        $missing = PaymentOutcome::query()
+            ->whereNull('payment_method')
+            ->when($days, fn ($q) => $q->where('created_at', '>=', now()->subDays($days)))
+            ->with('paymentSession.paymentAttempt')
+            ->orderBy('id');
+
+        $examined = 0;
+        $filled = 0;
+
+        $missing->chunkById(500, function ($outcomes) use ($dryRun, &$examined, &$filled) {
+            foreach ($outcomes as $outcome) {
+                $examined++;
+                $method = $outcome->paymentSession?->paymentAttempt?->payment_method;
+
+                if ($method === null) {
+                    continue;
+                }
+
+                $filled++;
+
+                if (! $dryRun) {
+                    $outcome->forceFill(['payment_method' => $method])->save();
+                }
+            }
+        });
+
+        $this->components->twoColumnDetail('<fg=cyan>Outcomes missing a payment method</>', number_format($examined));
+        $this->components->twoColumnDetail($dryRun ? '<fg=yellow>Would fill from the attempt (dry run)</>' : '<fg=green>Filled from the attempt</>', number_format($filled));
     }
 }

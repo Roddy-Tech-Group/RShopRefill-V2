@@ -45,6 +45,10 @@ return [
         'key' => env('RESEND_KEY'),
         'from_address' => env('MAIL_FROM_ADDRESS', 'noreply@rshoprefills.com'),
         'from_name' => env('MAIL_FROM_NAME', 'RshopRefills'),
+        // Resend allows 10 requests/second per account; the throttle in front
+        // of every send shares this ceiling across all queue workers.
+        'max_requests_per_second' => (int) env('RESEND_MAX_REQUESTS_PER_SECOND', 8),
+        'throttle_wait_ms' => (int) env('RESEND_THROTTLE_WAIT_MS', 5000),
     ],
 
     'slack' => [
@@ -64,6 +68,9 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+        // Local-only escape hatch that skips the OAuth state check (never
+        // honoured in production). Prefer fixing the redirect URI host.
+        'stateless' => env('GOOGLE_OAUTH_STATELESS', false),
         // Google Analytics 4 measurement ID (gtag.js). Empty = analytics off,
         // so local/dev and any deploy without the key render no tag.
         'analytics_id' => env('GOOGLE_ANALYTICS_ID'),
@@ -121,6 +128,10 @@ return [
         // 1% shortfall can erase the profit on an order. A payment is settled only
         // when actually_paid >= pay_amount, compared in CRYPTO terms. Anything less
         // is held as PartiallyPaid for the top-up flow and is never auto-fulfilled.
+        // The single exception is dust: a shortfall under half a cent in the price
+        // currency, which the top-up flow itself rounds to 0.00 and cannot charge.
+        // See NowPaymentsProvider::DUST_CEILING; it is a code constant, not config,
+        // and there is no percentage tolerance anywhere.
         //
         // Compare in crypto, never fiat: NOWPayments derives partially_paid from the
         // fiat equivalent at settlement, so a customer who sends exactly the right

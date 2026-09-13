@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class AdminTwoFactorController extends Controller
@@ -68,6 +69,22 @@ class AdminTwoFactorController extends Controller
             return redirect()->route('admin.login');
         }
 
+        // Five wrong codes end the challenge: the emailed code is burned and
+        // the admin must sign in again for a fresh one. A six-digit code that
+        // lives ten minutes is guessable online without this.
+        $attemptKey = "admin-2fa:{$admin->id}";
+
+        if (RateLimiter::tooManyAttempts($attemptKey, 5)) {
+            $this->twoFactorService->clearEmailOtp($admin);
+            $request->session()->forget(['admin_2fa_id', 'admin_2fa_remember']);
+            RateLimiter::clear($attemptKey);
+
+            Log::warning('Admin 2FA challenge abandoned after too many wrong codes', ['admin_id' => $admin->id]);
+
+            return redirect()->route('admin.login')
+                ->withErrors(['email' => __('Too many incorrect codes. Sign in again to receive a new one.')]);
+        }
+
         $isValid = false;
 
         if ($admin->hasTotpEnabled()) {
@@ -80,10 +97,14 @@ class AdminTwoFactorController extends Controller
         }
 
         if (! $isValid) {
+            RateLimiter::hit($attemptKey, 600);
+
             throw ValidationException::withMessages([
                 'code' => __('The provided code is invalid or expired.'),
             ]);
         }
+
+        RateLimiter::clear($attemptKey);
 
         // Clear OTP since it's used
         $this->twoFactorService->clearEmailOtp($admin);

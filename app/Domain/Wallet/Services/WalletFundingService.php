@@ -6,9 +6,11 @@ use App\Domain\Auth\Exceptions\EmailVerificationRequiredException;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
+use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\Risk\DTOs\RiskContext;
@@ -22,6 +24,7 @@ use App\Domain\Wallet\Events\FundingCompleted;
 use App\Domain\Wallet\Events\FundingFailed;
 use App\Domain\Wallet\Exceptions\WalletFundingException;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentSession;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletFunding;
@@ -212,6 +215,201 @@ class WalletFundingService
     }
 
     /**
+     * Start a CRYPTO funding at the moment the customer commits to a coin.
+     *
+     * initializeFunding() above mints the funding first and learns the method
+     * afterwards, which suits the fiat sheet: a card or bank tile needs a live
+     * session to drive. Crypto has two more decisions after that (rail, coin),
+     * so minting there produced a Pending funding for every amount ever typed,
+     * a failure email for every one abandoned, and a risk assessment for each.
+     *
+     * Here nothing is written until the gateway has issued a deposit address:
+     * the funding, its attempt and its session are created in one transaction
+     * around the NOWPayments call, and a refusal or error rolls all three back.
+     * A Pending crypto funding therefore always means "address issued, waiting
+     * for coins", never "an amount was typed".
+     *
+     * @return array{funding: WalletFunding, payment_session: PaymentSession}
+     *
+     * @throws WalletFundingException|GatewayDisabledException|EmailVerificationRequiredException|\InvalidArgumentException
+     */
+    public function initializeCryptoFunding(User $user, Wallet $wallet, float $amount, Currency $currency, string $payCurrency, ?string $displayCurrency = null): array
+    {
+        $this->assertFundingOpen($user);
+
+        // The crypto rail's own kill switch and, under enforcement, its approval
+        // for the wallet cell. Definitionally independent of the fiat rails, so
+        // a fiat outage never holds it hostage and a fiat revival never
+        // re-routes it.
+        if (! FeatureFlag::gatewayEnabled('nowpayments')) {
+            throw new GatewayDisabledException('nowpayments');
+        }
+
+        if ($this->paymentEligibilityService->enforcementEnabled()
+            && ! $this->paymentEligibilityService->allowsAll([ComplianceCategory::Wallet], 'nowpayments')) {
+            throw new WalletFundingException(GatewayDisabledException::customerMessageFor('nowpayments'));
+        }
+
+        $this->paymentSessionService->assertNotRateLimited($user, ProductLine::WalletFunding->value);
+        $this->assertAmountWithinBounds($wallet, $amount, $currency);
+
+        $quote = $this->quote($amount, $currency, $displayCurrency);
+
+        $this->guardRisk($user, $quote['settled_amount_usd'], $quote['display_currency']);
+
+        // The authoritative coin check, before any write: the same gate the
+        // checkout pay step applies, so the two surfaces cannot disagree.
+        $rejection = app(CryptoCoinGate::class)->rejection(
+            $payCurrency,
+            $quote['requested_amount'],
+            $quote['display_currency'],
+        );
+
+        if ($rejection !== null) {
+            throw new WalletFundingException($rejection);
+        }
+
+        $reference = $this->transactionService->generateReference('FUND', $currency);
+        $idempotencyKey = 'fund_init_'.Str::random(16);
+
+        return DB::transaction(function () use ($user, $wallet, $amount, $currency, $quote, $reference, $idempotencyKey, $payCurrency) {
+            $funding = WalletFunding::create([
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'currency' => $currency->value,
+                'display_currency' => $quote['display_currency'],
+                'amount' => $amount,
+                'requested_amount' => $quote['requested_amount'],
+                'settled_amount_usd' => $quote['settled_amount_usd'],
+                'exchange_rate_snapshot' => $quote['rate'],
+                'gateway' => 'nowpayments',
+                'status' => FundingStatus::Pending,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+            $attempt = PaymentAttempt::create([
+                'user_id' => $user->id,
+                'payable_type' => WalletFunding::class,
+                'payable_id' => $funding->id,
+                'gateway' => 'nowpayments',
+                'idempotency_key' => $reference,
+                'currency' => $quote['display_currency'],
+                'amount' => $quote['requested_amount'],
+                'exchange_rate_snapshot' => $quote['rate'],
+                'payment_status' => PaymentStatus::Pending,
+            ]);
+
+            // Recorded the same way the pay step records it, so method
+            // telemetry sees crypto fundings whichever door they came in by.
+            $attempt->recordPaymentMethod('crypto');
+
+            $provider = $this->paymentGatewayFactory->getProvider('nowpayments');
+
+            if (! $provider instanceof NowPaymentsProvider) {
+                throw new WalletFundingException('We could not start this crypto payment. Please try again.');
+            }
+
+            $result = $provider->chargeCrypto($attempt, $payCurrency);
+
+            if (($result['status'] ?? null) !== 'awaiting_transfer') {
+                // Throwing inside the transaction rolls the funding, the attempt
+                // and whatever the provider saved on it back out: no address,
+                // no row. The provider's message is already customer-safe.
+                throw new WalletFundingException(
+                    $result['message'] ?? 'We could not start this crypto payment. Please try again.'
+                );
+            }
+
+            // Born straight into awaiting_transfer, carrying the gateway's own
+            // expiry: the session type resolves from the nowpayments gateway.
+            $paymentSession = $this->paymentSessionService->createForWalletFunding($funding, $attempt, $result);
+
+            return [
+                'funding' => $funding,
+                'payment_session' => $paymentSession,
+            ];
+        });
+    }
+
+    /**
+     * The wallet-funding kill switch and the email gate, at the ONE seam every
+     * crypto entry point funnels through. Mirrors the opening of
+     * initializeFunding() exactly.
+     */
+    private function assertFundingOpen(User $user): void
+    {
+        if (FeatureFlag::off('wallet_funding')) {
+            throw new WalletFundingException('Wallet top-ups are temporarily unavailable. Please try again shortly.');
+        }
+
+        if (! $user->is_guest && ! $user->hasVerifiedEmail()) {
+            $result = app(VerificationResendThrottle::class)->attemptSend($user);
+
+            throw new EmailVerificationRequiredException(
+                $user->email,
+                $result['sent'],
+                max($result['retry_after'], 30),
+            );
+        }
+    }
+
+    /**
+     * Currency match plus the per-currency floor and ceiling, in the same
+     * order and words initializeFunding() uses.
+     */
+    private function assertAmountWithinBounds(Wallet $wallet, float $amount, Currency $currency): void
+    {
+        if ($wallet->currency->value !== $currency->value) {
+            throw new \InvalidArgumentException('Funding currency must match wallet currency.');
+        }
+
+        if ($amount < $currency->minimumFundingAmount()) {
+            throw new \InvalidArgumentException("Minimum funding amount is {$currency->minimumFundingAmount()} {$currency->value}.");
+        }
+
+        if ($amount > $currency->maximumFundingAmount()) {
+            throw new \InvalidArgumentException('Maximum funding amount per transaction is '.number_format($currency->maximumFundingAmount(), 2)." {$currency->value}.");
+        }
+    }
+
+    /**
+     * The rate snapshot a funding is priced at: the requested amount in the
+     * display currency, and the USD baseline the risk engine and reporting read.
+     *
+     * @return array{display_currency: string, rate: float, requested_amount: float, settled_amount_usd: float}
+     */
+    private function quote(float $amount, Currency $currency, ?string $displayCurrency): array
+    {
+        $displayCurrency = strtoupper(trim($displayCurrency ?: $currency->value));
+
+        $rate = $this->currencyRateService->resolveRate($currency->value, $displayCurrency);
+        $usdRate = $this->currencyRateService->resolveRate($currency->value, 'USD');
+
+        return [
+            'display_currency' => $displayCurrency,
+            'rate' => $rate,
+            'requested_amount' => round($amount * $rate, 4),
+            'settled_amount_usd' => round($amount * $usdRate, 4),
+        ];
+    }
+
+    /**
+     * The unified risk + KYC gate for funding, same discipline as checkout.
+     */
+    private function guardRisk(User $user, float $settledAmountUsd, string $displayCurrency): void
+    {
+        $this->riskGate->guard(RiskContext::capture(
+            user: $user,
+            context: 'funding',
+            amountUsd: $settledAmountUsd,
+            currency: $displayCurrency,
+            subjectType: 'wallet',
+            subjectId: (string) $user->getKey(),
+        ));
+    }
+
+    /**
      * Process a successful webhook event and credit the user's wallet.
      * Uses pessimistic locking to ensure idempotency and prevent double-credits.
      *
@@ -233,7 +431,21 @@ class WalletFundingService
             return;
         }
 
-        if ($funding->status === FundingStatus::Failed || $funding->status === FundingStatus::Cancelled) {
+        if ($funding->status === FundingStatus::Cancelled) {
+            throw WalletFundingException::alreadyProcessed($txRef);
+        }
+
+        // Failed is final for a fiat funding: the gateway said no, and a
+        // replayed webhook must not resurrect it. A CRYPTO funding is different.
+        // Our own expiry sweep fails one on the clock while the customer's coins
+        // may still be confirming on-chain, and NOWPayments then delivers a
+        // genuine `finished` for it. Refusing that here left real money at the
+        // gateway and the wallet never credited. So a failed crypto funding
+        // falls through to the server-to-server verification below: if the
+        // gateway confirms full settlement it is credited, otherwise
+        // failFunding() keeps it failed. The ledger idempotency key and the
+        // Completed check make a double credit impossible either way.
+        if ($funding->status === FundingStatus::Failed && ! in_array($funding->gateway, ['nowpayments', 'crypto'], true)) {
             throw WalletFundingException::alreadyProcessed($txRef);
         }
 
@@ -305,11 +517,14 @@ class WalletFundingService
                 ]
             );
 
-            // Mark funding completed
+            // Mark funding completed. failed_reason is cleared because a crypto
+            // funding can arrive here from Failed (see the guard above); a
+            // completed deposit must not carry the sweep's old verdict.
             $funding->update([
                 'status' => FundingStatus::Completed,
                 'gateway_reference' => $flwTransactionId,
                 'provider_payload_snapshot' => $rawPayload,
+                'failed_reason' => null,
                 'completed_at' => now(),
                 'processed_at' => now(),
             ]);

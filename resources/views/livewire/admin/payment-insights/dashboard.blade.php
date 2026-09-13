@@ -50,21 +50,21 @@ class extends Component {
         ? 'text-zinc-400'
         : ($rate >= 85 ? 'text-emerald-600 dark:text-emerald-400' : ($rate >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'));
 
-    $trendMax = max(1, max(array_map(fn ($d) => $d['submitted'] + $d['abandoned'], $trend)));
+    $timeframes = [
+        '24_hours' => 'Last 24 Hours',
+        '7_days' => 'Last 7 Days',
+        '30_days' => 'Last 30 Days',
+        'all_time' => 'All Time',
+    ];
 @endphp
 
 <div class="space-y-5 max-w-7xl mx-auto -mt-2">
+    {{-- Period selector. The shared admin dropdown, not a native <select>: the
+         OS paints native option panels, which is why they went light on dark
+         admin pages. --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="{{ $subtle }}">
-            <span class="font-semibold text-zinc-700 dark:text-zinc-200">Payment success</span> counts only payments that reached a gateway, so it measures whether payments work.
-            <span class="font-semibold text-zinc-700 dark:text-zinc-200">Checkout conversion</span> counts everyone who started, so it measures whether checkout works.
-        </p>
-        <select wire:model.live="timeframe" class="rounded-[10px] border-zinc-300 text-sm font-semibold focus:border-blue-500 focus:ring-blue-500 dark:border-white/10 dark:bg-[#1d3252] dark:text-white">
-            <option value="24_hours">Last 24 Hours</option>
-            <option value="7_days">Last 7 Days</option>
-            <option value="30_days">Last 30 Days</option>
-            <option value="all_time">All Time</option>
-        </select>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">How payments succeed, fail and recover, and where lost ones went.</p>
+        <x-admin.select wire:model.live="timeframe" :options="$timeframes" wrapperClass="w-44 !mt-0" />
     </div>
 
     {{-- ── Headline rates ─────────────────────────────────────────── --}}
@@ -97,56 +97,45 @@ class extends Component {
     </section>
 
     {{-- ── Daily trend ────────────────────────────────────────────── --}}
-    <section class="{{ $card }}">
-        <header class="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-                <h2 class="{{ $sectionTitle }}">Daily Trend</h2>
-                <p class="{{ $subtle }}">Degradation is a slope, not a snapshot. Bar height is volume; the number under each is that day's payment success rate.</p>
-            </div>
+    {{-- Three lines via ApexCharts (paymentTrendChart in resources/js/app.js,
+         lazy-imported). The success rate lives in the tooltip, not a second
+         axis. wire:key on the timeframe replaces the card on a period change
+         so Alpine mounts a fresh chart with the new series. Don't add
+         x-init="init()": Alpine runs init() itself. --}}
+    <section class="{{ $card }} min-w-0 overflow-hidden" wire:key="payment-trend-{{ $timeframe }}" x-data="paymentTrendChart(@js($trend))">
+        <header class="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="{{ $sectionTitle }}">Daily Trend</h2>
             <div class="flex items-center gap-3 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>Paid</span>
-                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-red-500"></span>Declined</span>
-                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-amber-400"></span>Walked away</span>
+                <span class="flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 8" class="h-2 w-6 text-emerald-400" fill="none" aria-hidden="true"><path d="M1 4 Q 4 0, 7 4 T 13 4 T 19 4 T 23 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Paid
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 8" class="h-2 w-6 text-red-400" fill="none" aria-hidden="true"><path d="M1 4 Q 4 0, 7 4 T 13 4 T 19 4 T 23 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Declined
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 8" class="h-2 w-6 text-amber-400" fill="none" aria-hidden="true"><path d="M1 4 Q 4 0, 7 4 T 13 4 T 19 4 T 23 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Walked away
+                </span>
             </div>
         </header>
-        <div class="flex items-end gap-1.5 overflow-x-auto pb-1">
-            @foreach ($trend as $day)
-                @php
-                    $total = $day['submitted'] + $day['abandoned'];
-                    $heightPct = round(($total / $trendMax) * 100);
-                @endphp
-                <div class="flex min-w-8 flex-1 flex-col items-center gap-1.5">
-                    <div class="flex h-28 w-full flex-col justify-end" title="{{ $day['date'] }}: {{ $day['confirmed'] }} paid, {{ $day['failed'] }} declined, {{ $day['abandoned'] }} walked away">
-                        @if ($total === 0)
-                            <div class="h-1 w-full rounded-sm bg-zinc-100 dark:bg-white/10"></div>
-                        @else
-                            <div class="flex w-full flex-col overflow-hidden rounded-[4px]" style="height: {{ max(4, $heightPct) }}%">
-                                @if ($day['abandoned'])
-                                    <div class="w-full bg-amber-400" style="flex-grow: {{ $day['abandoned'] }}"></div>
-                                @endif
-                                @if ($day['failed'])
-                                    <div class="w-full bg-red-500" style="flex-grow: {{ $day['failed'] }}"></div>
-                                @endif
-                                @if ($day['confirmed'])
-                                    <div class="w-full bg-emerald-500" style="flex-grow: {{ $day['confirmed'] }}"></div>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
-                    <span class="text-[10px] font-semibold tabular-nums {{ $rateTone($day['authorizationRate']) }}">
-                        {{ $day['authorizationRate'] === null ? '—' : round($day['authorizationRate']).'%' }}
-                    </span>
-                    <span class="text-[10px] text-zinc-400 dark:text-zinc-500">{{ \Illuminate\Support\Carbon::parse($day['date'])->format('j M') }}</span>
-                </div>
-            @endforeach
+        <div class="relative">
+            <div x-ref="canvas" class="min-h-[280px]"></div>
+            <div
+                x-show="isEmpty()"
+                x-cloak
+                class="absolute inset-0 z-10 flex items-center justify-center rounded-[12px] bg-zinc-50/95 text-sm text-zinc-500 dark:bg-[#26416b]/95 dark:text-zinc-400"
+            >
+                No payments in this period yet.
+            </div>
         </div>
     </section>
 
     {{-- ── Where payments die + why ───────────────────────────────── --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section class="{{ $card }}">
-            <h2 class="{{ $sectionTitle }}">Where Payments Die</h2>
-            <p class="{{ $subtle }} mb-4">The checkout step each lost payment reached before it stopped.</p>
+            <h2 class="{{ $sectionTitle }} mb-4">Where Payments Die</h2>
             <div class="space-y-3">
                 @foreach ($stages as $stage)
                     <div>
@@ -163,8 +152,7 @@ class extends Component {
         </section>
 
         <section class="{{ $card }}">
-            <h2 class="{{ $sectionTitle }}">Failure Categories</h2>
-            <p class="{{ $subtle }} mb-4">Who or what is responsible for the loss.</p>
+            <h2 class="{{ $sectionTitle }} mb-4">Failure Categories</h2>
             <div class="space-y-3">
                 @php $bucketTotal = max(1, array_sum($buckets)); @endphp
                 @foreach ($buckets as $category => $count)
@@ -186,10 +174,6 @@ class extends Component {
                     </div>
                 @endforeach
             </div>
-            <div class="mt-4 space-y-1 border-t border-zinc-100 pt-3 text-[11px] text-zinc-400 dark:border-white/10 dark:text-zinc-500">
-                <p><span class="font-semibold">Customer:</span> declines, wrong PIN, walked away. <span class="font-semibold">Provider:</span> gateway errors and timeouts.</p>
-                <p><span class="font-semibold">Frontend:</span> browser blocked the payment. <span class="font-semibold">System:</span> our own bugs.</p>
-            </div>
         </section>
     </div>
 
@@ -198,7 +182,6 @@ class extends Component {
         <section class="{{ $card }} !p-0 overflow-hidden">
             <header class="px-5 pt-5 pb-3">
                 <h2 class="{{ $sectionTitle }}">Top Failure Reasons</h2>
-                <p class="{{ $subtle }}">The gateway's actual verdicts. "Retryable" means asking again could work; those are recovery-email candidates.</p>
             </header>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -238,7 +221,6 @@ class extends Component {
         <section class="{{ $card }} !p-0 overflow-hidden">
             <header class="px-5 pt-5 pb-3">
                 <h2 class="{{ $sectionTitle }}">By Payment Method</h2>
-                <p class="{{ $subtle }}">Which rails work. A weak method is a checkout decision, not just a statistic.</p>
             </header>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -261,7 +243,7 @@ class extends Component {
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="{{ $td }} py-8 text-center text-zinc-400">No method data yet. Newly captured on each payment attempt, so this fills in from here.</td></tr>
+                            <tr><td colspan="4" class="{{ $td }} py-8 text-center text-zinc-400">No method data yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -274,10 +256,6 @@ class extends Component {
     <section x-data="{ expanded: false }" class="{{ $card }} !p-0 overflow-hidden">
         <header class="px-5 pt-5 pb-3">
             <h2 class="{{ $sectionTitle }}">Recent Lost Payments</h2>
-            <p class="{{ $subtle }}">
-                Every payment that did not complete, declines and walk-aways alike, with the gateway's own words.
-                The first place to look when a customer asks why their payment failed. Never shown to customers.
-            </p>
         </header>
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -341,7 +319,6 @@ class extends Component {
     <section class="{{ $card }}">
         <header class="mb-4">
             <h2 class="{{ $sectionTitle }}">Transaction Recovery</h2>
-            <p class="{{ $subtle }}">Recovery emails sent for failed payments, and what customers did with them. "Recovered" counts payments that actually confirmed, never clicks.</p>
         </header>
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
             <div>
@@ -381,12 +358,19 @@ class extends Component {
     </section>
 
     {{-- ── Frontend failures ──────────────────────────────────────── --}}
+    {{-- Browser-side losses are rare by nature, so a quiet period collapses
+         the panel to one line rather than four empty columns. It expands
+         itself the moment there is anything to show. --}}
+    @php $frontendQuiet = ($frontend['total'] ?? 0) === 0 && $frontend['signals']->isEmpty(); @endphp
+    @if ($frontendQuiet)
+    <section class="{{ $card }} flex flex-wrap items-center justify-between gap-3 !py-4">
+        <h2 class="{{ $sectionTitle }}">Frontend Failures</h2>
+        <p class="{{ $subtle }}">None in this period. Browser-side losses and environment signals appear here when they happen.</p>
+    </section>
+    @else
     <section class="{{ $card }}">
         <header class="mb-4 flex items-start justify-between gap-4">
-            <div>
-                <h2 class="{{ $sectionTitle }}">Frontend Failures</h2>
-                <p class="{{ $subtle }}">Payments lost inside the customer's browser: blocked popups, SDK loads, script errors, plus non-terminal environment signals.</p>
-            </div>
+            <h2 class="{{ $sectionTitle }}">Frontend Failures</h2>
             <div class="shrink-0 text-right">
                 <p class="text-2xl font-bold tracking-tight text-purple-600 dark:text-purple-400">{{ $frontend['shareOfFailures'] }}%</p>
                 <p class="{{ $foot }}">of all failures ({{ number_format($frontend['total']) }})</p>
@@ -415,6 +399,7 @@ class extends Component {
             @endforeach
         </div>
     </section>
+    @endif
 
     {{-- ── Providers, skips, feedback ─────────────────────────────── --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -447,8 +432,7 @@ class extends Component {
         </section>
 
         <section class="{{ $card }}">
-            <h2 class="{{ $sectionTitle }}">Recovery Skips</h2>
-            <p class="{{ $subtle }} mb-4">Failed payments where no recovery email was sent, and why.</p>
+            <h2 class="{{ $sectionTitle }} mb-4">Recovery Skips</h2>
             <div class="space-y-2.5">
                 @forelse($recovery['skipReasons'] as $reason => $count)
                     <div class="{{ $row }}">
@@ -463,7 +447,6 @@ class extends Component {
 
         <section class="{{ $card }}">
             <h2 class="{{ $sectionTitle }}">Customer Feedback</h2>
-            <p class="{{ $subtle }} mb-4">Reasons customers gave on the recovery page for not completing payment.</p>
             <div class="space-y-2.5">
                 @forelse($recovery['feedbackBreakdown'] as $reason => $count)
                     <div class="{{ $row }}">

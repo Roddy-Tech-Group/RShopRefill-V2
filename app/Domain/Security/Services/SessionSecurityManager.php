@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 class SessionSecurityManager
 {
-    public function createSession(User $user, TrustedDevice $device, string $laravelSessionId = null, string $riskLevel = 'LOW'): UserSession
+    public function createSession(User $user, TrustedDevice $device, ?string $laravelSessionId = null, string $riskLevel = 'LOW'): UserSession
     {
         $session = UserSession::create([
             'user_id' => $user->id,
@@ -26,31 +26,5 @@ class SessionSecurityManager
         $device->increment('current_session_count');
 
         return $session;
-    }
-
-    public function revokeSession(UserSession $session): void
-    {
-        $session->revoked_at = now();
-        $session->save();
-
-        if ($session->device) {
-            $session->device->decrement('current_session_count');
-        }
-
-        // Actually destroy the underlying Laravel session
-        \Illuminate\Support\Facades\DB::table('sessions')->where('id', $session->laravel_session_id)->delete();
-    }
-
-    public function revokeAllSessionsForUser(User $user): void
-    {
-        $sessions = UserSession::where('user_id', $user->id)->whereNull('revoked_at')->get();
-
-        foreach ($sessions as $session) {
-            $this->revokeSession($session);
-        }
-
-        // Physically destroy all underlying Laravel sessions for this user, guaranteeing full revocation
-        // even if UserSession records were out of sync.
-        \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $user->id)->delete();
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CartWebController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\EmailPreviewController;
 use App\Http\Controllers\EsimStoreController;
 use App\Http\Controllers\EsimTopupController;
@@ -284,33 +285,30 @@ $resolveGiftCardBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("brand_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
-        $p = Product::query()
+    // ID-only cache: a serialized model with hundreds of variants can exceed
+    // MySQL's max_allowed_packet (see the topup resolver below).
+    $productId = TaggedCache::for(['catalog'])->remember("brand_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+        return Product::query()
             ->where('brand_key', $brandKey)
             ->where('country_code', $requested)
             ->where('is_active', true)
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ])
-            ->first();
-
-        if (! $p) {
-            $p = Product::query()
+            ->value('id')
+            ?: Product::query()
                 ->where('brand_key', $brandKey)
                 ->where('is_active', true)
                 ->orderByRaw("country_code = 'US' DESC")
-                ->with([
-                    'subcategory:id,name,slug',
-                    'category:id,name,slug',
-                    'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-                ])
-                ->first();
-        }
-
-        return $p;
+                ->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 
@@ -354,20 +352,30 @@ $resolveTopupBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("topup_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+    // Cache the resolved product ID only, never the model: a serialized
+    // Product with hundreds of metadata-heavy variants (Boost US carries 296)
+    // exceeds MySQL's max_allowed_packet and 500s the page on the cache
+    // write. Resolving the id is the expensive part; loading one product by
+    // id is milliseconds.
+    $productId = TaggedCache::for(['catalog'])->remember("topup_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
         $base = fn () => Product::query()
             ->where('brand_key', $brandKey)
             ->where('is_active', true)
-            ->whereHas('category', fn ($q) => $q->where('slug', 'mobile-airtime'))
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ]);
+            ->whereHas('category', fn ($q) => $q->where('slug', 'mobile-airtime'));
 
-        return $base()->where('country_code', $requested)->first()
-            ?: $base()->orderByRaw("country_code = 'US' DESC")->first();
+        return $base()->where('country_code', $requested)->value('id')
+            ?: $base()->orderByRaw("country_code = 'US' DESC")->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 
@@ -401,20 +409,27 @@ $resolveBillBrand = function (string $brandSlug) use ($brandGoneResponse) {
 
     $requested = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
 
-    $product = TaggedCache::for(['catalog'])->remember("bill_product_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
+    // ID-only cache: a serialized model with hundreds of variants can exceed
+    // MySQL's max_allowed_packet (see the topup resolver above).
+    $productId = TaggedCache::for(['catalog'])->remember("bill_product_id_{$brandKey}_{$requested}", 3600, function () use ($brandKey, $requested) {
         $base = fn () => Product::query()
             ->where('brand_key', $brandKey)
             ->where('is_active', true)
-            ->whereHas('category', fn ($q) => $q->where('slug', 'bill-payments'))
-            ->with([
-                'subcategory:id,name,slug',
-                'category:id,name,slug',
-                'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
-            ]);
+            ->whereHas('category', fn ($q) => $q->where('slug', 'bill-payments'));
 
-        return $base()->where('country_code', $requested)->first()
-            ?: $base()->orderByRaw("country_code = 'US' DESC")->first();
+        return $base()->where('country_code', $requested)->value('id')
+            ?: $base()->orderByRaw("country_code = 'US' DESC")->value('id');
     });
+
+    abort_if(! $productId, 404);
+
+    $product = Product::query()
+        ->with([
+            'subcategory:id,name,slug',
+            'category:id,name,slug',
+            'variants' => fn ($q) => $q->where('is_available', true)->orderBy('face_value'),
+        ])
+        ->find($productId);
 
     abort_if(! $product, 404);
 
@@ -877,8 +892,11 @@ Route::middleware(['auth'])->group(function () {
 
     // Rcoin withdrawal request - posts from the form on the rewards page.
     // Admins review at /admin/content/rewards-withdrawals.
+    // Money out waits for the 24-hour new-device hold like every other
+    // security-sensitive action: a thief's first move on a fresh device is
+    // to drain what they can.
     Route::post('dashboard/rewards/withdraw', [RcoinWithdrawalController::class, 'store'])
-        ->middleware('maintenance-guard')->name('dashboard.rewards.withdraw');
+        ->middleware(['maintenance-guard', 'device.mature'])->name('dashboard.rewards.withdraw');
 
     // Instant Rcoin → wallet (USD) conversion. No admin approval. Capped by
     // wallet_conversion_min_usd setting (default $2.00).
@@ -922,6 +940,12 @@ Route::middleware(['auth'])->group(function () {
 
     // KYC identity-verification submission (documents stored on the private disk).
     Route::post('dashboard/kyc', [KycController::class, 'store'])->name('kyc.submit');
+    // Right of access: a PDF copy of the customer's data, gated by an emailed
+    // one-time code rather than the password (see DataExportController).
+    Route::get('dashboard/privacy/export', [DataExportController::class, 'show'])->name('privacy.export');
+    Route::post('dashboard/privacy/export/send', [DataExportController::class, 'send'])->name('privacy.export.send');
+    Route::post('dashboard/privacy/export', [DataExportController::class, 'verify'])->name('privacy.export.verify');
+    Route::get('dashboard/privacy/export/file', [DataExportController::class, 'file'])->name('privacy.export.file');
 
     // Suspension review request - submitted from the banner the customer
     // sees on their dashboard when their account is suspended. Lands in the
@@ -1009,9 +1033,13 @@ Route::middleware(['auth'])->prefix('security')->name('security.')->group(functi
     Route::post('verify-device/send', [DeviceVerificationController::class, 'sendOtp'])->name('verify-device.send');
     Route::post('verify-device', [DeviceVerificationController::class, 'verifyOtp'])->name('verify-device.verify');
 
-    // Unauthenticated route for the NO IT WASN'T ME flow
+    // Unauthenticated route for the NO IT WASN'T ME flow. The link is a
+    // temporary signed url (see NewDeviceDetectedMail): `signed` rejects a
+    // tampered or expired one before the controller runs, and the throttle
+    // keeps the endpoint from being used to hammer accounts.
     Route::get('compromise', [DeviceVerificationController::class, 'handleCompromise'])
         ->withoutMiddleware(['auth'])
+        ->middleware(['signed', 'throttle:6,1'])
         ->name('compromise');
 
     // Account recovery flow for Protected Mode

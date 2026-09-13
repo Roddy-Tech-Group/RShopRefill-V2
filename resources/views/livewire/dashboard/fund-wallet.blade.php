@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Payment\Support\FundingMethodCatalog;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Domain\Wallet\Services\WalletFundingService;
@@ -38,6 +39,15 @@ new class extends Component
     /** Trigger style: 'full' (desktop wallet card) or 'compact' (mobile hero). */
     public string $variant = 'full';
 
+    /**
+     * Open the sheet on page load. Set when the page was reached through a
+     * deep link for this wallet's currency (?fund=USD&amount=50), which is
+     * how the payment-recovery email resumes a failed top-up: the customer
+     * lands with the sheet open and the amount filled in, not on a bare
+     * dashboard wondering where to click.
+     */
+    public bool $openOnLoad = false;
+
     public function mount(string $currency = 'USD', string $variant = 'full'): void
     {
         // RCOIN is a reward ledger - it's earned, not topped up. If the parent
@@ -47,6 +57,17 @@ new class extends Component
         $resolved = Currency::tryFrom(strtoupper($currency))?->value ?? 'USD';
         $this->currency = $resolved === 'RCOIN' ? 'USD' : $resolved;
         $this->variant = $variant;
+
+        $requested = strtoupper(trim((string) request()->query('fund', '')));
+
+        if ($requested !== '' && $requested === $this->currency) {
+            $this->openOnLoad = true;
+
+            $amount = (float) request()->query('amount', 0);
+            if ($amount > 0) {
+                $this->amount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+            }
+        }
     }
 
     /**
@@ -120,7 +141,163 @@ new class extends Component
     }
 
     /**
-     * Initiate funding and hand off to the payment gateway's hosted page.
+     * The minimum the amount screen enforces. The currency floor when a fiat
+     * rail can take the money; otherwise crypto is the only rail, so its floor
+     * is the real one and is shown here rather than two screens later.
+     */
+    public function effectiveMinimum(): float
+    {
+        return $this->fiatIsLive()
+            ? $this->minimum()
+            : max($this->minimum(), $this->cryptoMinimum());
+    }
+
+    public function effectiveMinimumLabel(): string
+    {
+        $decimals = in_array($this->currency, ['NGN', 'XAF'], true) ? 0 : 2;
+
+        return $this->symbol().number_format($this->effectiveMinimum(), $decimals);
+    }
+
+    /** Whether any fiat method can take money in the selected currency right now. */
+    public function fiatIsLive(): bool
+    {
+        return FundingMethodCatalog::hasLiveFiat($this->currency);
+    }
+
+    /**
+     * Screen 1 -> screen 2 with NOTHING written.
+     *
+     * Validates the amount against the effective minimum, raises the email gate
+     * early (the same notice the service raises at commit), and hands the sheet
+     * a session-less draft: the method tiles for this currency, each flagged
+     * live or not, so a dark rail greys out exactly as it does at checkout.
+     * The funding row is minted only when the customer commits to a method
+     * (fund(), fiat) or a coin (fundCrypto()).
+     */
+    public function prepare(): void
+    {
+        if (! \App\Support\FeatureFlag::on('wallet_funding')) {
+            $this->addError('amount', 'Wallet funding is temporarily disabled.');
+
+            return;
+        }
+
+        $this->validate([
+            'currency' => ['required', 'in:'.implode(',', array_map(fn ($c) => $c->value, self::fundableCurrencies()))],
+            'amount' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $currency = $this->currencyEnum();
+
+        if ((float) $this->amount < $this->effectiveMinimum()) {
+            $this->addError('amount', $this->fiatIsLive()
+                ? 'Minimum funding amount is '.$this->effectiveMinimumLabel().'.'
+                : 'Crypto top-ups start at '.$this->effectiveMinimumLabel().' while card and bank payments are unavailable.');
+
+            return;
+        }
+
+        if ((float) $this->amount > $currency->maximumFundingAmount()) {
+            $this->addError('amount', 'Maximum funding amount per transaction is '.$this->symbol().number_format($currency->maximumFundingAmount(), 2).'.');
+
+            return;
+        }
+
+        $user = auth()->user();
+
+        if (! $user->is_guest && ! $user->hasVerifiedEmail()) {
+            $throttle = app(\App\Support\VerificationResendThrottle::class)->attemptSend($user);
+            $gate = new \App\Domain\Auth\Exceptions\EmailVerificationRequiredException(
+                $user->email,
+                $throttle['sent'],
+                max($throttle['retry_after'], 30),
+            );
+
+            $this->dispatch('email-verification-required',
+                message: $gate->customerMessage(),
+                retryAfter: $gate->retryAfter,
+            );
+
+            return;
+        }
+
+        $this->dispatch('funding-draft-ready', draft: [
+            'currency' => $currency->value,
+            'amount' => (float) $this->amount,
+            'methods' => FundingMethodCatalog::forCurrency($currency->value, $this->cryptoMinimumLabel()),
+            'down_rails' => FundingMethodCatalog::downRails($currency->value),
+        ]);
+    }
+
+    /**
+     * Commit to CRYPTO: the customer has picked a coin. This is the first
+     * write on the crypto path - funding, attempt and session are created
+     * around the gateway call and rolled back together if it refuses.
+     */
+    public function fundCrypto(string $payCurrency): void
+    {
+        if (! \App\Support\FeatureFlag::on('wallet_funding')) {
+            $this->dispatch('funding-error', message: 'Wallet funding is temporarily disabled.');
+
+            return;
+        }
+
+        $this->validate([
+            'currency' => ['required', 'in:'.implode(',', array_map(fn ($c) => $c->value, self::fundableCurrencies()))],
+            'amount' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $currency = $this->currencyEnum();
+        $wallet = app(WalletService::class)->getOrCreateWallet(auth()->user(), $currency);
+
+        try {
+            $result = app(WalletFundingService::class)->initializeCryptoFunding(
+                user: auth()->user(),
+                wallet: $wallet,
+                amount: (float) $this->amount,
+                currency: $currency,
+                payCurrency: $payCurrency,
+            );
+
+            $resource = new \App\Http\Resources\PaymentSessionResource($result['payment_session']);
+
+            // Already awaiting_transfer: the sheet renders the address screen.
+            $this->dispatch('payment-session-initialized',
+                session: $resource->toArray(request()),
+                reference: $result['funding']->reference,
+            );
+        } catch (\App\Domain\PaymentInsights\Exceptions\PaymentBackoffException $e) {
+            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds);
+        } catch (\App\Domain\Auth\Exceptions\EmailVerificationRequiredException $e) {
+            $this->dispatch('email-verification-required',
+                message: $e->customerMessage(),
+                retryAfter: $e->retryAfter,
+            );
+        } catch (\App\Domain\Kyc\Exceptions\KycStepUpRequiredException $e) {
+            $this->dispatch('kyc-step-up-required', payload: $e->toResponse());
+        } catch (\App\Domain\Risk\Exceptions\RiskReviewRequiredException|\App\Domain\Risk\Exceptions\RiskDeniedException $e) {
+            $this->dispatch('risk-hold', message: $e->customerMessage());
+        } catch (\App\Domain\Wallet\Exceptions\WalletFundingException|\App\Domain\Payment\Exceptions\GatewayDisabledException|\InvalidArgumentException $e) {
+            // Customer-safe by construction: coin gate, kill switch, bounds,
+            // or the provider's own refusal wording.
+            $this->dispatch('funding-error', message: $e->getMessage());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Crypto wallet funding failed to start', [
+                'user_id' => auth()->id(),
+                'currency' => $currency->value,
+                'pay_currency' => $payCurrency,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('funding-error', message: 'We could not start this crypto payment. Please try again.');
+        }
+    }
+
+    /**
+     * Commit to a FIAT method: the customer has picked a card / bank / mobile
+     * money tile. Mints the funding and its session the way it always has and
+     * hands the session to the sheet, which continues into that tile's flow.
      */
     public function fund(WalletService $wallets, WalletFundingService $funding)
     {
@@ -181,15 +358,24 @@ new class extends Component
             $this->dispatch('risk-hold', message: $e->customerMessage());
         } catch (\Throwable $e) {
             $this->addError('amount', $e->getMessage());
+            // The sheet is on the method screen by now, where the amount
+            // field (and its error) is out of view.
+            $this->dispatch('funding-error', message: $e->getMessage());
         }
     }
 }; ?>
 
 <div
     x-data="{
-        open: false,
+        open: @js($openOnLoad),
         ccyOpen: false,
         session: null,
+        // Session-less method list from prepare(): the sheet shows tiles off
+        // this until the customer commits and a real session replaces it.
+        draft: null,
+        // The fiat tile clicked before its session existed; continued into
+        // once fund() hands the session back.
+        pendingMethod: null,
         backoffRemaining: 0,
         backoffInterval: null,
         selectedMethod: null,
@@ -294,15 +480,18 @@ new class extends Component
         },
 
         getFilteredMethods() {
-            if (!this.session || !this.session.available_methods) return [];
-            return this.session.available_methods.filter(m => {
+            const methods = this.session?.available_methods ?? this.draft?.methods ?? [];
+            return methods.filter(m => {
                 if (m.type === 'apple_pay' && !this.applePayAvailable) return false;
                 return true;
             });
         },
 
-        initPayment(session) {
-            this.session = session;
+        // Screen 2 without a session: nothing has been written yet.
+        initDraft(draft) {
+            this.session = null;
+            this.draft = draft;
+            this.pendingMethod = null;
             this.paymentState = 'select_method';
             this.selectedMethod = null;
             this.errorMessage = '';
@@ -312,6 +501,37 @@ new class extends Component
             if (this.pollInterval) {
                 clearInterval(this.pollInterval);
             }
+        },
+
+        initPayment(session) {
+            this.session = session;
+            this.selectedMethod = null;
+            this.errorMessage = '';
+            this.pinValue = '';
+            this.otpValue = '';
+            this.resetCardDetails();
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+            }
+
+            // A session born already charged (the crypto commit hands back an
+            // awaiting_transfer session with its address) goes straight to
+            // that screen.
+            if (['awaiting_transfer', 'awaiting_confirmation', 'awaiting_customer_action', 'awaiting_redirect', 'confirmed', 'failed'].includes(session?.status)) {
+                this.handlePayResponse(session);
+                return;
+            }
+
+            // A session minted because a fiat tile was picked continues into
+            // that tile's flow instead of asking the customer to pick again.
+            if (this.pendingMethod) {
+                const method = this.pendingMethod;
+                this.pendingMethod = null;
+                this.continueWithMethod(method);
+                return;
+            }
+
+            this.paymentState = 'select_method';
         },
 
         resetCardDetails() {
@@ -373,20 +593,76 @@ new class extends Component
         },
 
         selectPaymentMethod(method) {
+            // A dark rail is shown greyed, never actionable.
+            if (method.enabled === false) return;
+
+            this.selectedMethod = method;
+
+            // Crypto commits at the coin, not here: no session yet.
+            if (method.type === 'crypto') {
+                this.cryptoDetails.pay_currency = method.coin || 'usdt';
+                this.paymentState = 'crypto_input';
+                return;
+            }
+
+            // A fiat tile is the commitment point: mint the session now, then
+            // initPayment() continues into this tile once it arrives.
+            if (! this.session) {
+                this.pendingMethod = method;
+                this.paymentState = 'processing';
+                this.$wire.fund();
+                return;
+            }
+
+            this.continueWithMethod(method);
+        },
+
+        // Drive a fiat tile against a live session.
+        continueWithMethod(method) {
             this.selectedMethod = method;
             if (method.type === 'card') {
                 this.paymentState = 'card_input';
             } else if (method.type === 'bank_transfer') {
                 this.paySession('bank_transfer');
             } else if (method.type === 'mobile_money') {
-                this.momoDetails.network = method.supported_networks ? method.supported_networks[0] : 'MTN';
+                this.momoDetails.network = (method.supported_networks ?? [])[0] ?? '';
                 this.paymentState = 'momo_input';
-            } else if (method.type === 'crypto') {
-                this.cryptoDetails.pay_currency = method.coin || 'usdt';
-                this.paymentState = 'crypto_input';
             } else if (method.type === 'apple_pay') {
                 this.paySession('apple_pay', {});
+            } else {
+                // Hosted-redirect family (USSD, Pay With Bank, Bank QR, e-wallets):
+                // the pay step returns awaiting_redirect and handlePayResponse
+                // forwards the customer.
+                this.paySession(method.type, {});
             }
+        },
+
+        // The crypto commit. First write on this path; the server rolls back
+        // if the gateway refuses, so a failure here leaves no trace.
+        selectCoin(code) {
+            this.cryptoDetails.pay_currency = code;
+
+            // A session already exists when the customer picked a fiat tile,
+            // backed out, and chose crypto instead (or already holds a live
+            // crypto quote). Re-stamp THAT session through the pay step, as
+            // before, rather than minting a second funding beside it.
+            if (this.session) {
+                if (this.session.status === 'awaiting_transfer') {
+                    this.handlePayResponse(this.session);
+                    return;
+                }
+                this.paySession('crypto', { pay_currency: code });
+                return;
+            }
+
+            this.paymentState = 'processing';
+            this.$wire.fundCrypto(code);
+        },
+
+        onFundingError(message) {
+            this.pendingMethod = null;
+            this.paymentState = 'error';
+            this.errorMessage = message || 'Something went wrong. Please try again.';
         },
 
         async paySession(method, dataPayload = {}) {
@@ -673,6 +949,8 @@ new class extends Component
             }
             this.open = false;
             this.session = null;
+            this.draft = null;
+            this.pendingMethod = null;
             this.paymentState = 'idle';
             if (this.pollInterval) {
                 clearInterval(this.pollInterval);
@@ -783,8 +1061,10 @@ new class extends Component
         }
     }"
     @payment-session-initialized.window="initPayment($event.detail.session)"
+    @funding-draft-ready.window="if (open) initDraft($event.detail.draft)"
+    @funding-error.window="if (open) onFundingError($event.detail.message)"
     @open-fund-wallet.window="if (($event.detail?.code || '').toUpperCase() === '{{ strtoupper($this->currency) }}') open = true"
-    @payment-backoff-triggered.window="if (open) { startBackoff($event.detail.seconds); errorMessage = 'Too many failed payment attempts. Please wait.' }"
+    @payment-backoff-triggered.window="if (open) { startBackoff($event.detail.seconds); errorMessage = 'Too many failed payment attempts. Please wait.'; if (draft && ! session) { pendingMethod = null; paymentState = 'select_method' } }"
     @kyc-step-up-required.window="if (open) onKycStepUp($event.detail.payload)"
     @risk-hold.window="if (open) onRiskHold($event.detail.message)"
     @email-verification-required.window="if (open) onEmailNotice($event.detail)"
@@ -851,7 +1131,7 @@ new class extends Component
             </div>
 
             <!-- STEP 1: Enter amount & select currency -->
-            <div x-show="!session">
+            <div x-show="!session && !draft">
                 {{-- Currency — custom dropdown selector. --}}
                 <label class="mt-5 block text-xs font-semibold text-zinc-700">Currency</label>
                 <div class="relative mt-1.5" @click.outside="ccyOpen = false">
@@ -908,25 +1188,33 @@ new class extends Component
                         step="any"
                         min="0"
                         wire:model="amount"
-                        wire:keydown.enter="fund"
+                        wire:keydown.enter="prepare"
                         placeholder="0.00"
                         class="w-full min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none"
                     >
                 </div>
-                <p class="mt-1.5 text-[11px] text-zinc-500">Minimum {{ $this->symbol() }}{{ number_format($this->minimum(), 2) }}.</p>
+                {{-- The effective minimum: the crypto floor whenever crypto is the
+                     only rail that can take the money, so a short amount is
+                     refused here rather than two screens later. --}}
+                <p class="mt-1.5 text-[11px] text-zinc-500">
+                    Minimum {{ $this->effectiveMinimumLabel() }}.
+                    @unless ($this->fiatIsLive())
+                        <span class="text-zinc-400">Card and bank payments are temporarily unavailable; top-ups are by crypto.</span>
+                    @endunless
+                </p>
 
                 @error('amount') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                 @error('currency') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
 
                 <button
                     type="button"
-                    wire:click="fund"
-                    wire:target="fund"
+                    wire:click="prepare"
+                    wire:target="prepare"
                     wire:loading.attr="disabled"
                     x-bind:disabled="backoffRemaining > 0"
                     class="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                    <svg wire:loading wire:target="fund" class="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg wire:loading wire:target="prepare" class="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
@@ -935,26 +1223,45 @@ new class extends Component
                     </template>
                     <template x-if="backoffRemaining === 0">
                         <span>
-                            <span wire:loading.remove wire:target="fund">Continue to payment</span>
-                            <span wire:loading wire:target="fund">Starting...</span>
+                            <span wire:loading.remove wire:target="prepare">Continue to payment</span>
+                            <span wire:loading wire:target="prepare">Loading...</span>
                         </span>
                     </template>
                 </button>
             </div>
 
-            <!-- STEP 2: Active Payment Session Details & Wizard -->
-            <div x-show="session" class="mt-4">
+            <!-- STEP 2: Draft (nothing written yet) or the active payment session -->
+            <div x-show="session || draft" class="mt-4">
                 <!-- Select Method -->
                 <div x-show="paymentState === 'select_method'">
                     <h3 class="text-sm font-bold text-zinc-900">Select Payment Method</h3>
                     <p class="text-xs text-zinc-500 mb-4">Choose how you want to fund your account.</p>
+
+                    {{-- Same notice checkout shows when a rail is dark. --}}
+                    <template x-if="draft?.down_rails?.length">
+                        <div class="mb-4 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 ring-1 ring-amber-200">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.02 13.9A1.5 1.5 0 0 0 3.57 20h16.86a1.5 1.5 0 0 0 1.3-2.24l-8.02-13.9a1.5 1.5 0 0 0-2.6 0z"/>
+                            </svg>
+                            <p class="text-xs leading-relaxed text-amber-800">
+                                <span x-text="draft.down_rails.join(' and ')"></span>
+                                <span x-text="draft.down_rails.length > 1 ? ' are' : ' is'"></span>
+                                temporarily unavailable. We are working on it, please use another payment method or check back shortly.
+                            </p>
+                        </div>
+                    </template>
 
                     <div class="grid grid-cols-1 gap-3">
                         <template x-for="method in getFilteredMethods()" :key="method.type">
                             <button
                                 type="button"
                                 @click="selectPaymentMethod(method)"
-                                class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[12px] hover:border-blue-500 hover:bg-blue-50/30 text-left transition duration-150"
+                                :disabled="method.enabled === false"
+                                :aria-disabled="method.enabled === false ? 'true' : 'false'"
+                                :class="method.enabled === false
+                                    ? 'cursor-not-allowed opacity-50 grayscale'
+                                    : 'hover:border-blue-500 hover:bg-blue-50/30'"
+                                class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[12px] text-left transition duration-150"
                             >
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
                                     {{-- Icon by method.type. Falls back to first 2 letters when no icon.
@@ -970,7 +1277,7 @@ new class extends Component
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-semibold text-zinc-950" x-text="method.label"></p>
-                                    <p class="text-xs text-zinc-500 truncate" x-text="method.description"></p>
+                                    <p class="text-xs text-zinc-500 truncate" x-text="method.enabled === false ? 'Temporarily unavailable' : method.description"></p>
                                 </div>
                                 <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
@@ -1140,7 +1447,7 @@ new class extends Component
                             <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
                         </div>
 
-                        <div>
+                        <div x-show="(selectedMethod?.supported_networks ?? []).length > 0">
                             <label class="block text-xs font-semibold text-zinc-700">Network</label>
                             <div class="relative mt-1.5">
                                 <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
@@ -1178,7 +1485,7 @@ new class extends Component
                     @if ($this->meetsCryptoMinimum())
                     <div class="mt-1.5 grid grid-cols-4 gap-2 mb-4">
                         @forelse ($cryptoCoins as $coin)
-                            <button type="button" @click="cryptoDetails.pay_currency = '{{ strtolower($coin->code) }}'; paySession('crypto', { pay_currency: '{{ strtolower($coin->code) }}' })"
+                            <button type="button" @click="selectCoin('{{ strtolower($coin->code) }}')"
                                 class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 transition-colors border-zinc-200 hover:border-blue-500 hover:bg-blue-50">
                                 @if ($coin->iconUrl())
                                     <img src="{{ $coin->iconUrl() }}" alt="" class="h-6 w-6 rounded-[12px]">
@@ -1199,7 +1506,7 @@ new class extends Component
                             <p class="text-xs font-semibold text-amber-900">
                                 Crypto top-ups start at {{ $this->cryptoMinimumLabel() }}. You entered {{ $this->symbol() }}{{ number_format((float) $this->amount, 2) }}.
                             </p>
-                            <button type="button" @click="session = null; paymentState = 'idle'"
+                            <button type="button" @click="session = null; draft = null; paymentState = 'idle'"
                                 class="mt-3 w-full rounded-[12px] bg-blue-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
                                 Change amount
                             </button>
