@@ -26,7 +26,7 @@
 
 <div
     x-data="{ search: '' }"
-    {{ $attributes->merge(['class' => 'flex w-full flex-col']) }}
+    {{ $attributes->merge(['class' => 'flex w-full min-h-0 flex-col']) }}
 >
     <div class="relative mb-3">
         <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">

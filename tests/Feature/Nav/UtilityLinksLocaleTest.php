@@ -162,7 +162,14 @@ class UtilityLinksLocaleTest extends TestCase
         // Six rows: 6 x 3rem plus the card's 0.5rem padding. NOT flex-1 - a
         // list narrowed to two matches should be two rows tall, not a six-row
         // box with a hole in it.
-        $this->assertSame(3, substr_count($modal, 'min-h-0 max-h-[18.5rem] overflow-y-auto'));
+        //
+        // Two panels in the modal (country, currency), not three: the language
+        // pane mounts x-nav.language-switcher, which carries its own panel. The
+        // modal used to wrap that mount in an identical panel of its own, so
+        // the list drew a second ring and two 18.5rem scroll areas nested.
+        $this->assertSame(2, substr_count($modal, 'min-h-0 max-h-[18.5rem] overflow-y-auto'));
+        $switcher = File::get(resource_path('views/components/nav/language-switcher.blade.php'));
+        $this->assertSame(1, substr_count($switcher, 'min-h-0 max-h-[18.5rem] overflow-y-auto'));
         $this->assertStringNotContainsString('min-h-0 flex-1 overflow-y-auto', $modal);
 
         // A row is 3rem in every list, so "six rows" is one height: py-3 either

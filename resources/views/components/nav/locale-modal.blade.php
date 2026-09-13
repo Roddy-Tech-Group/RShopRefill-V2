@@ -72,14 +72,17 @@
         );
     }
 
-    // Ten languages, not the 88 this used to list.
-
-    // English and French are the business languages; the rest follow the
-    // catalogue and the top-up networks - Spanish, Portuguese, Arabic, Swahili,
-    // Hausa, German, Chinese, Italian.
-
+    // Ten languages, not the 88 the translate engine can reach. English and
+    // French are the business languages; the rest follow the catalogue and the
+    // top-up networks - Spanish, Portuguese, Arabic, Swahili, Hausa, German,
+    // Chinese, Italian. Offering every engine locale made the pane a wall to
+    // scroll past for a choice almost nobody changes.
+    //
     // Swahili and Hausa are why this stays on the browser translate widget:
     // DeepL, the better engine for the European entries, supports neither.
+    //
+    // These are DISPLAY names; partials/translate-engine owns the
+    // name -> language-code map, and nothing else needs to know the codes.
     $languages = [
         'English', 'French', 'Spanish', 'Portuguese', 'Standard Arabic', 'Swahili', 'Hausa', 'German', 'Mandarin Chinese', 'Italian',
     ];
@@ -104,22 +107,6 @@
         ['code' => 'SAR', 'symbol' => 'SAR', 'name' => 'Saudi Riyal'],
         ['code' => 'TRY', 'symbol' => '₺',   'name' => 'Turkish Lira'],
         ['code' => 'CHF', 'symbol' => 'Fr',  'name' => 'Swiss Franc'],
-    ];
-
-    // Every language the translate engine offers, in rough speaker order so
-    // the common ones are reachable without searching. These are DISPLAY
-    // names; partials/translate-engine owns the name -> language-code map,
-    // and nothing else needs to know the codes.
-    $languages = [
-        'English', 'Mandarin Chinese', 'Hindi', 'Spanish', 'French', 'Standard Arabic', 'Bengali', 'Russian', 'Portuguese', 'Indonesian',
-        'Urdu', 'German', 'Japanese', 'Swahili', 'Marathi', 'Telugu', 'Turkish', 'Tamil', 'Cantonese', 'Vietnamese',
-        'Korean', 'Italian', 'Hausa', 'Thai', 'Gujarati', 'Persian', 'Polish', 'Pashto', 'Kannada', 'Malayalam',
-        'Sundanese', 'Hebrew', 'Burmese', 'Amharic', 'Oromo', 'Yoruba', 'Igbo', 'Ukrainian', 'Dutch', 'Romanian',
-        'Filipino', 'Greek', 'Czech', 'Swedish', 'Hungarian', 'Serbian', 'Croatian', 'Bulgarian', 'Danish', 'Finnish',
-        'Norwegian', 'Slovak', 'Afrikaans', 'Albanian', 'Armenian', 'Azerbaijani', 'Basque', 'Belarusian', 'Bosnian', 'Catalan',
-        'Estonian', 'Galician', 'Georgian', 'Hawaiian', 'Icelandic', 'Irish', 'Kazakh', 'Khmer', 'Lao', 'Latvian',
-        'Lithuanian', 'Macedonian', 'Malay', 'Maltese', 'Maori', 'Mongolian', 'Nepali', 'Punjabi', 'Sinhala', 'Slovenian',
-        'Somali', 'Tajik', 'Turkmen', 'Uzbek', 'Welsh', 'Xhosa', 'Zulu', 'Esperanto',
     ];
 
     // Picking a country drives the currency — there is no separate currency picker.
@@ -488,8 +475,8 @@
 
         {{-- Language chooser.
 
-             x-nav.language-switcher stages draftLocale; the form's Save button
-             posts it. No search field: two options do not need one.
+             x-nav.language-switcher stages draftLanguage; the form's Save button
+             posts it, and it carries its own search field.
 
              Sharing this sheet with country and currency is presentation only.
              Picking a language changes no country or currency value. --}}
@@ -503,9 +490,13 @@
             x-transition:leave-end="opacity-0 translate-x-full"
             class="col-start-1 row-start-1 flex min-h-0 flex-col"
         >
-            <div class="min-h-0 max-h-[18.5rem] overflow-y-auto rounded-[12px] bg-[#ffffff] p-1 ring-1 ring-[#dee3e1] dark:bg-white/5 dark:ring-white/10">
-                <x-nav.language-switcher :languages="$languages" />
-            </div>
+            {{-- No wrapper here on purpose. The switcher already renders its
+                 own search field and its own bordered, scrolling panel, so
+                 boxing it again drew a second identical ring around the list
+                 and nested two 18.5rem scroll areas inside each other. The
+                 country pane above builds its search and list as siblings for
+                 the same reason. --}}
+            <x-nav.language-switcher :languages="$languages" />
         </div>
 
         {{-- Payment currency chooser.
