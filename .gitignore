@@ -33,6 +33,19 @@ yarn-error.log
 /.zed
 ProjectMemory.md
 public/assets/Store front video 1.mp4
+
+# Newsletter campaign art, uploaded by an admin at send time and written into
+# the web root by the compose screen. Runtime content, not source: committing
+# it would put customer-facing campaign images in the repo, and every local
+# test upload would show up as an untracked file.
+#
+# The URLs it serves ship inside emails that have already gone out, so this
+# directory must SURVIVE deploys. That holds today because deploys are an
+# in-place `git pull` (docs/OPERATIONS.md section 2). If the atomic-release
+# work on the P1-3 roadmap lands, this has to become a shared directory
+# symlinked into each release, as storage/ will have to be, or those URLs
+# start 404ing.
+/public/assets/newsletter/
 /storage/partners.php
 
 # Env backups — these contain REAL credentials and must never be committed.
