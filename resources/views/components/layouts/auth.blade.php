@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\Languages::direction() }}">
     <head>
         @include('partials.head')
 
@@ -44,7 +44,6 @@
         {{-- Translation engine. Sign-in and register are website content too:
              a visitor who reached them in their own language should not be
              handed an English form at the one step that asks them to type. --}}
-        @include("partials.translate-engine")
 
         {{-- The form card alone, centered on the page tone. Nothing sits
              above it any more: the logo was a second brand mark on a page that

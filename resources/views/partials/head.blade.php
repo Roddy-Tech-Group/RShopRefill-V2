@@ -335,6 +335,16 @@
     <link rel="dns-prefetch" href="https://www.googletagmanager.com">
 @endif
 
+{{-- The language the server rendered this page in, as its display name.
+
+     app.js paints the nav's language pill from this before hydration and
+     mirrors it into localStorage. It has to be set BEFORE the bundle loads,
+     and it has to come from the server: the pill used to read localStorage
+     first, which was right while a browser translate widget owned the choice
+     and wrong the moment Laravel took it back, because a stale entry would
+     label the page with a language it is not in. --}}
+<script>window.rshopLanguage = @json(\App\Support\Languages::nameFor(app()->getLocale()) ?? \App\Support\Languages::defaultName());</script>
+
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
 

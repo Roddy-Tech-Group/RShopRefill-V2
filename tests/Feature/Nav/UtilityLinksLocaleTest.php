@@ -44,10 +44,10 @@ class UtilityLinksLocaleTest extends TestCase
             $this->assertStringContainsString($part, $bar);
         }
 
-        // The language half names the translate engine's chosen language.
-        // It cannot come from the server locale: the engine translates into
-        // languages the app ships no strings for, so the pill read "EN" over
-        // a fully Spanish page.
+        // The language half names the language in force. It is Alpine state
+        // rather than a Blade echo so the pill can repaint without a reload;
+        // the value it holds comes from the server (window.rshopLanguage),
+        // so it can no longer disagree with the page it labels.
         $this->assertStringContainsString("language || 'English'", $bar);
         $this->assertStringContainsString("' + (language || 'English') + '", $bar);
     }
@@ -65,11 +65,11 @@ class UtilityLinksLocaleTest extends TestCase
     }
 
     /**
-     * The pill tracks the translate engine's language, which is client
-     * state - so the server cannot render it, and must not pretend to. It
-     * ships the neutral fallback and Alpine fills in the real choice.
+     * The pill paints from Alpine, seeded by the server. The server-rendered
+     * fallback stays neutral ("EN") because the markup is cached per layout,
+     * not per locale; Alpine fills in the real name on hydration.
      */
-    public function test_the_pill_reads_the_engines_language_not_the_server_locale(): void
+    public function test_the_pill_paints_the_language_from_alpine_state(): void
     {
         $pill = File::get(resource_path('views/components/nav/region-pill.blade.php'));
 
@@ -78,16 +78,19 @@ class UtilityLinksLocaleTest extends TestCase
     }
 
     /**
-     * `locale.language` is the translate engine's live choice, so the nav
-     * reads it and nothing deletes it. A removal shim here - correct while
-     * the engine was gone - wiped the language on every page load once it
-     * came back, leaving only the cookie to keep the page translated while
-     * the nav fell back to "English".
+     * `locale.language` is the pre-hydration paint copy, refreshed from the
+     * server on every load. It is read but never deleted: a removal shim here
+     * once wiped it on every page load, leaving the nav reading "English"
+     * over a page that was not.
+     *
+     * The server value takes precedence, so a stale entry cannot mislabel the
+     * page - it is only what paints before the bundle has run.
      */
-    public function test_the_language_key_is_read_and_never_wiped(): void
+    public function test_the_language_key_is_seeded_from_the_server_and_never_wiped(): void
     {
         $js = File::get(resource_path('js/app.js'));
 
+        $this->assertStringContainsString('window.rshopLanguage', $js);
         $this->assertStringContainsString("read('language'", $js);
         $this->assertStringNotContainsString("localStorage.removeItem('locale.language')", $js);
     }
@@ -222,17 +225,16 @@ class UtilityLinksLocaleTest extends TestCase
         $this->assertStringContainsString('action="{{ route(\'locale.update\') }}"', $modal);
         $this->assertStringContainsString('@csrf', $modal);
         // The hidden locale is BOUND to the staged language, not frozen at the
-        // locale the page happened to render in. That binding is the server
-        // half of a language change: picking French has to post `fr` to reach
-        // lang/fr, and picking a machine language has to post the default so
-        // the widget translates out of a page it was told the truth about.
-        // The plain value attribute stays as the no-JavaScript fallback.
-        $this->assertStringContainsString(':value="serverLocaleFor(draftLanguage)"', $modal);
+        // locale the page happened to render in. That binding IS the language
+        // change now: every offered language has its own lang directory, so
+        // the POST installs the locale and its redirect renders the next page
+        // already translated. The plain value attribute is the fallback.
+        $this->assertStringContainsString(':value="localeFor(draftLanguage)"', $modal);
         $this->assertStringContainsString('name="locale"', $modal);
 
-        // The language rides along as the engine's cookie, set in the same
-        // commit so the POST's redirect is the one reload that applies it.
-        $this->assertStringContainsString('window.rshopSetTranslateCookie', $modal);
+        // No translate-widget cookie rides along any more: the POST is the
+        // whole of the change, and its redirect renders the new language.
+        $this->assertStringNotContainsString('rshopSetTranslateCookie', $modal);
         $this->assertStringContainsString('type="submit"', $modal);
         $this->assertStringContainsString('@submit="commit($event)"', $modal);
 

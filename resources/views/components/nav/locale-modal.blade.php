@@ -74,13 +74,14 @@
 
     // The offered languages, resolved from config/localization.php through
     // App\Support\Languages. NOT a list of its own: a second copy here is how
-    // the picker and the translate engine drifted apart, leaving a visitor
-    // auto-detected into one of the engine's 88 with no row to un-pick it.
+    // the picker and the old translate widget drifted apart, leaving a visitor
+    // auto-detected into one of that widget's 88 with no row to un-pick it.
     //
-    // These are DISPLAY names. Which of them Laravel renders itself and which
-    // the widget paints is the config's business, not this view's.
+    // These are DISPLAY names; the locale each one posts is the config's
+    // business, not this view's. Every one of them has its own lang directory,
+    // so picking a language is a page render, not a repaint.
     $languages = \App\Support\Languages::names();
-    $languageServerLocales = \App\Support\Languages::serverLocaleMap();
+    $languageLocales = \App\Support\Languages::localeMap();
     $currentLanguage = \App\Support\Languages::nameFor(app()->getLocale())
         ?? \App\Support\Languages::defaultName();
     $currencies = [
@@ -190,14 +191,14 @@
         /** The live language, for the row label when the sheet is closed. */
         language: @js($currentLanguage),
 
-        /** Display name -> the locale the server must render for it. */
-        languageServerLocales: @js($languageServerLocales),
+        /** Display name -> the locale that renders it. */
+        languageLocales: @js($languageLocales),
 
         /** Only these can be staged, stored or posted. */
         offeredLanguages: @js($languages),
 
-        serverLocaleFor(name) {
-            return this.languageServerLocales[name] ?? @js(config('localization.default', 'en'));
+        localeFor(name) {
+            return this.languageLocales[name] ?? @js(config('localization.default', 'en'));
         },
 
         /*
@@ -258,15 +259,12 @@
                 return;
             }
 
-            // Language takes both halves. The form field above carries the
-            // server locale; this mirrors the choice into localStorage and
-            // sets the engine's cookie, so the one reload this submit already
-            // causes comes back correct by whichever mechanism owns the
-            // language. Dispatching the engine's own 'language-changed' here
-            // would reload immediately and race the POST.
+            // Language is server state: the hidden field above carries it
+            // and the POST's redirect renders the next page translated. The
+            // localStorage copy is only what the nav pill paints from before
+            // Alpine has a server value, so it is mirrored, never authoritative.
             try {
                 localStorage.setItem('locale.language', this.draftLanguage);
-                window.rshopSetTranslateCookie?.(this.draftLanguage);
             } catch (e) {}
 
             try {
@@ -389,20 +387,14 @@
             class="grid min-h-0 flex-1 grid-cols-1 grid-rows-1"
         >
             @csrf
-            {{-- The SERVER locale the staged language needs, which is the half
-                 of the change Laravel owns.
-
-                 Picking French posts `fr` and gets the real lang/fr files, so
-                 French stopped being a machine translation of an English page.
-                 Picking a machine language posts the default locale instead,
-                 because the widget translates out of whatever the server
-                 rendered - leaving a French page here while telling the widget
-                 the source was English is how already-translated copy went
-                 through the machine a second time.
+            {{-- The locale the staged language renders in. Every offered
+                 language has its own lang/{code} directory, so this is the
+                 whole of a language change: the POST installs the locale and
+                 its redirect renders the next page already translated.
 
                  LocaleController validates this against localization.supported,
                  so only a locale the app genuinely ships can ever land. --}}
-            <input type="hidden" name="locale" :value="serverLocaleFor(draftLanguage)" value="{{ $languageServerLocales[$currentLanguage] ?? config('localization.default', 'en') }}">
+            <input type="hidden" name="locale" :value="localeFor(draftLanguage)" value="{{ $languageLocales[$currentLanguage] ?? config('localization.default', 'en') }}">
 
         {{-- Root: the three settings, previewing the DRAFT rather than what is
              in force - the sheet has to show what Save is about to do. --}}

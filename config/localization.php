@@ -8,6 +8,30 @@
  * selectable in the UI but rejected by the server, or vice versa.
  *
  * Adding a language is this file plus a lang/{code} directory - nothing else.
+ *
+ * Every language here is rendered by Laravel from its own lang/{code} files.
+ * There is no machine-translation tier: the browser translate widget that used
+ * to paint other languages over an English page was removed. It cost a
+ * third-party request on every page load, repainted the document after it had
+ * already rendered, told the widget every page was English so French copy was
+ * machine-translated a second time, and could reach far more languages than
+ * the picker offered, which let a visitor land somewhere with no row to
+ * un-pick it.
+ *
+ * EIGHT MORE LANGUAGES ARE BUILT BUT NOT OFFERED.
+ * lang/es, lang/pt, lang/ar, lang/sw, lang/ha, lang/de, lang/zh and lang/it
+ * are complete and verified: 404 keys each, key-for-key with lang/en, with
+ * every placeholder and plural form intact. They are deliberately not listed
+ * below, because the storefront ships in the two business languages.
+ *
+ * Turning one back on is ONE entry here plus its key in picker_order. Nothing
+ * else: no code, no views, no new tests. The files stay under test - the
+ * localisation suite checks every lang directory on disk, not just the offered
+ * ones, so an unoffered translation cannot rot while it waits.
+ *
+ * If you re-enable Arabic, give it 'rtl' => true. The layouts already read
+ * that through App\Support\Languages::direction() for the <html dir>
+ * attribute, and the suite already covers it.
  */
 return [
     'default' => 'en',
@@ -26,47 +50,13 @@ return [
     ],
 
     /**
-     * Machine-translated languages: offered in the picker, rendered by the
-     * browser translate widget (partials/translate-engine) rather than by a
-     * lang/{code} directory.
+     * The order the picker lists languages in.
      *
-     * These are NOT in `supported` on purpose. `supported` means "the server
-     * renders this itself", which is what LocaleController validates against
-     * and what App::setLocale() is given. A machine language is a client-side
-     * overlay on top of a page the server rendered in a supported locale, so
-     * promoting one here would tell the server to load lang files that do not
-     * exist.
-     *
-     * `engine` is the widget's own language code, which is not always the ISO
-     * tag: Mandarin is zh-CN, not zh. Nothing outside the engine knows these
-     * codes - the picker and the stored preference both use the key.
-     *
-     * Why these eight and not the ~88 the widget can reach: English and French
-     * are the business languages and live in `supported`; the rest follow the
-     * catalogue and the top-up networks. Offering every engine locale made the
-     * picker a wall to scroll for a choice almost nobody changes, and let a
-     * visitor land in a language the picker could not show back to them.
-     *
-     * Swahili and Hausa are why this stays on the browser widget at all: DeepL,
-     * the better engine for the European entries, supports neither.
+     * A language missing from this list is still offered, appended last, on
+     * the grounds that a forgotten entry is a typo and hiding it silently
+     * would be the worse failure.
      */
-    'machine' => [
-        'es' => ['name' => 'Spanish', 'native_name' => 'Español', 'short' => 'ES', 'engine' => 'es'],
-        'pt' => ['name' => 'Portuguese', 'native_name' => 'Português', 'short' => 'PT', 'engine' => 'pt'],
-        'ar' => ['name' => 'Standard Arabic', 'native_name' => 'العربية', 'short' => 'AR', 'engine' => 'ar'],
-        'sw' => ['name' => 'Swahili', 'native_name' => 'Kiswahili', 'short' => 'SW', 'engine' => 'sw'],
-        'ha' => ['name' => 'Hausa', 'native_name' => 'Hausa', 'short' => 'HA', 'engine' => 'ha'],
-        'de' => ['name' => 'German', 'native_name' => 'Deutsch', 'short' => 'DE', 'engine' => 'de'],
-        'zh' => ['name' => 'Mandarin Chinese', 'native_name' => '中文', 'short' => 'ZH', 'engine' => 'zh-CN'],
-        'it' => ['name' => 'Italian', 'native_name' => 'Italiano', 'short' => 'IT', 'engine' => 'it'],
-    ],
-
-    /**
-     * The order the picker lists languages in, by key across BOTH lists above.
-     * The business languages lead; the rest follow the catalogue. Kept here so
-     * the picker has no list of its own to drift out of step.
-     */
-    'picker_order' => ['en', 'fr', 'es', 'pt', 'ar', 'sw', 'ha', 'de', 'zh', 'it'],
+    'picker_order' => ['en', 'fr'],
 
     /**
      * How long the guest's choice is remembered. A year: the preference is a

@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * See lang/en/products.php. Brand names, eSIM package identifiers and
+ * supplier-sourced titles are never translated.
+ */
+return [
+    'sort' => 'Sortieren',
+    'category_unavailable' => 'Geschenkkarten sind vorübergehend nicht verfügbar',
+    'coming_soon' => 'Bald',
+    'flag_off' => 'Aus',
+    'browse_categories_label' => 'Kategorien durchsuchen',
+    'pick_a_category' => 'Kategorie wählen',
+    'subcategories' => 'Unterkategorien',
+    'see_more' => 'Mehr anzeigen',
+    'request_a_product' => 'Produkt anfragen',
+    'didnt_find' => 'Nicht gefunden, wonach Sie gesucht haben?',
+    'showing_out_of' => ':shown von :total angezeigt',
+    'recently_added' => 'Neu hinzugefügt',
+    'popular_brands' => 'Beliebte Marken',
+    'popular_brands_heading' => 'Entdecken Sie die beliebtesten Marken!',
+    'gift_card_categories' => 'Geschenkkarten-Kategorien',
+    'all_gift_cards' => 'Alle Geschenkkarten',
+    'shop_by_category' => 'Geschenkkarten nach Kategorie',
+    'next_page' => 'Mehr :category',
+    'previous_page' => 'Vorherige :category',
+    'browse_all_countries' => 'Alle Länder ansehen',
+    'switch_country' => 'Land wechseln',
+    'no_gift_cards_in_country_hint' => 'Für dieses Land verkaufen wir noch keine Geschenkkarten. Wählen Sie ein anderes Land, um zu sehen, was verfügbar ist.',
+    'no_gift_cards_in_country' => 'Keine Geschenkkarten für :country verfügbar',
+    'clear_all_filters' => 'Alle Filter löschen',
+    'no_products_hint' => 'Löschen Sie die Suche oder wählen Sie eine andere Kategorie.',
+    'more_gift_cards' => 'Mehr Geschenkkarten',
+    'rating_out_of_five' => 'Bewertet mit :rating von 5 aus :count Bewertungen',
+    'browse_categories' => 'Kategorien durchsuchen',
+    'gift_cards_desc' => 'Digitale Geschenkkarten globaler Marken, sofort geliefert.',
+    'esims_desc' => 'Sofort nutzbare Reise-eSIMs für über 200 Ziele. Keine Roaming-Gebühren.',
+    'mobile_refill_desc' => 'Laden Sie Guthaben und Datenpakete für Handynummern weltweit auf.',
+    'bill_payments_desc' => 'Zahlen Sie Rechnungen, Abos und Dienste des Alltags.',
+    'check_it_out' => 'Ansehen',
+    'temporarily_unavailable' => 'Vorübergehend nicht verfügbar',
+    'out_of_stock' => 'Nicht verfügbar',
+    'view_all' => 'Alle ansehen',
+    'select_amount' => 'Betrag wählen',
+    'add_to_cart' => 'In den Warenkorb',
+    'buy_now' => 'Jetzt kaufen',
+    'no_products' => 'Keine Produkte passen zu Ihrer Suche',
+];

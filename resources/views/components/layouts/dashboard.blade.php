@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\Languages::direction() }}">
     <head>
         @include('partials.head')
     </head>
@@ -244,7 +244,6 @@
         @endauth
 
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
-        @include("partials.translate-engine")
 
         @php
             $user = Auth::user();

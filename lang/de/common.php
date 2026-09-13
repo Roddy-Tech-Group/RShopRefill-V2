@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * See lang/en/common.php for the scope of this file.
+ */
+return [
+    'menu' => 'Menü',
+    'continue' => 'Weiter',
+    'cancel' => 'Abbrechen',
+    'save' => 'Speichern',
+    'close' => 'Schließen',
+    'back' => 'Zurück',
+    'back_to_website' => 'Zurück zur Website',
+    'search' => 'Suchen',
+    'clear' => 'Löschen',
+    'show_all_results' => 'Alle Ergebnisse anzeigen',
+    'popular_searches' => 'Beliebte Suchanfragen',
+    'recent_searches' => 'Letzte Suchanfragen',
+    'loading' => 'Wird geladen…',
+    'searching' => 'Suche läuft…',
+    'no_results' => 'Keine Ergebnisse',
+    'nothing_here_yet' => 'Hier ist noch nichts',
+    'try_again' => 'Erneut versuchen',
+    'learn_more' => 'Mehr erfahren',
+    'get_started' => 'Loslegen',
+    'copy' => 'Kopieren',
+    'copied' => 'Kopiert',
+    'preferences' => 'Einstellungen',
+    'language' => 'Sprache',
+    'country' => 'Land',
+    'payment_currency' => 'Zahlungswährung',
+    'theme' => 'Design',
+    'theme_light' => 'Hell',
+    'theme_dark' => 'Dunkel',
+    'theme_system' => 'System',
+    'help' => 'Hilfe',
+    'invite_a_friend' => 'Freunde einladen',
+    'change_country' => 'Land ändern',
+    'shop_in' => 'In :currency bezahlen',
+];

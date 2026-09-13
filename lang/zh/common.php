@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * See lang/en/common.php for the scope of this file.
+ */
+return [
+    'menu' => '菜单',
+    'continue' => '继续',
+    'cancel' => '取消',
+    'save' => '保存',
+    'close' => '关闭',
+    'back' => '返回',
+    'back_to_website' => '返回网站',
+    'search' => '搜索',
+    'clear' => '清除',
+    'show_all_results' => '查看全部结果',
+    'popular_searches' => '热门搜索',
+    'recent_searches' => '最近搜索',
+    'loading' => '加载中…',
+    'searching' => '搜索中…',
+    'no_results' => '没有结果',
+    'nothing_here_yet' => '这里还没有内容',
+    'try_again' => '重试',
+    'learn_more' => '了解更多',
+    'get_started' => '开始使用',
+    'copy' => '复制',
+    'copied' => '已复制',
+    'preferences' => '偏好设置',
+    'language' => '语言',
+    'country' => '国家',
+    'payment_currency' => '支付货币',
+    'theme' => '主题',
+    'theme_light' => '浅色',
+    'theme_dark' => '深色',
+    'theme_system' => '跟随系统',
+    'help' => '帮助',
+    'invite_a_friend' => '邀请好友',
+    'change_country' => '更改国家',
+    'shop_in' => '以 :currency 购买',
+];

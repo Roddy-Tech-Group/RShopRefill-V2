@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * See lang/en/products.php. Brand names, eSIM package identifiers and
+ * supplier-sourced titles are never translated.
+ */
+return [
+    'sort' => '排序',
+    'category_unavailable' => '礼品卡暂时无法购买',
+    'coming_soon' => '敬请期待',
+    'flag_off' => '已关闭',
+    'browse_categories_label' => '浏览分类',
+    'pick_a_category' => '选择分类',
+    'subcategories' => '子分类',
+    'see_more' => '查看更多',
+    'request_a_product' => '申请上架产品',
+    'didnt_find' => '没有找到您想要的？',
+    'showing_out_of' => '显示 :shown 个，共 :total 个',
+    'recently_added' => '最新上架',
+    'popular_brands' => '热门品牌',
+    'popular_brands_heading' => '看看最受欢迎的品牌！',
+    'gift_card_categories' => '礼品卡分类',
+    'all_gift_cards' => '全部礼品卡',
+    'shop_by_category' => '按分类选购礼品卡',
+    'next_page' => '更多 :category',
+    'previous_page' => '上一页 :category',
+    'browse_all_countries' => '浏览所有国家',
+    'switch_country' => '切换国家',
+    'no_gift_cards_in_country_hint' => '我们暂未销售该国家的礼品卡。请选择其他国家查看可购商品。',
+    'no_gift_cards_in_country' => ':country 暂无可购礼品卡',
+    'clear_all_filters' => '清除所有筛选',
+    'no_products_hint' => '试试清除搜索条件，或选择其他分类。',
+    'more_gift_cards' => '更多礼品卡',
+    'rating_out_of_five' => '评分 :rating / 5，来自 :count 条评价',
+    'browse_categories' => '浏览分类',
+    'gift_cards_desc' => '选购全球品牌的数字礼品卡，即时送达。',
+    'esims_desc' => '覆盖 200+ 目的地的即时旅行 eSIM，免漫游费。',
+    'mobile_refill_desc' => '为全球手机号码充值话费和流量套餐。',
+    'bill_payments_desc' => '缴纳水电费、订阅费和日常服务费用。',
+    'check_it_out' => '去看看',
+    'temporarily_unavailable' => '暂时无法购买',
+    'out_of_stock' => '缺货',
+    'view_all' => '查看全部',
+    'select_amount' => '选择金额',
+    'add_to_cart' => '加入购物车',
+    'buy_now' => '立即购买',
+    'no_products' => '没有符合您搜索条件的产品',
+];

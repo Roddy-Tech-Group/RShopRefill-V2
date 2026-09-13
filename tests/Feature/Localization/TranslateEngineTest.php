@@ -8,51 +8,113 @@ use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The languages a visitor can reach, and which mechanism produces each.
+ * Every offered language renders server-side, from its own lang directory.
  *
- * Two systems render language on this site: Laravel's own lang files, and a
- * browser translate widget. The rules under test are the ones that keep them
- * from colliding or drifting:
+ * There used to be two mechanisms: Laravel's lang files for English and
+ * French, and a browser translate widget painting the other eight over an
+ * English page. That split caused three problems, and this suite is the guard
+ * against each coming back:
  *
- *   - the picker offers exactly what config says and nothing else,
- *   - a language Laravel renders is never ALSO handed to the widget,
- *   - the widget is told the language the page is genuinely in,
- *   - and a visitor is never left in a language the picker cannot un-pick.
+ *   - it was SLOW. The widget was fetched on every page load for every
+ *     visitor, then rewrote the document after it had already painted.
+ *   - it was WRONG. The widget was told every page was English, so French
+ *     copy from lang/fr was machine-translated a second time.
+ *   - it STRANDED people. The widget reached far more languages than the
+ *     picker listed, so auto-detection could leave a visitor in a language
+ *     with no row to change it from.
  *
- * The last one is why the offered list shrank: when the picker showed ten and
- * the engine could reach eighty-eight, auto-detection could strand a visitor
- * in a language with no row to change it from.
+ * The fix was to give all ten languages real translations and delete the
+ * widget. What remains to protect is that the list stays single, complete and
+ * genuinely translated.
  */
 class TranslateEngineTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function engine(): string
+    /** Every leaf key of a nested array, dot-joined. */
+    private function leaves(array $a, string $prefix = ''): array
     {
-        return File::get(resource_path('views/partials/translate-engine.blade.php'));
+        $out = [];
+
+        foreach ($a as $k => $v) {
+            $out = array_merge($out, is_array($v) ? $this->leaves($v, "{$prefix}{$k}.") : ["{$prefix}{$k}"]);
+        }
+
+        return $out;
     }
 
-    private function modal(): string
+    /** Distinct :placeholder tokens in a string, sorted. */
+    private function placeholders(string $s): array
     {
-        return File::get(resource_path('views/components/nav/locale-modal.blade.php'));
+        preg_match_all('/:[a-zA-Z_][a-zA-Z0-9_]*/', $s, $m);
+        $u = array_values(array_unique($m[0]));
+        sort($u);
+
+        return $u;
+    }
+
+    private function value(array $a, string $path): mixed
+    {
+        foreach (explode('.', $path) as $seg) {
+            if (! is_array($a) || ! array_key_exists($seg, $a)) {
+                return null;
+            }
+            $a = $a[$seg];
+        }
+
+        return $a;
+    }
+
+    /** The locales the picker offers. */
+    private function locales(): array
+    {
+        return array_keys(config('localization.supported'));
+    }
+
+    /**
+     * Every lang directory on disk, offered or not.
+     *
+     * Eight translations are built but not currently offered. They are checked
+     * anyway: an unoffered translation that silently rots is worse than none,
+     * because turning it back on is meant to be a single config line.
+     */
+    private function translated(): array
+    {
+        return array_values(array_diff(
+            array_map(fn ($d) => basename($d), File::directories(lang_path())),
+            ['en']
+        ));
+    }
+
+    private function files(): array
+    {
+        return array_map('basename', File::files(lang_path('en')));
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  The offered list
+    //  The list
     // ─────────────────────────────────────────────────────────────────
 
     public function test_the_offered_languages_are_exactly_the_configured_ones(): void
     {
-        $this->assertSame([
-            'English', 'French', 'Spanish', 'Portuguese', 'Standard Arabic',
-            'Swahili', 'Hausa', 'German', 'Mandarin Chinese', 'Italian',
-        ], Languages::names());
+        $this->assertSame(['English', 'French'], Languages::names());
     }
 
     /**
-     * Order is config's, not insertion order across two arrays. The business
-     * languages lead because they are the ones most customers want.
+     * The storefront ships in the two business languages. Eight more are
+     * translated and sitting in lang/ ready to be switched on; they must not
+     * leak into the picker until someone lists them in config.
      */
+    public function test_the_unoffered_translations_are_not_in_the_picker(): void
+    {
+        foreach (['Spanish', 'Standard Arabic', 'Swahili', 'German'] as $name) {
+            $this->assertFalse(Languages::offers($name), $name.' should not be offered yet.');
+        }
+
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $this->assertStringNotContainsString('Kiswahili', $html);
+    }
+
     public function test_the_picker_order_leads_with_the_business_languages(): void
     {
         $names = Languages::names();
@@ -61,287 +123,297 @@ class TranslateEngineTest extends TestCase
         $this->assertSame('French', $names[1]);
     }
 
-    /**
-     * A language missing from picker_order is a typo in config, and hiding it
-     * would be a worse failure than listing it last.
-     */
+    /** A language missing from picker_order is a typo, not a reason to hide it. */
     public function test_a_language_left_out_of_the_order_is_appended_not_dropped(): void
     {
-        config()->set('localization.picker_order', ['en']);
+        config()->set('localization.picker_order', ['fr']);
 
         $names = Languages::names();
 
-        $this->assertSame('English', $names[0]);
-        $this->assertContains('Swahili', $names);
-        $this->assertCount(10, $names);
+        $this->assertSame('French', $names[0]);
+        $this->assertContains('English', $names);
+        $this->assertCount(2, $names);
+    }
+
+    /**
+     * Re-enabling a built translation is meant to be one config entry and
+     * nothing else. If this breaks, that promise is broken.
+     */
+    public function test_a_built_translation_can_be_offered_with_one_config_entry(): void
+    {
+        config()->set('localization.supported.sw', [
+            'name' => 'Swahili', 'native_name' => 'Kiswahili', 'short' => 'SW',
+        ]);
+        config()->set('localization.picker_order', ['en', 'fr', 'sw']);
+
+        $this->assertSame(['English', 'French', 'Swahili'], Languages::names());
+        $this->assertTrue(Languages::supports('sw'));
+        $this->assertSame('sw', Languages::localeMap()['Swahili']);
+
+        $this->post(route('locale.update'), ['locale' => 'sw'])->assertSessionHasNoErrors();
+
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('lang="sw"', $html);
+        $this->assertStringContainsString('window.rshopLanguage = "Swahili"', $html);
+    }
+
+    /**
+     * The whole point of the rebuild: no language is offered that the server
+     * cannot render itself. An entry without a lang directory would fall back
+     * to English while the picker claimed otherwise.
+     */
+    public function test_every_offered_language_has_its_own_lang_directory(): void
+    {
+        foreach ($this->locales() as $locale) {
+            $this->assertDirectoryExists(lang_path($locale), "{$locale} is offered but has no lang directory.");
+        }
+    }
+
+    public function test_every_locale_the_picker_can_post_is_one_the_server_supports(): void
+    {
+        foreach (Languages::localeMap() as $name => $locale) {
+            $this->assertContains($locale, $this->locales(), "{$name} would post an unsupported locale.");
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  The two mechanisms never overlap
+    //  The translations are complete and intact
     // ─────────────────────────────────────────────────────────────────
 
     /**
-     * The collision this whole change exists to remove. French has 577 lines
-     * of real translation; handing it to the widget as well meant French text
-     * was machine-translated a second time as though it were English.
+     * A missing key silently renders the dotted key path to a customer, which
+     * looks like a bug report waiting to happen rather than a missing string.
      */
-    public function test_a_language_laravel_renders_is_never_given_to_the_widget(): void
+    public function test_no_locale_is_missing_a_key_english_has(): void
     {
-        $engineMap = Languages::engineMap();
+        foreach ($this->translated() as $locale) {
+            foreach ($this->files() as $file) {
+                $path = lang_path("{$locale}/{$file}");
+                $this->assertFileExists($path, "{$locale} is missing {$file}.");
 
-        foreach (array_keys(config('localization.supported')) as $locale) {
-            $name = Languages::nameFor($locale);
+                $missing = array_diff(
+                    $this->leaves(require lang_path("en/{$file}")),
+                    $this->leaves(require $path)
+                );
 
-            $this->assertArrayNotHasKey(
-                $name,
-                $engineMap,
-                "{$name} has lang files, so the widget must not also translate it."
+                $this->assertSame([], array_values($missing), "{$locale}/{$file} is missing keys.");
+            }
+        }
+    }
+
+    /**
+     * Placeholders are substituted at runtime. One dropped in translation
+     * renders as literal text, so ":amount" reaches a customer where a sum
+     * should be. Compared as distinct sets: a translation may legitimately
+     * mention a token once where English repeats it.
+     */
+    public function test_no_translation_loses_or_invents_a_placeholder(): void
+    {
+        foreach ($this->translated() as $locale) {
+            foreach ($this->files() as $file) {
+                $en = require lang_path("en/{$file}");
+                $lo = require lang_path("{$locale}/{$file}");
+
+                foreach ($this->leaves($en) as $key) {
+                    $ev = $this->value($en, $key);
+                    $lv = $this->value($lo, $key);
+
+                    if (! is_string($ev) || ! is_string($lv)) {
+                        continue;
+                    }
+
+                    $this->assertSame(
+                        $this->placeholders($ev),
+                        $this->placeholders($lv),
+                        "{$locale}/{$file} key {$key} changed its placeholders."
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Laravel picks a plural form by counting pipe-separated segments. A
+     * translation with a different count silently returns the wrong branch.
+     */
+    public function test_no_translation_changes_the_plural_segment_count(): void
+    {
+        foreach ($this->translated() as $locale) {
+            foreach ($this->files() as $file) {
+                $en = require lang_path("en/{$file}");
+                $lo = require lang_path("{$locale}/{$file}");
+
+                foreach ($this->leaves($en) as $key) {
+                    $ev = $this->value($en, $key);
+                    $lv = $this->value($lo, $key);
+
+                    if (! is_string($ev) || ! is_string($lv)) {
+                        continue;
+                    }
+
+                    $this->assertSame(
+                        substr_count($ev, '|'),
+                        substr_count($lv, '|'),
+                        "{$locale}/{$file} key {$key} changed its plural segments."
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Field names appear inside every validation message, so leaving them
+     * untranslated puts English nouns in the middle of a translated sentence.
+     */
+    public function test_every_locale_names_its_validation_attributes(): void
+    {
+        $expected = array_keys(require lang_path('fr/validation.php'))
+            ? array_keys((require lang_path('fr/validation.php'))['attributes'])
+            : [];
+
+        $this->assertNotEmpty($expected);
+
+        foreach ($this->translated() as $locale) {
+            $attributes = (require lang_path("{$locale}/validation.php"))['attributes'] ?? [];
+
+            $this->assertSame($expected, array_keys($attributes), "{$locale} names a different set of attributes.");
+
+            foreach ($attributes as $field => $label) {
+                $this->assertNotSame('', trim((string) $label), "{$locale} left {$field} blank.");
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  The widget is gone
+    // ─────────────────────────────────────────────────────────────────
+
+    public function test_the_translate_widget_partial_no_longer_exists(): void
+    {
+        $this->assertFileDoesNotExist(resource_path('views/partials/translate-engine.blade.php'));
+    }
+
+    /**
+     * The speed fix. A page that fetches a third-party script cannot be
+     * instant, and this one fetched it for every visitor in every language.
+     */
+    public function test_no_page_requests_a_third_party_translation_script(): void
+    {
+        foreach (['/', '/login'] as $url) {
+            $html = $this->withoutVite()->get($url)->assertOk()->getContent();
+
+            foreach ([
+                'translate.google.com',
+                'translate_a/element.js',
+                'googleTranslateElementInit',
+                'google_translate_element',
+                'googtrans',
+            ] as $artefact) {
+                $this->assertStringNotContainsString($artefact, $html, "{$url} still carries {$artefact}.");
+            }
+        }
+    }
+
+    public function test_no_view_still_references_the_widget(): void
+    {
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            $this->assertStringNotContainsString(
+                'translate-engine',
+                File::get($file->getPathname()),
+                $file->getRelativePathname().' still references the widget.'
             );
         }
     }
 
-    public function test_every_machine_language_carries_an_engine_code(): void
-    {
-        $engineMap = Languages::engineMap();
-
-        $this->assertSame([
-            'Spanish' => 'es',
-            'Portuguese' => 'pt',
-            'Standard Arabic' => 'ar',
-            'Swahili' => 'sw',
-            'Hausa' => 'ha',
-            'German' => 'de',
-            // Not "zh": the widget's code for Mandarin carries the script.
-            'Mandarin Chinese' => 'zh-CN',
-            'Italian' => 'it',
-        ], $engineMap);
-    }
+    // ─────────────────────────────────────────────────────────────────
+    //  It actually renders
+    // ─────────────────────────────────────────────────────────────────
 
     /**
-     * A machine language is painted over a page the server rendered, so the
-     * server has to render the default locale for it - not whatever locale
-     * happened to be in force.
+     * Switching is one POST and the redirect renders the new language. Driven
+     * through the real endpoint rather than by setting the cookie twice: the
+     * session outranks the cookie in SetLocale's resolution order, so a second
+     * request in the same test would inherit the first request's locale and
+     * quietly prove nothing.
      */
-    public function test_a_machine_language_asks_the_server_for_the_default_locale(): void
+    public function test_a_page_renders_in_the_language_the_visitor_picked(): void
     {
-        $map = Languages::serverLocaleMap();
+        $english = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('window.rshopLanguage = "English"', $english);
+        $this->assertStringContainsString('lang="en"', $english);
 
-        $this->assertSame('en', $map['English']);
-        $this->assertSame('fr', $map['French']);
+        $this->post(route('locale.update'), ['locale' => 'fr']);
 
-        foreach (['Spanish', 'Swahili', 'Hausa', 'Mandarin Chinese'] as $machine) {
-            $this->assertSame('en', $map[$machine]);
+        $french = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('window.rshopLanguage = "French"', $french);
+        $this->assertStringContainsString('lang="fr"', $french);
+
+        $this->assertNotSame($english, $french, 'A French request rendered identical markup to an English one.');
+    }
+
+    /** Every language actually renders, not just the two that always did. */
+    public function test_every_offered_language_renders_its_own_page(): void
+    {
+        foreach (Languages::all() as $locale => $entry) {
+            $this->post(route('locale.update'), ['locale' => $locale])
+                ->assertSessionHasNoErrors();
+
+            $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+
+            $this->assertStringContainsString('lang="'.$locale.'"', $html, "{$locale} did not render.");
+            $this->assertStringContainsString(
+                'window.rshopLanguage = '.json_encode($entry['name']),
+                $html,
+                "{$locale} did not announce its name."
+            );
         }
     }
 
     /**
-     * Every locale the picker can post has to survive LocaleController, which
-     * validates against localization.supported. A machine language that posted
-     * its own key would 422 the Save.
+     * Right-to-left support is wired even though nothing offered uses it yet.
+     * Arabic is translated and one config entry away, and the layouts read
+     * direction() unconditionally, so this is what stops it regressing in the
+     * meantime. Without an explicit dir an Arabic document keeps ltr, which
+     * reorders punctuation and any Latin run inside a sentence, such as a
+     * currency code or a brand name.
      */
-    public function test_every_posted_locale_is_one_the_server_supports(): void
+    public function test_right_to_left_is_wired_for_when_arabic_returns(): void
     {
-        $supported = array_keys(config('localization.supported'));
+        config()->set('localization.supported.ar', [
+            'name' => 'Standard Arabic', 'native_name' => 'العربية', 'short' => 'AR', 'rtl' => true,
+        ]);
 
-        foreach (Languages::serverLocaleMap() as $name => $locale) {
-            $this->assertContains($locale, $supported, "{$name} would post an unsupported locale.");
-        }
-    }
+        $this->assertTrue(Languages::isRtl('ar'));
+        $this->assertSame('rtl', Languages::direction('ar'));
+        $this->assertSame('ltr', Languages::direction('en'));
 
-    // ─────────────────────────────────────────────────────────────────
-    //  Nobody gets stranded
-    // ─────────────────────────────────────────────────────────────────
+        $this->post(route('locale.update'), ['locale' => 'ar'])->assertSessionHasNoErrors();
 
-    public function test_a_retired_language_is_no_longer_offered(): void
-    {
-        // Hindi was reachable while the engine carried 88 languages.
-        $this->assertFalse(Languages::offers('Hindi'));
-        $this->assertFalse(Languages::offers('Esperanto'));
-        $this->assertFalse(Languages::offers(null));
-        $this->assertTrue(Languages::offers('Swahili'));
-    }
-
-    /**
-     * The stored preference is retired in the browser too. Without this the
-     * visitor keeps the old cookie and sees a page in a language the picker
-     * shows no checked row for.
-     */
-    public function test_the_engine_retires_a_stored_language_it_no_longer_offers(): void
-    {
-        $engine = $this->engine();
-
-        $this->assertStringContainsString('if (stored && !isOffered(stored))', $engine);
-        $this->assertStringContainsString('clearGoogTrans();', $engine);
-    }
-
-    /**
-     * Auto-detection may only land on an offered language. Falling through to
-     * the widget's nearest match is what stranded people.
-     */
-    public function test_detection_only_resolves_to_offered_languages(): void
-    {
-        $offered = Languages::names();
-
-        foreach (Languages::detectionMap() as $tag => $name) {
-            $this->assertContains($name, $offered, "Tag {$tag} detects into an unoffered language.");
-        }
-    }
-
-    public function test_detection_covers_the_tags_browsers_actually_report(): void
-    {
-        $map = Languages::detectionMap();
-
-        $this->assertSame('French', $map['fr']);
-        $this->assertSame('French', $map['fr-ca']);
-        $this->assertSame('Portuguese', $map['pt-br']);
-        $this->assertSame('Mandarin Chinese', $map['zh-cn']);
-        $this->assertSame('Swahili', $map['sw']);
-
-        // Retired languages must not sneak back in through a tag.
-        $this->assertArrayNotHasKey('hi', $map);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    //  Speed
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * The single biggest cost this removes. English and French are most of the
-     * traffic and neither needs the widget, so the third-party request has to
-     * sit behind the machine-language guard rather than run for everyone.
-     */
-    public function test_the_widget_is_only_fetched_for_a_machine_language(): void
-    {
-        $engine = $this->engine();
-
-        $guard = strpos($engine, 'if (!activeCode) { return; }');
-        $fetch = strpos($engine, 'translate_a/element.js');
-
-        $this->assertNotFalse($guard, 'The machine-language guard is missing.');
-        $this->assertNotFalse($fetch);
-        $this->assertLessThan($fetch, $guard, 'The widget is fetched before the guard that should gate it.');
-    }
-
-    public function test_the_widget_host_is_preconnected_only_when_it_will_be_used(): void
-    {
-        $engine = $this->engine();
-
-        $guard = strpos($engine, 'if (!activeCode) { return; }');
-        $preconnect = strpos($engine, "pre.rel = 'preconnect'");
-
-        $this->assertNotFalse($preconnect);
-        $this->assertLessThan($preconnect, $guard);
-    }
-
-    /**
-     * The old re-apply polled every 60ms up to 80 times, a 4.8 second tail on
-     * every SPA navigation, looking for a <select> the navigation had already
-     * destroyed. Rebuilding the widget is both correct and immediate.
-     */
-    public function test_navigation_rebuilds_the_widget_instead_of_polling_for_it(): void
-    {
-        $engine = $this->engine();
-
-        $this->assertStringContainsString('reapply(10)', $engine);
-        $this->assertStringContainsString('if (initElement()) { return; }', $engine);
-
-        $this->assertStringNotContainsString('triggerCombo', $engine);
-        $this->assertStringNotContainsString(', 80)', $engine);
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    //  One list, and a truthful source language
-    // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * The engine used to carry its own 88-entry map and the picker its own ten
-     * names. Two copies is how they drifted apart.
-     */
-    public function test_neither_view_keeps_a_language_list_of_its_own(): void
-    {
-        $engine = $this->engine();
-        $modal = $this->modal();
-
-        $this->assertStringContainsString('Languages::engineMap()', $engine);
-        $this->assertStringContainsString('Languages::names()', $modal);
-
-        // Names from the retired 88 must not survive as quoted literals. The
-        // quotes matter: the modal also renders the COUNTRY list, where
-        // Turkmenistan legitimately contains "Turkmen", and a bare substring
-        // search would fail on a country rather than on a language.
-        foreach (['Esperanto', 'Hawaiian', 'Turkmen', 'Hindi'] as $retired) {
-            $this->assertStringNotContainsString("'{$retired}'", $engine);
-            $this->assertStringNotContainsString("\"{$retired}\"", $engine);
-            $this->assertStringNotContainsString("'{$retired}'", $modal);
-            $this->assertStringNotContainsString("\"{$retired}\"", $modal);
-        }
-    }
-
-    public function test_the_engine_is_told_the_locale_the_page_was_actually_rendered_in(): void
-    {
-        $engine = $this->engine();
-
-        $this->assertStringContainsString('pageLanguage: PAGE_LOCALE', $engine);
-        $this->assertStringNotContainsString("pageLanguage: 'en'", $engine);
-    }
-
-    /**
-     * End to end: a French page must declare French as the widget's source,
-     * or the widget would treat French copy as English.
-     */
-    /** The value of one emitted `var NAME = ...;` line, as rendered. */
-    private function emitted(string $html, string $var): string
-    {
-        $this->assertMatchesRegularExpression(
-            '/var\s+'.preg_quote($var, '/').'\s*=\s*(.+?);/s',
-            $html,
-            "The engine did not emit {$var}."
-        );
-
-        preg_match('/var\s+'.preg_quote($var, '/').'\s*=\s*(.+?);/s', $html, $m);
-
-        return trim($m[1]);
-    }
-
-    public function test_a_french_page_declares_french_as_the_source(): void
-    {
-        $html = $this->withoutVite()
-            ->withCookie(config('localization.cookie.name'), 'fr')
-            ->get('/')
-            ->assertOk()
-            ->getContent();
-
-        $this->assertSame('"fr"', $this->emitted($html, 'PAGE_LOCALE'));
-    }
-
-    public function test_an_english_page_declares_english_as_the_source(): void
-    {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-
-        $this->assertSame('"en"', $this->emitted($html, 'PAGE_LOCALE'));
+        $this->assertStringContainsString('dir="rtl"', $html);
     }
 
-    /**
-     * What actually reaches the browser: the engine's map, carrying the eight
-     * machine languages and neither of the two Laravel renders.
-     *
-     * Asserted against the ENGINE line alone, not the whole document. The page
-     * also carries SERVER_LOCALE, which legitimately maps English to en and
-     * French to fr, so a document-wide search would find those pairs and prove
-     * nothing.
-     */
-    public function test_the_rendered_engine_map_excludes_the_server_languages(): void
+    public function test_the_layouts_always_declare_a_direction(): void
     {
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $engine = json_decode($this->emitted($html, 'ENGINE'), true);
+        foreach ([
+            'views/components/layouts/admin.blade.php',
+            'views/components/layouts/auth.blade.php',
+            'views/components/layouts/dashboard.blade.php',
+            'views/components/layouts/app/header.blade.php',
+        ] as $layout) {
+            $this->assertStringContainsString(
+                'dir="{{ \App\Support\Languages::direction() }}"',
+                File::get(resource_path($layout)),
+                $layout.' should declare a direction.'
+            );
+        }
+    }
 
-        $this->assertIsArray($engine);
-        $this->assertSame('sw', $engine['Swahili']);
-        $this->assertSame('zh-CN', $engine['Mandarin Chinese']);
-
-        $this->assertArrayNotHasKey('English', $engine);
-        $this->assertArrayNotHasKey('French', $engine);
-        $this->assertCount(8, $engine);
+    public function test_everything_offered_today_reads_left_to_right(): void
+    {
+        foreach ($this->locales() as $locale) {
+            $this->assertSame('ltr', Languages::direction($locale));
+        }
     }
 
     public function test_the_picker_reaches_the_browser_with_every_offered_language(): void
@@ -350,6 +422,22 @@ class TranslateEngineTest extends TestCase
 
         foreach (Languages::names() as $name) {
             $this->assertStringContainsString($name, $html);
+        }
+    }
+
+    /**
+     * The picker used to hold its own array of names and the widget its own
+     * map of eighty-eight. Two copies is how they drifted apart.
+     */
+    public function test_the_picker_keeps_no_language_list_of_its_own(): void
+    {
+        $modal = File::get(resource_path('views/components/nav/locale-modal.blade.php'));
+
+        $this->assertStringContainsString('Languages::names()', $modal);
+
+        foreach (['Esperanto', 'Hawaiian', 'Hindi'] as $retired) {
+            $this->assertStringNotContainsString("'{$retired}'", $modal);
+            $this->assertStringNotContainsString("\"{$retired}\"", $modal);
         }
     }
 }

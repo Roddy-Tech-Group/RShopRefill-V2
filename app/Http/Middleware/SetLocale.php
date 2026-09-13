@@ -41,10 +41,9 @@ class SetLocale
             $request->session()->put('locale', $locale);
         }
 
-        // No googtrans housekeeping here. That cookie is the translate
-        // engine's live language choice (partials/translate-engine), and a
-        // middleware that cleared it would reset every visitor to English on
-        // their next request.
+        // Nothing to clean up after the translate widget: it is gone, and
+        // every offered language now renders from its own lang/{code} files.
+        // A stale googtrans cookie from before the removal is inert.
         return $next($request);
     }
 

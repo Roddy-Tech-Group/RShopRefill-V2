@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * See lang/en/products.php. Brand names and supplier-sourced titles are never
+ * translated.
+ */
+return [
+    'sort' => 'Panga',
+    'category_unavailable' => 'Kadi za zawadi hazipatikani kwa muda',
+    'coming_soon' => 'Karibuni',
+    'flag_off' => 'Imezimwa',
+    'browse_categories_label' => 'Vinjari kategoria',
+    'pick_a_category' => 'Chagua kategoria',
+    'subcategories' => 'Kategoria ndogo',
+    'see_more' => 'Ona zaidi',
+    'request_a_product' => 'Omba bidhaa',
+    'didnt_find' => 'Hukupata ulichokuwa unatafuta?',
+    'showing_out_of' => 'Zinaonyeshwa :shown kati ya :total',
+    'recently_added' => 'Zilizoongezwa Hivi Karibuni',
+    'popular_brands' => 'Chapa Maarufu',
+    'popular_brands_heading' => 'Angalia chapa maarufu zaidi !',
+    'gift_card_categories' => 'Kategoria za kadi za zawadi',
+    'all_gift_cards' => 'Kadi zote za zawadi',
+    'shop_by_category' => 'Nunua kadi za zawadi kwa kategoria',
+    'next_page' => ':category zaidi',
+    'previous_page' => ':category zilizotangulia',
+    'browse_all_countries' => 'Vinjari nchi zote',
+    'switch_country' => 'Badilisha nchi',
+    'no_gift_cards_in_country_hint' => 'Bado hatuuzi kadi za zawadi za nchi hii. Chagua nchi nyingine ili kuona zinazopatikana.',
+    'no_gift_cards_in_country' => 'Hakuna kadi za zawadi zinazopatikana nchini :country',
+    'clear_all_filters' => 'Futa vichujio vyote',
+    'no_products_hint' => 'Jaribu kufuta utafutaji au chagua kategoria nyingine.',
+    'more_gift_cards' => 'Kadi Zaidi za Zawadi',
+    'rating_out_of_five' => 'Imepewa :rating kati ya 5 kutoka maoni :count',
+    'browse_categories' => 'Vinjari kategoria',
+    'gift_cards_desc' => 'Nunua chapa za kimataifa kwa kadi za zawadi za kidijitali zinazowasilishwa papo hapo.',
+    'esims_desc' => 'eSIM za safari papo hapo kwa maeneo 200+. Bila ada za roaming.',
+    'mobile_refill_desc' => 'Ongeza salio na vifurushi vya data kwa namba za simu duniani kote.',
+    'bill_payments_desc' => 'Lipa bili za huduma, usajili na huduma za kila siku.',
+    'check_it_out' => 'Angalia',
+    'temporarily_unavailable' => 'Haipatikani kwa muda',
+    'out_of_stock' => 'Imeisha',
+    'view_all' => 'Ona zote',
+    'select_amount' => 'Chagua kiasi',
+    'add_to_cart' => 'Weka kikapuni',
+    'buy_now' => 'Nunua sasa',
+    'no_products' => 'Hakuna bidhaa inayolingana na utafutaji wako',
+];

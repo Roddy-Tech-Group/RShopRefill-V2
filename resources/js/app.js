@@ -1406,10 +1406,14 @@ window.storefrontLocale = function () {
         currency:       read('currency',       'USD'),
         currencySymbol: read('currencySymbol', '$'),
 
-        // The translate engine's chosen language (partials/translate-engine
-        // owns it). Read, never written here: the engine and the locale modal
-        // are what set it, and the nav only needs to name it.
-        language:       read('language',       'English'),
+        // The language the SERVER rendered this page in. Laravel owns it now
+        // (every offered language has its own lang directory), so the server
+        // value wins and localStorage is only the paint-before-hydrate copy.
+        // Reading storage first used to be right while a browser widget owned
+        // the choice; it is exactly wrong now, because a stale entry would
+        // name a language the page is not actually in.
+        language:       (typeof window !== 'undefined' && window.rshopLanguage)
+                            || read('language', 'English'),
 
         activeCategory: 'Gift Cards',
 
@@ -1418,13 +1422,16 @@ window.storefrontLocale = function () {
                 try { localStorage.setItem('locale.' + key, val ?? ''); } catch (_) {}
             };
 
-            // `locale.language` is NOT dropped here. It is the translate
-            // engine's live choice again (partials/translate-engine), and this
-            // used to delete it on every page load - a leftover from the spell
-            // when the engine was gone and language was server state. With the
-            // engine back, that removal wiped the choice on every navigation;
-            // only the googtrans cookie kept the page translated, and the nav
-            // fell back to reading "English".
+            // `locale.language` is kept in step with the server rather than
+            // dropped or trusted. The server is authoritative again now the
+            // translate widget is gone, so storage is refreshed from it on
+            // every load; that way the nav pill paints the right name before
+            // hydration and can never disagree with the page it labels.
+
+            // Mirror the server's language into storage for the next paint.
+            try {
+                if (window.rshopLanguage) { localStorage.setItem('locale.language', window.rshopLanguage); }
+            } catch (_) {}
 
             // Persist each piece independently.
             this.$watch('country',        save('country'));

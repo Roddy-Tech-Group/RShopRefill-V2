@@ -3,56 +3,43 @@
 namespace App\Support;
 
 /**
- * The languages a visitor can actually reach, and how each one is produced.
+ * The languages a visitor can choose, resolved from config/localization.php.
  *
- * Two mechanisms sit behind one picker:
- *
- *   - SERVER languages (config localization.supported) are rendered by Laravel
- *     from a lang/{code} directory. Real translations, no third-party request,
- *     no flash of English before they apply.
- *
- *   - MACHINE languages (config localization.machine) are an overlay the
- *     browser translate widget paints over a server-rendered page.
+ * Every one of them is rendered by Laravel from its own lang/{code} directory,
+ * so a language change is a page render, not a repaint. The browser translate
+ * widget this used to arbitrate for is gone: it cost a third-party request on
+ * every page load, rewrote the document after it had already painted, and
+ * could reach languages the picker did not offer.
  *
  * Everything that needs the list resolves through here so there is exactly one
- * of it. Before this existed the picker held its own array of display names and
- * the engine held its own map of 88, which is how a visitor could be auto-
- * detected into a language the picker could not show back to them.
+ * of it. The picker used to hold its own array of display names and the engine
+ * its own map of eighty-eight, which is how a visitor could be auto-detected
+ * into a language the picker could not show back to them.
  */
 class Languages
 {
     /**
-     * Every offered language, in picker order, keyed by language key.
+     * Every offered language, in picker order, keyed by locale.
      *
-     * Each entry carries `server` - true when Laravel renders it, false when
-     * the widget does. That flag is the whole difference between a page that
-     * costs a third-party script and one that does not.
-     *
-     * @return array<string, array{name: string, native_name: string, short: string, engine: ?string, server: bool}>
+     * @return array<string, array{name: string, native_name: string, short: string, rtl: bool}>
      */
     public static function all(): array
     {
-        $server = (array) config('localization.supported', []);
-        $machine = (array) config('localization.machine', []);
-
+        $supported = (array) config('localization.supported', []);
         $out = [];
 
-        foreach (self::order($server, $machine) as $key) {
-            $entry = $server[$key] ?? $machine[$key] ?? null;
+        foreach (self::order($supported) as $locale) {
+            $entry = $supported[$locale] ?? null;
 
             if ($entry === null) {
                 continue;
             }
 
-            $out[$key] = [
-                'name' => (string) ($entry['name'] ?? $key),
-                'native_name' => (string) ($entry['native_name'] ?? $entry['name'] ?? $key),
-                'short' => (string) ($entry['short'] ?? strtoupper(substr($key, 0, 2))),
-                // Server languages have no engine code: asking the widget to
-                // translate a page Laravel already translated is the collision
-                // this class exists to prevent.
-                'engine' => isset($server[$key]) ? null : (string) ($entry['engine'] ?? $key),
-                'server' => isset($server[$key]),
+            $out[$locale] = [
+                'name' => (string) ($entry['name'] ?? $locale),
+                'native_name' => (string) ($entry['native_name'] ?? $entry['name'] ?? $locale),
+                'short' => (string) ($entry['short'] ?? strtoupper(substr($locale, 0, 2))),
+                'rtl' => (bool) ($entry['rtl'] ?? false),
             ];
         }
 
@@ -64,13 +51,12 @@ class Languages
      * dropped - a language missing from `picker_order` is a typo, and silently
      * hiding it would be a worse failure than listing it last.
      *
-     * @param  array<string, mixed>  $server
-     * @param  array<string, mixed>  $machine
+     * @param  array<string, mixed>  $supported
      * @return list<string>
      */
-    private static function order(array $server, array $machine): array
+    private static function order(array $supported): array
     {
-        $known = array_keys($server + $machine);
+        $known = array_keys($supported);
         $ordered = array_values(array_intersect((array) config('localization.picker_order', []), $known));
 
         return array_values(array_unique([...$ordered, ...$known]));
@@ -87,64 +73,44 @@ class Languages
     }
 
     /**
-     * Display name -> widget language code, for machine languages only.
-     *
-     * Server languages are deliberately absent: the engine reads this map to
-     * decide whether to translate at all, so an entry here means "the widget
-     * owns this language".
+     * Display name -> locale. The picker stages a name; the form posts this.
      *
      * @return array<string, string>
      */
-    public static function engineMap(): array
+    public static function localeMap(): array
     {
         $map = [];
 
-        foreach (self::all() as $entry) {
-            if ($entry['engine'] !== null) {
-                $map[$entry['name']] = $entry['engine'];
-            }
+        foreach (self::all() as $locale => $entry) {
+            $map[$entry['name']] = $locale;
         }
 
         return $map;
     }
 
     /**
-     * Display name -> the locale the SERVER should render for it.
-     *
-     * A server language renders itself. A machine language renders in the
-     * default locale, because the widget translates out of whatever Laravel
-     * produced: pointing it at a French page while telling it the source is
-     * English is how already-translated text gets machine-translated a second
-     * time.
-     *
-     * @return array<string, string>
+     * The display name for a locale, or null if it is not offered.
      */
-    public static function serverLocaleMap(): array
+    public static function nameFor(string $locale): ?string
     {
-        $default = (string) config('localization.default', 'en');
-        $map = [];
-
-        foreach (self::all() as $key => $entry) {
-            $map[$entry['name']] = $entry['server'] ? $key : $default;
-        }
-
-        return $map;
+        return self::all()[$locale]['name'] ?? null;
     }
 
     /**
-     * The display name for a language key, or null if it is not offered.
+     * Is this locale offered? The picker, the controller and the middleware
+     * all gate on the same answer.
      */
-    public static function nameFor(string $key): ?string
+    public static function supports(?string $locale): bool
     {
-        return self::all()[$key]['name'] ?? null;
+        return $locale !== null && array_key_exists($locale, self::all());
     }
 
     /**
      * Is this display name one a visitor may actually choose?
      *
-     * Used to retire a stored preference from before the list was trimmed: a
-     * name that is no longer offered has to fall back rather than persist,
-     * or the visitor sits in a language the picker cannot un-pick.
+     * Used to retire a stored preference from before the list changed: a name
+     * that is no longer offered has to fall back rather than persist, or the
+     * visitor sits in a language the picker cannot un-pick.
      */
     public static function offers(?string $name): bool
     {
@@ -152,8 +118,8 @@ class Languages
     }
 
     /**
-     * The default language's display name - what an unrecognised browser tag
-     * or a retired preference falls back to.
+     * The default locale's display name - what an unrecognised browser tag or
+     * a retired preference falls back to.
      */
     public static function defaultName(): string
     {
@@ -163,44 +129,27 @@ class Languages
     }
 
     /**
-     * Browser language tag -> display name, for first-visit auto-detection.
+     * Does this locale read right to left?
      *
-     * Built from the offered list rather than kept by hand, plus the aliases a
-     * browser may report for a tag we do hold. Region subtags are collapsed by
-     * the caller, so this holds primary tags and the handful of exceptions
-     * where the region is the language (zh-TW is not Mandarin).
-     *
-     * @return array<string, string>
+     * Declared in config rather than derived from a hardcoded list of scripts,
+     * so adding Hebrew or Urdu later is a config line and not a code change.
      */
-    public static function detectionMap(): array
+    public static function isRtl(?string $locale = null): bool
     {
-        $map = [];
+        $locale ??= app()->getLocale();
 
-        foreach (self::all() as $key => $entry) {
-            $map[$key] = $entry['name'];
+        return (bool) (self::all()[$locale]['rtl'] ?? false);
+    }
 
-            if ($entry['engine'] !== null) {
-                $map[strtolower($entry['engine'])] = $entry['name'];
-            }
-        }
-
-        // Tags a browser reports that do not match a key or an engine code.
-        // Only aliases for languages actually offered - an alias pointing at a
-        // language the picker does not list would recreate the trap.
-        foreach ([
-            'zh-cn' => 'zh', 'zh-hans' => 'zh', 'zh-sg' => 'zh',
-            'pt-br' => 'pt', 'pt-pt' => 'pt',
-            'ar-eg' => 'ar', 'ar-sa' => 'ar',
-            'fr-ca' => 'fr', 'fr-be' => 'fr', 'fr-ch' => 'fr',
-            'en-gb' => 'en', 'en-us' => 'en',
-            'es-es' => 'es', 'es-mx' => 'es', 'es-419' => 'es',
-            'de-at' => 'de', 'de-ch' => 'de',
-        ] as $tag => $key) {
-            if (isset($map[$key])) {
-                $map[$tag] = $map[$key];
-            }
-        }
-
-        return $map;
+    /**
+     * The value for the <html dir> attribute.
+     *
+     * Always written explicitly, never left to the browser's default: an
+     * Arabic page inside a document still declaring ltr renders punctuation
+     * and mixed Latin runs (currency codes, brand names) in the wrong order.
+     */
+    public static function direction(?string $locale = null): string
+    {
+        return self::isRtl($locale) ? 'rtl' : 'ltr';
     }
 }

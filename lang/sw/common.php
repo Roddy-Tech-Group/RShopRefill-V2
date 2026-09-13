@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * See lang/en/common.php for the scope of this file.
+ */
+return [
+    'menu' => 'Menyu',
+    'continue' => 'Endelea',
+    'cancel' => 'Ghairi',
+    'save' => 'Hifadhi',
+    'close' => 'Funga',
+    'back' => 'Rudi',
+    'back_to_website' => 'Rudi kwenye tovuti',
+    'search' => 'Tafuta',
+    'clear' => 'Futa',
+    'show_all_results' => 'Onyesha matokeo yote',
+    'popular_searches' => 'Utafutaji maarufu',
+    'recent_searches' => 'Utafutaji wa hivi karibuni',
+    'loading' => 'Inapakia…',
+    'searching' => 'Inatafuta…',
+    'no_results' => 'Hakuna matokeo',
+    'nothing_here_yet' => 'Bado hakuna kitu hapa',
+    'try_again' => 'Jaribu tena',
+    'learn_more' => 'Jifunze zaidi',
+    'get_started' => 'Anza',
+    'copy' => 'Nakili',
+    'copied' => 'Imenakiliwa',
+    'preferences' => 'Mapendeleo',
+    'language' => 'Lugha',
+    'country' => 'Nchi',
+    'payment_currency' => 'Sarafu ya malipo',
+    'theme' => 'Muonekano',
+    'theme_light' => 'Mwanga',
+    'theme_dark' => 'Giza',
+    'theme_system' => 'Mfumo',
+    'help' => 'Msaada',
+    'invite_a_friend' => 'Mwalike rafiki',
+    'change_country' => 'Badilisha nchi',
+    'shop_in' => 'Nunua kwa :currency',
+];

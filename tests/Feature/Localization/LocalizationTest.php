@@ -35,9 +35,18 @@ class LocalizationTest extends TestCase
         $this->assertSame('en', config('localization.default'));
     }
 
-    public function test_only_english_and_french_are_supported(): void
+    /**
+     * The storefront ships in the two business languages. Eight more are
+     * translated and sitting in lang/, one config entry away each, but they
+     * are not offered - see config/localization.php.
+     */
+    public function test_only_english_and_french_are_offered(): void
     {
         $this->assertSame(['en', 'fr'], array_keys(config('localization.supported')));
+
+        foreach (array_keys(config('localization.supported')) as $locale) {
+            $this->assertDirectoryExists(lang_path($locale));
+        }
     }
 
     // ── Switching ───────────────────────────────────────────────────────
@@ -96,10 +105,13 @@ class LocalizationTest extends TestCase
 
     public function test_an_unsupported_locale_is_rejected(): void
     {
-        $this->post(route('locale.update'), ['locale' => 'de'])
+        // A real locale the app does not offer. 'de' is deliberately NOT used
+        // here even though it is unoffered: lang/de exists, so it tests the
+        // gate rather than the absence of files, which is covered separately.
+        $this->post(route('locale.update'), ['locale' => 'ja'])
             ->assertSessionHasErrors('locale');
 
-        $this->assertNotSame('de', session('locale'));
+        $this->assertNotSame('ja', session('locale'));
     }
 
     /**
@@ -163,8 +175,26 @@ class LocalizationTest extends TestCase
 
     public function test_an_unsupported_browser_language_falls_back_to_english(): void
     {
+        // Japanese: a language the app ships nothing for. German used to play
+        // this part and is now one of the ten.
         $this->withoutVite()
-            ->withHeader('Accept-Language', 'de-DE,de;q=0.9')
+            ->withHeader('Accept-Language', 'ja-JP,ja;q=0.9')
+            ->get('/')
+            ->assertOk()
+            ->assertSee('lang="en"', false);
+    }
+
+    /**
+     * A browser asking for a language that is translated but not offered gets
+     * English, not the unoffered translation. The config list is the gate, not
+     * the presence of a lang directory.
+     */
+    public function test_a_translated_but_unoffered_language_is_not_served(): void
+    {
+        $this->assertDirectoryExists(lang_path('es'));
+
+        $this->withoutVite()
+            ->withHeader('Accept-Language', 'es-MX,es;q=0.9')
             ->get('/')
             ->assertOk()
             ->assertSee('lang="en"', false);
@@ -256,24 +286,20 @@ class LocalizationTest extends TestCase
      * Every customer-facing layout serves it, auth screens included: the one
      * step that asks someone to type is the worst place to hand them English.
      */
-    public function test_every_customer_layout_serves_the_translate_engine(): void
+    public function test_no_customer_layout_loads_a_translation_widget(): void
     {
         foreach (['/', '/login'] as $url) {
-            $this->assertStringContainsString(
+            $html = $this->withoutVite()->get($url)->assertOk()->getContent();
+
+            foreach ([
                 'googleTranslateElementInit',
-                $this->withoutVite()->get($url)->assertOk()->getContent(),
-                $url.' should serve the engine'
-            );
-        }
-
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-
-        foreach ([
-            'googleTranslateElementInit',
-            'google_translate_element',
-            'rshopSetTranslateCookie',
-        ] as $artefact) {
-            $this->assertStringContainsString($artefact, $html, '/ should serve '.$artefact);
+                'google_translate_element',
+                'rshopSetTranslateCookie',
+                'translate_a/element.js',
+                'translate.google.com',
+            ] as $artefact) {
+                $this->assertStringNotContainsString($artefact, $html, $url.' still carries '.$artefact);
+            }
         }
     }
 
@@ -294,18 +320,18 @@ class LocalizationTest extends TestCase
         }
     }
 
-    public function test_the_translate_engine_partial_exists(): void
+    public function test_the_translate_engine_partial_is_gone(): void
     {
-        $this->assertFileExists(resource_path('views/partials/translate-engine.blade.php'));
+        $this->assertFileDoesNotExist(resource_path('views/partials/translate-engine.blade.php'));
     }
 
     /**
-     * googtrans is the engine's live language choice, so the server must
-     * leave it alone. A middleware used to clear it - correct while the
-     * engine was gone, and exactly wrong now: it reset every visitor to
-     * English on their next request.
+     * googtrans was the widget's language choice. Nothing reads or writes it
+     * now, and a stale one left over from before the widget was removed must
+     * not influence anything: the locale comes from the account, the session,
+     * our own cookie, or Accept-Language, in that order and nowhere else.
      */
-    public function test_the_translate_cookie_is_left_alone(): void
+    public function test_a_stale_translate_cookie_changes_nothing(): void
     {
         $this->withoutVite()
             ->withUnencryptedCookie('googtrans', '/en/fr')
@@ -313,8 +339,7 @@ class LocalizationTest extends TestCase
             ->assertOk()
             ->assertCookieMissing('googtrans');
 
-        $middleware = File::get(app_path('Http/Middleware/SetLocale.php'));
-        $this->assertStringNotContainsString('clearCookie', $middleware);
+        $this->assertSame('en', app()->getLocale());
     }
 
     // ── Wiring ──────────────────────────────────────────────────────────
