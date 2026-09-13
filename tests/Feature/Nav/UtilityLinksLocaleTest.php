@@ -221,7 +221,14 @@ class UtilityLinksLocaleTest extends TestCase
 
         $this->assertStringContainsString('action="{{ route(\'locale.update\') }}"', $modal);
         $this->assertStringContainsString('@csrf', $modal);
-        $this->assertStringContainsString('<input type="hidden" name="locale" value="{{ app()->getLocale() }}">', $modal);
+        // The hidden locale is BOUND to the staged language, not frozen at the
+        // locale the page happened to render in. That binding is the server
+        // half of a language change: picking French has to post `fr` to reach
+        // lang/fr, and picking a machine language has to post the default so
+        // the widget translates out of a page it was told the truth about.
+        // The plain value attribute stays as the no-JavaScript fallback.
+        $this->assertStringContainsString(':value="serverLocaleFor(draftLanguage)"', $modal);
+        $this->assertStringContainsString('name="locale"', $modal);
 
         // The language rides along as the engine's cookie, set in the same
         // commit so the POST's redirect is the one reload that applies it.

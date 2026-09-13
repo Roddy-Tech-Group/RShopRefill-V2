@@ -1,23 +1,32 @@
 {{--
     Site translation engine.
 
-    Drives whole-page translation for the 88 languages offered in the locale modal
-    (resources/views/components/nav/locale-modal.blade.php). Two entry points:
+    Applies the MACHINE languages from config/localization.php - the ones the
+    app has no lang/{code} directory for - by driving a browser translate
+    widget. The list it can reach is exactly the list the picker offers
+    (App\Support\Languages), so a visitor can never land in a language the
+    picker cannot show back to them.
 
-      1. Auto-detect — on a visitor's first load (no stored choice) we read the
-         browser language and translate to it automatically.
-      2. Manual — picking a language in the locale modal sets `locale.language`
-         in localStorage and dispatches `language-changed`; we re-translate live.
+    It deliberately does NOTHING for a server language. English and French are
+    rendered by Laravel from real translation files, so for those visitors this
+    partial loads no third-party script, makes no third-party request, and
+    leaves the page exactly as the server sent it. That is most traffic.
 
-    The choice is persisted in the `googtrans` cookie so it survives full reloads,
-    and re-applied on `livewire:navigated` so SPA page swaps stay translated.
+    Two entry points:
 
-    The third-party translate widget's banner/toolbar is hidden via CSS; only our
-    own modal picker is ever shown to the customer.
+      1. Auto-detect - on a first load with no stored choice, the browser
+         language picks one of the offered languages, or English if it names
+         none of them.
+      2. Manual - the locale modal stages a language and its Save posts the
+         matching SERVER locale while setting the cookie this engine reads, so
+         one reload applies both halves.
+
+    The widget's own banner and toolbar are hidden; the locale modal is the
+    only language control a customer ever sees.
 --}}
 
 <style>
-    /* Hide the injected translate banner/toolbar — we drive everything from the locale modal. */
+    /* Hide the injected translate banner/toolbar - we drive everything from the locale modal. */
     .goog-te-banner-frame.skiptranslate,
     .goog-te-gadget,
     .goog-te-gadget-icon,
@@ -37,52 +46,28 @@
 
 <script>
 (function () {
-    // Locale-modal display name -> translate engine language code.
-    var LANG_MAP = {
-        'English': 'en', 'Mandarin Chinese': 'zh-CN', 'Hindi': 'hi', 'Spanish': 'es', 'French': 'fr',
-        'Standard Arabic': 'ar', 'Bengali': 'bn', 'Russian': 'ru', 'Portuguese': 'pt', 'Indonesian': 'id',
-        'Urdu': 'ur', 'German': 'de', 'Japanese': 'ja', 'Swahili': 'sw', 'Marathi': 'mr', 'Telugu': 'te',
-        'Turkish': 'tr', 'Tamil': 'ta', 'Cantonese': 'zh-TW', 'Vietnamese': 'vi', 'Korean': 'ko',
-        'Italian': 'it', 'Hausa': 'ha', 'Thai': 'th', 'Gujarati': 'gu', 'Persian': 'fa', 'Polish': 'pl',
-        'Pashto': 'ps', 'Kannada': 'kn', 'Malayalam': 'ml', 'Sundanese': 'su', 'Hebrew': 'iw',
-        'Burmese': 'my', 'Amharic': 'am', 'Oromo': 'om', 'Yoruba': 'yo', 'Igbo': 'ig', 'Ukrainian': 'uk',
-        'Dutch': 'nl', 'Romanian': 'ro', 'Filipino': 'tl', 'Greek': 'el', 'Czech': 'cs', 'Swedish': 'sv',
-        'Hungarian': 'hu', 'Serbian': 'sr', 'Croatian': 'hr', 'Bulgarian': 'bg', 'Danish': 'da',
-        'Finnish': 'fi', 'Norwegian': 'no', 'Slovak': 'sk', 'Afrikaans': 'af', 'Albanian': 'sq',
-        'Armenian': 'hy', 'Azerbaijani': 'az', 'Basque': 'eu', 'Belarusian': 'be', 'Bosnian': 'bs',
-        'Catalan': 'ca', 'Estonian': 'et', 'Galician': 'gl', 'Georgian': 'ka', 'Hawaiian': 'haw',
-        'Icelandic': 'is', 'Irish': 'ga', 'Kazakh': 'kk', 'Khmer': 'km', 'Lao': 'lo', 'Latvian': 'lv',
-        'Lithuanian': 'lt', 'Macedonian': 'mk', 'Malay': 'ms', 'Maltese': 'mt', 'Maori': 'mi',
-        'Mongolian': 'mn', 'Nepali': 'ne', 'Punjabi': 'pa', 'Sinhala': 'si', 'Slovenian': 'sl',
-        'Somali': 'so', 'Tajik': 'tg', 'Turkmen': 'tk', 'Uzbek': 'uz', 'Welsh': 'cy', 'Xhosa': 'xh',
-        'Zulu': 'zu', 'Esperanto': 'eo'
-    };
+    'use strict';
 
-    // Browser language code -> our display name (for auto-detect). Built from LANG_MAP,
-    // plus a few aliases the browser may report.
-    var CODE_TO_NAME = {};
-    Object.keys(LANG_MAP).forEach(function (name) {
-        var code = LANG_MAP[name].toLowerCase();
-        if (!(code in CODE_TO_NAME)) { CODE_TO_NAME[code] = name; }
-    });
-    var ALIASES = {
-        'zh': 'Mandarin Chinese', 'zh-cn': 'Mandarin Chinese', 'zh-hans': 'Mandarin Chinese',
-        'zh-tw': 'Cantonese', 'zh-hant': 'Cantonese', 'yue': 'Cantonese',
-        'he': 'Hebrew', 'pt-br': 'Portuguese', 'pt-pt': 'Portuguese', 'fil': 'Filipino',
-        'nb': 'Norwegian', 'nn': 'Norwegian', 'in': 'Indonesian'
-    };
+    // ── The offered languages, resolved server-side from one config ──────────
+    // ENGINE holds ONLY machine languages: a name in here means the widget owns
+    // it. English and French are absent because Laravel renders them, and that
+    // absence is what stops this file from machine-translating a page that was
+    // already translated properly.
+    var ENGINE        = @json(\App\Support\Languages::engineMap());
+    var SERVER_LOCALE = @json(\App\Support\Languages::serverLocaleMap());
+    var DETECT        = @json(\App\Support\Languages::detectionMap());
+    var OFFERED       = @json(\App\Support\Languages::names());
+    var DEFAULT_NAME  = @json(\App\Support\Languages::defaultName());
+
+    // What Laravel actually rendered this response in. The widget is told this
+    // as the source language, so it is truthful even if the session locale and
+    // the stored language ever disagree.
+    var PAGE_LOCALE   = @json(app()->getLocale());
 
     var STORAGE_KEY = 'locale.language';
 
-    function nameToCode(name) { return LANG_MAP[name] || 'en'; }
-
-    function detectName() {
-        var nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
-        if (ALIASES[nav]) { return ALIASES[nav]; }
-        if (CODE_TO_NAME[nav]) { return CODE_TO_NAME[nav]; }
-        var primary = nav.split('-')[0];
-        return ALIASES[primary] || CODE_TO_NAME[primary] || 'English';
-    }
+    function isOffered(name) { return !!name && OFFERED.indexOf(name) !== -1; }
+    function engineCode(name) { return ENGINE[name] || null; }
 
     function readStored() {
         try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
@@ -91,96 +76,120 @@
         try { localStorage.setItem(STORAGE_KEY, name); } catch (e) {}
     }
 
-    function setGoogTrans(value) {
+    // ── The widget's cookie ───────────────────────────────────────────────────
+    // Written on the bare host and both dotted forms because the widget reads
+    // whichever the deployment happens to produce.
+    function googHosts() {
         var host = location.hostname;
-        document.cookie = 'googtrans=' + value + ';path=/';
+        var hosts = [null];
         if (host.indexOf('.') > -1 && !/^\d+(\.\d+)+$/.test(host)) {
-            document.cookie = 'googtrans=' + value + ';path=/;domain=' + host;
-            document.cookie = 'googtrans=' + value + ';path=/;domain=.' + host;
+            hosts.push(host, '.' + host);
         }
+        return hosts;
+    }
+    function setGoogTrans(value) {
+        googHosts().forEach(function (domain) {
+            document.cookie = 'googtrans=' + value + ';path=/' + (domain ? ';domain=' + domain : '');
+        });
     }
     function clearGoogTrans() {
         var expire = ';expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-        var host = location.hostname;
-        document.cookie = 'googtrans=' + expire;
-        if (host.indexOf('.') > -1 && !/^\d+(\.\d+)+$/.test(host)) {
-            document.cookie = 'googtrans=' + expire.replace(';path=/', ';path=/;domain=' + host);
-            document.cookie = 'googtrans=' + expire.replace(';path=/', ';path=/;domain=.' + host);
-        }
+        googHosts().forEach(function (domain) {
+            document.cookie = 'googtrans=' + expire + (domain ? ';domain=' + domain : '');
+        });
     }
 
-    // Drive the (hidden) widget select in place so we don't need a full reload.
-    function triggerCombo(code, attempts) {
-        var combo = document.querySelector('select.goog-te-combo');
-        if (combo) {
-            combo.value = code;
-            combo.dispatchEvent(new Event('change'));
-            return;
-        }
-        if (attempts > 0) {
-            setTimeout(function () { triggerCombo(code, attempts - 1); }, 60);
-        }
+    // ── Auto-detect, limited to what the picker offers ────────────────────────
+    // An unrecognised tag falls back to the default rather than to the widget's
+    // nearest match: being silently machine-translated into a language you
+    // cannot then un-pick is worse than being shown English.
+    function detectName() {
+        var nav = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        if (!nav) { return DEFAULT_NAME; }
+        if (DETECT[nav]) { return DETECT[nav]; }
+        return DETECT[nav.split('-')[0]] || DEFAULT_NAME;
     }
 
-    // Apply a language by its display name. Both paths set the cookie and reload:
-    // the page then comes back already translated on load (fast + flicker-free),
-    // which is far smoother than the in-place re-translate. English clears the
-    // cookie so the reload shows the original source.
-    function applyByName(name) {
-        // Persist here too (not just via the Alpine locale store) so the choice
-        // survives the reload no matter which layout/scope triggered the change -
-        // the dashboard's locale store sits in a different Alpine scope than the
-        // storefront's, and was not reliably saving before the reload.
-        writeStored(name);
-        var code = nameToCode(name);
-        if (code === 'en') {
-            clearGoogTrans();
-        } else {
-            setGoogTrans('/en/' + code);
-        }
-        window.location.reload();
-    }
-    // The locale modal stages a language and applies it on Save. It needs the
-    // cookie written without the immediate reload applyByName() does, so the
-    // one reload the Save already causes is what shows the translation.
-    window.rshopSetTranslateCookie = function (name) {
-        var code = nameToCode(name);
-        if (code === "en") { clearGoogTrans(); } else { setGoogTrans("/en/" + code); }
-    };
-
-    window.__applyStoredLanguage = function () {
-        var name = readStored();
-        if (name && nameToCode(name) !== 'en') {
-            triggerCombo(nameToCode(name), 80);
-        }
-    };
-
-    // ── First-load setup (runs before Alpine reads localStorage) ──────────────
+    // ── Resolve what is in force ──────────────────────────────────────────────
     var stored = readStored();
+
+    // A preference from before the list was trimmed is retired here rather than
+    // honoured. Without this a visitor stored as, say, Hindi keeps getting a
+    // Hindi page while the picker shows ten languages, none of them checked.
+    if (stored && !isOffered(stored)) {
+        stored = null;
+        clearGoogTrans();
+    }
+
     if (!stored) {
-        // No explicit choice yet: auto-detect from the browser and remember it so
-        // the locale modal reflects the detected language.
         stored = detectName();
         writeStored(stored);
     }
-    var initialCode = nameToCode(stored);
-    if (initialCode !== 'en') {
-        // Seed the cookie so the widget auto-translates as soon as it initialises.
-        setGoogTrans('/en/' + initialCode);
+
+    var activeCode = engineCode(stored);
+
+    // ── Server languages: nothing to do, and nothing to load ──────────────────
+    if (!activeCode) {
+        clearGoogTrans();
+    } else {
+        // Source is what the server rendered, target is the stored choice.
+        setGoogTrans('/' + PAGE_LOCALE + '/' + activeCode);
     }
 
-    // ── Translate widget bootstrap ────────────────────────────────────────────
-    window.googleTranslateElementInit = function () {
+    // ── Public hook for the locale modal ──────────────────────────────────────
+    // The modal's Save posts the server locale AND sets this cookie, so the one
+    // reload that POST already causes comes back in the right language by both
+    // mechanisms. The source here is the locale the POST is about to install,
+    // not the one currently rendered.
+    window.rshopSetTranslateCookie = function (name) {
+        if (!isOffered(name)) { return; }
+        var code = engineCode(name);
+        if (!code) { clearGoogTrans(); return; }
+        setGoogTrans('/' + (SERVER_LOCALE[name] || PAGE_LOCALE) + '/' + code);
+    };
+
+    // Direct application, for anything that changes language outside the modal.
+    // Reloads so the page comes back already translated rather than visibly
+    // re-translating in place.
+    window.addEventListener('language-changed', function (e) {
+        var name = (e && e.detail) ? e.detail : readStored();
+        if (!isOffered(name)) { return; }
+        writeStored(name);
+        window.rshopSetTranslateCookie(name);
+        window.location.reload();
+    });
+
+    // Everything below drives the widget. A server language needs none of it,
+    // so this is where most visitors stop: no preconnect, no script, no
+    // third-party request at all.
+    if (!activeCode) { return; }
+
+    // ── Widget bootstrap ──────────────────────────────────────────────────────
+    function initElement() {
+        if (!(window.google && window.google.translate && window.google.translate.TranslateElement)) {
+            return false;
+        }
         new google.translate.TranslateElement({
-            pageLanguage: 'en',
+            // The language the page is genuinely in, not a hardcoded 'en'.
+            pageLanguage: PAGE_LOCALE,
             autoDisplay: false,
             layout: google.translate.TranslateElement.InlineLayout.SIMPLE
         }, 'google_translate_element');
-        window.__applyStoredLanguage();
-    };
+        return true;
+    }
+
+    window.googleTranslateElementInit = function () { initElement(); };
 
     function loadWidget() {
         if (document.getElementById('translate-engine-script')) { return; }
+
+        // Warm DNS and TLS only for the visitors who will actually use it.
+        var pre = document.createElement('link');
+        pre.rel = 'preconnect';
+        pre.href = 'https://translate.googleapis.com';
+        pre.crossOrigin = '';
+        document.head.appendChild(pre);
+
         var s = document.createElement('script');
         s.id = 'translate-engine-script';
         s.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
@@ -189,18 +198,34 @@
     }
     loadWidget();
 
-    // ── Manual switching from the locale modal ────────────────────────────────
-    window.addEventListener('language-changed', function (e) {
-        var name = (e && e.detail) ? e.detail : readStored();
-        if (name) { applyByName(name); }
-    });
+    // ── Re-apply after SPA navigation ─────────────────────────────────────────
+    // Livewire swaps the body, which takes the widget's mount point and its
+    // injected <select> with it. Re-creating the element re-scans the new
+    // document; the old code instead polled 80 times at 60ms for a <select>
+    // that navigation had already destroyed, so it burned 4.8 seconds per
+    // page swap and usually found nothing.
+    function reapply(attempts) {
+        var combo = document.querySelector('select.goog-te-combo');
 
-    // ── Keep translation applied after SPA navigation ─────────────────────────
-    window.addEventListener('livewire:navigated', function () {
-        var name = readStored();
-        if (name && nameToCode(name) !== 'en') {
-            triggerCombo(nameToCode(name), 80);
+        if (combo) {
+            if (combo.value !== activeCode) {
+                combo.value = activeCode;
+                combo.dispatchEvent(new Event('change'));
+            }
+            return;
         }
-    });
+
+        // No select: the widget is gone with the old body. Rebuild it, which
+        // re-translates from the cookie on its own.
+        if (initElement()) { return; }
+
+        // Script still in flight on a very early navigation. Bounded, and an
+        // order of magnitude shorter than what it replaces.
+        if (attempts > 0) {
+            setTimeout(function () { reapply(attempts - 1); }, 100);
+        }
+    }
+
+    window.addEventListener('livewire:navigated', function () { reapply(10); });
 })();
 </script>

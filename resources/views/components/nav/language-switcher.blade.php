@@ -4,15 +4,15 @@
     standalone pill on the nav duplicating it.
 
     These rows STAGE a choice, they do not apply it. Each writes draftLanguage
-    on the modal scope; the modal's Save is what stores it and sets the cookie
-    the translate engine reads, so one Save still applies all three preferences
-    together rather than the language jumping the moment you touch it.
+    on the modal scope; the modal's Save posts the server locale and sets the
+    translate engine's cookie together, so one Save still applies all three
+    preferences rather than the language jumping the moment you touch it.
 
-    The list is the translate engine's, not the app's own locale list: the
-    engine (partials/translate-engine) machine-translates the whole page into
-    any of these, including catalogue copy no lang file can reach. Names rather
-    than ISO codes because the engine owns that mapping and the picker shows
-    names anyway.
+    The list comes from App\Support\Languages, which is the one place that
+    knows which of these Laravel renders from lang files (English, French) and
+    which the translate engine paints over an English page - including
+    catalogue copy no lang file can reach. Display names rather than ISO codes
+    because a picker shows names, and nothing here needs the codes.
 
     Language shares the modal SHEET with country and currency, but not their
     state: picking a language changes no country or currency value. Someone

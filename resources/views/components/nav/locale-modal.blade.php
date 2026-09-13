@@ -72,20 +72,17 @@
         );
     }
 
-    // Ten languages, not the 88 the translate engine can reach. English and
-    // French are the business languages; the rest follow the catalogue and the
-    // top-up networks - Spanish, Portuguese, Arabic, Swahili, Hausa, German,
-    // Chinese, Italian. Offering every engine locale made the pane a wall to
-    // scroll past for a choice almost nobody changes.
+    // The offered languages, resolved from config/localization.php through
+    // App\Support\Languages. NOT a list of its own: a second copy here is how
+    // the picker and the translate engine drifted apart, leaving a visitor
+    // auto-detected into one of the engine's 88 with no row to un-pick it.
     //
-    // Swahili and Hausa are why this stays on the browser translate widget:
-    // DeepL, the better engine for the European entries, supports neither.
-    //
-    // These are DISPLAY names; partials/translate-engine owns the
-    // name -> language-code map, and nothing else needs to know the codes.
-    $languages = [
-        'English', 'French', 'Spanish', 'Portuguese', 'Standard Arabic', 'Swahili', 'Hausa', 'German', 'Mandarin Chinese', 'Italian',
-    ];
+    // These are DISPLAY names. Which of them Laravel renders itself and which
+    // the widget paints is the config's business, not this view's.
+    $languages = \App\Support\Languages::names();
+    $languageServerLocales = \App\Support\Languages::serverLocaleMap();
+    $currentLanguage = \App\Support\Languages::nameFor(app()->getLocale())
+        ?? \App\Support\Languages::defaultName();
     $currencies = [
         ['code' => 'USD', 'symbol' => '$',   'name' => 'United States Dollar'],
         ['code' => 'EUR', 'symbol' => '€',   'name' => 'Euro'],
@@ -179,20 +176,42 @@
         draftCurrency: '',
         draftCurrencySymbol: '',
         /*
-         * The staged LANGUAGE, as a display name. The translate engine is
-         * what applies it (see partials/translate-engine): it stores the
-         * live choice in localStorage under 'locale.language' and keeps the
-         * googtrans cookie in step, so this reads from there rather than
-         * from the server locale - the engine serves 88 languages and the
-         * app itself is only translated into a couple.
+         * The staged LANGUAGE, as a display name.
+         *
+         * Applying it takes both halves of Save: the form posts the SERVER
+         * locale this language needs (English and French have real lang files;
+         * every other offered language is painted over an English page), and
+         * the translate engine's cookie is set alongside it. The live choice
+         * is mirrored in localStorage under 'locale.language' because the
+         * engine reads it before Alpine exists.
          */
-        draftLanguage: 'English',
+        draftLanguage: @js($currentLanguage),
 
         /** The live language, for the row label when the sheet is closed. */
-        language: 'English',
+        language: @js($currentLanguage),
 
+        /** Display name -> the locale the server must render for it. */
+        languageServerLocales: @js($languageServerLocales),
+
+        /** Only these can be staged, stored or posted. */
+        offeredLanguages: @js($languages),
+
+        serverLocaleFor(name) {
+            return this.languageServerLocales[name] ?? @js(config('localization.default', 'en'));
+        },
+
+        /*
+         * A stored language that is no longer offered falls back rather than
+         * being staged: it has no row in the list, so honouring it would show
+         * a sheet where nothing is checked and Save could not change anything.
+         */
         readLanguage() {
-            try { return localStorage.getItem('locale.language') || 'English'; } catch (e) { return 'English'; }
+            try {
+                const stored = localStorage.getItem('locale.language');
+                return this.offeredLanguages.includes(stored) ? stored : @js($currentLanguage);
+            } catch (e) {
+                return @js($currentLanguage);
+            }
         },
 
         /*
@@ -239,11 +258,12 @@
                 return;
             }
 
-            // The language is the translate engine's to apply: store the
-            // choice and set the cookie it reads, then let the reload this
-            // submit already causes come back translated. Dispatching the
-            // engine's own 'language-changed' here would reload immediately
-            // and race the POST.
+            // Language takes both halves. The form field above carries the
+            // server locale; this mirrors the choice into localStorage and
+            // sets the engine's cookie, so the one reload this submit already
+            // causes comes back correct by whichever mechanism owns the
+            // language. Dispatching the engine's own 'language-changed' here
+            // would reload immediately and race the POST.
             try {
                 localStorage.setItem('locale.language', this.draftLanguage);
                 window.rshopSetTranslateCookie?.(this.draftLanguage);
@@ -369,13 +389,20 @@
             class="grid min-h-0 flex-1 grid-cols-1 grid-rows-1"
         >
             @csrf
-            {{-- The app's own locale, unchanged. Language is the translate
-                 engine's now, and LocaleController only accepts the locales
-                 the app itself ships translations for - posting one of the
-                 engine's 88 names here would just fail validation. The field
-                 stays so Save remains a real, CSRF-protected POST whose
-                 redirect gives us the one reload that applies all three. --}}
-            <input type="hidden" name="locale" value="{{ app()->getLocale() }}">
+            {{-- The SERVER locale the staged language needs, which is the half
+                 of the change Laravel owns.
+
+                 Picking French posts `fr` and gets the real lang/fr files, so
+                 French stopped being a machine translation of an English page.
+                 Picking a machine language posts the default locale instead,
+                 because the widget translates out of whatever the server
+                 rendered - leaving a French page here while telling the widget
+                 the source was English is how already-translated copy went
+                 through the machine a second time.
+
+                 LocaleController validates this against localization.supported,
+                 so only a locale the app genuinely ships can ever land. --}}
+            <input type="hidden" name="locale" :value="serverLocaleFor(draftLanguage)" value="{{ $languageServerLocales[$currentLanguage] ?? config('localization.default', 'en') }}">
 
         {{-- Root: the three settings, previewing the DRAFT rather than what is
              in force - the sheet has to show what Save is about to do. --}}
