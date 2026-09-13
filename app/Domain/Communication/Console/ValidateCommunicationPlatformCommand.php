@@ -63,8 +63,10 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Monolog\Handler\StreamHandler;
 
 /**
  * Communication Platform Validation Suite.
@@ -75,7 +77,7 @@ use Illuminate\Support\Str;
  * that is always rolled back, so no business data is ever persisted.
  *
  * Emails are delivered through the real pipeline; with the log mail
- * driver (forced for the run) every rendered email lands in laravel.log.
+ * driver (forced for the run) every rendered email lands in the dedicated mail log (storage/logs/mail-YYYY-MM-DD.log), never laravel.log.
  */
 class ValidateCommunicationPlatformCommand extends Command
 {
@@ -143,10 +145,18 @@ class ValidateCommunicationPlatformCommand extends Command
             return self::FAILURE;
         }
 
-        // Force safe transports for the whole run: emails render into
-        // laravel.log, queued jobs execute inline so results are observable.
+        // Force safe transports for the whole run: emails render to the log
+        // rather than a real provider, queued jobs execute inline so results
+        // are observable.
+        //
+        // Pinned to the dedicated `mail` channel, not whatever the app log is.
+        // The log transport writes the whole MIME message including base64
+        // inline images, so a full probe run of branded emails is hundreds of
+        // megabytes; sent to laravel.log it buried every real entry and left a
+        // 1.4GB archive behind.
         config([
             'mail.default' => 'log',
+            'mail.mailers.log.channel' => 'mail',
             'queue.default' => 'sync',
         ]);
 
@@ -253,7 +263,7 @@ class ValidateCommunicationPlatformCommand extends Command
 
     private function runDynamicChecks(): void
     {
-        $logFile = storage_path('logs/laravel.log');
+        $logFile = $this->mailLogFile();
         $logOffset = is_file($logFile) ? filesize($logFile) : 0;
 
         DB::beginTransaction();
@@ -275,7 +285,7 @@ class ValidateCommunicationPlatformCommand extends Command
             DB::rollBack();
         }
 
-        $this->checkLaravelLogReceived($logFile, $logOffset);
+        $this->checkMailLogReceived($logFile, $logOffset);
         $this->checkPlatformConfig();
     }
 
@@ -724,13 +734,37 @@ class ValidateCommunicationPlatformCommand extends Command
     }
 
     // ─────────────────────────────────────────────────────────────────
-    //  laravel.log delivery proof + platform config
+    //  mail-log delivery proof + platform config
     // ─────────────────────────────────────────────────────────────────
 
-    private function checkLaravelLogReceived(string $logFile, int $offset): void
+    /**
+     * The file the pinned `mail` channel is writing to right now. Asked of
+     * the channel's own handler rather than guessed from config: the channel
+     * is a daily rotator, so today's file is mail-YYYY-MM-DD.log, not the
+     * mail.log its path key names.
+     */
+    private function mailLogFile(): string
+    {
+        foreach (Log::channel('mail')->getLogger()->getHandlers() as $handler) {
+            if ($handler instanceof StreamHandler && $handler->getUrl()) {
+                return $handler->getUrl();
+            }
+        }
+
+        return (string) config('logging.channels.mail.path');
+    }
+
+    /**
+     * Delivery proof. The run pins the log mailer to the `mail` channel, so
+     * the rendered MIME of every probe email is appended to that file and
+     * nowhere else; laravel.log only ever carried it by accident. A rendered
+     * message is counted by its Message-ID header, which Symfony adds to
+     * every message it serialises, exactly once.
+     */
+    private function checkMailLogReceived(string $logFile, int $offset): void
     {
         if (! is_file($logFile)) {
-            $this->record('Email Delivery (laravel.log)', false, 'laravel.log exists', 'file not found — check LOG_CHANNEL');
+            $this->record('Email Delivery (mail log)', false, 'mail log exists', 'file not found: '.$logFile.' (check logging.channels.mail)');
 
             return;
         }
@@ -740,14 +774,14 @@ class ValidateCommunicationPlatformCommand extends Command
         $newContent = stream_get_contents($handle) ?: '';
         fclose($handle);
 
-        $rendered = substr_count($newContent, 'Email logged successfully via LogProvider');
+        $rendered = substr_count($newContent, 'Message-ID:');
         $probeHits = substr_count($newContent, (string) $this->probeUser?->email);
 
-        $this->record('Email Delivery (laravel.log)', $rendered > 0,
-            "Rendered emails written to laravel.log ({$rendered} emails)",
-            $rendered > 0 ? null : 'no LogProvider entries appended during the run');
+        $this->record('Email Delivery (mail log)', $rendered > 0,
+            "Rendered emails written to the mail log ({$rendered} emails)",
+            $rendered > 0 ? null : 'no rendered emails appended during the run');
 
-        $this->record('Email Delivery (laravel.log)', $probeHits > 0,
+        $this->record('Email Delivery (mail log)', $probeHits > 0,
             'Probe recipient address appears in logged emails',
             $probeHits > 0 ? null : 'probe address not found in appended log content');
     }
@@ -922,7 +956,7 @@ class ValidateCommunicationPlatformCommand extends Command
         $this->newLine();
 
         if (! $this->option('static')) {
-            $this->components->info('All probe data was rolled back — no business records were persisted. Rendered emails are in storage/logs/laravel.log.');
+            $this->components->info('All probe data was rolled back — no business records were persisted. Rendered emails are in '.$this->mailLogFile().'.');
         }
 
         return $totalFailed === 0 ? self::SUCCESS : self::FAILURE;

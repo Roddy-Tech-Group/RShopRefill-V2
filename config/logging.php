@@ -75,6 +75,24 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Rendered emails, when the mailer is the `log` transport. That
+        // transport writes the ENTIRE MIME message, base64 inline images and
+        // all, so a single branded campaign is megabytes. Sent to laravel.log
+        // it buried real entries and grew the file past 600MB; the comms
+        // validation probe alone produced a 1.4GB archive.
+        //
+        // Wired up by MAIL_LOG_CHANNEL (config/mail.php mailers.log.channel).
+        // Short retention on purpose: this is a debugging aid, and nothing
+        // reads it after the send it was written to explain.
+        'mail' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/mail.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('MAIL_LOG_DAYS', 3),
+            'permission' => 0666,
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

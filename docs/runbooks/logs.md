@@ -18,6 +18,7 @@ Application root: `/home/rshoprefills-v2/htdocs/rshoprefill.com` (see
 | What | Where | Notes |
 |---|---|---|
 | Laravel application log | `storage/logs/laravel.log` | Every alert the platform sends is also written here with its context |
+| Rendered email (log mailer) | `storage/logs/mail-YYYY-MM-DD.log` | Full MIME of every email sent through the `log` transport, base64 inline images included, so it is large by design. Written by the comms and payments validation probes; rotates daily and keeps `MAIL_LOG_DAYS` (3) days |
 | Horizon / queue workers | `storage/logs/` + Supervisor's own log dir | Worker crashes land in Supervisor logs, job failures in the `failed_jobs` table |
 | nginx access + error | typically `/home/rshoprefills-v2/logs/nginx/` on CloudPanel; verify with `nginx -T \| grep log` | 5xx spikes show here before anywhere else |
 | PHP-FPM | `php-fpm` error log per pool; verify with `php-fpm8.2 -tt 2>&1 \| grep error_log` | Fatal errors that never reach Laravel |
