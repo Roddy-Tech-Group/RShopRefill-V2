@@ -16,6 +16,7 @@ use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
+use App\Domain\PaymentInsights\Services\RefusedCardRecorder;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
@@ -107,6 +108,26 @@ class PaymentSessionController extends Controller
         $session = PaymentSession::with('paymentAttempt.order')->findOrFail($id);
 
         $this->authorizeSessionAccess($session);
+
+        // A customer who cancels after the popup refused their card did not
+        // change their mind, they were declined. Ask the gateway first; if it
+        // refused a card, the session fails with that verdict instead of
+        // being filed as a cancellation.
+        if (in_array($session->status, ['awaiting_payment', 'awaiting_customer_action', 'awaiting_redirect', 'processing'], true)) {
+            $recorder = app(RefusedCardRecorder::class);
+            $declines = $recorder->reconcile($session);
+
+            if ($declines->isNotEmpty()) {
+                $failure = $recorder->failureFor($session, $declines);
+                app(PaymentSessionService::class)->failSession($session, $failure['reason'], $failure['payload'] + ['client_reason' => 'customer_cancelled']);
+
+                return response()->json([
+                    'message' => $failure['reason'],
+                    'status' => 'failed',
+                    'is_expired' => $session->expires_at ? $session->expires_at->isPast() : false,
+                ]);
+            }
+        }
 
         try {
             DB::transaction(function () use ($session) {

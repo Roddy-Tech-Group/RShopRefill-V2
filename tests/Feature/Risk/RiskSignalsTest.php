@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Risk;
 
-use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Risk\Contracts\RiskSignal;
 use App\Domain\Risk\DTOs\RiskContext;
 use App\Domain\Risk\Signals\AccountBannedSignal;
@@ -24,7 +23,7 @@ use App\Domain\Risk\Signals\VelocityIp1hSignal;
 use App\Domain\Risk\Signals\VelocityUser1hSignal;
 use App\Domain\Risk\Signals\VelocityUser24hSignal;
 use App\Models\Order;
-use App\Models\PaymentBackoffEvent;
+use App\Models\PaymentDecline;
 use App\Models\RiskAssessment;
 use App\Models\RiskLabel;
 use App\Models\SiteSetting;
@@ -276,20 +275,46 @@ class RiskSignalsTest extends TestCase
     {
         $signal = app(RepeatedDeclinesSignal::class);
         $user = User::factory()->create();
-        PaymentBackoffEvent::create([
-            'identifier' => 'u:'.$user->id,
-            'user_id' => $user->id,
-            'product_line' => 'checkout',
-            'signal' => PaymentBackoffManager::SIGNAL_DECLINE,
-            'tier' => 'known',
-            'decline_count' => 3,
-            'no_show_count' => 0,
-            'wait_seconds' => 30,
-            'enforced' => false,
-            'customer_ip' => '203.0.113.1',
-        ]);
+
+        // Three DIFFERENT cards refused inside the window: the card-testing
+        // shape. Read from the refused cards the gateway reported, not from a
+        // rate-limiter event table that never received a decline.
+        foreach (['fp-a', 'fp-b', 'fp-c'] as $fingerprint) {
+            PaymentDecline::create([
+                'user_id' => $user->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'tx-'.$fingerprint,
+                'tx_ref' => 'ref-'.$user->id,
+                'card_fingerprint' => $fingerprint,
+                'verdict' => 'Suspected Fraud',
+                'verdict_class' => 'fraud',
+                'amount' => 20,
+                'currency' => 'USD',
+                'declined_at' => now()->subMinutes(5),
+            ]);
+        }
 
         $this->assertFires($signal, $this->ctx(['user' => $user]));
+
+        // The same card refused three times is one card, not three.
+        $retrying = User::factory()->create();
+        foreach ([1, 2, 3] as $n) {
+            PaymentDecline::create([
+                'user_id' => $retrying->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'retry-'.$n,
+                'tx_ref' => 'ref-'.$retrying->id,
+                'card_fingerprint' => 'same-card',
+                'verdict' => 'Insufficient Funds',
+                'verdict_class' => 'soft',
+                'amount' => 20,
+                'currency' => 'USD',
+                'declined_at' => now()->subMinutes(5),
+            ]);
+        }
+        $this->assertSilent($signal, $this->ctx(['user' => $retrying]));
 
         $quiet = User::factory()->create();
         $this->assertSilent($signal, $this->ctx(['user' => $quiet]));

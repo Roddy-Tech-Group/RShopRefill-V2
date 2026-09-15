@@ -24,16 +24,6 @@ class RecoveryEligibilityService
     /** Failure reasons that must never be invited to retry. */
     private const RISK_REASONS = ['risk_rejected', 'fraud_detected', 'high_risk'];
 
-    /**
-     * Failures that were our fault. An automated "try again" to someone we
-     * just failed is the wrong voice: it implies they can fix it, and on
-     * 2026-09-09 it sent a Ghana customer back into the same broken rail. These
-     * raise a SEV-2 instead (insights:alert-failures) and a person writes.
-     *
-     * @var list<string>
-     */
-    private const PLATFORM_FAULT_CODES = ['gateway_config_error', 'gateway_compliance_block', 'system_error'];
-
     /** At most one recovery email per customer per rolling day. */
     private const COOLDOWN_HOURS = 24;
 
@@ -42,6 +32,7 @@ class RecoveryEligibilityService
 
     public function __construct(
         private readonly PreferenceManager $preferences,
+        private readonly PaymentBackoffManager $backoff,
     ) {}
 
     /**
@@ -74,9 +65,26 @@ class RecoveryEligibilityService
         }
 
         // Checked before the retryable gate so the analytics say WHY the robot
-        // stayed quiet: not "could not succeed" but "was ours to fix".
-        if (in_array((string) $outcome->failure_reason_code, self::PLATFORM_FAULT_CODES, true)) {
+        // stayed quiet: not "could not succeed" but "was ours to fix". An
+        // automated "try again" to someone we just failed is the wrong voice:
+        // it implies they can fix it, and on 2026-09-09 it sent a Ghana
+        // customer back into the same broken rail. These raise a SEV-2 instead
+        // (insights:alert-failures) and a person writes.
+        if (in_array((string) $outcome->failure_reason_code, FailureReasonClassifier::PLATFORM_FAULT_CODES, true)) {
             return $this->skip(IneligibilityReason::PlatformFault);
+        }
+
+        // Several different cards refused inside two hours is the card-testing
+        // shape. Fifty-four recovery emails went to card testers in the first
+        // three months because their sessions read as abandonment; the ladder
+        // now says when to stay quiet, whatever the last verdict was.
+        if ((bool) ($outcome->metadata['suspected_testing'] ?? false)
+            || $this->backoff->suspectedTesting(
+                $outcome->user_id ? User::find($outcome->user_id) : null,
+                $outcome->customer_ip,
+                $outcome->device_uuid,
+            )) {
+            return $this->skip(IneligibilityReason::SuspectedTesting);
         }
 
         // A swept session never got a final answer from the gateway: the

@@ -38,7 +38,7 @@ return [
     | (Champion/challenger comparison in Stage 3 keys off this string.)
     |
     */
-    'policy_version' => env('RISK_POLICY_VERSION', '2026.08.14'),
+    'policy_version' => env('RISK_POLICY_VERSION', '2026.09.13'),
 
     /*
     |--------------------------------------------------------------------------
@@ -305,10 +305,14 @@ return [
 
         // Linkage / graph (Stage 3). "max_accounts" fires when the number of
         // DISTINCT accounts sharing the entity EXCEEDS the value. Thresholds are
-        // set to spare legitimate sharing (a household sharing one phone, a
-        // family card, an office IP) and catch farms: 3+ accounts per device or
-        // card, 6+ accounts per IP in a day.
-        'device_shared_max_accounts' => 2,
+        // set to spare legitimate sharing (a family card, an office IP) and
+        // catch farms: 3+ accounts per card, 6+ accounts per IP in a day.
+        //
+        // Devices are stricter since 2026-09-13: the first card-testing pair
+        // caught in production (two accounts, one phone, seven refused cards)
+        // sat exactly one account under the old bar. Two accounts on one
+        // device now adds weight; it never holds anyone on its own.
+        'device_shared_max_accounts' => 1,
         'ip_shared_max_accounts' => 5,
         'ip_shared_window_hours' => 24,
         'instrument_reuse_max_accounts' => 2,
@@ -358,14 +362,13 @@ return [
         'sla_hours' => 12,
         'clearance_hours' => 24,
 
-        // Who owns the review queue and is alerted to new reviews + SLA breaches.
-        // The first entry is the standing overseer (the CTO today); analysts are
-        // ADDED here as the team grows, never replacing the overseer. Comma-
-        // separated in RISK_REVIEW_OWNERS; the CTO address is the default so the
-        // queue is never unowned even before the env var is set.
+        // Optional email recipients for new reviews, comma-separated in
+        // RISK_REVIEW_OWNERS. The primary alert is the SEV-2 Telegram message
+        // every opened review sends through OperationalAlerter, so a held
+        // order never waits in an inbox; email is an extra, not the default.
         'owners' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('RISK_REVIEW_OWNERS', 'dev@roddytechgroup.com')),
+            explode(',', (string) env('RISK_REVIEW_OWNERS', '')),
         ))),
     ],
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\PaymentInsights\Services\RefusedCardRecorder;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentSession;
 use App\Models\PaymentTelemetryEvent;
@@ -28,7 +29,8 @@ class PaymentTelemetryController extends Controller
     private const MAX_SIGNALS_PER_SESSION = 20;
 
     public function __construct(
-        private readonly PaymentSessionService $paymentSessionService
+        private readonly PaymentSessionService $paymentSessionService,
+        private readonly RefusedCardRecorder $refusedCards,
     ) {}
 
     public function recordFailure(Request $request): JsonResponse
@@ -57,6 +59,24 @@ class PaymentTelemetryController extends Controller
         // Fail closed - a session without a customer email is nobody's to fail.
         if (! $session->customer_email || strcasecmp($session->customer_email, (string) $request->user()?->email) !== 0) {
             return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        // Before filing "popup closed", ask the gateway what happened inside
+        // the popup. A closed popup after a refused card is a decline, not an
+        // abandonment, and the difference decides whether the customer gets a
+        // "complete your purchase" email or the rate limiter gets a signal.
+        $declines = $this->refusedCards->reconcile($session);
+
+        if ($declines->isNotEmpty()) {
+            $failure = $this->refusedCards->failureFor($session, $declines);
+
+            $this->paymentSessionService->failSession(
+                session: $session,
+                reason: $failure['reason'],
+                payload: array_merge($validated['context'] ?? [], $failure['payload'], ['client_reason' => $validated['reason']]),
+            );
+
+            return response()->json(['status' => 'recorded', 'declined' => true]);
         }
 
         // Use the state machine to fail it, which fires PaymentSessionFailed

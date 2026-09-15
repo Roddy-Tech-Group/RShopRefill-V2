@@ -5,6 +5,7 @@ namespace Tests\Feature\Wallet;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
@@ -14,9 +15,11 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Order;
+use App\Models\PaymentDecline;
 use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
 use App\Models\Wallet;
@@ -206,5 +209,91 @@ class WalletPinCheckoutTest extends TestCase
 
         $this->expectException(InsufficientBalanceException::class);
         $this->placeWalletOrder();
+    }
+
+    /**
+     * The checkout page decides between a quiet button countdown and the lock
+     * notice with a Contact support button from one field in the 429. The web
+     * controller used to build its own reply without it, so on the real page a
+     * six hour lock looked like a short pause and never offered the way out.
+     */
+    public function test_the_checkout_page_is_told_when_a_pause_is_a_lock(): void
+    {
+        SiteSetting::put('features.payment_backoff_enforce_enabled', 'on', 'features');
+        Cache::flush();
+
+        foreach (range(1, 5) as $n) {
+            PaymentDecline::create([
+                'user_id' => $this->user->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'web-lock-'.$n,
+                'tx_ref' => 'ref-'.$this->user->id,
+                'payment_method' => 'card',
+                'card_fingerprint' => 'card-'.$n,
+                'verdict' => 'Payment declined. Suspected Fraud',
+                'verdict_class' => 'fraud',
+                'amount' => 25,
+                'currency' => 'USD',
+                'declined_at' => now()->subSeconds(5),
+            ]);
+        }
+
+        $response = $this->actingAs($this->user)
+            ->withCookie('guest_token', 'irrelevant')
+            ->postJson(route('checkout.process'), [
+                'delivery_email' => $this->user->email,
+                'payment_method' => 'card',
+                'currency' => 'USD',
+            ]);
+
+        $response->assertStatus(429)
+            ->assertJson(['is_rate_limited' => true, 'locked' => true]);
+        $this->assertStringContainsString('contact support', (string) $response->json('message'));
+    }
+
+    /**
+     * The payment rate limiter stops new money coming in; it never stops a
+     * customer spending money already in their wallet. Even under a six hour
+     * card-testing lock, paying from balance goes through, while the same
+     * customer reaching for a card is refused.
+     */
+    public function test_a_locked_customer_can_still_pay_from_wallet_balance_but_not_by_card(): void
+    {
+        Queue::fake([FulfillOrderItemJob::class]);
+        SiteSetting::put('features.payment_backoff_enforce_enabled', 'on', 'features');
+        Cache::flush();
+
+        foreach (range(1, 5) as $n) {
+            PaymentDecline::create([
+                'user_id' => $this->user->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'lock-'.$n,
+                'tx_ref' => 'ref-'.$this->user->id,
+                'payment_method' => 'card',
+                'card_fingerprint' => 'card-'.$n,
+                'verdict' => 'Payment declined. Suspected Fraud',
+                'verdict_class' => 'fraud',
+                'amount' => 25,
+                'currency' => 'USD',
+                'declined_at' => now()->subSeconds(5),
+            ]);
+        }
+
+        app(TransactionPinService::class)->setupPin($this->user, self::PIN);
+        $this->fundedWallet();
+
+        $order = $this->placeWalletOrder();
+        $this->assertTrue($order->exists, 'a locked customer could not spend their own wallet balance');
+
+        $this->expectException(PaymentBackoffException::class);
+
+        app(CheckoutService::class)->placeOrder(
+            user: $this->user,
+            cart: $this->cart->fresh(),
+            paymentMethod: 'flutterwave',
+            displayCurrency: 'USD',
+        );
     }
 }

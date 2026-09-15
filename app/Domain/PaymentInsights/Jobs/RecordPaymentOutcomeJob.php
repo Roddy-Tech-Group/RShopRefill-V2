@@ -138,6 +138,12 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                     'raw_reason' => $reasonText,
                     'failure_details' => $failureDetails,
                     'provider_payload' => $session->metadata['failure_payload'] ?? null,
+                    // Written by the refused-card recorder when the gateway
+                    // said cards were declined inside the popup: how many, and
+                    // whether the identity had reached the suspected-testing
+                    // rung of the rate limiter's ladder at that moment.
+                    'refused_cards' => (int) data_get($session->metadata, 'failure_payload.refused_cards', 0),
+                    'suspected_testing' => (bool) data_get($session->metadata, 'failure_payload.suspected_testing', false),
                 ],
             ]
         );

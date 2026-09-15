@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PaymentDecline;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\RiskLabel;
@@ -187,6 +188,57 @@ class EsimTopupTest extends TestCase
             Order::where('user_id', $user->id)->where('order_number', '!=', 'RSR-PARENT-ESIM-1')->first(),
         );
         $this->assertSame(50.0, (float) $wallet->fresh()->balance);
+    }
+
+    /**
+     * A top-up spends a balance the customer already holds. The payment rate
+     * limiter only stops new money coming in, so even a device locked for
+     * running stolen cards can still spend what is already in its wallet.
+     * Freezing funds is a separate, human decision: the admin wallet hold.
+     */
+    public function test_a_locked_device_can_still_spend_its_wallet_balance_on_topups(): void
+    {
+        Queue::fake();
+        SiteSetting::put('features.payment_backoff_enforce_enabled', 'on', 'features');
+        Cache::flush();
+        CurrencyRate::create(['code' => 'USD', 'name' => 'US Dollar', 'type' => 'fiat', 'rate_per_usd' => 1.0, 'is_active' => true]);
+
+        $user = $this->pinnedUser();
+        $wallet = Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 50.0, 'is_active' => true]);
+        $item = $this->fulfilledEsimItem($user);
+
+        // Five different cards, all refused as fraud, on this account.
+        foreach (['a', 'b', 'c', 'd', 'e'] as $card) {
+            PaymentDecline::create([
+                'user_id' => $user->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'drain-'.$card,
+                'tx_ref' => 'ref-'.$user->id,
+                'card_fingerprint' => 'card-'.$card,
+                'verdict' => 'Payment declined. Suspected Fraud',
+                'verdict_class' => 'fraud',
+                'amount' => 25,
+                'currency' => 'USD',
+                'declined_at' => now()->subSeconds(5),
+            ]);
+        }
+
+        $this->mock(AiraloFulfillmentProvider::class)
+            ->shouldReceive('listTopupsForIccid')
+            ->andReturn([['id' => 'topup_1gb', 'net_price' => 5.0]]);
+
+        $response = $this->actingAs($user)->post(
+            route('dashboard.esim.topup.purchase', $item),
+            ['package_id' => 'topup_1gb', 'net_price' => 5.0, 'wallet_pin' => '1234'],
+        );
+
+        $response->assertSessionHasNoErrors();
+        $this->assertLessThan(50.0, (float) $wallet->fresh()->balance, 'a locked device was stopped from spending its own balance');
+        $this->assertNotNull(
+            Order::where('user_id', $user->id)->where('order_number', '!=', 'RSR-PARENT-ESIM-1')->first(),
+            'no top-up order was written',
+        );
     }
 
     public function test_shadow_mode_records_an_assessment_and_lets_the_topup_through(): void
