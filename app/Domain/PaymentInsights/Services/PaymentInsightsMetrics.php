@@ -91,6 +91,8 @@ class PaymentInsightsMetrics
                 'raw_reason' => $outcome->metadata['raw_reason'] ?? null,
                 'retryable' => $outcome->retryable,
                 'user_id' => $outcome->user_id,
+                'refused_cards' => (int) ($outcome->metadata['refused_cards'] ?? 0),
+                'suspected_testing' => (bool) ($outcome->metadata['suspected_testing'] ?? false),
             ]);
 
         // Per-provider success rate: confirmed / all outcomes for the provider.

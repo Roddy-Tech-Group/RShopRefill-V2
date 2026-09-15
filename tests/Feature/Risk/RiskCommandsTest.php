@@ -7,6 +7,8 @@ use App\Models\RiskAssessment;
 use App\Models\RiskReview;
 use App\Notifications\CriticalSystemAlert;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -44,6 +46,39 @@ class RiskCommandsTest extends TestCase
         $this->artisan('risk:report')->assertSuccessful();
 
         Notification::assertSentOnDemand(CriticalSystemAlert::class);
+    }
+
+    /**
+     * The email owner list is optional and empty by default, so a breach must
+     * reach Telegram on its own; otherwise held orders sit past their SLA with
+     * nobody hearing about it.
+     */
+    public function test_an_sla_breach_reaches_telegram_even_with_no_email_owners(): void
+    {
+        Notification::fake();
+        config([
+            'risk.review.sla_hours' => 12,
+            'risk.review.owners' => [],
+            'alerting.enabled' => true,
+            'alerting.channels.telegram.bot_token' => 'bot-token',
+            'alerting.channels.telegram.chat_id' => '-100',
+            'alerting.channels.mail.to' => null,
+            'alerting.channels.slack.enabled' => false,
+            'alerting.routing.sev2' => ['telegram'],
+            'alerting.throttle_minutes' => 60,
+        ]);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
+
+        RiskReview::factory()->create([
+            'status' => RiskReviewStatus::Pending,
+            'created_at' => now()->subHours(24),
+        ]);
+
+        $this->artisan('risk:report')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'api.telegram.org')
+            && str_contains((string) $request['text'], 'Risk reviews past SLA'));
+        Notification::assertNothingSent();
     }
 
     public function test_report_is_quiet_when_nothing_has_breached(): void

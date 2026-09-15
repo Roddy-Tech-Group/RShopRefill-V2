@@ -7,6 +7,7 @@ use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\MockMode;
+use App\Domain\PaymentInsights\Support\DeclineVerdict;
 use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
 use Illuminate\Support\Facades\Http;
@@ -14,6 +15,14 @@ use Illuminate\Support\Facades\Log;
 
 class FlutterwavePaymentProvider implements PaymentProviderInterface
 {
+    /**
+     * Pages of the charge listing read per reference. Each page is one gateway
+     * round trip made while a customer request or the sweeper waits, so the
+     * cap bounds that wait; three pages already covers far more refused cards
+     * than one popup session produces.
+     */
+    private const MAX_CHARGE_LISTING_PAGES = 3;
+
     private string $secretKey;
 
     private string $baseUrl;
@@ -960,12 +969,117 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             $attempt->payment_status = PaymentStatus::Paid;
             $attempt->confirmed_at = now();
             $attempt->verification_payload = $payload;
+
+            // The card that paid, as a keyed fingerprint only. The risk
+            // engine's instrument-reuse signal reads this to spot one card
+            // funding many accounts; without it the signal abstained forever.
+            $card = is_array($data['card'] ?? null) ? $data['card'] : [];
+            $fingerprint = DeclineVerdict::fingerprint($card['first_6digits'] ?? null, $card['last_4digits'] ?? null);
+            if ($fingerprint !== null) {
+                $attempt->metadata = array_merge($attempt->metadata ?? [], [
+                    'card_fingerprint' => $fingerprint,
+                    'card_brand' => $card['type'] ?? null,
+                    'card_country' => $card['country'] ?? null,
+                ]);
+            }
+
             $attempt->save();
 
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Every charge the gateway attempted under one of our references.
+     *
+     * The inline popup lets a customer try several cards under a single
+     * tx_ref and reports none of the refusals by webhook, so this is the only
+     * way to learn that a card was declined. Returns one normalised entry per
+     * charge, oldest first, or an empty list when the gateway cannot be asked
+     * (mock credentials, network trouble): a missing answer must never break
+     * the checkout that asked.
+     *
+     * @return list<array{
+     *     id: ?string, status: ?string, processor_response: ?string, amount: float, currency: ?string,
+     *     payment_type: ?string, created_at: ?string,
+     *     card: array{first_6digits: ?string, last_4digits: ?string, type: ?string, issuer: ?string, country: ?string}
+     * }>
+     */
+    public function listChargesByReference(string $txRef): array
+    {
+        if (str_contains($this->secretKey, 'MOCK') || trim($txRef) === '') {
+            return [];
+        }
+
+        $charges = [];
+
+        try {
+            $page = 1;
+            $totalPages = 1;
+
+            // The listing is paginated. A tester can run more cards inside one
+            // popup than a single page holds (seventeen, in one production
+            // case), so later pages are read too, up to a cap that keeps a slow
+            // gateway from holding the request that asked.
+            do {
+                $response = Http::withToken($this->secretKey)
+                    ->timeout(8)
+                    ->connectTimeout(4)
+                    ->get("{$this->baseUrl}/transactions", ['tx_ref' => $txRef, 'page' => $page]);
+
+                if ($response->failed()) {
+                    Log::warning('Flutterwave charge listing failed', [
+                        'tx_ref' => $txRef,
+                        'page' => $page,
+                        'status' => $response->status(),
+                    ]);
+
+                    break;
+                }
+
+                $rows = $response->json('data');
+                if (! is_array($rows)) {
+                    break;
+                }
+
+                foreach ($rows as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+
+                    $card = is_array($row['card'] ?? null) ? $row['card'] : [];
+
+                    $charges[] = [
+                        'id' => isset($row['id']) ? (string) $row['id'] : null,
+                        'status' => isset($row['status']) ? strtolower((string) $row['status']) : null,
+                        'processor_response' => isset($row['processor_response']) ? trim((string) $row['processor_response']) : null,
+                        'amount' => (float) ($row['amount'] ?? 0),
+                        'currency' => isset($row['currency']) ? strtoupper((string) $row['currency']) : null,
+                        'payment_type' => $row['payment_type'] ?? null,
+                        'created_at' => $row['created_at'] ?? null,
+                        'card' => [
+                            'first_6digits' => $card['first_6digits'] ?? null,
+                            'last_4digits' => $card['last_4digits'] ?? null,
+                            'type' => $card['type'] ?? null,
+                            'issuer' => $card['issuer'] ?? null,
+                            'country' => $card['country'] ?? null,
+                        ],
+                    ];
+                }
+
+                $totalPages = max(1, (int) $response->json('meta.page_info.total_pages', 1));
+                $page++;
+            } while ($page <= min($totalPages, self::MAX_CHARGE_LISTING_PAGES));
+        } catch (\Throwable $e) {
+            // A timeout on a later page keeps what the earlier pages returned.
+            Log::warning('Flutterwave charge listing error: '.$e->getMessage(), ['tx_ref' => $txRef]);
+        }
+
+        usort($charges, fn (array $a, array $b) => strcmp((string) $a['created_at'], (string) $b['created_at']));
+
+        return $charges;
     }
 
     public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool

@@ -33,6 +33,7 @@ use App\Models\CommunicationLog;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentBackoffEvent;
+use App\Models\PaymentDecline;
 use App\Models\PaymentOutcome;
 use App\Models\PaymentSession;
 use App\Models\PaymentTelemetryEvent;
@@ -138,7 +139,16 @@ class ValidatePaymentPlatformCommand extends Command
     ];
 
     /** Progressive backoff schedule: consecutive fails → expected wait seconds. */
-    private const BACKOFF_SCHEDULE = [1 => 0, 2 => 0, 3 => 30, 4 => 60, 5 => 300];
+    /** A distinct device per probe, so one probe's lock cannot follow the device into the next. */
+    private int $probeDevices = 0;
+
+    /**
+     * Feature flag keys the probes flipped, so their cached values can be
+     * dropped once the rollback has restored the rows.
+     *
+     * @var array<string, true>
+     */
+    private array $touchedFlagKeys = [];
 
     private const FEATURE_FLAGS = ['payment_insights', 'frontend_payment_tracking', 'progressive_backoff'];
 
@@ -411,6 +421,7 @@ class ValidatePaymentPlatformCommand extends Command
             $this->probeAnalytics();
         } finally {
             DB::rollBack();
+            $this->forgetTouchedFlags();
             Context::forget('correlation_id');
         }
     }
@@ -824,129 +835,297 @@ class ValidatePaymentPlatformCommand extends Command
     private function runBackoffProbes(): void
     {
         $manager = app(PaymentBackoffManager::class);
-        $user = $this->makeProbeUser();
-        $order = Order::factory()->create(['user_id' => $user->id]);
 
-        $this->probe('Progressive Backoff', 'decline schedule: 1→none, 2→none, 3→30s, 4→60s, 5→300s', function () use ($manager, $user, $order) {
-            foreach (self::BACKOFF_SCHEDULE as $failNumber => $expectedWait) {
-                $this->failAtGateway($user, $order, 'declined #'.$failNumber);
+        $this->probe('Progressive Backoff', 'attempts: 2 → nothing, 3 → 60s pause, 4 → 5m pause, 5 different fraud cards on a young unpaid account → 6h lock', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $device = $this->probeDevice();
 
-                $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10');
-                $this->ensure($status['consecutive_fails'] === $failNumber, "after fail {$failNumber}: count {$status['consecutive_fails']}");
+            $this->refuseCard($user, 'ladder-a', device: $device);
+            $this->refuseCard($user, 'ladder-b', device: $device);
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10', $device);
+            $this->ensure(! $status['is_rate_limited'], 'two failed attempts tripped the limiter');
+            $this->ensure($status['step'] === PaymentBackoffManager::STEP_NONE, "step {$status['step']} after two attempts");
 
-                if ($expectedWait === 0) {
-                    $this->ensure(! $status['is_rate_limited'], "rate limited after only {$failNumber} failures");
-                } else {
-                    $this->ensure($status['is_rate_limited'], "not rate limited after {$failNumber} failures");
-                    $this->ensure($status['wait_seconds'] > $expectedWait - 5 && $status['wait_seconds'] <= $expectedWait,
-                        "fail {$failNumber}: wait {$status['wait_seconds']}s, expected ~{$expectedWait}s");
+            $this->refuseCard($user, 'ladder-c', device: $device);
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10', $device);
+            $this->ensure($status['is_rate_limited'] && $status['signal'] === PaymentBackoffManager::SIGNAL_FAILED_ATTEMPTS, 'three failed attempts did not pause');
+            $this->ensure($status['wait_seconds'] > 0 && $status['wait_seconds'] <= PaymentBackoffManager::PAUSE_SECONDS, "pause wait {$status['wait_seconds']}s");
 
-                    // The guard must refuse while limited. It is asserted here
-                    // rather than through session creation because enforcement
-                    // moved pre-flight: refusing at createForOrder meant the
-                    // order, its items and the attempt were already committed,
-                    // so a throttled customer was left with an unpayable order
-                    // no sweeper could see.
-                    try {
-                        app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
-                        $this->ensure(false, 'guard allowed a rate limited customer through');
-                    } catch (PaymentBackoffException $e) {
-                        $response = $e->render(request());
-                        $this->ensure($response->getStatusCode() === 429, "backoff renders {$response->getStatusCode()}");
-                        $data = $response->getData(true);
-                        $this->ensure(($data['is_rate_limited'] ?? false) === true && isset($data['wait_seconds']), 'backoff payload incomplete');
-                    }
+            // The guard must refuse while paused. Asserted here rather than
+            // through session creation because enforcement runs pre-flight:
+            // refusing at createForOrder left an unpayable order behind.
+            try {
+                app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
+                $this->ensure(false, 'guard allowed a paused customer through');
+            } catch (PaymentBackoffException $e) {
+                $response = $e->render(request());
+                $this->ensure($response->getStatusCode() === 429, "backoff renders {$response->getStatusCode()}");
+                $data = $response->getData(true);
+                $this->ensure(($data['is_rate_limited'] ?? false) === true && isset($data['wait_seconds']) && $data['locked'] === false, 'pause payload incomplete');
+            }
 
-                    // …and unblocked once the cooldown has actually elapsed
-                    // (regression: reversed Carbon diff made cooldowns grow forever).
-                    PaymentOutcome::where('user_id', $user->id)->update(['created_at' => now()->subSeconds($expectedWait + 2)]);
-                    $after = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10');
-                    $this->ensure(! $after['is_rate_limited'], "cooldown did not expire after {$expectedWait}s elapsed");
-                }
+            // ...and released once the pause has actually elapsed.
+            PaymentDecline::where('user_id', $user->id)->update(['declined_at' => now()->subSeconds(PaymentBackoffManager::PAUSE_SECONDS + 2)]);
+            $after = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10', $device);
+            $this->ensure(! $after['is_rate_limited'], 'pause did not expire after 60s elapsed');
+
+            $this->refuseCard($user, 'ladder-d', device: $device);
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10', $device);
+            $this->ensure($status['step'] === PaymentBackoffManager::STEP_HOLD, "step {$status['step']} after four attempts");
+            $this->ensure($status['wait_seconds'] > PaymentBackoffManager::PAUSE_SECONDS && $status['wait_seconds'] <= PaymentBackoffManager::HOLD_SECONDS, "hold wait {$status['wait_seconds']}s");
+            $this->ensure(! $status['locked'], 'four fraud cards locked a device');
+
+            $this->refuseCard($user, 'ladder-e', device: $device);
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10', $device);
+            $this->ensure($status['locked'] && $status['signal'] === PaymentBackoffManager::SIGNAL_CARD_TESTING, 'five different fraud cards on a young unpaid account did not lock');
+            $this->ensure($status['wait_seconds'] > 3600, "lock wait {$status['wait_seconds']}s");
+
+            try {
+                app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
+                $this->ensure(false, 'guard allowed a locked customer through');
+            } catch (PaymentBackoffException $e) {
+                $this->ensure($e->locked && str_contains($e->customerMessage(), 'contact support'), 'lock message does not name the way out');
             }
         });
 
-        $this->probe('Progressive Backoff', 'successful payment resets the counter', function () use ($manager, $user, $order) {
+        $this->probe('Progressive Backoff', 'retrying one card counts every time, but can never lock', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $device = $this->probeDevice();
+
+            foreach (range(1, 20) as $_) {
+                $this->refuseCard($user, 'same-card', device: $device);
+            }
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.11', $device);
+            $this->ensure($status['attempts'] === 20, "counted {$status['attempts']} attempts");
+            $this->ensure($status['fraud_cards'] === 1, "counted {$status['fraud_cards']} fraud cards");
+            $this->ensure(! $status['locked'] && $status['step'] === PaymentBackoffManager::STEP_HOLD, "one card reached step {$status['step']}");
+        });
+
+        $this->probe('Progressive Backoff', 'bank refusals pause like any failure, but never lock', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $device = $this->probeDevice();
+
+            foreach (range(1, 8) as $n) {
+                $this->refuseCard($user, 'soft-'.$n, 'soft', $device);
+            }
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.12', $device);
+            $this->ensure($status['attempts'] === 8 && $status['fraud_cards'] === 0, 'soft refusals miscounted');
+            $this->ensure($status['is_rate_limited'] && ! $status['locked'], 'eight bank refusals were not paused, or were locked');
+        });
+
+        $this->probe('Progressive Backoff', 'four fraud cards pause, the fifth different one locks', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c', 'd'] as $card) {
+                $this->refuseCard($user, 'four-'.$card, device: $device);
+            }
+            $this->refuseCard($user, 'four-a', device: $device);
+            $this->refuseCard($user, 'four-b', device: $device);
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.13', $device);
+            $this->ensure($status['fraud_cards'] === 4 && ! $status['locked'], 'four different fraud cards locked a device');
+        });
+
+        $this->probe('Progressive Backoff', 'the lock follows the device to a new account, never the IP', function () use ($manager) {
+            $tester = $this->makeProbeUser();
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c', 'd', 'e'] as $card) {
+                $this->refuseCard($tester, 'follow-'.$card, device: $device);
+            }
+            $this->ensure($manager->getBackoffStatus($tester, 'checkout', '203.0.113.14', $device)['locked'], 'tester was not locked');
+
+            $secondAccount = $this->makeProbeUser();
+            $this->ensure($manager->getBackoffStatus($secondAccount, 'checkout', '198.51.100.14', $device)['locked'], 'a new account on the locked device got through');
+
+            $neighbour = $this->makeProbeUser();
+            $this->ensure(! $manager->getBackoffStatus($neighbour, 'checkout', '203.0.113.14', $this->probeDevice())['is_rate_limited'], 'the lock leaked to a different device on the same IP');
+        });
+
+        $this->probe('Progressive Backoff', 'a successful payment clears the pauses but keeps the fraud cards', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c'] as $card) {
+                $this->refuseCard($user, 'reset-'.$card, device: $device);
+            }
+            $this->ensure($manager->getBackoffStatus($user, 'checkout', '203.0.113.15', $device)['is_rate_limited'], 'expected paused before the payment');
+
             $session = $this->makeSessionFor($user, $order);
             app(PaymentSessionService::class)->confirmSession($session);
 
-            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.10');
-            $this->ensure($status['consecutive_fails'] === 0, "count {$status['consecutive_fails']} after success");
-            $this->ensure(! $status['is_rate_limited'], 'still limited after success');
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.15', $device);
+            $this->ensure($status['attempts'] === 0 && ! $status['is_rate_limited'], 'still paused after a successful payment');
+            $this->ensure($status['fraud_cards'] === 3, "a payment erased the fraud cards, {$status['fraud_cards']} left");
         });
 
-        $this->probe('Progressive Backoff', 'abandoning at the gateway is NOT counted as a failure', function () use ($manager) {
-            // The behaviour this whole rewrite exists for. A customer who
-            // reaches the payment screen and walks away is shopping, not
-            // failing, and on real traffic this is the overwhelming majority
-            // of unsuccessful outcomes. Counting it throttled ordinary buyers.
+        $this->probe('Progressive Backoff', 'a lucky payment does not save a tester from the lock', function () use ($manager) {
+            // User 243 in production: four fraud cards, a payment landed, then
+            // a fifth fraud card inside the same two hours.
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c', 'd'] as $card) {
+                $this->refuseCard($user, 'lucky-'.$card, device: $device);
+            }
+
+            app(PaymentSessionService::class)->confirmSession($this->makeSessionFor($user, $order));
+
+            PaymentDecline::create([
+                'user_id' => $user->id,
+                'product_line' => 'checkout',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'probe-'.Str::random(12),
+                'tx_ref' => 'probe-'.$user->id,
+                'card_fingerprint' => 'lucky-e',
+                'verdict' => 'Payment declined. Suspected Fraud',
+                'verdict_class' => 'fraud',
+                'reason_code' => 'suspected_fraud',
+                'amount' => 25,
+                'currency' => 'USD',
+                'customer_ip' => '203.0.113.10',
+                'device_uuid' => $device,
+                'declined_at' => now()->addSecond(),
+            ]);
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.16', $device);
+            $this->ensure($status['fraud_cards'] === 5 && $status['locked'], 'one lucky card bought a tester a fresh start');
+        });
+
+        $this->probe('Progressive Backoff', 'walking away at the gateway IS a failed attempt', function () use ($manager) {
+            // Every payment that does not complete writes rows, whether the
+            // customer was refused or simply closed the window.
             $walker = $this->makeProbeUser();
             $walkerOrder = Order::factory()->create(['user_id' => $walker->id]);
 
-            for ($i = 0; $i < 8; $i++) {
+            for ($i = 0; $i < 3; $i++) {
                 $session = $this->makeSessionFor($walker, $walkerOrder);
                 $session->transitionTo('awaiting_confirmation');
                 app(PaymentSessionService::class)->failSession($session, 'popup_closed');
             }
 
             $status = $manager->getBackoffStatus($walker, 'checkout', '203.0.113.20');
-            $this->ensure(! $status['is_rate_limited'], 'deep abandonment triggered a rate limit');
-            $this->ensure($status['declines'] === 0, "deep abandonment counted {$status['declines']} declines");
-            $this->ensure($status['no_shows'] === 0, "deep abandonment counted {$status['no_shows']} no-shows");
+            $this->ensure($status['attempts'] === 3, "three walk-aways counted as {$status['attempts']}");
+            $this->ensure($status['is_rate_limited'], 'three walk-aways did not pause');
         });
 
-        $this->probe('Progressive Backoff', 'repeat Pay taps that never reach a gateway ARE counted', function () use ($manager) {
-            // The trial-and-error pattern: checkout created, no payment method
-            // ever engaged. Guests get the tightest allowance on this signal.
+        $this->probe('Progressive Backoff', 'Pay taps that never reach a gateway are failed attempts too', function () use ($manager) {
             $tapper = $this->makeProbeUser();
             $tapperOrder = Order::factory()->create(['user_id' => $tapper->id]);
 
-            for ($i = 0; $i < 6; $i++) {
+            for ($i = 0; $i < 4; $i++) {
                 $session = $this->makeSessionFor($tapper, $tapperOrder);
                 app(PaymentSessionService::class)->failSession($session, 'popup_closed');
             }
 
             $status = $manager->getBackoffStatus($tapper, 'checkout', '203.0.113.30');
-            $this->ensure($status['no_shows'] === 6, "expected 6 no-shows, got {$status['no_shows']}");
-            $this->ensure($status['signal'] === PaymentBackoffManager::SIGNAL_NO_SHOW, 'wrong signal drove the verdict');
-            $this->ensure($status['is_rate_limited'], 'six no-shows did not trip the limiter');
+            $this->ensure($status['attempts'] === 4, "expected 4 attempts, got {$status['attempts']}");
+            $this->ensure($status['step'] === PaymentBackoffManager::STEP_HOLD, "four taps reached step {$status['step']}");
         });
 
-        $this->probe('Progressive Backoff', 'a customer who has paid before gets a longer leash', function () use ($manager) {
-            $trusted = $this->makeProbeUser();
-            $trustedOrder = Order::factory()->create(['user_id' => $trusted->id]);
+        $this->probe('Progressive Backoff', 'compliance blocks count: retrying them does not fix them', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
 
-            // Establish trust with a real payment, then reset the clock so the
-            // success does not also wipe the failures we are about to record.
-            $paid = $this->makeSessionFor($trusted, $trustedOrder);
-            app(PaymentSessionService::class)->confirmSession($paid);
-            PaymentOutcome::where('user_id', $trusted->id)->update(['created_at' => now()->subMinutes(90)]);
-
-            $status = $manager->getBackoffStatus($trusted, 'checkout', '203.0.113.40');
-            $this->ensure($status['tier'] === PaymentBackoffManager::TIER_TRUSTED, "tier {$status['tier']} for a paying customer");
-
-            // Three declines would stop an untrusted customer dead.
             for ($i = 0; $i < 3; $i++) {
-                $this->failAtGateway($trusted, $trustedOrder, 'declined');
+                $session = $this->makeSessionFor($user, $order);
+                app(PaymentSessionService::class)->failSession($session, 'Payment could not be started', [
+                    'failure' => ['provider_code' => null, 'provider_message' => 'Transaction failed compliance checks. Please try again later or use a different payment method.', 'http_status' => 400],
+                ]);
             }
 
-            $status = $manager->getBackoffStatus($trusted, 'checkout', '203.0.113.40');
-            $this->ensure($status['declines'] === 3, "expected 3 declines, got {$status['declines']}");
-            $this->ensure(! $status['is_rate_limited'], 'a paying customer was throttled at the baseline threshold');
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.31');
+            $this->ensure($status['attempts'] === 3 && $status['is_rate_limited'], 'three compliance blocks did not pause');
+        });
+
+        $this->probe('Progressive Backoff', 'wallet balance payments are never counted', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
+
+            for ($i = 0; $i < 5; $i++) {
+                $session = $this->makeSessionFor($user, $order);
+                $session->forceFill(['provider' => 'wallet'])->save();
+                app(PaymentSessionService::class)->failSession($session, 'insufficient balance');
+            }
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.32');
+            $this->ensure($status['attempts'] === 0 && ! $status['is_rate_limited'], 'wallet balance attempts were counted');
+        });
+
+        $this->probe('Progressive Backoff', 'a customer who has paid before is locked like anyone else', function () use ($manager) {
+            $trusted = $this->makeProbeUser();
+            $trustedOrder = Order::factory()->create(['user_id' => $trusted->id]);
+            $device = $this->probeDevice();
+
+            // A real payment, moved back so it does not also wipe the refusals
+            // recorded below. One lucky card must not buy immunity.
+            $paid = $this->makeSessionFor($trusted, $trustedOrder);
+            app(PaymentSessionService::class)->confirmSession($paid);
+            PaymentSession::whereKey($paid->id)->update(['confirmed_at' => now()->subMinutes(150)]);
+
+            $status = $manager->getBackoffStatus($trusted, 'checkout', '203.0.113.40', $device);
+            $this->ensure($status['tier'] === PaymentBackoffManager::TIER_TRUSTED, "tier {$status['tier']} for a paying customer");
+
+            foreach (['a', 'b', 'c', 'd', 'e'] as $card) {
+                $this->refuseCard($trusted, 'trusted-'.$card, device: $device);
+            }
+
+            $status = $manager->getBackoffStatus($trusted, 'checkout', '203.0.113.40', $device);
+            $this->ensure($status['locked'], 'a customer who had paid before was spared the lock');
+        });
+
+        $this->probe('Progressive Backoff', 'a purchase from wallet balance does not wipe the count', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $order = Order::factory()->create(['user_id' => $user->id]);
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c', 'd'] as $card) {
+                $this->refuseCard($user, 'balance-'.$card, device: $device);
+            }
+
+            $walletPurchase = $this->makeSessionFor($user, $order);
+            $walletPurchase->forceFill(['provider' => 'wallet'])->save();
+            app(PaymentSessionService::class)->confirmSession($walletPurchase);
+
+            $this->refuseCard($user, 'balance-e', device: $device);
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.42', $device);
+            $this->ensure($status['fraud_cards'] === 5 && $status['locked'], 'a wallet purchase reset the card count between stolen cards');
+        });
+
+        $this->probe('Progressive Backoff', 'lifting a lock releases the customer at once', function () use ($manager) {
+            $user = $this->makeProbeUser();
+            $device = $this->probeDevice();
+
+            foreach (['a', 'b', 'c', 'd', 'e'] as $card) {
+                $this->refuseCard($user, 'lift-'.$card, device: $device);
+            }
+            $this->ensure($manager->getBackoffStatus($user, 'checkout', '203.0.113.41', $device)['locked'], 'expected a lock');
+
+            $lock = PaymentBackoffEvent::where('user_id', $user->id)->where('signal', PaymentBackoffManager::SIGNAL_CARD_TESTING)->latest('id')->first();
+            $this->ensure($lock !== null, 'lock event not recorded');
+            $manager->liftLock($lock, null);
+
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.41', $device);
+            $this->ensure(! $status['is_rate_limited'] && $status['step'] === PaymentBackoffManager::STEP_NONE, 'lift did not release the customer');
         });
 
         $this->probe('Progressive Backoff', 'recovery link retry resets the backoff', function () use ($manager) {
-            // A dedicated customer, so the schedule probe's failure history
-            // can't bleed into this scenario.
+            // A dedicated customer, so no other probe's history can bleed in.
             $retryUser = $this->makeProbeUser();
             $retryOrder = Order::factory()->create(['user_id' => $retryUser->id]);
 
-            // Rack up three declines → limited. They have to be real declines:
+            // Three fraud-class cards → paused. They have to be refused cards:
             // three no-shows sit well inside that counter's allowance.
-            $lastSession = null;
-            for ($i = 0; $i < 3; $i++) {
-                $lastSession = $this->failAtGateway($retryUser, $retryOrder, 'declined');
+            foreach (['a', 'b', 'c'] as $card) {
+                $this->refuseCard($retryUser, 'retry-'.$card, device: null);
             }
+            $lastSession = $this->failAtGateway($retryUser, $retryOrder, 'declined');
             $this->ensure($manager->getBackoffStatus($retryUser, 'checkout', '203.0.113.10')['is_rate_limited'], 'expected to be limited before recovery retry');
 
             $recovery = TransactionRecovery::create([
@@ -974,17 +1153,17 @@ class ValidatePaymentPlatformCommand extends Command
     {
         $this->probe('Progressive Backoff', 'shadow mode records the decision without blocking', function () {
             $user = $this->makeProbeUser();
-            $order = Order::factory()->create(['user_id' => $user->id]);
+            $device = $this->probeDevice();
 
-            for ($i = 0; $i < 4; $i++) {
-                $this->failAtGateway($user, $order, 'declined');
+            foreach (['a', 'b', 'c', 'd', 'e'] as $card) {
+                $this->refuseCard($user, 'shadow-'.$card, device: $device);
             }
 
             $manager = app(PaymentBackoffManager::class);
             $this->ensure(! $manager->enforcementEnabled(), 'enforcement is on by default');
 
             $before = PaymentBackoffEvent::count();
-            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.50');
+            $status = $manager->getBackoffStatus($user, 'checkout', '203.0.113.50', $device);
 
             $this->ensure(! $status['is_rate_limited'], 'shadow mode blocked a customer');
             $this->ensure($status['enforced'] === false, 'status claims enforcement while shadowing');
@@ -993,7 +1172,7 @@ class ValidatePaymentPlatformCommand extends Command
 
             $event = PaymentBackoffEvent::latest('id')->first();
             $this->ensure($event->enforced === false, 'event marked enforced while shadowing');
-            $this->ensure($event->signal === PaymentBackoffManager::SIGNAL_DECLINE, "event signal {$event->signal}");
+            $this->ensure($event->signal === PaymentBackoffManager::SIGNAL_CARD_TESTING, "event signal {$event->signal}");
 
             // And the guard must let them through.
             app(PaymentSessionService::class)->assertNotRateLimited($user, 'checkout');
@@ -1001,12 +1180,49 @@ class ValidatePaymentPlatformCommand extends Command
     }
 
     /**
-     * A payment that reached the gateway and was refused there.
-     *
-     * The backoff counter separates these from checkouts that never engaged a
-     * payment method, and a session created by makeSessionFor() sits at
-     * 'awaiting_method'. Failing it directly would record a no-show, so any
-     * probe asserting the decline schedule has to advance the session first.
+     * A card the gateway refused, written the way RefusedCardRecorder writes
+     * it after a popup closes. Each one is a failed attempt, and the fraud-class
+     * ones are what a lock is judged on.
+     */
+    private function refuseCard(User $user, string $fingerprint, string $class = 'fraud', ?string $device = null, string $productLine = 'checkout'): void
+    {
+        PaymentDecline::create([
+            'user_id' => $user->id,
+            'product_line' => $productLine,
+            'gateway' => 'flutterwave',
+            'gateway_transaction_id' => 'probe-'.Str::random(12),
+            'tx_ref' => 'probe-'.$user->id,
+            'card_fingerprint' => $fingerprint,
+            'card_brand' => 'VISA',
+            'verdict' => match ($class) {
+                'fraud' => 'Payment declined. Suspected Fraud',
+                'soft' => 'Insufficient Funds',
+                default => 'Transaction failed compliance checks',
+            },
+            'verdict_class' => $class,
+            'reason_code' => match ($class) {
+                'fraud' => 'suspected_fraud',
+                'soft' => 'insufficient_funds',
+                default => 'gateway_compliance_block',
+            },
+            'amount' => 25,
+            'currency' => 'USD',
+            'customer_ip' => '203.0.113.10',
+            'device_uuid' => $device,
+            'declined_at' => now()->subSeconds(5),
+        ]);
+    }
+
+    private function probeDevice(): string
+    {
+        return 'probe-device-'.(++$this->probeDevices);
+    }
+
+    /**
+     * A payment that reached the gateway and was refused there. The rate
+     * limiter counts it the same as any other failed attempt; insights and
+     * recovery still care which stage it failed at, which is why the session
+     * is advanced before it fails.
      */
     private function failAtGateway(User $user, Order $order, string $reason): PaymentSession
     {
@@ -1059,11 +1275,8 @@ class ValidatePaymentPlatformCommand extends Command
             // failures have to be real declines rather than no-shows.
             $this->setFlag('payment_backoff_enforce', true);
 
-            for ($i = 0; $i < 3; $i++) {
-                $this->failAtGateway($user, $order, 'declined');
-                if ($i < 2) {
-                    PaymentOutcome::where('user_id', $user->id)->update(['created_at' => now()->subSeconds(35)]);
-                }
+            foreach (['a', 'b', 'c'] as $card) {
+                $this->refuseCard($user, 'kill-'.$card, device: null);
             }
             $this->ensure(app(PaymentBackoffManager::class)->getBackoffStatus($user, 'checkout', '203.0.113.10')['is_rate_limited'], 'expected limited');
 
@@ -1370,8 +1583,34 @@ class ValidatePaymentPlatformCommand extends Command
     private function setFlag(string $flag, bool $on): void
     {
         $key = "features.{$flag}_enabled";
+        $this->touchedFlagKeys[$key] = true;
+
         SiteSetting::put($key, $on ? 'on' : 'off', 'features');
         Cache::forget('site_setting_'.$key);
+    }
+
+    /**
+     * Drop the cached value of every flag a probe flipped.
+     *
+     * The rollback restores each flag in the database, but not in the cache: a
+     * probe that read a flag mid-run cached the temporary value for an hour.
+     * Run in production after payment_backoff_enforce was switched on, this
+     * command would otherwise leave enforcement reading "off" for up to an
+     * hour afterwards. Forgetting the keys makes the next read come from the
+     * restored row.
+     */
+    private function forgetTouchedFlags(): void
+    {
+        foreach (array_keys($this->touchedFlagKeys) as $key) {
+            try {
+                Cache::forget('site_setting_'.$key);
+                Cache::forget('site_setting:'.$key);
+            } catch (\Throwable) {
+                // A cache hiccup here must not mask the probe results.
+            }
+        }
+
+        $this->touchedFlagKeys = [];
     }
 
     /**

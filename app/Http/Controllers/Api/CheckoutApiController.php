@@ -83,13 +83,10 @@ class CheckoutApiController extends Controller
                 'category_ineligible' => true,
             ], 422);
         } catch (PaymentBackoffException $e) {
-            // 429 with the wait, not a generic 400. Nothing was written, so the
-            // client is safe to retry once the window passes.
-            return response()->json([
-                'message' => $e->customerMessage(),
-                'is_rate_limited' => true,
-                'wait_seconds' => $e->waitSeconds,
-            ], 429);
+            // 429 with the wait and whether it is a lock, not a generic 400.
+            // Nothing was written, so the client is safe to retry once the
+            // window passes. The exception renders the one shared payload.
+            return $e->render($request);
         } catch (WalletOnHoldException|InsufficientBalanceException|MissingTransactionPinException $e) {
             // Friendly wallet errors carry a customer-ready message — return
             // it verbatim instead of prefixing "Checkout failed:".

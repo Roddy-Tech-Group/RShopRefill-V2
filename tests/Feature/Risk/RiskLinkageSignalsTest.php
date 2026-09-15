@@ -34,9 +34,11 @@ class RiskLinkageSignalsTest extends TestCase
         parent::setUp();
 
         // Pin the production linkage thresholds so these tests document the
-        // policy: households/family sharing stay silent, farms fire.
+        // policy: family cards and office IPs stay silent, farms fire. Devices
+        // are stricter since the first production card-testing pair was two
+        // accounts on one phone.
         config([
-            'risk.thresholds.device_shared_max_accounts' => 2,
+            'risk.thresholds.device_shared_max_accounts' => 1,
             'risk.thresholds.ip_shared_max_accounts' => 5,
             'risk.thresholds.ip_shared_window_hours' => 24,
             'risk.thresholds.instrument_reuse_max_accounts' => 2,
@@ -78,26 +80,28 @@ class RiskLinkageSignalsTest extends TestCase
         ], $extra));
     }
 
-    public function test_device_shared_fires_on_a_farm_but_spares_a_household(): void
+    public function test_device_shared_fires_on_a_second_account_but_never_on_one(): void
     {
         $signal = app(DeviceSharedSignal::class);
-
-        // A household: two accounts on one phone stays silent.
-        $a = User::factory()->create();
-        $b = User::factory()->create();
-        $this->device($a->id, 'family-dev');
-        $this->device($b->id, 'family-dev');
-        $this->assertSilent($signal, $this->ctx(['user' => $a, 'deviceUuid' => 'family-dev']));
-
-        // A farm: three accounts on one device fires.
-        $c = User::factory()->create();
-        $this->device($c->id, 'family-dev');
-        $this->assertFires($signal, $this->ctx(['user' => $a, 'deviceUuid' => 'family-dev']));
 
         // A device with a single account does not fire.
         $solo = User::factory()->create();
         $this->device($solo->id, 'solo-dev');
         $this->assertSilent($signal, $this->ctx(['user' => $solo, 'deviceUuid' => 'solo-dev']));
+
+        // Two accounts on one phone: the exact shape of the first card-testing
+        // pair caught in production (users 400 and 428, seven refused cards
+        // between them). It adds weight; at 25 points it holds nobody alone.
+        $a = User::factory()->create();
+        $b = User::factory()->create();
+        $this->device($a->id, 'shared-dev');
+        $this->device($b->id, 'shared-dev');
+        $this->assertFires($signal, $this->ctx(['user' => $a, 'deviceUuid' => 'shared-dev']));
+
+        // A farm keeps firing.
+        $c = User::factory()->create();
+        $this->device($c->id, 'shared-dev');
+        $this->assertFires($signal, $this->ctx(['user' => $a, 'deviceUuid' => 'shared-dev']));
     }
 
     public function test_ip_shared_fires_on_bulk_accounts_but_spares_cgnat_scale_sharing(): void

@@ -7,6 +7,7 @@ use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\NowPaymentsStatus;
+use App\Domain\PaymentInsights\Services\RefusedCardRecorder;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Jobs\VerifyPaymentJob;
@@ -225,7 +226,24 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                 //    failed session would rewrite the reason the customer was
                 //    given for a failure that already has one.
                 if (in_array($session->status, self::ACTIVE_STATUSES, true)) {
-                    $paymentSessionService->expireSession($session);
+                    // 2a. A popup the customer simply left open after a refused
+                    //     card is a decline, not an abandonment. Ask the gateway
+                    //     before filing it as expired; a refused card fails the
+                    //     session with the verdict instead.
+                    $declines = $attempt ? app(RefusedCardRecorder::class)->reconcile($session) : collect();
+
+                    if ($declines->isNotEmpty()) {
+                        $failure = app(RefusedCardRecorder::class)->failureFor($session, $declines);
+                        $paymentSessionService->failSession($session, $failure['reason'], $failure['payload'] + ['client_reason' => 'session_expired']);
+
+                        // The attempt was refused, not abandoned: the admin
+                        // Transactions page should say Failed, not Expired.
+                        if ($attempt && in_array($attempt->payment_status, [PaymentStatus::Unpaid, PaymentStatus::Pending, PaymentStatus::Processing], true)) {
+                            $attempt->update(['payment_status' => PaymentStatus::Failed, 'failed_at' => now()]);
+                        }
+                    } else {
+                        $paymentSessionService->expireSession($session);
+                    }
                 }
 
                 // 3. Cascade to the linked Order or WalletFunding so the customer's

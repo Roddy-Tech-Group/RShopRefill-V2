@@ -8,6 +8,7 @@ use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentDecline;
 use App\Models\RecoveryAttempt;
 use App\Models\TransactionRecovery;
 use App\Models\User;
@@ -159,10 +160,12 @@ class RecoveryFlowTest extends TestCase
     }
 
     /**
-     * A wallet deposit paid by card has session_type 'card' - the retry must
-     * still reset the wallet_funding backoff bucket, not checkout's.
+     * A customer invited back by a recovery email must not be greeted by a
+     * pause. Failed attempts are counted across checkout and top-ups together,
+     * so the retry clears that one shared count, and the customer landing on
+     * the wallet top-up can pay straight away.
      */
-    public function test_wallet_funding_retry_resets_the_wallet_backoff_bucket(): void
+    public function test_wallet_funding_retry_clears_the_shared_backoff_count(): void
     {
         $user = User::factory()->create();
         $wallet = Wallet::create([
@@ -200,14 +203,35 @@ class RecoveryFlowTest extends TestCase
             'expires_at' => now()->addDay(),
         ]);
 
+        // Three refused top-ups: enough to pause this customer everywhere.
+        foreach (range(1, 3) as $n) {
+            PaymentDecline::create([
+                'user_id' => $user->id,
+                'product_line' => 'wallet_funding',
+                'gateway' => 'flutterwave',
+                'gateway_transaction_id' => 'recovery-'.$n,
+                'tx_ref' => 'ref-'.$user->id,
+                'payment_method' => 'card',
+                'card_fingerprint' => 'card-'.$n,
+                'verdict' => 'Insufficient Funds',
+                'verdict_class' => 'soft',
+                'amount' => 50,
+                'currency' => 'USD',
+                'declined_at' => now()->subSeconds(30),
+            ]);
+        }
+
+        $manager = app(PaymentBackoffManager::class);
+        $this->assertSame(3, $manager->peek($user, 'wallet_funding', '127.0.0.1')['attempts']);
+
         // The wallet, with the sheet told to open for this currency and the
         // failed amount filled in, instead of a bare dashboard.
         $this->post(route('recovery.retry', $recovery->token))
             ->assertRedirect(route('dashboard', ['fund' => 'USD', 'amount' => '50.0000']));
 
-        // The reset watermark must land in the wallet_funding bucket (key
-        // format mirrors PaymentBackoffManager::resetBackoff).
-        $this->assertNotNull(Cache::get("payment_backoff_reset:user:{$user->id}:wallet_funding"));
-        $this->assertNull(Cache::get("payment_backoff_reset:user:{$user->id}:checkout"));
+        // One shared count, cleared for both lines at once.
+        $this->assertNotNull(Cache::get("payment_backoff_reset:user:{$user->id}"));
+        $this->assertSame(0, $manager->peek($user, 'wallet_funding', '127.0.0.1')['attempts']);
+        $this->assertSame(0, $manager->peek($user, 'checkout', '127.0.0.1')['attempts']);
     }
 }

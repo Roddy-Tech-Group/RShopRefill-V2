@@ -31,6 +31,19 @@ new class extends Component
         ];
     }
 
+    /**
+     * A pause or lock this customer is already serving, so a refreshed page
+     * starts the countdown on the top-up button straight away instead of
+     * offering Continue to payment and refusing it a moment later.
+     *
+     * @return array{wait_seconds: int, locked: bool, message: string}|null
+     */
+    public function paymentHold(): ?array
+    {
+        return app(\App\Domain\Payment\Services\PaymentSessionService::class)
+            ->currentHold(auth()->user(), 'wallet_funding');
+    }
+
     /** Funding form. */
     public string $currency = 'USD';
 
@@ -268,7 +281,7 @@ new class extends Component
                 reference: $result['funding']->reference,
             );
         } catch (\App\Domain\PaymentInsights\Exceptions\PaymentBackoffException $e) {
-            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds);
+            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds, message: $e->customerMessage(), locked: $e->locked);
         } catch (\App\Domain\Auth\Exceptions\EmailVerificationRequiredException $e) {
             $this->dispatch('email-verification-required',
                 message: $e->customerMessage(),
@@ -339,7 +352,7 @@ new class extends Component
                 reference: $result['funding']->reference,
             );
         } catch (\App\Domain\PaymentInsights\Exceptions\PaymentBackoffException $e) {
-            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds);
+            $this->dispatch('payment-backoff-triggered', seconds: $e->waitSeconds, message: $e->customerMessage(), locked: $e->locked);
         } catch (\App\Domain\Auth\Exceptions\EmailVerificationRequiredException $e) {
             // Same verify-email notice checkout shows: amber envelope, message,
             // Resend with the escalating countdown, Got it.
@@ -368,6 +381,7 @@ new class extends Component
 <div
     x-data="{
         open: @js($openOnLoad),
+        initialHold: @js($this->paymentHold()),
         ccyOpen: false,
         session: null,
         // Session-less method list from prepare(): the sheet shows tiles off
@@ -378,6 +392,13 @@ new class extends Component
         pendingMethod: null,
         backoffRemaining: 0,
         backoffInterval: null,
+        // When the hold ends, as a wall-clock time, and how long it was when
+        // it started. The end time keeps the countdown true after the tab has
+        // been in the background (browsers slow timers there to once a
+        // minute); the starting length decides the wording, so it never
+        // changes halfway through a countdown.
+        backoffEndsAt: 0,
+        backoffTotal: 0,
         selectedMethod: null,
         cardDetails: {
             card_number: '',
@@ -414,12 +435,26 @@ new class extends Component
         kycSmile: null,
         holdMessage: '',
         emailMessage: '',
+        // The limiter's own sentence, and whether this is the six hour device
+        // lock rather than a short pause. The heading is the only thing the
+        // flag changes; the wording always comes from the server.
+        backoffMessage: '',
+        backoffLocked: false,
         resendRemaining: 0,
         resendTimerId: null,
         resendBusy: false,
         resendFlash: '',
 
         init() {
+            // A pause or lock already being served when the page loaded:
+            // start the countdown now, so a refresh never offers Continue to
+            // payment only to refuse it a moment later.
+            if (this.initialHold && this.initialHold.wait_seconds > 0) {
+                this.backoffLocked = !! this.initialHold.locked;
+                this.backoffMessage = this.initialHold.message || '';
+                this.startBackoff(this.initialHold.wait_seconds);
+            }
+
             if (!document.getElementById('flutterwave-v3')) {
                 let script = document.createElement('script');
                 script.id = 'flutterwave-v3';
@@ -433,15 +468,56 @@ new class extends Component
         },
 
         startBackoff(seconds) {
-            this.backoffRemaining = seconds;
+            const total = Math.max(0, Math.round(Number(seconds) || 0));
+
+            this.backoffTotal = total;
+            this.backoffEndsAt = Date.now() + total * 1000;
+            this.backoffRemaining = total;
+
             if (this.backoffInterval) clearInterval(this.backoffInterval);
             this.backoffInterval = setInterval(() => {
-                if (this.backoffRemaining > 0) {
-                    this.backoffRemaining--;
-                } else {
+                this.backoffRemaining = Math.max(0, Math.ceil((this.backoffEndsAt - Date.now()) / 1000));
+
+                if (this.backoffRemaining === 0) {
                     clearInterval(this.backoffInterval);
                 }
             }, 1000);
+        },
+
+        /**
+         * The time left as a running clock: 5:59:59 for the lock, 4:59 for the
+         * pauses. Exact to the second, so it never rounds to an odd reading of
+         * about 60 minutes.
+         *
+         * NO DOUBLE QUOTES anywhere in this x-data block, comments included:
+         * the whole object sits inside a double-quoted HTML attribute, and one
+         * stray quote ends the attribute, kills the component, and leaves this
+         * modal stuck open with a dead close button.
+         */
+        backoffCountdown() {
+            const left = Math.max(0, this.backoffRemaining);
+            const hours = Math.floor(left / 3600);
+            const minutes = Math.floor((left % 3600) / 60);
+            const seconds = left % 60;
+            const pad = (value) => String(value).padStart(2, '0');
+
+            return hours > 0
+                ? hours + ':' + pad(minutes) + ':' + pad(seconds)
+                : minutes + ':' + pad(seconds);
+        },
+
+        /**
+         * The top-up button's label while a hold is running. The five minute
+         * pause says why; the one minute pause and the lock just show the
+         * clock, the lock's reason being on its notice. Chosen from the hold's
+         * starting length, so the wording stays put while the clock runs down.
+         */
+        backoffLabel() {
+            if (! this.backoffLocked && this.backoffTotal > 60) {
+                return 'Too many attempts, try again in ' + this.backoffCountdown();
+            }
+
+            return 'Try again in ' + this.backoffCountdown();
         },
 
         /**
@@ -991,6 +1067,33 @@ new class extends Component
             this.riskOverlay = true;
         },
 
+        /**
+         * The card-testing limiter held this top-up. Never the red failure
+         * panel: nothing was charged and nothing was attempted, and a real
+         * customer told their payment failed goes looking for another card,
+         * which is exactly what is being throttled. The method picker is
+         * restored underneath so they can carry on when the wait is over.
+         */
+        onBackoffNotice(detail) {
+            this.startBackoff(detail?.seconds || 0);
+            this.backoffLocked = !! detail?.locked;
+            this.backoffMessage = detail?.message || '';
+
+            if (this.draft && ! this.session) {
+                this.pendingMethod = null;
+                this.paymentState = 'select_method';
+            }
+
+            // Everything stays inside the top-up modal, where the customer
+            // already is. A short pause needs no panel at all: the Continue to
+            // payment button counts itself down. Only the six hour lock, which
+            // cannot be waited out, replaces the step and offers a way to
+            // reach a human.
+            if (this.backoffLocked) {
+                this.paymentState = 'backoff_notice';
+            }
+        },
+
         // Email not verified: the same calm notice + escalating Resend that
         // checkout shows. The server just auto-sent (or told us the cooldown).
         onEmailNotice(detail) {
@@ -1064,7 +1167,7 @@ new class extends Component
     @funding-draft-ready.window="if (open) initDraft($event.detail.draft)"
     @funding-error.window="if (open) onFundingError($event.detail.message)"
     @open-fund-wallet.window="if (($event.detail?.code || '').toUpperCase() === '{{ strtoupper($this->currency) }}') open = true"
-    @payment-backoff-triggered.window="if (open) { startBackoff($event.detail.seconds); errorMessage = 'Too many failed payment attempts. Please wait.'; if (draft && ! session) { pendingMethod = null; paymentState = 'select_method' } }"
+    @payment-backoff-triggered.window="if (open) onBackoffNotice($event.detail)"
     @kyc-step-up-required.window="if (open) onKycStepUp($event.detail.payload)"
     @risk-hold.window="if (open) onRiskHold($event.detail.message)"
     @email-verification-required.window="if (open) onEmailNotice($event.detail)"
@@ -1131,7 +1234,7 @@ new class extends Component
             </div>
 
             <!-- STEP 1: Enter amount & select currency -->
-            <div x-show="!session && !draft">
+            <div x-show="!session && !draft && paymentState !== 'backoff_notice'">
                 {{-- Currency — custom dropdown selector. --}}
                 <label class="mt-5 block text-xs font-semibold text-zinc-700">Currency</label>
                 <div class="relative mt-1.5" @click.outside="ccyOpen = false">
@@ -1206,8 +1309,23 @@ new class extends Component
                 @error('amount') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                 @error('currency') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
 
+                {{-- During a lock, a separate button that reopens the lock
+                     notice instead of calling the server, which would only
+                     refuse. Kept apart from the Livewire button below so the
+                     two clicks can never race. --}}
                 <button
                     type="button"
+                    x-show="backoffLocked && backoffRemaining > 0"
+                    x-cloak
+                    @click="paymentState = 'backoff_notice'"
+                    class="mt-5 flex w-full items-center justify-center gap-2 rounded-[15px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                    <span x-text="backoffLabel()"></span>
+                </button>
+
+                <button
+                    type="button"
+                    x-show="! (backoffLocked && backoffRemaining > 0)"
                     wire:click="prepare"
                     wire:target="prepare"
                     wire:loading.attr="disabled"
@@ -1219,7 +1337,7 @@ new class extends Component
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
                     <template x-if="backoffRemaining > 0">
-                        <span x-text="'Please wait ' + backoffRemaining + ' seconds before trying again'"></span>
+                        <span x-text="backoffLabel()"></span>
                     </template>
                     <template x-if="backoffRemaining === 0">
                         <span>
@@ -1236,6 +1354,18 @@ new class extends Component
                 <div x-show="paymentState === 'select_method'">
                     <h3 class="text-sm font-bold text-zinc-900">Select Payment Method</h3>
                     <p class="text-xs text-zinc-500 mb-4">Choose how you want to fund your account.</p>
+
+                    {{-- A short hold from the card-testing limiter. The customer
+                         is returned to this step, so the countdown belongs here:
+                         the Continue to payment button that normally carries it
+                         is a step behind them and hidden. One quiet line, no
+                         heading, because a minute is not worth a panel. --}}
+                    <p
+                        x-show="backoffRemaining > 0"
+                        x-cloak
+                        class="mb-4 rounded-[12px] bg-amber-50 px-3.5 py-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-200"
+                        x-text="backoffLabel()"
+                    ></p>
 
                     {{-- Same notice checkout shows when a rail is dark. --}}
                     <template x-if="draft?.down_rails?.length">
@@ -1655,6 +1785,41 @@ new class extends Component
 
                     <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                         Try Another Method
+                    </button>
+                </div>
+
+            </div>
+
+            {{-- Payments paused on this device by the card-testing limiter.
+                 Lives inside the top-up modal, where the customer already is,
+                 rather than throwing them back to the dashboard behind an
+                 overlay. Amber, not the red failure panel: nothing was charged
+                 and nothing was attempted. Outside both steps on purpose, so it
+                 opens from the amount step too (a locked customer who reloads
+                 and taps Continue) and not only after a method is picked. Only
+                 the six hour lock gets this treatment; the short pauses just
+                 count the button down. --}}
+            <div x-show="paymentState === 'backoff_notice'" x-cloak class="flex flex-col items-center py-6 text-center">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+                    <svg class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5V12l2.75 1.75"/>
+                    </svg>
+                </div>
+                <h3 class="mt-4 text-sm font-bold text-zinc-900">Suspicious payments detected</h3>
+                <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="backoffMessage"></p>
+
+                <p x-show="backoffRemaining > 0" x-cloak class="mt-3 rounded-[10px] bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700" x-text="'Try again in ' + backoffCountdown()"></p>
+
+                <div class="mt-6 flex items-center justify-center gap-2.5">
+                    <a href="{{ route('shop.contact') }}" class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100">
+                        Contact support
+                    </a>
+                    {{-- closeModal(), not open = false: it clears the draft and
+                         the lock state, so reopening the top-up after the lock
+                         ends starts fresh instead of showing a stale notice. --}}
+                    <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                        Got it
                     </button>
                 </div>
             </div>

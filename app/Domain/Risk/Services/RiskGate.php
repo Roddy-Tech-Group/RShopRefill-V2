@@ -13,6 +13,7 @@ use App\Domain\Risk\DTOs\RiskDecision;
 use App\Domain\Risk\Enums\RiskOutcome;
 use App\Domain\Risk\Exceptions\RiskDeniedException;
 use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
+use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -119,6 +120,23 @@ class RiskGate
                 // user+context so repeated attempts share one queue entry.
                 throw new RiskReviewRequiredException($this->reviews->open($decision, $context));
             case RiskOutcome::StepUp:
+                // A step-up hands the customer to the identity provider and
+                // bypasses the KYC enforcement flag, so it has its own switch.
+                // Review and deny come only from behaviour signals and can be
+                // enforced first; the step-up waits until the provider is
+                // proven live. Off: log what would have happened, let through.
+                if (! FeatureFlag::on('risk_step_up_enforce', false)) {
+                    Log::info('risk.shadow_step_up', [
+                        'assessment_id' => $decision->assessmentId,
+                        'context' => $context->context,
+                        'user_id' => $context->user?->getKey(),
+                        'score' => $decision->score,
+                        'band' => $decision->band->value,
+                    ]);
+
+                    return;
+                }
+
                 $this->kycGate->stepUp($context->user, KycTier::IdentityVerified, $context->context);
 
                 return;

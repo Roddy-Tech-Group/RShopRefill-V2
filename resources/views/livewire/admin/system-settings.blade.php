@@ -48,6 +48,7 @@ class extends Component {
         'Risk & Fraud' => [
             'features.risk_engine_enabled',
             'features.risk_engine_enforce_enabled',
+            'features.risk_step_up_enforce_enabled',
             'features.device_restriction_enabled',
         ],
         'Verification & Limits' => [

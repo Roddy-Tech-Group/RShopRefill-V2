@@ -6,12 +6,15 @@ use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Risk\DTOs\RiskContext;
 use App\Domain\Risk\DTOs\RiskDecision;
 use App\Domain\Risk\Enums\RiskReviewStatus;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Models\RiskLabel;
 use App\Models\RiskReview;
 use App\Models\User;
 use App\Notifications\CriticalSystemAlert;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Owns the manual review queue lifecycle: opening a review when the engine holds
@@ -24,7 +27,10 @@ use Illuminate\Support\Facades\Notification;
  */
 class RiskReviewService
 {
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly OperationalAlerter $alerter,
+    ) {}
 
     /**
      * Open a pending review for a held decision, or return the existing blocking
@@ -57,12 +63,43 @@ class RiskReviewService
     }
 
     /**
-     * Alert the review-queue owners (config risk.review.owners) that a new review
-     * needs attention. Delivery is queued (CriticalSystemAlert) and wrapped, so a
-     * mail hiccup can never break the money action that opened the review.
+     * A held order is an interruption, not a queue item: it goes to Telegram
+     * as a SEV-2 the moment it opens, with the review link, and additionally
+     * by email to any configured owners. Both paths are wrapped, so an alert
+     * hiccup can never break the money action that opened the review.
      */
     private function notifyOwners(RiskReview $review): void
     {
+        try {
+            $context = [
+                'review' => $review->getKey(),
+                'user_id' => $review->user_id,
+                'context' => $review->context,
+                'score' => $review->score,
+                'band' => $review->band,
+                'reasons' => implode(', ', $review->reason_codes ?? []),
+                'sla_hours' => config('risk.review.sla_hours'),
+            ];
+
+            if (Route::has('admin.risk.review')) {
+                $context['review_page'] = route('admin.risk.review', $review->getKey());
+            }
+
+            $this->alerter->send(
+                severity: AlertSeverity::Sev2,
+                key: 'risk:review:'.$review->getKey(),
+                title: 'Risk review opened ('.strtoupper((string) $review->band).')',
+                message: 'A '.$review->context.' action is on hold until someone approves or rejects it. The customer is waiting; the SLA is '.config('risk.review.sla_hours').' hours.',
+                context: $context,
+                runbook: 'docs/runbooks/risk-review.md',
+            );
+        } catch (\Throwable $e) {
+            Log::warning('risk.review_alert_failed', [
+                'review' => $review->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $owners = array_filter((array) config('risk.review.owners', []));
 
         if ($owners === []) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Risk\Exceptions\RiskDeniedException;
 use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Shared\Enums\Currency;
@@ -74,6 +75,11 @@ class UserWalletController extends Controller
                 'display_currency' => $result['funding']->display_currency,
                 'exchange_rate' => $result['funding']->exchange_rate_snapshot,
             ]);
+        } catch (PaymentBackoffException $e) {
+            // Paused or locked by the payment rate limiter: the same 429, wait
+            // and lock flag checkout returns, rather than a bare 400 that hides
+            // how long to wait.
+            return $e->render($request);
         } catch (KycStepUpRequiredException $e) {
             // Crossed the identity-verification threshold; hand back the Smile
             // session so the client can launch verification, then retry.

@@ -158,15 +158,38 @@ class RiskGateTest extends TestCase
         $this->assertSame(1, RiskReview::where('user_id', $user->id)->count());
     }
 
-    public function test_enforced_medium_forces_identity_step_up(): void
+    public function test_enforced_medium_forces_identity_step_up_once_the_step_up_switch_is_on(): void
     {
         $this->flags(master: true, enforce: true);
+        SiteSetting::put('features.risk_step_up_enforce_enabled', 'on', 'features');
+        Cache::flush();
         $this->weight(40); // MEDIUM -> step_up
         GateStubSignal::$fires = true;
         $user = User::factory()->create(['kyc_status' => 'pending']); // unverified
 
         $this->expectException(KycStepUpRequiredException::class);
         app(RiskGate::class)->guard($this->context($user));
+    }
+
+    /**
+     * A step-up hands the customer to the identity provider and bypasses the
+     * KYC enforcement flag, so risk enforcement alone must not put the
+     * provider live through the back door. Review and deny still bite; the
+     * step-up is logged and the customer goes through until its own switch
+     * is flipped.
+     */
+    public function test_enforced_medium_lets_the_customer_through_while_the_step_up_switch_is_off(): void
+    {
+        $this->flags(master: true, enforce: true);
+        SiteSetting::query()->where('key', 'features.risk_step_up_enforce_enabled')->delete();
+        Cache::flush();
+        $this->weight(40); // MEDIUM -> step_up
+        GateStubSignal::$fires = true;
+        $user = User::factory()->create(['kyc_status' => 'pending']); // unverified
+
+        app(RiskGate::class)->guard($this->context($user));
+
+        $this->assertDatabaseHas('risk_assessments', ['user_id' => $user->id, 'outcome' => 'step_up', 'enforced' => true]);
     }
 
     public function test_enforced_low_allows(): void

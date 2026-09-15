@@ -166,6 +166,16 @@ class FailureReasonClassifier
     private const FRONTEND_MARKERS = ['ad blocker', 'js exception', 'javascript', 'popup', 'network issue', 'sdk', 'offline', 'browser refresh', 'slow network'];
 
     /**
+     * Failures that were ours, not the customer's. Recovery stays quiet on
+     * them and insights:alert-failures raises a SEV-2 so a person writes
+     * instead of a robot. The payment rate limiter still counts them as failed
+     * attempts: retrying straight away does not fix them either.
+     *
+     * @var list<string>
+     */
+    public const PLATFORM_FAULT_CODES = ['gateway_config_error', 'gateway_compliance_block', 'system_error'];
+
+    /**
      * Human labels for every reason code the taxonomy can emit, kept beside
      * the taxonomy so a new code cannot ship without its display name.
      *
