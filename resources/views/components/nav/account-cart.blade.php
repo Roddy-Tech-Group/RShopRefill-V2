@@ -201,9 +201,13 @@
                  an avatar is the one control on the bar that reads as a face
                  rather than a button. overflow-hidden already clips a real
                  photo to the shape, so the crop follows for free. --}}
-            {{-- text colour is for the glyph fallback: zinc-200 remaps to the ash
-                 card surface in dark, so the glyph steps up to zinc-200 there. --}}
-            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-zinc-700 transition-all duration-150 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:text-zinc-200"
+            {{-- The dashboard avatar's outline, adapted to this bar: a 2px border
+                 at 30% of the ink and a 10% wash on hover, no fill. The dashboard
+                 draws white/30 on its navy bar; this band is #f4f6f5 in light, so
+                 the ink is the navy itself. In dark both bars are black and the
+                 dark classes are the dashboard's own. The text colour is for the
+                 glyph fallback, which inherits it. --}}
+            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
             aria-label="Your account"
         >
             @if ($authUser?->avatar_url)

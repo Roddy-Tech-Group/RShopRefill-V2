@@ -82,6 +82,27 @@ class AccountAvatarShapeTest extends TestCase
         $this->assertStringNotContainsString('data-flux-icon', $button);
     }
 
+    /**
+     * The outline is the dashboard avatar's, adapted to the light band. The
+     * dashboard draws border-white/30 on navy; white on #f4f6f5 is invisible, so
+     * here the ink is the navy itself at the same 30%, with the same 10% wash on
+     * hover and no fill. In dark both bars are black, so the dark classes are
+     * the dashboard's exactly.
+     */
+    public function test_the_border_is_the_dashboards_adapted_to_the_light_bar(): void
+    {
+        $tag = $this->avatarButtonTag($this->home(User::factory()->create()));
+
+        foreach (['border-2', 'border-[#0c1337]/30', 'hover:bg-[#0c1337]/10', 'dark:border-white/10', 'dark:hover:bg-white/5'] as $class) {
+            $this->assertStringContainsString($class, $tag, "Missing {$class}.");
+        }
+
+        // The old kit: a grey fill, a thin zinc ring, and a blue ring on hover.
+        foreach (['bg-zinc-200', 'ring-1 ring-zinc-200', 'hover:ring-blue-400', 'hover:ring-2'] as $old) {
+            $this->assertStringNotContainsString($old, $tag, "{$old} is still on the avatar.");
+        }
+    }
+
     /** The glyph needs a colour of its own: the button paints no text colour otherwise. */
     public function test_the_glyph_has_a_colour_in_both_themes(): void
     {
