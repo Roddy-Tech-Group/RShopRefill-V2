@@ -32,9 +32,11 @@
      a literal one inside a Blade comment can still be picked up
      by the compiler.) --}}
 @php
-    // Real photo if set, otherwise a deterministic initials avatar.
+    // Real photo if set. Otherwise the button draws the same plain user glyph
+    // the dashboard's avatar button falls back to, so one account reads the
+    // same on both bars instead of a coloured initials tile here and an icon
+    // there.
     $authUser = auth()->user();
-    $accountAvatar = $authUser?->avatar_url ?: ($authUser?->initialsAvatar() ?? '');
 @endphp
 
 {{-- Cart first, then the account avatar: on the phone bar the cart is
@@ -199,10 +201,16 @@
                  an avatar is the one control on the bar that reads as a face
                  rather than a button. overflow-hidden already clips a real
                  photo to the shape, so the crop follows for free. --}}
-            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-200 transition-all duration-150 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            {{-- text colour is for the glyph fallback: zinc-200 remaps to the ash
+                 card surface in dark, so the glyph steps up to zinc-200 there. --}}
+            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-zinc-700 transition-all duration-150 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:text-zinc-200"
             aria-label="Your account"
         >
-            <img src="{{ $accountAvatar }}" alt="{{ $authUser?->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
+            @if ($authUser?->avatar_url)
+                <img src="{{ $authUser->avatar_url }}" alt="{{ $authUser->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
+            @else
+                <flux:icon.user class="h-5 w-5" />
+            @endif
         </button>
 
         {{-- KYC verified tick over the storefront account avatar. --}}
