@@ -63,8 +63,8 @@ class AccountAvatarShapeTest extends TestCase
     {
         $button = $this->avatarButton($this->home(User::factory()->create(['avatar_url' => null])));
 
-        // The Flux icon, at the dashboard's size, stroked in the button's colour.
-        $this->assertMatchesRegularExpression('/<svg[^>]*class="[^"]*\bh-5 w-5\b[^"]*"[^>]*data-flux-icon/', $button);
+        // The Flux icon, at the dashboard's size (24px in a 36px chip), stroked in the button's colour.
+        $this->assertMatchesRegularExpression('/<svg[^>]*class="[^"]*\bh-6 w-6\b[^"]*"[^>]*data-flux-icon/', $button);
         $this->assertStringContainsString('stroke="currentColor"', $button);
 
         // No initials tile, and no image at all: the glyph is inline.

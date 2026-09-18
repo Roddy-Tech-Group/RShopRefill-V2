@@ -76,17 +76,20 @@ class MobileActionButtonsTest extends TestCase
         // white surface once it has focus.
         $this->assertStringContainsString("'border-transparent bg-[#f4f6f5] dark:bg-white/8'", $this->nav());
 
-        // Sign in + Cart: filled on a phone, transparent from md up, and the
-        // hover fill on both sides of that breakpoint.
+        // Sign in: filled on a phone, transparent from md up, and the hover
+        // fill on both sides of that breakpoint. Cart no longer shares this
+        // kit: it is the dashboard's outlined chip (see CartChipTest), so each
+        // of these appears once.
         $ac = $this->accountCart();
-        $this->assertSame(2, substr_count($ac, 'bg-[#f4f6f5] md:bg-transparent'));
-        $this->assertSame(2, substr_count($ac, 'hover:bg-[#e8ecea] md:hover:bg-[#f4f6f5]'));
-        $this->assertSame(2, substr_count($ac, 'dark:bg-white/8 md:dark:bg-transparent'));
-        $this->assertSame(2, substr_count($ac, 'dark:hover:bg-white/15 md:dark:hover:bg-white/10'));
+        $this->assertSame(1, substr_count($ac, 'bg-[#f4f6f5] md:bg-transparent'));
+        $this->assertSame(1, substr_count($ac, 'hover:bg-[#e8ecea] md:hover:bg-[#f4f6f5]'));
+        $this->assertSame(1, substr_count($ac, 'dark:bg-white/8 md:dark:bg-transparent'));
+        $this->assertSame(1, substr_count($ac, 'dark:hover:bg-white/15 md:dark:hover:bg-white/10'));
 
         // bg-zinc-200 remaps to a different grey in dark and is what the chips
-        // used to use; only the avatar button still carries it.
-        $this->assertSame(1, substr_count($ac, 'bg-zinc-200'));
+        // used to use. Nothing here carries it any more: the avatar took the
+        // dashboard's outline too (AccountAvatarShapeTest).
+        $this->assertSame(0, substr_count($ac, 'bg-zinc-200'));
     }
 
     public function test_the_guest_control_reads_sign_in(): void
@@ -116,11 +119,12 @@ class MobileActionButtonsTest extends TestCase
 
         // Two stroked marks, same weight, both inheriting the button colour.
         // Sign in is drawn here; Cart comes from x-icons.cart, which the
-        // dashboard shares so the two carts cannot drift apart.
+        // dashboard shares so the two carts cannot drift apart. It sits in the
+        // roll-on-hover wrapper now, sized by the wrapper, as on the dashboard.
         $stroke = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"';
 
         $this->assertSame(1, substr_count($ac, $stroke));
-        $this->assertStringContainsString('<x-icons.cart class="h-5 w-5" />', $ac);
+        $this->assertStringContainsString('<span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0" aria-hidden="true"><x-icons.cart /></span>', $ac);
         $this->assertStringContainsString($stroke, file_get_contents(resource_path('views/components/icons/cart.blade.php')));
     }
 }

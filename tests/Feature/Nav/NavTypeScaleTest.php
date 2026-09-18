@@ -61,7 +61,7 @@ class NavTypeScaleTest extends TestCase
             'utility-links' => 1,       // Help. The region pill is its own file
             'region-pill' => 1,         // ...here, shared by the row and the sheet
             'invite-link' => 1,
-            'account-cart' => 2,        // Login, Cart
+            'account-cart' => 1,        // Login. Cart is an icon-only chip now, with no text to face
             'main-nav' => 1,            // the shared category-tab class
         ] as $view => $expected) {
             $this->assertSame(

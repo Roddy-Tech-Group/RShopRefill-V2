@@ -1213,7 +1213,7 @@
                     {{-- Inline so the cart rolls on hover, in the button's text colour. --}}
                     {{-- The storefront's cart glyph (x-icons.cart), inside the same
                          hover-animation wrapper x-ui.anim-icon uses. --}}
-                    <span class="anim-icon anim-icon--cart inline-flex h-5 w-5 shrink-0" aria-hidden="true"><x-icons.cart /></span>
+                    <span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0" aria-hidden="true"><x-icons.cart /></span>
                     <span
                         x-show="$store.cart.count > 0"
                         x-text="$store.cart.count"
@@ -1329,7 +1329,7 @@
                     @if ($user?->avatar_url)
                         <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
                     @else
-                        <flux:icon.user class="h-5 w-5" />
+                        <flux:icon.user class="h-6 w-6" />
                     @endif
                 </button>
 
@@ -1575,7 +1575,7 @@
                             @if ($user?->avatar_url)
                                 <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
                             @else
-                                <flux:icon.user class="h-5 w-5" />
+                                <flux:icon.user class="h-6 w-6" />
                             @endif
                         </span>
                         @if (($user?->kyc_status ?? null) === 'verified')
@@ -1789,7 +1789,7 @@
                         aria-label="Cart"
                         class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95"
                     >
-                        <span class="anim-icon anim-icon--cart inline-flex h-5 w-5 shrink-0 text-black" aria-hidden="true"><x-icons.cart /></span>
+                        <span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0 text-black" aria-hidden="true"><x-icons.cart /></span>
                         <span
                             x-show="$store.cart && $store.cart.count > 0"
                             x-text="$store.cart ? $store.cart.count : ''"

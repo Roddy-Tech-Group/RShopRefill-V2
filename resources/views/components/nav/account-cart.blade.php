@@ -54,23 +54,24 @@
         @click="$store.cart.open = ! $store.cart.open; locked = $store.cart.open"
         :aria-expanded="$store.cart.open.toString()"
         aria-haspopup="menu"
-        class="relative flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full nav-text text-zinc-900 transition-colors duration-150 bg-[#f4f6f5] hover:bg-[#e8ecea] md:h-auto md:w-auto md:rounded-[10px] md:bg-transparent md:px-3 md:py-2 md:hover:bg-[#f4f6f5] dark:bg-white/8 md:dark:bg-transparent dark:hover:bg-white/15 md:dark:hover:bg-white/10 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:text-zinc-200"
+        {{-- The dashboard's cart chip, adapted to this bar the same way the
+             avatar beside it is: a 2px outline at 30% of the ink and a 10% wash
+             on hover, no fill, no label. The dashboard draws white on its navy
+             bar; this band is #f4f6f5, so the ink is the navy itself. In dark
+             both bars are black and the dark classes are the dashboard's own.
+             The aria-label still names it: the glyph is the whole control. --}}
+        class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
         aria-label="{{ __('navigation.cart') }}"
     >
-        {{-- Cart glyph, drawn to the same stroke weight as the sign-in mark
-             beside it - the old one was a heavy filled 48x48 path and read
-             noticeably darker next to it. Inherits the button colour. Shared
-             with the dashboard through x-icons.cart. --}}
-        <x-icons.cart class="h-5 w-5" />
-        {{-- Label from sm+ only, matching Login: the mobile row
-             is tight and the glyph plus aria-label already
-             identify the control. --}}
-        <span class="hidden sm:inline">{{ __('navigation.cart') }}</span>
+        {{-- The shared cart glyph (x-icons.cart) inside the wrapper x-ui.anim-icon
+             uses, so it rolls on hover here exactly as it does on the dashboard.
+             The wrapper sizes it; it inherits the button's ink. --}}
+        <span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0" aria-hidden="true"><x-icons.cart /></span>
         <span
             x-show="$store.cart.count > 0"
             x-text="$store.cart.count"
             x-cloak
-            class="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-[12px] bg-blue-600 text-[10px] font-bold text-white leading-none"
+            class="absolute -top-1 -right-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[5px] bg-blue-600 px-1 text-[9px] font-bold text-white ring-2 ring-white dark:ring-0"
         ></span>
     </button>
 
@@ -213,7 +214,7 @@
             @if ($authUser?->avatar_url)
                 <img src="{{ $authUser->avatar_url }}" alt="{{ $authUser->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
             @else
-                <flux:icon.user class="h-5 w-5" />
+                <flux:icon.user class="h-6 w-6" />
             @endif
         </button>
 
