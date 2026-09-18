@@ -1,3 +1,15 @@
+# RshopRefills V2 - Project Context
+
+Stack verified on 2026-09-17: **Laravel 12 + Blade + Livewire 4 + Alpine.js + Tailwind CSS 4 + GSAP**. The frontend uses plain JavaScript, existing Blade/Flux components, Volt, and the Alpine runtime bundled with Livewire. Vite builds `resources/css/app.css` and `resources/js/app.js`.
+
+- Read [README.md](README.md#tech-stack) for exact dependency versions, configuration distinctions, setup, and tests.
+- Read [roddy-tech-website-rules.md](roddy-tech-website-rules.md) for current collaboration, design, component, and animation guidance.
+- Read [ProjectMemory.md](ProjectMemory.md) for team workflow and dated session history. Its older design snapshots do not override current code or explicit user instructions.
+- Report the proposed scope before editing. Ask when that scope has not already been approved; complete explicitly authorized work without repeating the approval request.
+- Preserve existing animation behavior and shared component consumers. The illustration SVGs are in `resources/views/components/illo.blade.php`, with matching GSAP scene definitions in `resources/js/app.js`.
+- Dependency locks describe resolved versions; `config` files describe defaults; the selected local drivers and production infrastructure can differ. Recheck before documenting them as current.
+- Documentation-only changes need source, link, and diff verification. Application changes use the relevant checks below.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
