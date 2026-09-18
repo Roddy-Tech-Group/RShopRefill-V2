@@ -103,7 +103,9 @@ class ProductPageTranslationTest extends TestCase
 
         foreach ([
             __('products.detail_name_gift_card', ['brand' => 'Acme'], 'fr'),
-            __('products.detail_intro_gift_card', ['brand' => 'Acme'], 'fr'),
+            // The line under the name says what the card pays for; this fixture has
+            // no subcategory, so it is the general one.
+            __('products.detail_purpose_general', ['brand' => 'Acme', 'country' => 'United States'], 'fr'),
             __('products.detail_badge_online_redeemable', [], 'fr'),
             __('products.detail_quantity', [], 'fr'),
             // A gift card prices in its purchase card and names the pay currency
@@ -181,7 +183,7 @@ class ProductPageTranslationTest extends TestCase
 
         foreach ([
             'Acme gift card</h1>',
-            'Buy Acme gift cards with Bitcoin, USDT, USDC and other Crypto. Instant delivery and a fair refund policy.',
+            'Pays for anything Acme sells in United States, in store and online.',
             'Estimated price',
             'Payment currency',
             'Points you earn',

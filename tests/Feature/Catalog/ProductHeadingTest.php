@@ -145,6 +145,60 @@ class ProductHeadingTest extends TestCase
         $this->assertStringContainsString('@unless ($isGiftCard)', $source);
     }
 
+    /**
+     * The line under the rating says what the card is for, which follows the
+     * brand's own subcategory. The supplier sends a company blurb instead, the
+     * same shape on every brand, and that belongs in the long-form copy.
+     */
+    public function test_the_line_under_the_name_says_what_the_card_pays_for(): void
+    {
+        $this->product->update([
+            'description' => 'Acme is a multinational technology company that designs and sells consumer electronics.',
+            'subcategory_id' => Subcategory::create([
+                'category_id' => $this->product->category_id,
+                'name' => 'Digital Apps',
+                'slug' => 'digital-apps',
+            ])->id,
+        ]);
+
+        $html = $this->page();
+
+        $purpose = 'Pays for apps, games, subscriptions and devices at Acme in United States.';
+        $this->assertStringContainsString($purpose, $html);
+
+        // It leads the copy; the supplier's blurb is further down the page.
+        $blurb = strpos($html, 'Acme is a multinational technology company');
+        $this->assertNotFalse($blurb, 'The supplier blurb was dropped instead of moved.');
+        $this->assertLessThan($blurb, strpos($html, $purpose));
+        $this->assertGreaterThan(strpos($html, 'Frequently asked questions'), $blurb);
+    }
+
+    /** A different kind of brand gets a different line, not the same one. */
+    public function test_the_line_follows_the_brands_own_subcategory(): void
+    {
+        $this->product->update([
+            'subcategory_id' => Subcategory::create([
+                'category_id' => $this->product->category_id,
+                'name' => 'Restaurant',
+                'slug' => 'restaurant',
+            ])->id,
+        ]);
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('Pays for meals, drinks and groceries at Acme in United States.', $html);
+        $this->assertStringNotContainsString('Pays for apps, games', $html);
+    }
+
+    /** A brand with no subcategory still says something true about itself. */
+    public function test_a_brand_with_no_subcategory_falls_back_to_the_general_line(): void
+    {
+        $this->assertStringContainsString(
+            'Pays for anything Acme sells in United States, in store and online.',
+            $this->page()
+        );
+    }
+
     public function test_the_breadcrumb_landmark_is_translated(): void
     {
         $french = $this->withoutVite()

@@ -19,6 +19,19 @@
     $isBill       = $categorySlug === 'bill-payments';
     $isGiftCard   = $categorySlug === 'gift-cards';
 
+    // What the card is FOR, keyed off its own subcategory. The supplier sends a
+    // company blurb ("X is a multinational technology company...") which says
+    // nothing about why anyone would buy the card, and reads the same on every
+    // brand; it keeps its place in the long-form copy further down the page.
+    $purposeKey = match ($product->subcategory?->slug) {
+        'digital-apps', 'gaming-entertainment', 'electronics', 'imtu-internet' => 'products.detail_purpose_digital',
+        'food-beverage', 'restaurant', 'supermarket' => 'products.detail_purpose_food',
+        'travel-experience' => 'products.detail_purpose_travel',
+        'dating' => 'products.detail_purpose_dating',
+        'clothing-accessories', 'home-garden', 'sports-outdoors', 'health-beauty', 'auto-moto' => 'products.detail_purpose_retail',
+        default => 'products.detail_purpose_general',
+    };
+
     [$kindTitle, $listingRoute, $detailRoute] = match ($categorySlug) {
         'mobile-airtime' => [__('products.detail_kind_topup'), 'shop.topups', 'shop.topup'],
         'bill-payments'  => [__('products.detail_kind_bill'), 'shop.bills', 'shop.bill'],
@@ -814,7 +827,14 @@
                         </ul>
                     @endif
 
-                    @if ($product->description)
+                    @if ($isGiftCard)
+                        {{-- What this card solves, in one line: what it pays for, where,
+                             and how it is bought. The supplier's company blurb sits in the
+                             long-form copy instead. --}}
+                        <p class="mt-3 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            {{ __($purposeKey, ['brand' => $brandName, 'country' => $countryName]) }}
+                        </p>
+                    @elseif ($product->description)
                         <div class="mt-3 text-base leading-relaxed text-zinc-600 [&>p]:mb-2 [&_a]:text-blue-600 [&_a]:underline">{!! $product->description !!}</div>
                     @elseif ($isTopup)
                         <p class="mt-3 text-base leading-relaxed text-zinc-600">
@@ -1178,6 +1198,12 @@
                             @php
                                 $aboutReplace = ['brand' => $brandName, 'country' => $countryName, 'site' => $siteName, 'range' => (string) $rangeText];
                             @endphp
+
+                            @if ($isGiftCard && $product->description)
+                                {{-- The supplier's own words about the brand, kept out of the
+                                     heading where they said nothing about the card itself. --}}
+                                <div class="mt-4 text-base leading-relaxed text-zinc-600 [&>p]:mb-2 [&_a]:text-blue-600 [&_a]:underline dark:text-zinc-300">{!! $product->description !!}</div>
+                            @endif
                             <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
                                 {{ $kindText('products.detail_about_heading_gift_card', 'products.detail_about_heading_topup', 'products.detail_about_heading_bill', $aboutReplace) }}
                             </h2>

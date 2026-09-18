@@ -210,4 +210,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => 'Hanyar kewayawa',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => 'Tana biyan kuɗin manhajoji, wasanni, biyan kuɗi na wata-wata da na\'urori a :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+    'detail_purpose_food' => 'Tana biyan kuɗin abinci, abin sha da sayayya a :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+    'detail_purpose_retail' => 'Tana biyan kuɗin tufafi, kayan gida da sayayyar yau da kullum a :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+    'detail_purpose_travel' => 'Tana biyan kuɗin tafiye-tafiye, masauki da yawon shakatawa da :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+    'detail_purpose_dating' => 'Tana biyan kuɗin rajistar :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+    'detail_purpose_general' => 'Tana biyan duk abin da :brand ke sayarwa cikin :country, a shago da kuma kan layi. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
 ];

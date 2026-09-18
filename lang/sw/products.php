@@ -208,4 +208,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => 'Njia ya urambazaji',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => 'Inalipia programu, michezo, huduma za kujisajili na vifaa kwenye :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+    'detail_purpose_food' => 'Inalipia chakula, vinywaji na manunuzi kwenye :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+    'detail_purpose_retail' => 'Inalipia mavazi, vitu vya nyumbani na manunuzi ya kila siku kwenye :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+    'detail_purpose_travel' => 'Inalipia safari, malazi na matembezi na :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+    'detail_purpose_dating' => 'Inalipia usajili wa :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+    'detail_purpose_general' => 'Inalipia chochote kinachouzwa na :brand nchini :country, dukani na mtandaoni. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
 ];

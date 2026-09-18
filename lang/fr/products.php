@@ -215,4 +215,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => 'Fil d\'Ariane',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => 'Règle vos applis, jeux, abonnements et appareils chez :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+    'detail_purpose_food' => 'Règle vos repas, boissons et courses chez :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+    'detail_purpose_retail' => 'Règle vos vêtements, votre maison et vos achats du quotidien chez :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+    'detail_purpose_travel' => 'Règle vos voyages, séjours et sorties avec :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+    'detail_purpose_dating' => 'Règle votre abonnement :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+    'detail_purpose_general' => 'Règle tout ce que vend :brand en :country, en boutique comme en ligne. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
 ];

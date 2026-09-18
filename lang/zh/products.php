@@ -209,4 +209,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => '面包屑导航',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => '可在 :country 的 :brand 支付应用、游戏、订阅与设备。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+    'detail_purpose_food' => '可在 :country 的 :brand 支付餐饮与日常采购。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+    'detail_purpose_retail' => '可在 :country 的 :brand 支付服饰、家居与日常购物。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+    'detail_purpose_travel' => '可在 :country 通过 :brand 支付行程、住宿与出行。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+    'detail_purpose_dating' => '可在 :country 支付 :brand 会员费。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+    'detail_purpose_general' => '可在 :country 的 :brand 门店与线上支付任何商品。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
 ];

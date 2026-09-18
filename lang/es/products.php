@@ -210,4 +210,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => 'Ruta de navegación',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => 'Paga apps, juegos, suscripciones y dispositivos en :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+    'detail_purpose_food' => 'Paga comidas, bebidas y compra diaria en :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+    'detail_purpose_retail' => 'Paga ropa, hogar y compras del día a día en :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+    'detail_purpose_travel' => 'Paga viajes, estancias y planes con :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+    'detail_purpose_dating' => 'Paga tu suscripción de :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+    'detail_purpose_general' => 'Paga cualquier cosa que venda :brand en :country, en tienda y online. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
 ];

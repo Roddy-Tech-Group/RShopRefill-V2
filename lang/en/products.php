@@ -225,4 +225,12 @@ return [
 
     // The heading's breadcrumb landmark.
     'detail_breadcrumb' => 'Breadcrumb',
+
+    // What a gift card is for, by the family of brand it belongs to.
+    'detail_purpose_digital' => 'Pays for apps, games, subscriptions and devices at :brand in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+    'detail_purpose_food' => 'Pays for meals, drinks and groceries at :brand in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+    'detail_purpose_retail' => 'Pays for clothing, homeware and everyday shopping at :brand in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+    'detail_purpose_travel' => 'Pays for trips, stays and days out with :brand in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+    'detail_purpose_dating' => 'Pays for :brand membership in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+    'detail_purpose_general' => 'Pays for anything :brand sells in :country, in store and online. Buy it with crypto, a card or mobile money and redeem it the same minute.',
 ];
