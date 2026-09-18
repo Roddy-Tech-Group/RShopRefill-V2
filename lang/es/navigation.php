@@ -41,4 +41,9 @@ return [
     'refund_policy' => 'Política de reembolsos',
     'accessibility' => 'Accesibilidad',
     'sitemap' => 'Mapa del sitio',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'Estás viendo productos canjeables en :country. Ver productos para:',
+    'region_suggest_switch' => 'Cambiar',
+    'region_suggest_dismiss' => 'Descartar la sugerencia de región',
 ];

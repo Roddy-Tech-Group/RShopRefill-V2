@@ -58,7 +58,7 @@ class StorefrontTranslationTest extends TestCase
         $html = $this->french('/');
 
         foreach ([
-            'Roddy Technologies LTD',
+            'Roddy Technologies Ltd',
             '9385422',
             '5 Tetlow Road, Njemenze, Owerri, Imo State, Nigeria',
         ] as $verbatim) {
@@ -74,13 +74,20 @@ class StorefrontTranslationTest extends TestCase
         }
     }
 
-    /** Brand names stay verbatim in both languages. */
+    /**
+     * Brand names stay verbatim in both languages.
+     *
+     * This used to read the homepage, where the footer's App Store and Google
+     * Play download badges were. Those badges are gone - there is no app to
+     * download - so the assertion moved to How it works, which lists the gift
+     * card brands and is the page where the rule now has something to protect.
+     */
     public function test_store_brands_are_not_translated(): void
     {
-        $html = $this->french('/');
+        $html = $this->french('/how-it-works');
 
-        foreach (['App Store', 'Google Play'] as $brand) {
-            $this->assertStringContainsString($brand, $html);
+        foreach (['Google Play', 'PlayStation', 'Netflix', 'Apple'] as $brand) {
+            $this->assertStringContainsString($brand, $html, $brand.' is a brand, not copy.');
         }
     }
 

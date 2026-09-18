@@ -1,9 +1,7 @@
 <?php
 
 /*
- * Pied de page.
- *
- * Colonnes de liens, encart application, réseaux sociaux et mention légale.
+ * Pied de page. Voir lang/en/footer.php.
  *
  * RÉVISION JURIDIQUE REQUISE avant mise en production: legal_line porte
  * l'identité légale de l'opérateur. Le nom de la société, le numéro RC et
@@ -15,47 +13,45 @@ return [
 
     // Column headings
     'shop' => 'Boutique',
+    'help' => 'Aide et assistance',
     'company' => 'Société',
-    'help' => 'Aide',
-    'legal' => 'Mentions légales',
+    'legal' => 'Juridique et confiance',
+
+    // Brand column
+    'tagline' => 'Votre marketplace de cartes cadeaux, d’eSIM de voyage, de recharges mobiles et de paiement de factures.',
 
     // Shop column
     'gift_cards' => 'Cartes cadeaux',
     'travel_esims' => 'eSIM de voyage',
-    'mobile_refills' => 'Recharges mobiles',
+    'mobile_topups' => 'Recharges mobiles',
+    'data_bundles' => 'Forfaits internet',
     'bill_payments' => 'Paiement de factures',
+    'request_a_product' => 'Demander un produit',
     'flights' => 'Vols',
     'stays' => 'Hébergements',
 
-    // Company column
-    'about_us' => 'A propos',
-    'blog' => 'Blog',
-    'reviews' => 'Avis',
-    'partnerships' => 'Partenariats',
-    'suppliers' => 'Fournisseurs',
-    'careers' => 'Carrières',
-
-    // Help column
+    // Help & Support column
     'help_center' => 'Centre d\'aide',
     'faqs' => 'FAQ',
-    'contact_us' => 'Nous contacter',
+    'contact_support' => 'Contacter l’assistance',
     'how_it_works' => 'Comment ça marche',
-    'earn_points' => 'Gagner des points',
+    'refund_policy' => 'Politique de remboursement',
+    'esim_installation_guide' => 'Guide d’installation eSIM',
 
-    // Legal column
-    'privacy' => 'Confidentialité',
+    // Company column
+    'about_us' => 'À propos',
+    'blog' => 'Blog',
+    'customer_reviews' => 'Avis clients',
+    'influencers_affiliates' => 'Influenceurs et affiliés',
+    'press_media' => 'Presse et médias',
+
+    // Legal & Trust column
     'terms_of_service' => 'Conditions d\'utilisation',
+    'privacy_policy' => 'Politique de confidentialité',
     'cookie_policy' => 'Politique relative aux cookies',
     'compliance' => 'Conformité',
-    'refund_policy' => 'Politique de remboursement',
-    'privacy_policy' => 'Politique de confidentialité',
+    'security' => 'Sécurité',
     'accessibility' => 'Accessibilité',
-    'sitemap' => 'Plan du site',
-
-    // App callout
-    'get_the_app' => 'Télécharger l\'application',
-    'coming_soon_on' => 'Bientôt sur',
-    'app_coming_soon' => 'Bientôt disponible - utilisez notre application web',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Suivez-nous',
@@ -67,9 +63,18 @@ return [
     'social_whatsapp' => 'Discutez avec nous sur WhatsApp',
     'social_discord' => 'Rejoignez-nous sur Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Thème',
     'cookie_settings' => 'Paramètres des cookies',
-    'verify' => 'Vérifier',
-    'legal_line' => 'Tous droits réservés. Ce site est détenu et exploité par :company, RC - (:rc), dont le siège social est situé au :address.',
+    'all_rights_reserved' => 'Tous droits réservés.',
+    'legal_line' => 'Détenu et exploité par :company, RC :rc, dont le siège est situé au :address.',
+    'verify_company' => 'Vérifier la société',
+
+    // Newsletter row, above the footer columns.
+    'newsletter_pitch' => 'Recevez nos offres de cartes cadeaux, eSIM et recharges par e-mail',
+    'newsletter_label' => 'Adresse e-mail',
+    'newsletter_placeholder' => 'vous@exemple.com',
+    'newsletter_cta' => "S'inscrire",
+    'newsletter_sending' => 'Inscription',
+    'newsletter_done' => 'Vous êtes inscrit. Merci !',
 ];

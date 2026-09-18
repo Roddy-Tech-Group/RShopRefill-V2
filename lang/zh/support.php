@@ -17,4 +17,12 @@ return [
     'kyc_verified' => '身份已验证',
     'kyc_rejected' => '我们无法验证您的证件',
     'kyc_upload_id' => '上传政府签发的身份证件',
+
+    // FAQ page.
+    'faq_title' => '常见问题',
+    'faq_heading' => '您需要了解的一切',
+    'faq_subheading' => '常见问题',
+    'faq_still_need_help' => '仍需要帮助？请访问我们的 :help_center 或 :contact_team。',
+    'faq_help_center_link' => '帮助中心',
+    'faq_contact_team_link' => '联系我们的团队',
 ];

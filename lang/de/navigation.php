@@ -39,4 +39,9 @@ return [
     'refund_policy' => 'Rückerstattungsrichtlinie',
     'accessibility' => 'Barrierefreiheit',
     'sitemap' => 'Sitemap',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'Sie sehen Produkte, die in :country einlösbar sind. Produkte anzeigen für:',
+    'region_suggest_switch' => 'Wechseln',
+    'region_suggest_dismiss' => 'Regionsvorschlag ausblenden',
 ];

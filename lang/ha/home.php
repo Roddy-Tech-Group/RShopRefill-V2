@@ -30,4 +30,27 @@ return [
     'chip_devices_subtitle' => 'Ya dace da kwamfuta, iPad da waya',
     'chip_search_title' => 'Nemo abin da kake so da sauri',
     'chip_search_subtitle' => 'Nemi katunan kyauta, eSIM da caji cikin daƙiƙu',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'Abin da kuke samu da yadda ake biya',
+    'assurance_instant_title' => 'Isar da kaya nan take',
+    'panel_title' => 'Isar da kaya nan take, babu wahala.',
+    'assurance_privacy_title' => 'Amintacce ta tsarin sa',
+    'assurance_support_title' => 'Tallafin mutane awa 24',
+    'assurance_pay_with' => 'Biya da MOMO, OM, katuna da kripto',
+    'assurance_more_methods' => '+:count ƙari',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'Tambayoyin da ake yawan yi',
+    'faq_subheading' => 'Duba shafin :link don ƙarin tambayoyi',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'Abokan ciniki masu rajista',
+    'counts_orders' => 'Oda da aka kai',
+    'counts_countries' => 'Ƙasashen da muke hidima',
+    'counts_rank_value' => 'Abin dogaro',
+    'counts_rank_label' => 'Dandalin cinikin dijital',
 ];

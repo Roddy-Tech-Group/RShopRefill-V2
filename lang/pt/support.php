@@ -17,4 +17,12 @@ return [
     'kyc_verified' => 'Identidade verificada',
     'kyc_rejected' => 'Não foi possível verificar seus documentos',
     'kyc_upload_id' => 'Envie um documento oficial de identidade',
+
+    // FAQ page.
+    'faq_title' => 'Perguntas frequentes',
+    'faq_heading' => 'Tudo o que você precisa saber',
+    'faq_subheading' => 'Perguntas frequentes',
+    'faq_still_need_help' => 'Ainda precisa de ajuda? Visite nossa :help_center ou :contact_team.',
+    'faq_help_center_link' => 'Central de ajuda',
+    'faq_contact_team_link' => 'fale com nossa equipe',
 ];

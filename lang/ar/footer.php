@@ -1,10 +1,7 @@
 <?php
 
 /*
- * Footer.
- *
- * Link columns, the app callout, the social row and the legal line - every
- * storefront page carries these, so they are the strings a visitor sees most.
+ * Footer. See lang/en/footer.php.
  *
  * The company name, RC number and registered address are NOT translated: they
  * are the legal identity of the operator. They arrive as :company, :rc and
@@ -15,47 +12,45 @@ return [
 
     // Column headings
     'shop' => 'المتجر',
+    'help' => 'المساعدة والدعم',
     'company' => 'الشركة',
-    'help' => 'المساعدة',
-    'legal' => 'الشؤون القانونية',
+    'legal' => 'الشؤون القانونية والثقة',
+
+    // Brand column
+    'tagline' => 'سوقك لبطاقات الهدايا وشرائح eSIM للسفر وشحن رصيد الجوال ودفع الفواتير.',
 
     // Shop column
     'gift_cards' => 'بطاقات الهدايا',
     'travel_esims' => 'شرائح eSIM للسفر',
-    'mobile_refills' => 'شحن الرصيد',
+    'mobile_topups' => 'شحن رصيد الجوال',
+    'data_bundles' => 'باقات البيانات',
     'bill_payments' => 'دفع الفواتير',
+    'request_a_product' => 'اطلب منتجًا',
     'flights' => 'رحلات الطيران',
     'stays' => 'أماكن الإقامة',
+
+    // Help & Support column
+    'help_center' => 'مركز المساعدة',
+    'faqs' => 'الأسئلة الشائعة',
+    'contact_support' => 'تواصل مع الدعم',
+    'how_it_works' => 'كيف يعمل',
+    'refund_policy' => 'سياسة الاسترداد',
+    'esim_installation_guide' => 'دليل تثبيت eSIM',
 
     // Company column
     'about_us' => 'من نحن',
     'blog' => 'المدونة',
-    'reviews' => 'التقييمات',
-    'partnerships' => 'الشراكات',
-    'suppliers' => 'الموردون',
-    'careers' => 'الوظائف',
+    'customer_reviews' => 'آراء العملاء',
+    'influencers_affiliates' => 'المؤثرون والمسوّقون بالعمولة',
+    'press_media' => 'الصحافة والإعلام',
 
-    // Help column
-    'help_center' => 'مركز المساعدة',
-    'faqs' => 'الأسئلة الشائعة',
-    'contact_us' => 'اتصل بنا',
-    'how_it_works' => 'كيف يعمل',
-    'earn_points' => 'اكسب نقاطًا',
-
-    // Legal column
-    'privacy' => 'الخصوصية',
+    // Legal & Trust column
     'terms_of_service' => 'شروط الخدمة',
+    'privacy_policy' => 'سياسة الخصوصية',
     'cookie_policy' => 'سياسة ملفات تعريف الارتباط',
     'compliance' => 'الامتثال',
-    'refund_policy' => 'سياسة الاسترداد',
-    'privacy_policy' => 'سياسة الخصوصية',
+    'security' => 'الأمان',
     'accessibility' => 'إمكانية الوصول',
-    'sitemap' => 'خريطة الموقع',
-
-    // App callout
-    'get_the_app' => 'حمّل التطبيق',
-    'coming_soon_on' => 'قريبًا على',
-    'app_coming_soon' => 'قريبًا - استخدم تطبيق الويب الآن',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'تابعنا',
@@ -67,9 +62,10 @@ return [
     'social_whatsapp' => 'راسلنا على WhatsApp',
     'social_discord' => 'انضم إلينا على Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'المظهر',
     'cookie_settings' => 'إعدادات ملفات تعريف الارتباط',
-    'verify' => 'تحقق',
-    'legal_line' => 'جميع الحقوق محفوظة. هذا الموقع مملوك ومُدار من قبل :company، RC - (:rc)، ومقره المسجل في :address.',
+    'all_rights_reserved' => 'جميع الحقوق محفوظة.',
+    'legal_line' => 'مملوك ومُدار من قبل :company، RC :rc، ومقره المسجل في :address.',
+    'verify_company' => 'التحقق من الشركة',
 ];

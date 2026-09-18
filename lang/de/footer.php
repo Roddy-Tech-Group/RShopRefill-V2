@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Footer.
+ * Footer. See lang/en/footer.php.
  *
  * LEGAL REVIEW REQUIRED before release: legal_line carries the operator's legal
  * identity. The company name, RC number and registered address arrive as
@@ -12,47 +12,45 @@ return [
 
     // Column headings
     'shop' => 'Shop',
+    'help' => 'Hilfe und Support',
     'company' => 'Unternehmen',
-    'help' => 'Hilfe',
-    'legal' => 'Rechtliches',
+    'legal' => 'Rechtliches und Vertrauen',
+
+    // Brand column
+    'tagline' => 'Ihr Marktplatz für Geschenkkarten, Reise-eSIMs, Handy-Aufladungen und Rechnungszahlungen.',
 
     // Shop column
     'gift_cards' => 'Geschenkkarten',
     'travel_esims' => 'Reise-eSIMs',
-    'mobile_refills' => 'Handy-Aufladungen',
+    'mobile_topups' => 'Handy-Aufladungen',
+    'data_bundles' => 'Datenpakete',
     'bill_payments' => 'Rechnungszahlungen',
+    'request_a_product' => 'Produkt anfragen',
     'flights' => 'Flüge',
     'stays' => 'Unterkünfte',
+
+    // Help & Support column
+    'help_center' => 'Hilfecenter',
+    'faqs' => 'FAQ',
+    'contact_support' => 'Support kontaktieren',
+    'how_it_works' => 'So funktioniert es',
+    'refund_policy' => 'Rückerstattungsrichtlinie',
+    'esim_installation_guide' => 'eSIM-Installationsanleitung',
 
     // Company column
     'about_us' => 'Über uns',
     'blog' => 'Blog',
-    'reviews' => 'Bewertungen',
-    'partnerships' => 'Partnerschaften',
-    'suppliers' => 'Lieferanten',
-    'careers' => 'Karriere',
+    'customer_reviews' => 'Kundenbewertungen',
+    'influencers_affiliates' => 'Influencer und Affiliates',
+    'press_media' => 'Presse und Medien',
 
-    // Help column
-    'help_center' => 'Hilfecenter',
-    'faqs' => 'FAQ',
-    'contact_us' => 'Kontakt',
-    'how_it_works' => 'So funktioniert es',
-    'earn_points' => 'Punkte sammeln',
-
-    // Legal column
-    'privacy' => 'Datenschutz',
+    // Legal & Trust column
     'terms_of_service' => 'Nutzungsbedingungen',
+    'privacy_policy' => 'Datenschutzerklärung',
     'cookie_policy' => 'Cookie-Richtlinie',
     'compliance' => 'Compliance',
-    'refund_policy' => 'Rückerstattungsrichtlinie',
-    'privacy_policy' => 'Datenschutzerklärung',
+    'security' => 'Sicherheit',
     'accessibility' => 'Barrierefreiheit',
-    'sitemap' => 'Sitemap',
-
-    // App callout
-    'get_the_app' => 'App herunterladen',
-    'coming_soon_on' => 'Bald verfügbar bei',
-    'app_coming_soon' => 'Bald verfügbar - nutzen Sie heute unsere Web-App',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Folgen Sie uns',
@@ -64,9 +62,10 @@ return [
     'social_whatsapp' => 'Chatten Sie mit uns auf WhatsApp',
     'social_discord' => 'Treten Sie uns auf Discord bei',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Design',
     'cookie_settings' => 'Cookie-Einstellungen',
-    'verify' => 'Verifizieren',
-    'legal_line' => 'Alle Rechte vorbehalten. Diese Website wird von :company, RC - (:rc), mit eingetragenem Sitz in :address betrieben.',
+    'all_rights_reserved' => 'Alle Rechte vorbehalten.',
+    'legal_line' => 'Betrieben von :company, RC :rc, mit eingetragenem Sitz in :address.',
+    'verify_company' => 'Unternehmen prüfen',
 ];

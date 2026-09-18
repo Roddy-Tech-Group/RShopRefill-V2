@@ -25,4 +25,27 @@ return [
     'chip_devices_subtitle' => 'Kompatibel mit Laptop, iPad und Handy',
     'chip_search_title' => 'Finden Sie schnell, was Sie brauchen',
     'chip_search_subtitle' => 'Geschenkkarten, eSIMs und Aufladungen in Sekunden finden',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'Was Sie erhalten und wie Sie zahlen',
+    'assurance_instant_title' => 'Sofortige Lieferung',
+    'panel_title' => 'Sofortige Lieferung, kein Aufwand.',
+    'assurance_privacy_title' => 'Sicher von Grund auf',
+    'assurance_support_title' => 'Persönlicher Support rund um die Uhr',
+    'assurance_pay_with' => 'Zahlen Sie mit MOMO, OM, Karten und Krypto',
+    'assurance_more_methods' => '+:count weitere',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'Häufig gestellte Fragen',
+    'faq_subheading' => 'Weitere Antworten finden Sie auf unserer :link-Seite',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'Registrierte Kunden',
+    'counts_orders' => 'Gelieferte Bestellungen',
+    'counts_countries' => 'Bediente Länder',
+    'counts_rank_value' => 'Vertrauenswürdig',
+    'counts_rank_label' => 'Plattform für digitalen Handel',
 ];

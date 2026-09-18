@@ -30,4 +30,27 @@ return [
     'chip_devices_subtitle' => 'Compatível com notebook, iPad e celular',
     'chip_search_title' => 'Encontre rápido o que precisa',
     'chip_search_subtitle' => 'Busque cartões-presente, eSIMs e recargas em segundos',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'O que você recebe e como pagar',
+    'assurance_instant_title' => 'Entrega instantânea',
+    'panel_title' => 'Entrega instantânea, sem complicações.',
+    'assurance_privacy_title' => 'Seguro por concepção',
+    'assurance_support_title' => 'Suporte humano 24 horas',
+    'assurance_pay_with' => 'Pague com MOMO, OM, cartões e cripto',
+    'assurance_more_methods' => '+:count mais',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'Perguntas frequentes',
+    'faq_subheading' => 'Veja nossa página de :link para mais respostas',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'Clientes registados',
+    'counts_orders' => 'Pedidos entregues',
+    'counts_countries' => 'Países atendidos',
+    'counts_rank_value' => 'Confiável',
+    'counts_rank_label' => 'Plataforma de comércio digital',
 ];

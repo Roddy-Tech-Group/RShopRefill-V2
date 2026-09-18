@@ -30,4 +30,27 @@ return [
     'chip_devices_subtitle' => 'متوافق مع الحاسوب وiPad والهاتف',
     'chip_search_title' => 'اعثر على ما تحتاجه بسرعة',
     'chip_search_subtitle' => 'ابحث في بطاقات الهدايا وeSIM وشحن الرصيد في ثوانٍ',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'ما تحصل عليه وكيف تدفع',
+    'assurance_instant_title' => 'تسليم فوري',
+    'panel_title' => 'تسليم فوري، بلا عناء.',
+    'assurance_privacy_title' => 'آمن بالتصميم',
+    'assurance_support_title' => 'دعم بشري على مدار الساعة',
+    'assurance_pay_with' => 'ادفع عبر MOMO وOM والبطاقات والعملات الرقمية',
+    'assurance_more_methods' => '+:count أخرى',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'الأسئلة الشائعة',
+    'faq_subheading' => 'اطّلع على صفحة :link لمزيد من الأسئلة',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'عملاء مسجلون',
+    'counts_orders' => 'طلبات تم تسليمها',
+    'counts_countries' => 'دولة نخدمها',
+    'counts_rank_value' => 'موثوق',
+    'counts_rank_label' => 'منصة تجارة رقمية',
 ];

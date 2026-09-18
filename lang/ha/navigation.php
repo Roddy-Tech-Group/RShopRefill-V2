@@ -41,4 +41,9 @@ return [
     'refund_policy' => 'Manufar maido da kuɗi',
     'accessibility' => 'Sauƙin amfani',
     'sitemap' => 'Taswirar shafi',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'Kana ganin kayayyaki da ake amfani da su a :country. Duba kayayyaki na:',
+    'region_suggest_switch' => 'Canza',
+    'region_suggest_dismiss' => 'Yi watsi da shawarar yanki',
 ];

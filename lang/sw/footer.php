@@ -1,9 +1,7 @@
 <?php
 
 /*
- * Footer.
- *
- * Link columns, the app callout, the social row and the legal line.
+ * Footer. See lang/en/footer.php.
  *
  * LEGAL REVIEW REQUIRED before production: legal_line carries the operator's
  * legal identity. The company name, RC number and address arrive as :company,
@@ -14,47 +12,45 @@ return [
 
     // Column headings
     'shop' => 'Duka',
+    'help' => 'Msaada na usaidizi',
     'company' => 'Kampuni',
-    'help' => 'Msaada',
-    'legal' => 'Kisheria',
+    'legal' => 'Sheria na uaminifu',
+
+    // Brand column
+    'tagline' => 'Soko lako la kadi za zawadi, eSIM za safari, salio la simu na malipo ya bili.',
 
     // Shop column
     'gift_cards' => 'Kadi za zawadi',
     'travel_esims' => 'eSIM za safari',
-    'mobile_refills' => 'Salio la simu',
+    'mobile_topups' => 'Salio la simu',
+    'data_bundles' => 'Vifurushi vya data',
     'bill_payments' => 'Malipo ya bili',
+    'request_a_product' => 'Omba bidhaa',
     'flights' => 'Safari za ndege',
     'stays' => 'Malazi',
+
+    // Help & Support column
+    'help_center' => 'Kituo cha msaada',
+    'faqs' => 'Maswali ya mara kwa mara',
+    'contact_support' => 'Wasiliana na usaidizi',
+    'how_it_works' => 'Jinsi inavyofanya kazi',
+    'refund_policy' => 'Sera ya marejesho',
+    'esim_installation_guide' => 'Mwongozo wa kusakinisha eSIM',
 
     // Company column
     'about_us' => 'Kuhusu sisi',
     'blog' => 'Blogu',
-    'reviews' => 'Maoni',
-    'partnerships' => 'Ushirikiano',
-    'suppliers' => 'Wasambazaji',
-    'careers' => 'Nafasi za kazi',
+    'customer_reviews' => 'Maoni ya wateja',
+    'influencers_affiliates' => 'Washawishi na washirika',
+    'press_media' => 'Habari na vyombo vya habari',
 
-    // Help column
-    'help_center' => 'Kituo cha msaada',
-    'faqs' => 'Maswali ya mara kwa mara',
-    'contact_us' => 'Wasiliana nasi',
-    'how_it_works' => 'Jinsi inavyofanya kazi',
-    'earn_points' => 'Pata pointi',
-
-    // Legal column
-    'privacy' => 'Faragha',
+    // Legal & Trust column
     'terms_of_service' => 'Masharti ya Huduma',
+    'privacy_policy' => 'Sera ya Faragha',
     'cookie_policy' => 'Sera ya Vidakuzi',
     'compliance' => 'Uzingatiaji wa sheria',
-    'refund_policy' => 'Sera ya marejesho',
-    'privacy_policy' => 'Sera ya Faragha',
+    'security' => 'Usalama',
     'accessibility' => 'Ufikivu',
-    'sitemap' => 'Ramani ya tovuti',
-
-    // App callout
-    'get_the_app' => 'Pata programu',
-    'coming_soon_on' => 'Inakuja hivi karibuni kwenye',
-    'app_coming_soon' => 'Inakuja hivi karibuni - tumia programu yetu ya wavuti sasa',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Tufuate',
@@ -66,9 +62,10 @@ return [
     'social_whatsapp' => 'Ongea nasi kwenye WhatsApp',
     'social_discord' => 'Jiunge nasi kwenye Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Muonekano',
     'cookie_settings' => 'Mipangilio ya vidakuzi',
-    'verify' => 'Thibitisha',
-    'legal_line' => 'Haki zote zimehifadhiwa. Tovuti hii inamilikiwa na kuendeshwa na :company, RC - (:rc), yenye anwani rasmi katika :address.',
+    'all_rights_reserved' => 'Haki zote zimehifadhiwa.',
+    'legal_line' => 'Inamilikiwa na kuendeshwa na :company, RC :rc, yenye anwani rasmi katika :address.',
+    'verify_company' => 'Thibitisha kampuni',
 ];

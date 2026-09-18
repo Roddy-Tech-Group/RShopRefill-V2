@@ -30,4 +30,27 @@ return [
     'chip_devices_subtitle' => 'Compatible with laptop, iPad and mobile',
     'chip_search_title' => 'Find what you need fast',
     'chip_search_subtitle' => 'Search gift cards, eSIMs and top-ups in seconds',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'What you get and how you pay',
+    'assurance_instant_title' => 'Instant Delivery',
+    'panel_title' => 'Instant Delivery, Zero Hassle.',
+    'assurance_privacy_title' => 'Secure by design',
+    'assurance_support_title' => '24/7 human support',
+    'assurance_pay_with' => 'Pay with MOMO, OM, Cards, Crypto',
+    'assurance_more_methods' => '+:count more',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'Frequently asked questions',
+    'faq_subheading' => 'Check out our :link page for more questions',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'Registered Customers',
+    'counts_orders' => 'Orders delivered',
+    'counts_countries' => 'Countries served',
+    'counts_rank_value' => 'Trusted',
+    'counts_rank_label' => 'Digital commerce platform',
 ];

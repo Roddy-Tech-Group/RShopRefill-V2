@@ -41,4 +41,9 @@ return [
     'refund_policy' => 'سياسة الاسترداد',
     'accessibility' => 'إمكانية الوصول',
     'sitemap' => 'خريطة الموقع',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'أنت ترى منتجات قابلة للاستخدام في :country. اعرض منتجات:',
+    'region_suggest_switch' => 'تغيير',
+    'region_suggest_dismiss' => 'تجاهل اقتراح المنطقة',
 ];

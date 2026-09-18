@@ -1,10 +1,7 @@
 <?php
 
 /*
- * Footer.
- *
- * Link columns, the app callout, the social row and the legal line - every
- * storefront page carries these, so they are the strings a visitor sees most.
+ * Footer. See lang/en/footer.php.
  *
  * The company name, RC number and registered address are NOT translated: they
  * are the legal identity of the operator. They arrive as :company, :rc and
@@ -15,47 +12,45 @@ return [
 
     // Column headings
     'shop' => 'Tienda',
+    'help' => 'Ayuda y soporte',
     'company' => 'Empresa',
-    'help' => 'Ayuda',
-    'legal' => 'Legal',
+    'legal' => 'Legal y confianza',
+
+    // Brand column
+    'tagline' => 'Tu marketplace de tarjetas de regalo, eSIM de viaje, recargas móviles y pago de facturas.',
 
     // Shop column
     'gift_cards' => 'Tarjetas de regalo',
     'travel_esims' => 'eSIM de viaje',
-    'mobile_refills' => 'Recargas móviles',
+    'mobile_topups' => 'Recargas móviles',
+    'data_bundles' => 'Paquetes de datos',
     'bill_payments' => 'Pago de facturas',
+    'request_a_product' => 'Solicitar un producto',
     'flights' => 'Vuelos',
     'stays' => 'Alojamientos',
+
+    // Help & Support column
+    'help_center' => 'Centro de ayuda',
+    'faqs' => 'Preguntas frecuentes',
+    'contact_support' => 'Contactar con soporte',
+    'how_it_works' => 'Cómo funciona',
+    'refund_policy' => 'Política de reembolsos',
+    'esim_installation_guide' => 'Guía de instalación de eSIM',
 
     // Company column
     'about_us' => 'Quiénes somos',
     'blog' => 'Blog',
-    'reviews' => 'Opiniones',
-    'partnerships' => 'Alianzas',
-    'suppliers' => 'Proveedores',
-    'careers' => 'Empleo',
+    'customer_reviews' => 'Opiniones de clientes',
+    'influencers_affiliates' => 'Influencers y afiliados',
+    'press_media' => 'Prensa y medios',
 
-    // Help column
-    'help_center' => 'Centro de ayuda',
-    'faqs' => 'Preguntas frecuentes',
-    'contact_us' => 'Contáctanos',
-    'how_it_works' => 'Cómo funciona',
-    'earn_points' => 'Gana puntos',
-
-    // Legal column
-    'privacy' => 'Privacidad',
+    // Legal & Trust column
     'terms_of_service' => 'Términos del servicio',
+    'privacy_policy' => 'Política de privacidad',
     'cookie_policy' => 'Política de cookies',
     'compliance' => 'Cumplimiento',
-    'refund_policy' => 'Política de reembolsos',
-    'privacy_policy' => 'Política de privacidad',
+    'security' => 'Seguridad',
     'accessibility' => 'Accesibilidad',
-    'sitemap' => 'Mapa del sitio',
-
-    // App callout
-    'get_the_app' => 'Descargar la app',
-    'coming_soon_on' => 'Muy pronto en',
-    'app_coming_soon' => 'Muy pronto - usa hoy nuestra app web',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Síguenos',
@@ -67,9 +62,10 @@ return [
     'social_whatsapp' => 'Chatea con nosotros por WhatsApp',
     'social_discord' => 'Únete a nosotros en Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Tema',
     'cookie_settings' => 'Configuración de cookies',
-    'verify' => 'Verificar',
-    'legal_line' => 'Todos los derechos reservados. Este sitio web pertenece y es operado por :company, RC - (:rc), con domicilio social en :address.',
+    'all_rights_reserved' => 'Todos los derechos reservados.',
+    'legal_line' => 'Propiedad y gestión de :company, RC :rc, con domicilio social en :address.',
+    'verify_company' => 'Verificar empresa',
 ];

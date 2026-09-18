@@ -17,4 +17,12 @@ return [
     'kyc_verified' => 'تم التحقق من الهوية',
     'kyc_rejected' => 'لم نتمكن من التحقق من مستنداتك',
     'kyc_upload_id' => 'حمّل وثيقة هوية رسمية',
+
+    // FAQ page.
+    'faq_title' => 'الأسئلة الشائعة',
+    'faq_heading' => 'كل ما تحتاج إلى معرفته',
+    'faq_subheading' => 'الأسئلة الشائعة',
+    'faq_still_need_help' => 'هل ما زلت بحاجة إلى مساعدة؟ تفضل بزيارة :help_center أو :contact_team.',
+    'faq_help_center_link' => 'مركز المساعدة',
+    'faq_contact_team_link' => 'تواصل مع فريقنا',
 ];

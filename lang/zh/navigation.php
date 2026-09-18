@@ -39,4 +39,9 @@ return [
     'refund_policy' => '退款政策',
     'accessibility' => '无障碍',
     'sitemap' => '网站地图',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => '您正在浏览可在:country使用的商品。查看以下地区的商品：',
+    'region_suggest_switch' => '切换',
+    'region_suggest_dismiss' => '关闭地区建议',
 ];

@@ -3,8 +3,12 @@
 /*
  * Footer.
  *
- * Link columns, the app callout, the social row and the legal line - every
- * storefront page carries these, so they are the strings a visitor sees most.
+ * The brand line, four link columns, the social row, the settings row and the
+ * legal lines - every storefront page carries these, so they are the strings a
+ * visitor sees most.
+ *
+ * Each link lives in exactly one column. Privacy and Terms used to appear in
+ * the Legal column AND a bottom link bar; the bar is gone.
  *
  * The company name, RC number and registered address are NOT translated: they
  * are the legal identity of the operator. They arrive as :company, :rc and
@@ -13,49 +17,49 @@
 
 return [
 
-    // Column headings
+    // Column headings. The keys predate the renames ("help" reads Help &
+    // Support, "legal" reads Legal & Trust) and are kept so the column ids
+    // built from them stay stable.
     'shop' => 'Shop',
+    'help' => 'Help & Support',
     'company' => 'Company',
-    'help' => 'Help',
-    'legal' => 'Legal',
+    'legal' => 'Legal & Trust',
+
+    // Brand column
+    'tagline' => 'Your marketplace for gift cards, travel eSIMs, mobile top-ups and bill payments.',
 
     // Shop column
-    'gift_cards' => 'Gift cards',
+    'gift_cards' => 'Gift Cards',
     'travel_esims' => 'Travel eSIMs',
-    'mobile_refills' => 'Mobile refills',
-    'bill_payments' => 'Bill payments',
+    'mobile_topups' => 'Mobile Top-Ups',
+    'data_bundles' => 'Data Bundles',
+    'bill_payments' => 'Bill Payments',
+    'request_a_product' => 'Request a product',
     'flights' => 'Flights',
     'stays' => 'Stays',
 
-    // Company column
-    'about_us' => 'About us',
-    'blog' => 'Blog',
-    'reviews' => 'Reviews',
-    'partnerships' => 'Partnerships',
-    'suppliers' => 'Suppliers',
-    'careers' => 'Careers',
-
-    // Help column
-    'help_center' => 'Help center',
+    // Help & Support column
+    'help_center' => 'Help Center',
     'faqs' => 'FAQs',
-    'contact_us' => 'Contact us',
-    'how_it_works' => 'How it works',
-    'earn_points' => 'Earn points',
+    'contact_support' => 'Contact Support',
+    'how_it_works' => 'How It Works',
+    'refund_policy' => 'Refund Policy',
+    'esim_installation_guide' => 'eSIM Installation Guide',
 
-    // Legal column
-    'privacy' => 'Privacy',
+    // Company column
+    'about_us' => 'About Us',
+    'blog' => 'Blog',
+    'customer_reviews' => 'Customer Reviews',
+    'influencers_affiliates' => 'Influencers and Affiliates',
+    'press_media' => 'Press & Media',
+
+    // Legal & Trust column
     'terms_of_service' => 'Terms of Service',
+    'privacy_policy' => 'Privacy Policy',
     'cookie_policy' => 'Cookie Policy',
     'compliance' => 'Compliance',
-    'refund_policy' => 'Refund policy',
-    'privacy_policy' => 'Privacy Policy',
+    'security' => 'Security',
     'accessibility' => 'Accessibility',
-    'sitemap' => 'Sitemap',
-
-    // App callout
-    'get_the_app' => 'Get the app',
-    'coming_soon_on' => 'Coming soon on',
-    'app_coming_soon' => 'Coming soon - use our Web App today',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Follow us',
@@ -67,9 +71,18 @@ return [
     'social_whatsapp' => 'Chat with us on WhatsApp',
     'social_discord' => 'Join us on Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Theme',
-    'cookie_settings' => 'Cookie settings',
-    'verify' => 'Verify',
-    'legal_line' => 'All rights reserved. This website is owned and operated by :company, RC - (:rc), with a registered address at :address.',
+    'cookie_settings' => 'Cookie Settings',
+    'all_rights_reserved' => 'All rights reserved.',
+    'legal_line' => 'Owned and operated by :company, RC :rc, registered at :address.',
+    'verify_company' => 'Verify company',
+
+    // Newsletter row, above the footer columns.
+    'newsletter_pitch' => 'Get gift card, eSIM and airtime deals delivered to your inbox',
+    'newsletter_label' => 'Email address',
+    'newsletter_placeholder' => 'you@example.com',
+    'newsletter_cta' => 'Sign Up',
+    'newsletter_sending' => 'Signing up',
+    'newsletter_done' => 'You are on the list. Thanks!',
 ];

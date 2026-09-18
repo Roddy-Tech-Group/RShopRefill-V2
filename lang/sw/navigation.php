@@ -39,4 +39,9 @@ return [
     'refund_policy' => 'Sera ya marejesho',
     'accessibility' => 'Ufikivu',
     'sitemap' => 'Ramani ya tovuti',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'Unaona bidhaa zinazotumika :country. Angalia bidhaa za:',
+    'region_suggest_switch' => 'Badilisha',
+    'region_suggest_dismiss' => 'Ondoa pendekezo la eneo',
 ];

@@ -12,47 +12,45 @@ return [
 
     // Column headings
     'shop' => '商城',
+    'help' => '帮助与支持',
     'company' => '公司',
-    'help' => '帮助',
-    'legal' => '法律条款',
+    'legal' => '法律与信任',
+
+    // Brand column
+    'tagline' => '您的礼品卡、旅行 eSIM、手机充值和账单缴费一站式平台。',
 
     // Shop column
     'gift_cards' => '礼品卡',
     'travel_esims' => '旅行 eSIM',
-    'mobile_refills' => '手机充值',
+    'mobile_topups' => '手机充值',
+    'data_bundles' => '流量套餐',
     'bill_payments' => '账单缴费',
+    'request_a_product' => '请求上架商品',
     'flights' => '机票',
     'stays' => '住宿',
+
+    // Help & Support column
+    'help_center' => '帮助中心',
+    'faqs' => '常见问题',
+    'contact_support' => '联系客服',
+    'how_it_works' => '使用指南',
+    'refund_policy' => '退款政策',
+    'esim_installation_guide' => 'eSIM 安装指南',
 
     // Company column
     'about_us' => '关于我们',
     'blog' => '博客',
-    'reviews' => '用户评价',
-    'partnerships' => '合作伙伴',
-    'suppliers' => '供应商',
-    'careers' => '招聘',
+    'customer_reviews' => '用户评价',
+    'influencers_affiliates' => '网红与联盟推广',
+    'press_media' => '新闻与媒体',
 
-    // Help column
-    'help_center' => '帮助中心',
-    'faqs' => '常见问题',
-    'contact_us' => '联系我们',
-    'how_it_works' => '使用指南',
-    'earn_points' => '赚取积分',
-
-    // Legal column
-    'privacy' => '隐私',
+    // Legal & Trust column
     'terms_of_service' => '服务条款',
+    'privacy_policy' => '隐私政策',
     'cookie_policy' => 'Cookie 政策',
     'compliance' => '合规',
-    'refund_policy' => '退款政策',
-    'privacy_policy' => '隐私政策',
+    'security' => '安全',
     'accessibility' => '无障碍',
-    'sitemap' => '网站地图',
-
-    // App callout
-    'get_the_app' => '下载应用',
-    'coming_soon_on' => '即将上线',
-    'app_coming_soon' => '即将推出 - 现在就用我们的网页版',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => '关注我们',
@@ -64,9 +62,10 @@ return [
     'social_whatsapp' => '在 WhatsApp 上与我们联系',
     'social_discord' => '加入我们的 Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => '主题',
     'cookie_settings' => 'Cookie 设置',
-    'verify' => '验证',
-    'legal_line' => '版权所有。本网站由 :company 拥有并运营，RC - (:rc)，注册地址为 :address。',
+    'all_rights_reserved' => '版权所有。',
+    'legal_line' => '由 :company 拥有并运营，RC :rc，注册地址为 :address。',
+    'verify_company' => '核实公司',
 ];

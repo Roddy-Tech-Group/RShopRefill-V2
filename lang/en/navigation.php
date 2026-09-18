@@ -41,4 +41,9 @@ return [
     'refund_policy' => 'Refund policy',
     'accessibility' => 'Accessibility',
     'sitemap' => 'Sitemap',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'You are seeing products redeemable in :country. View products for:',
+    'region_suggest_switch' => 'Switch',
+    'region_suggest_dismiss' => 'Dismiss region suggestion',
 ];

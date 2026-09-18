@@ -1,10 +1,7 @@
 <?php
 
 /*
- * Footer.
- *
- * Link columns, the app callout, the social row and the legal line - every
- * storefront page carries these, so they are the strings a visitor sees most.
+ * Footer. See lang/en/footer.php.
  *
  * The company name, RC number and registered address are NOT translated: they
  * are the legal identity of the operator. They arrive as :company, :rc and
@@ -15,47 +12,45 @@ return [
 
     // Column headings
     'shop' => 'Siyayya',
+    'help' => 'Taimako da tallafi',
     'company' => 'Kamfani',
-    'help' => 'Taimako',
-    'legal' => 'Doka',
+    'legal' => 'Doka da amana',
+
+    // Brand column
+    'tagline' => 'Kasuwarka ta katunan kyauta, eSIM na tafiya, cajin waya da biyan bili.',
 
     // Shop column
     'gift_cards' => 'Katunan kyauta',
     'travel_esims' => 'eSIM na tafiya',
-    'mobile_refills' => 'Cajin waya',
+    'mobile_topups' => 'Cajin waya',
+    'data_bundles' => 'Fakitin data',
     'bill_payments' => 'Biyan bili',
+    'request_a_product' => 'Nemi samfuri',
     'flights' => 'Jirage',
     'stays' => 'Masauki',
+
+    // Help & Support column
+    'help_center' => 'Cibiyar taimako',
+    'faqs' => 'Tambayoyi',
+    'contact_support' => 'Tuntuɓi tallafi',
+    'how_it_works' => 'Yadda yake aiki',
+    'refund_policy' => 'Manufar maido da kuɗi',
+    'esim_installation_guide' => 'Jagorar saka eSIM',
 
     // Company column
     'about_us' => 'Game da mu',
     'blog' => 'Blog',
-    'reviews' => 'Ra\'ayoyi',
-    'partnerships' => 'Haɗin gwiwa',
-    'suppliers' => 'Masu kaya',
-    'careers' => 'Guraben aiki',
+    'customer_reviews' => 'Ra\'ayoyin abokan ciniki',
+    'influencers_affiliates' => 'Masu tasiri da abokan hulɗa',
+    'press_media' => 'Labarai da kafafen yaɗa labarai',
 
-    // Help column
-    'help_center' => 'Cibiyar taimako',
-    'faqs' => 'Tambayoyi',
-    'contact_us' => 'Tuntuɓe mu',
-    'how_it_works' => 'Yadda yake aiki',
-    'earn_points' => 'Sami maki',
-
-    // Legal column
-    'privacy' => 'Sirri',
+    // Legal & Trust column
     'terms_of_service' => 'Sharuɗɗan Amfani',
+    'privacy_policy' => 'Manufar Sirri',
     'cookie_policy' => 'Manufar Kuki',
     'compliance' => 'Bin ƙa\'idoji',
-    'refund_policy' => 'Manufar maido da kuɗi',
-    'privacy_policy' => 'Manufar Sirri',
+    'security' => 'Tsaro',
     'accessibility' => 'Sauƙin amfani',
-    'sitemap' => 'Taswirar shafi',
-
-    // App callout
-    'get_the_app' => 'Sami manhaja',
-    'coming_soon_on' => 'Nan ba da jimawa a',
-    'app_coming_soon' => 'Nan ba da jimawa - yi amfani da manhajarmu ta yanar gizo yau',
 
     // Social row - the network names themselves are brands, never translated
     'follow_us' => 'Bi mu',
@@ -67,9 +62,10 @@ return [
     'social_whatsapp' => 'Yi hira da mu a WhatsApp',
     'social_discord' => 'Haɗu da mu a Discord',
 
-    // Bottom bar
+    // Settings row and legal lines
     'theme' => 'Kamanni',
     'cookie_settings' => 'Saitunan kuki',
-    'verify' => 'Tabbatar',
-    'legal_line' => 'Duk haƙƙoƙi na kiyaye. :company ce ke mallaka da gudanar da wannan shafin yanar gizo, RC - (:rc), wanda adireshin rajistarsa yake a :address.',
+    'all_rights_reserved' => 'Duk haƙƙoƙi na kiyaye.',
+    'legal_line' => ':company ce ke mallaka da gudanarwa, RC :rc, adireshin rajista a :address.',
+    'verify_company' => 'Tabbatar da kamfani',
 ];

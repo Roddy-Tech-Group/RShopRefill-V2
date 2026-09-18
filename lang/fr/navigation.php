@@ -39,4 +39,9 @@ return [
     'refund_policy' => 'Politique de remboursement',
     'accessibility' => 'Accessibilité',
     'sitemap' => 'Plan du site',
+
+    // Region suggestion popup under the header's region pill.
+    'region_suggest_body' => 'Vous voyez des produits utilisables en :country. Voir les produits pour :',
+    'region_suggest_switch' => 'Changer',
+    'region_suggest_dismiss' => 'Ignorer la suggestion de région',
 ];

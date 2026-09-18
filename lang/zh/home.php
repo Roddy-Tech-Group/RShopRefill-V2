@@ -26,4 +26,27 @@ return [
     'chip_devices_subtitle' => '兼容电脑、iPad 和手机',
     'chip_search_title' => '快速找到所需',
     'chip_search_subtitle' => '几秒内搜索礼品卡、eSIM 和充值',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => '您获得什么以及如何付款',
+    'assurance_instant_title' => '即时交付',
+    'panel_title' => '即时交付，毫无麻烦。',
+    'assurance_privacy_title' => '安全设计',
+    'assurance_support_title' => '全天候真人客服',
+    'assurance_pay_with' => '支持 MOMO、OM、银行卡和加密货币付款',
+    'assurance_more_methods' => '另有 :count 种',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => '常见问题',
+    'faq_subheading' => '更多问题请查看我们的 :link 页面',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => '注册客户',
+    'counts_orders' => '已交付订单',
+    'counts_countries' => '服务国家/地区',
+    'counts_rank_value' => '值得信赖',
+    'counts_rank_label' => '数字商务平台',
 ];

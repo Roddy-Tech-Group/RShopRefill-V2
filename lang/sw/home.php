@@ -21,4 +21,27 @@ return [
     'chip_devices_subtitle' => 'Inaendana na kompyuta, iPad na simu',
     'chip_search_title' => 'Pata unachohitaji haraka',
     'chip_search_subtitle' => 'Tafuta kadi za zawadi, eSIM na salio kwa sekunde chache',
+
+    // Assurance strip under the category cards: three promises and the
+    // payment methods that back them.
+    'assurance_label' => 'Unachopata na jinsi ya kulipa',
+    'assurance_instant_title' => 'Uwasilishaji wa papo hapo',
+    'panel_title' => 'Uwasilishaji wa papo hapo, bila usumbufu.',
+    'assurance_privacy_title' => 'Salama kwa muundo',
+    'assurance_support_title' => 'Msaada wa binadamu saa 24',
+    'assurance_pay_with' => 'Lipa kwa MOMO, OM, kadi na kripto',
+    'assurance_more_methods' => '+:count zaidi',
+
+    // Homepage FAQ. Questions themselves live in the faqs table.
+    'faq_heading' => 'Maswali yanayoulizwa mara kwa mara',
+    'faq_subheading' => 'Tazama ukurasa wetu wa :link kwa maswali zaidi',
+    'faq_link_label' => 'FAQ',
+
+    // Live counts panel. The numbers come from the database; these are
+    // only the labels beside them.
+    'counts_customers' => 'Wateja waliosajiliwa',
+    'counts_orders' => 'Oda zilizowasilishwa',
+    'counts_countries' => 'Nchi tunazohudumia',
+    'counts_rank_value' => 'Inaaminika',
+    'counts_rank_label' => 'Jukwaa la biashara ya kidijitali',
 ];

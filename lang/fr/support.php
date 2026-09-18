@@ -17,4 +17,12 @@ return [
     'kyc_verified' => 'Identité vérifiée',
     'kyc_rejected' => 'Nous n’avons pas pu vérifier vos documents',
     'kyc_upload_id' => 'Téléversez une pièce d’identité officielle',
+
+    // Page FAQ.
+    'faq_title' => 'FAQ',
+    'faq_heading' => 'Tout ce que vous devez savoir',
+    'faq_subheading' => 'Questions fréquentes',
+    'faq_still_need_help' => 'Besoin d’aide supplémentaire ? Consultez notre :help_center ou :contact_team.',
+    'faq_help_center_link' => 'Centre d’aide',
+    'faq_contact_team_link' => 'contactez notre équipe',
 ];
