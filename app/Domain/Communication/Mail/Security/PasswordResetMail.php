@@ -21,7 +21,7 @@ class PasswordResetMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Reset Password Request - '.$brand,
@@ -40,7 +40,7 @@ class PasswordResetMail extends Mailable
             with: [
                 'name' => $this->user->name,
                 'resetUrl' => $resetUrl,
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

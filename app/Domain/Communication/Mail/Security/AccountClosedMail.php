@@ -32,7 +32,7 @@ class AccountClosedMail extends Mailable
             view: 'emails.auth.account-closed',
             with: [
                 'name' => $this->name,
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

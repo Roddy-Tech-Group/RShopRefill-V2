@@ -32,7 +32,7 @@ class DataExportRequestedByStaffMail extends Mailable
             view: 'emails.security.data-export-attached',
             with: [
                 'name' => $this->name,
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

@@ -39,7 +39,7 @@ class PaymentRecoveryMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
         $productLine = $this->recovery->productLine();
         $copy = RecoveryCopy::for($this->recovery->failure_reason_code, $productLine);
 

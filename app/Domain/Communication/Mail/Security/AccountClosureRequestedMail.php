@@ -36,7 +36,7 @@ class AccountClosureRequestedMail extends Mailable
                 'closesOn' => $this->closesOn->format('l, j F Y'),
                 'graceDays' => $this->graceDays,
                 'loginUrl' => route('login'),
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

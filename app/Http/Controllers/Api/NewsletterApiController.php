@@ -67,7 +67,7 @@ class NewsletterApiController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'You have been successfully unsubscribed from RshopRefills newsletter.',
+            'message' => 'You have been successfully unsubscribed from RshopRefill newsletter.',
         ]);
     }
 }

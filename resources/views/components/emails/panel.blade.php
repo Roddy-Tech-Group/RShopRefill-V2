@@ -1,7 +1,7 @@
 @props([
     'title' => null,
     'background' => '#f4f7ff',
-    'border' => '#dbe4ff',
+    'border' => '#dfe3e1',
     'accent' => '#2563eb',
 ])
 {{-- Highlight box for transactional detail (order info, balances, reasons).

@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 /**
  * The single entry point for ALL outgoing communications across the
- * entire RShopRefills platform.
+ * entire RshopRefill platform.
  *
  * Business logic emits events → listeners call CommunicationManager::send()
  * → the manager resolves channels, preferences, sender, rate limits →

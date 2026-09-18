@@ -46,7 +46,7 @@ class SendGiftCardsRestoredNotification extends Command
                         recipient: $user,
                         category: CommunicationCategory::GiftCardsRestored,
                         title: 'Great News! Gift Cards Are Back!',
-                        message: 'Our Gift Card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online. We appreciate your continued trust in RShopRefills. Happy shopping!',
+                        message: 'Our Gift Card service is now fully restored and ready to use. Thank you for your patience and understanding while we worked to get everything back online. We appreciate your continued trust in RshopRefill. Happy shopping!',
                         mailable: new GiftCardsRestoredMail($user),
                         correlationId: 'giftcards_restored_2026_07_'.$user->id,
                         metadata: [

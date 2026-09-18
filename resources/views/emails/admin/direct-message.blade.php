@@ -5,7 +5,7 @@
         ? 'Please review this warning about your '.$siteName.' account.'
         : 'You have a new message from the '.$siteName.' team.';
     $accent = $isWarning ? '#b45309' : '#2563eb';   // amber-700 vs brand blue
-    $bgTint = $isWarning ? '#fef3c7' : '#dbeafe';   // amber-100 vs blue-100
+    $bgTint = $isWarning ? '#fef3c7' : '#f4f6f5';   // amber-100 vs neutral (no light blue)
     $badge  = $isWarning ? 'Warning' : 'Notification';
 @endphp
 <x-emails.layout :mail-message="$message ?? null" :title="$headline" :preheader="$preheader">

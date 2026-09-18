@@ -40,7 +40,7 @@ class TestWebPushCommand extends Command
 
         $report = $provider->send(
             subscriptions: $subscriptions,
-            title: '🎉 RshopRefills Push Test',
+            title: '🎉 RshopRefill Push Test',
             body: 'If you see this, Web Push is working! '.now()->format('H:i:s'),
             url: '/dashboard',
             icon: '/assets/icon-512.png',

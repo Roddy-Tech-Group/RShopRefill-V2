@@ -31,7 +31,7 @@ class VerifyEmailMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Verify your email address - '.$brand,
@@ -45,7 +45,7 @@ class VerifyEmailMail extends Mailable
             with: [
                 'name' => $this->user->name,
                 'verifyUrl' => $this->verificationUrl(),
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
                 'expireMinutes' => (int) config('auth.verification.expire', 60),
             ]
         );
