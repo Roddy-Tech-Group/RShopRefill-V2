@@ -106,7 +106,10 @@ class ProductPageTranslationTest extends TestCase
             __('products.detail_intro_gift_card', ['brand' => 'Acme'], 'fr'),
             __('products.detail_badge_online_redeemable', [], 'fr'),
             __('products.detail_quantity', [], 'fr'),
+            // A gift card prices in its purchase card and names the pay currency
+            // beside its values, so it carries both labels.
             __('products.detail_estimated_price', [], 'fr'),
+            __('common.payment_currency', [], 'fr'),
             __('products.detail_points_you_earn', [], 'fr'),
             __('products.detail_redeemable_in', ['country' => 'United States'], 'fr'),
             __('products.detail_faq_gift_card_failed_q', [], 'fr'),
@@ -131,6 +134,7 @@ class ProductPageTranslationTest extends TestCase
 
         foreach ([
             'Estimated price',
+            'Payment currency',
             'Points you earn',
             'Online redeemable',
             'May only be redeemable in',
@@ -157,11 +161,13 @@ class ProductPageTranslationTest extends TestCase
             __('products.detail_validity_days', ['count' => '30'], 'fr'),
             __('products.detail_phone_label', ['country' => 'United States'], 'fr'),
             __('products.detail_faq_topup_failed_q', [], 'fr'),
+            // The buy panel, which only the other kinds still draw, keeps this label.
+            __('products.detail_estimated_price', [], 'fr'),
         ] as $french) {
             $this->assertStringContainsString(e($french), $html, 'Missing top-up French: '.$french);
         }
 
-        foreach (['Choose how to top up', '2GB data', '30-day validity', 'phone number to refill'] as $english) {
+        foreach (['Choose how to top up', '2GB data', '30-day validity', 'phone number to refill', 'Estimated price'] as $english) {
             $this->assertStringNotContainsString($english, $html, 'Untranslated top-up English: '.$english);
         }
     }
@@ -177,6 +183,7 @@ class ProductPageTranslationTest extends TestCase
             'Acme gift card</h1>',
             'Buy Acme gift cards with Bitcoin, USDT, USDC and other Crypto. Instant delivery and a fair refund policy.',
             'Estimated price',
+            'Payment currency',
             'Points you earn',
             'May only be redeemable in United States',
             'Not in United States?',
@@ -184,7 +191,9 @@ class ProductPageTranslationTest extends TestCase
             'Buy Acme Gift Card in United States',
             'How to buy Acme gift card',
             'Receive your redemption code by email instantly, then redeem it at Acme.',
-            "x-text=\"amount ? amount : 'Select amount'\"",
+            // Gift cards pick from a standing grid of values now, not the
+            // dropdown whose placeholder this used to pin (GiftCardDenominationGridTest).
+            'role="radiogroup"',
         ] as $english) {
             $this->assertStringContainsString($english, $html, 'English product page copy changed: '.$english);
         }

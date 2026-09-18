@@ -640,40 +640,120 @@
         })"
         x-init="init()"
         style="--brand: {{ $brandColor }};"
+        {{-- Narrower than the nav and the listing pages, which run the full 1550px:
+             a product page is one thing to read and buy, not a grid of many. --}}
         class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
     >
 
-        {{-- Two-column hero + buy panel --}}
-        <div class="mt-6 grid grid-cols-1 gap-8 lg:mt-10 lg:grid-cols-2 lg:gap-8">
+        {{-- Two columns: the writing (with the art and values inside it for a gift
+             card), and the buy panel, which for a gift card is the purchase card. --}}
+        <div class="mt-6 grid grid-cols-1 gap-8 lg:mt-10 lg:gap-8 {{ $isGiftCard ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : 'lg:grid-cols-2' }}">
 
-            {{-- LEFT: hero plate. The outer div is a normal grid cell (stretches to full row
-                 height); the sticky wrapper lives INSIDE it so position:sticky always has room
-                 to travel as the taller right column scrolls. --}}
-            <div>
+            {{-- A gift card's buy rail: the purchase card alone, standing in a narrow
+                 column beside the writing and riding the scroll with it. The other
+                 kinds keep the hero plate here, and a gift card draws that plate
+                 beside its values instead. On a phone both columns dissolve
+                 (max-lg:contents) and order runs writing, card, the rest. --}}
+            {{-- The rail spans the rows beside it as well as its own, so the card has
+                 room to ride the scroll: a sticky element can only travel inside its
+                 own cell, and a cell that is exactly the card's height never moves. --}}
+            <div class="{{ $isGiftCard ? 'max-lg:contents lg:col-start-2 lg:row-start-2 lg:row-span-3' : '' }}">
                 {{-- top offset clears the sticky header (top-bar 36 + nav 64 + category bar 40)
-                     so the card parks below it instead of sliding up behind the nav. --}}
-                <div class="lg:sticky lg:top-[156px]">
-                    <div class="pure-card mx-auto lg:mr-0 flex w-full max-w-lg items-center justify-center rounded-[24px] bg-[#e8e8f7] p-10 sm:p-14 dark:border dark:border-[#24364f] dark:bg-[#0c1a36]">
-                        {{-- The brand plate. keep-light holds it white in dark mode: bg-[#ffffff]
-                             became the dashboard card class in the light redesign, and the dashboard
-                             mirror of this page renders the same file, so without the opt-out the
-                             plate repaints to the card grey and a dark-linework logo vanishes. --}}
-                        <div class="relative flex aspect-[8/5] w-4/5 items-center justify-center overflow-hidden rounded-[20px] keep-light bg-[#ffffff] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.25)]">
-                            @if ($logoSrc)
-                                <img src="{{ $logoSrc }}" alt="{{ $productLabel }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high">
-                            @else
-                                {{-- No logo (e.g. mobile-airtime operators) — a branded name tile. --}}
-                                <div class="flex h-full w-full items-center justify-center" style="background-color: {{ Product::tileColor($brandKey) }}">
-                                    <span class="px-4 text-center text-2xl font-extrabold leading-tight text-white">{{ $brandName }}</span>
+                     so it parks below it instead of sliding up behind the nav. --}}
+                <div class="{{ $isGiftCard ? 'max-lg:contents ' : '' }}lg:sticky lg:top-[156px]">
+                    @if ($isGiftCard)
+                        @if ($hasStock)
+                            {{-- The purchase card, alone in the rail: the brand mark with the
+                                 chosen value and the quantity, the price, then the buy actions.
+                                 It reads the page's own state, and the values it prices stand
+                                 beside the art in the column next to it. --}}
+                            <aside class="pure-card w-full rounded-[20px] border border-zinc-200 bg-white p-5 shadow-md shadow-zinc-900/[0.06] max-lg:order-3 dark:border-white/10 dark:shadow-none" aria-label="{{ $productLabel }}">
+                                <div class="flex items-center gap-3">
+                                    @if ($logoSrc)
+                                        <img src="{{ $logoSrc }}" alt="" class="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-white/10" loading="lazy">
+                                    @endif
+                                    <div class="min-w-0 flex-1 leading-tight">
+                                        <p class="truncate text-sm text-zinc-700 dark:text-zinc-300">{{ $brandName }}</p>
+                                        {{-- The chosen value with its code, then the kind: "25 USD Gift Card". --}}
+                                        <p class="truncate text-sm font-semibold text-zinc-900 dark:text-white">
+                                            <span x-text="customMode
+                                                ? (amount ? Number(amount).toLocaleString('en-US') + ' {{ strtoupper((string) $customCurrency) }}' : @js(__('products.detail_custom_amount')))
+                                                : (variants.find(v => v.id === selectedVariantId) ? Number(variants.find(v => v.id === selectedVariantId).face_value).toLocaleString('en-US') + ' {{ strtoupper((string) $currency) }}' : @js(__('products.detail_select_amount')))">{{ __('products.detail_select_amount') }}</span>
+                                            {{ __('products.detail_kind_gift_card') }}
+                                        </p>
+                                    </div>
+                                    {{-- Quantity, in the site's own dropdown rather than the
+                                         browser's, so it matches every other picker here. --}}
+                                    <div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative shrink-0">
+                                        <button
+                                            type="button"
+                                            id="gift-quantity"
+                                            @click="open = ! open"
+                                            :aria-expanded="open.toString()"
+                                            aria-haspopup="listbox"
+                                            aria-label="{{ __('products.detail_quantity') }}"
+                                            class="flex h-9 items-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white pl-3 pr-2 text-sm font-semibold tabular-nums text-zinc-900 transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-blue-400/50"
+                                        >
+                                            <span x-text="quantity">1</span>
+                                            <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 -translate-y-1"
+                                            x-transition:enter-end="opacity-100 translate-y-0"
+                                            role="listbox"
+                                            class="absolute right-0 top-full z-20 mt-1 max-h-60 w-[4.5rem] overflow-y-auto rounded-[12px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] dark:border-white/10 dark:bg-[#1a1a1e] [&::-webkit-scrollbar]:hidden"
+                                        >
+                                            @for ($n = 1; $n <= 10; $n++)
+                                                <button
+                                                    type="button"
+                                                    role="option"
+                                                    :aria-selected="(quantity === {{ $n }}).toString()"
+                                                    @click="quantity = {{ $n }}; open = false"
+                                                    :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"
+                                                    class="flex w-full items-center justify-center rounded-[12px] px-2 py-1.5 text-sm font-medium tabular-nums transition-colors"
+                                                >{{ $n }}</button>
+                                            @endfor
+                                        </div>
+                                    </div>
                                 </div>
-                            @endif
-                        </div>
-                    </div>
+
+                                {{-- The pay currency, then what this many of the chosen value
+                                     costs in it. --}}
+                                <div class="mt-4">
+                                    @include('shop._pay-currency-picker', ['pickerCodeOnly' => true, 'pickerLabelText' => __('common.payment_currency')])
+                                </div>
+
+                                {{-- The estimated price. The tiles carry face values only,
+                                     so this is the one figure the customer pays. --}}
+                                <p class="mt-4 text-xs font-semibold text-zinc-600 dark:text-zinc-400">{{ __('products.detail_estimated_price') }}</p>
+                                <p x-data="valueFlip()" x-effect="selectedVariantId; quantity; selectedCrypto; flash()" class="mt-1 text-[32px] font-bold leading-none tabular-nums text-zinc-900 dark:text-white" x-text="formatCrypto()">0.00 USD</p>
+
+                                @include('shop._buy-actions')
+                            </aside>
+                        @endif
+                    @else
+                        @include('shop._brand-plate')
+                    @endif
                 </div>
             </div>
 
-            {{-- RIGHT: buy panel --}}
-            <div class="flex flex-col gap-5">
+            {{-- The writing, and for the other kinds the buy panel itself. A gift card
+                 takes the left column here and carries its art and values inside it. --}}
+            {{-- A gift card's writing dissolves into the page grid (its three regions place
+                 themselves), so this carries no display of its own there: a flex utility
+                 alongside would win over contents and collapse them back into one cell. --}}
+            <div class="{{ $isGiftCard ? 'contents' : 'flex flex-col gap-5' }}">
+            @if ($isGiftCard)
+                {{-- Split in two so that on a phone the art, the values and the card can
+                     be ordered above the writing. --}}
+                <div class="flex min-w-0 flex-col gap-5 max-lg:order-1 lg:col-start-1 lg:row-start-1">
+            @endif
 
                 {{-- Heading --}}
                 <div>
@@ -749,15 +829,34 @@
                 @php
                     $kindPillLabel = $isTopup ? __('products.detail_pill_credits') : ($isBill ? __('products.detail_kind_bill') : __('products.detail_kind_gift_card'));
                 @endphp
-                <div>
-                    <span class="inline-flex items-center rounded-[5px] bg-blue-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">{{ $kindPillLabel }}</span>
-                </div>
+                {{-- A gift card says where it can be redeemed here instead: the kind is
+                     already in the heading above, and where it works is the thing a buyer
+                     checks before choosing a value. --}}
+                @if ($isGiftCard)
+                    @include('shop._country-availability', ['availabilityClass' => 'mb-1'])
+                @else
+                    <div>
+                        <span class="inline-flex items-center rounded-[5px] bg-blue-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">{{ $kindPillLabel }}</span>
+                    </div>
+                @endif
+
+                @if ($isGiftCard)
+                    </div>{{-- /heading --}}
+
+                    {{-- The second row: the art with its values, standing level with the
+                         purchase card in the column beside it. --}}
+                    <div class="flex min-w-0 flex-col gap-5 max-lg:order-2 lg:col-start-1 lg:row-start-2">
+                @endif
 
                 @if ($hasStock)
                     {{-- Mobile top-ups: a Credit / Data / Bundle switcher sharing one ttab
                          scope. The Credit panel is the amount selector below; Data/Bundle
                          panels are benefit cards. All read from synced Zendit metadata. --}}
+                    {{-- This wrapper only carries the top-up tab state. Gift cards skip
+                         it: it would span their region boundaries. --}}
+                    @unless ($isGiftCard)
                     <div @if ($isTopup && $topupHasPlans) x-data="{ ttab: '{{ $topupDefaultTab }}' }" @endif>
+                    @endunless
 
                     @if ($isTopup && $topupHasPlans)
                         <div class="mb-5">
@@ -828,312 +927,24 @@
                         </div>
                     @endif
 
-                    {{-- Amount / Quantity / Estimated price. Mobile: Amount on its own full
-                         row, Quantity + Estimated price share a 2-col row. sm+: one row. --}}
-                    <div class="grid gap-3 {{ ! ($isTopup && $topupHasPlans) ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : '' }}"
-                        @if ($isTopup && $topupHasPlans) :class="ttab === 'credit' ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_1fr]'" @endif>
-
-                        {{-- Amount field — plain typeable input with $ prefix. Suggested denominations
-                             render as small clickable chips below so users can one-tap a common value. --}}
-                        <div class="col-span-2 sm:col-span-1" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? __('products.detail_credit_amount') : __('products.detail_amount') }}</label>
-                            <div
-                                x-data="{ open: false, locked: false }"
-                                @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
-                                @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
-                                @click.outside="open = false; locked = false"
-                                class="relative"
-                            >
-                                <button
-                                    type="button"
-                                    @click="open = ! open; locked = open"
-                                    :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
-                                >
-                                    <span class="font-semibold text-zinc-600">{{ $variable ? $customSymbol : $displaySymbol }}</span>
-                                    <span
-                                        x-data="valueFlip()"
-                                        x-effect="selectedVariantId; customMode; flash()"
-                                        class="flex-1 truncate text-left tabular-nums"
-                                        :class="amount ? 'text-zinc-900' : 'font-medium text-zinc-500'"
-                                        x-text="amount ? amount : @js(__('products.detail_select_amount'))"
-                                    >{{ __('products.detail_select_amount') }}</span>
-                                    {{-- Clear the selected denomination. @click.stop so it doesn't toggle the dropdown. --}}
-                                    <span
-                                        x-show="selectedVariantId || amount"
-                                        @click.stop="amount = ''; selectedVariantId = null; customMode = false; open = false"
-                                        @keydown.enter.stop="amount = ''; selectedVariantId = null; customMode = false; open = false"
-                                        role="button"
-                                        tabindex="0"
-                                        aria-label="{{ __('products.detail_clear_amount') }}"
-                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300"
-                                    >
-                                        <img src="{{ asset('assets/' . rawurlencode('x button.webp')) }}" alt="" class="h-3.5 w-3.5 object-contain" loading="lazy">
-                                    </span>
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    style="display:none;"
-                                    class="absolute left-0 right-0 top-full z-20 max-h-[27rem] overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                                    role="listbox"
-                                >
-                                    @if ($isTopup)
-                                        {{-- Credit selector: airtime-credit denominations only (Data/Bundle
-                                             are chosen from their cards above). Labeled by FACE VALUE (the
-                                             $35 the listing advertises and the carrier prints), not the
-                                             charged price - the charge shows in Estimated price, mirroring
-                                             the gift-card flow. Selection is carried by the variant id, so
-                                             the card and the cart still can never disagree. --}}
-                                        @foreach ($topupPicks as $pick)
-                                            @if (isset($pick['plan']))
-                                                @php $plan = $pick['plan']; @endphp
-                                                <button
-                                                    type="button"
-                                                    @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
-                                                    :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
-                                                >
-                                                    <span class="flex min-w-0 flex-col">
-                                                        <span class="font-bold">{{ $conv($plan['face']) }}</span>
-                                                        @php $pickNote = trim((string) ($plan['summary'] ?? '')); @endphp
-                                                        @if ($pickNote !== '')
-                                                            <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $pickNote }}</span>
-                                                        @endif
-                                                    </span>
-                                                </button>
-                                            @else
-                                                {{-- Synthesized round amount served through the custom-amount
-                                                     variant - this slot has no clean face in the catalog. --}}
-                                                <button
-                                                    type="button"
-                                                    @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = {{ $pick['amount'] }}; open = false"
-                                                    :class="(customMode && Number(amount) === {{ $pick['amount'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                                    class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
-                                                >
-                                                    <span class="font-bold">{{ $conv($pick['amount']) }}</span>
-                                                </button>
-                                            @endif
-                                        @endforeach
-                                        @foreach ($topupCreditPlans as $plan)
-                                            <button
-                                                type="button"
-                                                @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
-                                                :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
-                                            >
-                                                <span class="flex min-w-0 flex-col">
-                                                    <span class="font-bold">{{ $conv($plan['face']) }}</span>
-                                                    @php $creditNote = trim((string) ($plan['summary'] ?? '')); @endphp
-                                                    @if ($creditNote !== '')
-                                                        {{-- The supplier's own description, verbatim. Deliberately NOT
-                                                             chips derived from dataGB / dataUnlimited: those fields are
-                                                             populated on plain credit offers too, so rendering them here
-                                                             would advertise data the carrier does not actually sell. --}}
-                                                        <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $creditNote }}</span>
-                                                    @endif
-                                                </span>
-                                            </button>
-                                        @endforeach
-                                        @if ($variable)
-                                            <button
-                                                type="button"
-                                                @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
-                                                :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                                class="flex w-full items-center justify-between rounded-[12px] {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
-                                            >
-                                                <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
-                                                <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
-                                            </button>
-                                        @endif
-                                    @else
-                                    @foreach ($fixedDenoms as $i => $v)
-                                        @php
-                                            $val  = (float) $v->retail_price;
-                                            $disp = round($val * $displayRate, 2); // value in the display currency
-                                        @endphp
-                                        <button
-                                            type="button"
-                                            @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false; open = false"
-                                            :class="(! customMode && Number(amount) === {{ $disp }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
-                                        >
-                                            <span class="font-bold">{{ $conv($val) }}</span>
-                                            @if ($i === $fixedDenoms->count() - 1 && $fixedDenoms->count() > 1)
-                                                <span class="inline-flex items-center rounded-[12px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">{{ __('products.detail_popular') }}</span>
-                                            @endif
-                                        </button>
-                                    @endforeach
-                                    @if ($variable)
-                                        <button
-                                            type="button"
-                                            @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
-                                            :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
-                                        >
-                                            <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
-                                            <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
-                                        </button>
-                                    @endif
-                                    @endif
-                                </div>
-                            </div>
-
-                            @if ($variable)
-                                {{-- Custom-amount input. The amount is entered in the variant's own
-                                     currency ({{ $customCurrency }} for this product). A value outside the
-                                     min-max range is rejected: the error shows and the buy buttons
-                                     disable via canAddToCart(). --}}
-                                <div x-show="customMode" x-transition class="mt-2">
-                                    <div class="relative">
-                                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-zinc-600">{{ $customSymbol }}</span>
-                                        <input
-                                            type="number"
-                                            inputmode="decimal"
-                                            x-model="amount"
-                                            min="{{ (float) $customDisplayMin }}"
-                                            max="{{ (float) $customDisplayMax }}"
-                                            step="any"
-                                            placeholder="{{ rtrim(rtrim(number_format((float) $customDisplayMin, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $customDisplayMax, 2), '0'), '.') }}"
-                                            class="w-full rounded-[12px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
-                                            :class="(amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)) ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-[color:var(--brand)]'"
-                                        />
-                                    </div>
-                                    <p
-                                        x-show="amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)"
-                                        x-cloak
-                                        class="mt-1.5 text-xs font-medium text-red-600"
-                                    >
-                                        {{ __('products.detail_amount_out_of_range', ['min' => $customMoney($customDisplayMin), 'max' => $customMoney($customDisplayMax)]) }}
-                                    </p>
-                                </div>
-                            @endif
-
-                            @if ($rangeMin !== null && $rangeMax !== null)
-                                <p class="mt-1.5 text-xs text-zinc-600">
-                                    {{ __('products.detail_range_hint', ['min' => $variable ? $customMoney($rangeMin) : $conv($rangeMin), 'max' => $variable ? $customMoney($rangeMax) : $conv($rangeMax)]) }}
-                                </p>
-                            @endif
-                        </div>
-
-                        {{-- Quantity — custom dropdown so it visually matches the Amount + Estimated price fields. --}}
-                        <div class="sm:min-w-[6rem]">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_quantity') }}</label>
-                            <div
-                                x-data="{ open: false, locked: false }"
-                                @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
-                                @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
-                                @click.outside="open = false; locked = false"
-                                class="relative"
-                            >
-                                <button
-                                    type="button"
-                                    @click="open = ! open; locked = open"
-                                    :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
-                                >
-                                    <span x-data="valueFlip()" x-effect="quantity; flash()" class="flex-1 text-left tabular-nums" x-text="quantity">1</span>
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    style="display:none;"
-                                    class="absolute left-0 right-0 top-full z-20 max-h-60 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                                    role="listbox"
-                                >
-                                    @for ($n = 1; $n <= 10; $n++)
-                                        <button
-                                            type="button"
-                                            @click="quantity = {{ $n }}; open = false"
-                                            :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-center rounded-[12px] px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
-                                        >
-                                            {{ $n }}
-                                        </button>
-                                    @endfor
-                                </div>
+                    {{-- The art and the values it belongs to, side by side. The purchase
+                         card that prices them stands in the rail. The other kinds keep
+                         their amount fields in the panel, with no plate beside them. --}}
+                    @if ($isGiftCard)
+                        <div class="grid gap-5 sm:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+                            @include('shop._brand-plate', ['plateClass' => 'w-full self-start p-4', 'artWidth' => 'w-full'])
+                            <div class="min-w-0">
+                                @include('shop._amount-fields')
                             </div>
                         </div>
+                    @else
+                        @include('shop._amount-fields')
+                    @endif
 
-                        {{-- Estimated price — crypto currency selector. Each option shows the equivalent
-                             in that crypto using a placeholder rate (rate table lives in Alpine state). --}}
-                        <div class="sm:min-w-[9rem]">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_estimated_price') }}</label>
-                            <div
-                                x-data="{ open: false, locked: false }"
-                                @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
-                                @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
-                                @click.outside="open = false; locked = false"
-                                class="relative"
-                            >
-                                <button
-                                    type="button"
-                                    @click="open = ! open; locked = open"
-                                    :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                                    class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
-                                >
-                                    <template x-if="cryptos[selectedCrypto]?.icon">
-                                        <img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[12px]">
-                                    </template>
-                                    <template x-if="!cryptos[selectedCrypto]?.icon && cryptos[selectedCrypto]?.flag">
-                                        <img :src="cryptos[selectedCrypto].flag" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200">
-                                    </template>
-                                    <template x-if="!cryptos[selectedCrypto]?.icon && !cryptos[selectedCrypto]?.flag">
-                                        <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="cryptos[selectedCrypto]?.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="selectedCrypto.charAt(0)"></span>
-                                    </template>
-                                    <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; selectedCrypto; flash()" class="flex-1 truncate text-left tabular-nums" x-text="formatCrypto()">0.00 USDT</span>
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-
-                                <div
-                                    x-show="open"
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    style="display:none;"
-                                    class="absolute right-0 top-full z-20 max-h-80 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                                    role="listbox"
-                                >
-                                    <template x-for="(meta, code) in cryptos" :key="code">
-                                        <button
-                                            type="button"
-                                            @click="selectedCrypto = code; open = false"
-                                            :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
-                                        >
-                                            <template x-if="meta.icon">
-                                                <img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px]">
-                                            </template>
-                                            <template x-if="!meta.icon && meta.flag">
-                                                <img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200">
-                                            </template>
-                                            <template x-if="!meta.icon && !meta.flag">
-                                                <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span>
-                                            </template>
-                                            <span class="flex-1 truncate text-left tabular-nums" x-text="formatCryptoFor(code)"></span>
-                                            <svg x-show="selectedCrypto === code" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                            </svg>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    @if ($isGiftCard)
+                        </div>{{-- /art and values --}}
+                        <div class="flex min-w-0 flex-col gap-5 max-lg:order-4 lg:col-start-1 lg:row-start-3">
+                    @endif
 
                     {{-- Account ID — bill payments only. Captures the meter
                          number / customer ID the biller expects. Mirrors the
@@ -1222,118 +1033,37 @@
                         </div>
                     @endif
 
-                    {{-- Points you earn - calculated via backend rates (USD spent x cashback % / Rcoin USD rate). Coin icon is the site favicon. Hidden when the Rcoin engine is off. --}}
-                    <p x-show="rcoinConfig.enabled" class="my-3 flex items-center gap-1.5 text-sm font-semibold text-zinc-700">
-                        {{ __('products.detail_points_you_earn') }}
-                        <img src="{{ asset('assets/favicon.ico') }}" alt="{{ __('products.detail_points_icon_alt') }}" class="h-6 w-6 object-contain" loading="lazy">
-                        <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; flash()" class="inline-block text-zinc-900" x-text="pointsEarned()">0</span>
-                    </p>
-
-                    {{-- Feature A/B notice: the product stays fully visible but the buy
-                         controls below are disabled (and the purchase is blocked server-side)
-                         when out of stock or when its category feature is switched off. --}}
-                    @unless ($productBuyable)
-                        <div class="mb-3 flex items-start gap-3 rounded-[12px] border px-4 py-3 {{ $product->is_out_of_stock ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-white/5' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
-                            <svg class="mt-0.5 h-5 w-5 shrink-0 {{ $product->is_out_of_stock ? 'text-zinc-400' : 'text-amber-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-                            </svg>
-                            <div>
-                                <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? __('products.out_of_stock') : __('products.temporarily_unavailable') }}</p>
-                                <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">{{ $product->is_out_of_stock ? __('products.detail_out_of_stock_notice') : __('products.detail_paused_notice') }}</p>
-                            </div>
-                        </div>
+                    {{-- The points line, the stock notice and the two buttons. Gift cards carry
+                         them in the purchase card under the art instead. --}}
+                    @unless ($isGiftCard)
+                        @include('shop._buy-actions')
                     @endunless
 
-                    {{-- Add to cart + Buy now — brand blue (outline + filled).
-                         addToCart() pushes the selected variant into the global cart store,
-                         which drops the nav cart popup open. Buy now also routes to checkout. --}}
-                    <div class="grid grid-cols-2 gap-3">
-                        {{-- Add to cart — morphs label -> spinner -> checkmark with a success bounce.
-                             Re-clicks during the spinner/success cue are ignored by addToCart(). --}}
-                        <button
-                            type="button"
-                            @click="addToCart()"
-                            :disabled="! canAddToCart()"
-                            :class="cartState === 'success'
-                                ? 'border-emerald-500 bg-emerald-500 text-white animate-cart-pop'
-                                : 'border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white'"
-                            class="relative flex h-[52px] items-center justify-center rounded-[12px] border-2 px-4 text-base font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <span
-                                x-show="cartState === 'idle'"
-                                x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0"
-                                x-transition:leave="transition ease-in duration-100"
-                                x-transition:leave-end="opacity-0"
-                                class="absolute inset-0 flex items-center justify-center"
-                            >{{ __('products.add_to_cart') }}</span>
-
-                            <span
-                                x-show="cartState === 'loading'"
-                                style="display:none;"
-                                x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0"
-                                x-transition:leave="transition ease-in duration-100"
-                                x-transition:leave-end="opacity-0"
-                                class="absolute inset-0 flex items-center justify-center"
-                            >
-                                <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                    <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
-                                    <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
-                                </svg>
-                            </span>
-
-                            <span
-                                x-show="cartState === 'success'"
-                                style="display:none;"
-                                x-transition:enter="transition ease-out duration-200"
-                                x-transition:enter-start="opacity-0 scale-90"
-                                x-transition:enter-end="opacity-100 scale-100"
-                                class="absolute inset-0 flex items-center justify-center gap-2"
-                            >
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M5 13l4 4L19 7"/>
-                                </svg>
-                                {{ __('products.detail_added') }}
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            @click="buyNow()"
-                            :disabled="! canAddToCart() || $store.cart.loading"
-                            class="flex h-[52px] items-center justify-center rounded-[12px] bg-blue-600 px-4 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
-                        >
-                            {{ __('products.buy_now') }}
-                        </button>
-                    </div>
-
-                    {{-- Country availability — the redeemable country for this
-                         variant, plus a link to switch country via the locale modal. --}}
-                    <div class="mt-4 mb-2">
-                        <p class="flex items-center gap-2 text-sm text-zinc-700">
-                            @if (Product::flagUrl($product->country_code))
-                                <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-4 w-6 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
-                            @endif
-                            <span>{{ $isTopup ? __('products.detail_works_for_numbers', ['country' => $countryName]) : ($isBill ? __('products.detail_billers_in', ['country' => $countryName]) : __('products.detail_redeemable_in', ['country' => $countryName])) }}</span>
-                        </p>
-                        <p class="mt-0.5 text-sm text-zinc-600">
-                            {{ __('products.detail_not_in_country', ['country' => $countryName]) }}
-                            <button type="button" @click="$dispatch('open-locale-modal'); localeModalOpen = true" class="font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700">
-                                {{ __('products.detail_find_your_country') }}
-                            </button>
-                        </p>
-                    </div>
+                    {{-- A gift card carries this line up with the heading instead. --}}
+                    @unless ($isGiftCard)
+                        @include('shop._country-availability')
+                    @endunless
+                    @unless ($isGiftCard)
                     </div>{{-- /top-up switcher ttab scope --}}
+                    @endunless
                 @else
+                    @if ($isGiftCard)
+                        @include('shop._brand-plate', ['plateClass' => 'mx-auto w-full max-w-[300px] self-start p-4', 'artWidth' => 'w-full'])
+                    @endif
                     <div class="dash-shimmer pure-card rounded-[12px] bg-[#eff6ff] px-4 py-8 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
                         <p class="text-base font-semibold text-zinc-900">{{ __('products.out_of_stock') }}</p>
                         <p class="mt-1 text-sm text-zinc-600">{{ $kindText('products.detail_no_amounts_gift_card', 'products.detail_no_amounts_topup', 'products.detail_no_amounts_bill') }}</p>
                     </div>
+                    @if ($isGiftCard)
+                        {{-- Nothing to buy, so no purchase card: close the second row, open the third. --}}
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-5 max-lg:order-4 lg:col-start-1 lg:row-start-3">
+                    @endif
                 @endif
 
                 {{-- Accordion sections: How to redeem / Terms / FAQ — INSIDE the right column so the
                      gift card stays alone on the left. No dividers between items. --}}
-                <section class="mt-6">
+                <section class="mt-6 space-y-3">
             @if ($redeemUrl)
                 {{-- Jump straight to the brand's redemption page in a new tab. --}}
                 <a
@@ -1350,78 +1080,179 @@
             @endif
 
             @if ($product->redeem_instructions)
-                <details class="group" open>
-                    <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        {{ $categorySlug === 'gift-cards' ? __('products.detail_how_to_redeem') : __('products.detail_how_it_works') }}
-                        <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
-                        </svg>
-                    </summary>
-                    <div class="pb-5 text-base leading-relaxed text-zinc-700 [&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&>ol>li]:mb-1.5 [&>ul>li]:mb-1.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-700">
+                <x-accordion :title="$categorySlug === 'gift-cards' ? __('products.detail_how_to_redeem') : __('products.detail_how_it_works')" :open="true">
+                    <div class="[&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&>ol>li]:mb-1.5 [&>ul>li]:mb-1.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-700">
                         {!! $linkify($product->redeem_instructions) !!}
                     </div>
-                </details>
+                </x-accordion>
             @endif
 
             @if ($product->terms_and_conditions)
-                <details class="group">
-                    <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        {{ __('products.detail_terms') }}
-                        <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
-                        </svg>
-                    </summary>
-                    <div class="pb-5 text-sm leading-relaxed text-zinc-700 [&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&_a]:text-blue-600 [&_a]:underline">
+                <x-accordion :title="__('products.detail_terms')">
+                    <div class="text-sm [&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&_a]:text-blue-600 [&_a]:underline">
                         {!! $linkify($product->terms_and_conditions) !!}
                     </div>
-                </details>
+                </x-accordion>
             @endif
 
             @if ($redemptionVideo)
-                <details class="group">
-                    <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        {{ __('products.detail_walkthrough') }}
-                        <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
-                        </svg>
-                    </summary>
-                    <div class="pb-5">
-                        <div class="overflow-hidden rounded-[12px] bg-zinc-900 ring-1 ring-zinc-100">
-                            <video controls class="aspect-video w-full">
-                                <source src="{{ $redemptionVideo }}">
-                                {{ __('products.detail_video_unsupported') }}
-                            </video>
-                        </div>
+                <x-accordion :title="__('products.detail_walkthrough')">
+                    <div class="overflow-hidden rounded-[12px] bg-zinc-900 ring-1 ring-zinc-100">
+                        <video controls class="aspect-video w-full">
+                            <source src="{{ $redemptionVideo }}">
+                            {{ __('products.detail_video_unsupported') }}
+                        </video>
                     </div>
-                </details>
+                </x-accordion>
             @endif
 
-            <details class="group">
-                <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                    {{ __('products.detail_faq_heading') }}
-                    <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
-                    </svg>
-                </summary>
-                <div class="pb-5 text-base leading-relaxed text-zinc-700">
-                    @if ($isTopup)
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_topup_speed_q') }}</strong><br>{{ __('products.detail_faq_topup_speed_a') }}</p>
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_topup_numbers_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_topup_numbers_a', ['brand' => $brandName, 'country' => $countryName]) }}</p>
-                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_topup_failed_q') }}</strong><br>{{ __('products.detail_faq_topup_failed_a') }}</p>
-                    @elseif ($isBill)
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_bill_speed_q') }}</strong><br>{{ __('products.detail_faq_bill_speed_a') }}</p>
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_bill_need_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_bill_need_a') }}</p>
-                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_bill_failed_q') }}</strong><br>{{ __('products.detail_faq_bill_failed_a') }}</p>
-                    @else
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_speed_q') }}</strong><br>{{ __('products.detail_faq_gift_card_speed_a') }}</p>
-                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_country_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_gift_card_country_a', ['country' => $countryName]) }}</p>
-                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_failed_q') }}</strong><br>{{ __('products.detail_faq_gift_card_failed_a') }}</p>
-                    @endif
-                </div>
-            </details>
+            {{-- One row per question, so a reader opens only what they asked. --}}
+            <h2 class="pt-4 text-lg font-bold text-zinc-900 dark:text-white">{{ __('products.detail_faq_heading') }}</h2>
+            @php
+                if ($isTopup) {
+                    $faqs = [
+                        [__('products.detail_faq_topup_speed_q'), __('products.detail_faq_topup_speed_a')],
+                        [__('products.detail_faq_topup_numbers_q', ['brand' => $brandName]), __('products.detail_faq_topup_numbers_a', ['brand' => $brandName, 'country' => $countryName])],
+                        [__('products.detail_faq_topup_failed_q'), __('products.detail_faq_topup_failed_a')],
+                    ];
+                } elseif ($isBill) {
+                    $faqs = [
+                        [__('products.detail_faq_bill_speed_q'), __('products.detail_faq_bill_speed_a')],
+                        [__('products.detail_faq_bill_need_q', ['brand' => $brandName]), __('products.detail_faq_bill_need_a')],
+                        [__('products.detail_faq_bill_failed_q'), __('products.detail_faq_bill_failed_a')],
+                    ];
+                } else {
+                    $faqs = [
+                        [__('products.detail_faq_gift_card_speed_q'), __('products.detail_faq_gift_card_speed_a')],
+                        [__('products.detail_faq_gift_card_country_q', ['brand' => $brandName]), __('products.detail_faq_gift_card_country_a', ['country' => $countryName])],
+                        [__('products.detail_faq_gift_card_failed_q'), __('products.detail_faq_gift_card_failed_a')],
+                    ];
+                }
+            @endphp
+            @foreach ($faqs as [$question, $answer])
+                <x-accordion :title="$question">{{ $answer }}</x-accordion>
+            @endforeach
                 </section>
+            @if ($isGiftCard)
+
+            @if ($isGiftCard)
+                {{-- A gift card reads its long-form copy in this column, under the
+                     questions, so the purchase card beside it has room to ride the
+                     scroll. The other kinds keep it full width below the grid. --}}
+                        {{-- Long-form, data-driven brand copy. Everything here is derived from
+                         THIS brand's real catalog data (denomination range, the countries it
+                         sells in, category), so every brand page carries genuinely unique,
+                         indexable text instead of a shared template - the fix for Search
+                         Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
+                    <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
+                        <div class="max-w-3xl">
+                            @php
+                                $aboutReplace = ['brand' => $brandName, 'country' => $countryName, 'site' => $siteName, 'range' => (string) $rangeText];
+                            @endphp
+                            <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
+                                {{ $kindText('products.detail_about_heading_gift_card', 'products.detail_about_heading_topup', 'products.detail_about_heading_bill', $aboutReplace) }}
+                            </h2>
+
+                            <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                                {{ $rangeText ? $kindText('products.detail_about_delivery_ranged_gift_card', 'products.detail_about_delivery_ranged_topup', 'products.detail_about_delivery_ranged_bill', $aboutReplace) : $kindText('products.detail_about_delivery_gift_card', 'products.detail_about_delivery_topup', 'products.detail_about_delivery_bill', $aboutReplace) }} {{ $kindText('products.detail_about_payment_gift_card', 'products.detail_about_payment_topup', 'products.detail_about_payment_bill') }} {{ __('products.detail_about_refund') }}
+                            </p>
+
+                            @if ($brandCountries->count() > 1)
+                                @php
+                                    $aboutReplace['countries'] = $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' '.__('products.detail_list_and').' ');
+                                @endphp
+                                <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                                    {{ $kindText('products.detail_about_countries_gift_card', 'products.detail_about_countries_topup', 'products.detail_about_countries_bill', $aboutReplace) }} {{ __('products.detail_about_switch_country') }}
+                                </p>
+                            @endif
+
+                            @php
+                                // The same three steps either way: choose the amount, pay, receive it.
+                                // The "then redeem it at" tail is gift cards only; any other category
+                                // that lands here gets the plain line.
+                                $buyingSteps = [
+                                    __('products.detail_step_title_amount') => $kindText('products.detail_step_amount_gift_card', 'products.detail_step_amount_topup', 'products.detail_step_amount_bill', $aboutReplace),
+                                    __('products.detail_step_title_pay') => __('products.detail_step_pay'),
+                                    __('products.detail_step_title_receive') => $isGiftCard ? __('products.detail_step_receive_gift_card', $aboutReplace) : $kindText('products.detail_step_receive_code', 'products.detail_step_receive_topup', 'products.detail_step_receive_bill'),
+                                ];
+                            @endphp
+
+                            <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">{{ $kindText('products.detail_how_to_gift_card', 'products.detail_how_to_topup', 'products.detail_how_to_bill', $aboutReplace) }}</h3>
+
+                            {{-- One card per step, side by side on a wide screen and stacked on a
+                                 phone, numbered so the order is still read as a sequence. --}}
+                            <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+                                @foreach ($buyingSteps as $stepTitle => $stepBody)
+                                    <li class="pure-card rounded-[12px] border border-zinc-200 bg-white p-5 dark:border-white/10">
+                                        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white" aria-hidden="true">{{ $loop->iteration }}</span>
+                                        <p class="mt-3 text-base font-bold text-zinc-900 dark:text-white">{{ $stepTitle }}</p>
+                                        <p class="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{{ $stepBody }}</p>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+                    </section>
+            @endif
+                </div>{{-- /gift card lower details --}}
+            @endif
             </div>{{-- /right column --}}
         </div>{{-- /grid --}}
+
+        @unless ($isGiftCard)
+                    {{-- Long-form, data-driven brand copy. Everything here is derived from
+                     THIS brand's real catalog data (denomination range, the countries it
+                     sells in, category), so every brand page carries genuinely unique,
+                     indexable text instead of a shared template - the fix for Search
+                     Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
+                <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
+                    <div class="max-w-3xl">
+                        @php
+                            $aboutReplace = ['brand' => $brandName, 'country' => $countryName, 'site' => $siteName, 'range' => (string) $rangeText];
+                        @endphp
+                        <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
+                            {{ $kindText('products.detail_about_heading_gift_card', 'products.detail_about_heading_topup', 'products.detail_about_heading_bill', $aboutReplace) }}
+                        </h2>
+
+                        <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            {{ $rangeText ? $kindText('products.detail_about_delivery_ranged_gift_card', 'products.detail_about_delivery_ranged_topup', 'products.detail_about_delivery_ranged_bill', $aboutReplace) : $kindText('products.detail_about_delivery_gift_card', 'products.detail_about_delivery_topup', 'products.detail_about_delivery_bill', $aboutReplace) }} {{ $kindText('products.detail_about_payment_gift_card', 'products.detail_about_payment_topup', 'products.detail_about_payment_bill') }} {{ __('products.detail_about_refund') }}
+                        </p>
+
+                        @if ($brandCountries->count() > 1)
+                            @php
+                                $aboutReplace['countries'] = $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' '.__('products.detail_list_and').' ');
+                            @endphp
+                            <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
+                                {{ $kindText('products.detail_about_countries_gift_card', 'products.detail_about_countries_topup', 'products.detail_about_countries_bill', $aboutReplace) }} {{ __('products.detail_about_switch_country') }}
+                            </p>
+                        @endif
+
+                        @php
+                            // The same three steps either way: choose the amount, pay, receive it.
+                            // The "then redeem it at" tail is gift cards only; any other category
+                            // that lands here gets the plain line.
+                            $buyingSteps = [
+                                __('products.detail_step_title_amount') => $kindText('products.detail_step_amount_gift_card', 'products.detail_step_amount_topup', 'products.detail_step_amount_bill', $aboutReplace),
+                                __('products.detail_step_title_pay') => __('products.detail_step_pay'),
+                                __('products.detail_step_title_receive') => $isGiftCard ? __('products.detail_step_receive_gift_card', $aboutReplace) : $kindText('products.detail_step_receive_code', 'products.detail_step_receive_topup', 'products.detail_step_receive_bill'),
+                            ];
+                        @endphp
+
+                        <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">{{ $kindText('products.detail_how_to_gift_card', 'products.detail_how_to_topup', 'products.detail_how_to_bill', $aboutReplace) }}</h3>
+
+                        {{-- One card per step, side by side on a wide screen and stacked on a
+                             phone, numbered so the order is still read as a sequence. --}}
+                        <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+                            @foreach ($buyingSteps as $stepTitle => $stepBody)
+                                <li class="pure-card rounded-[12px] border border-zinc-200 bg-white p-5 dark:border-white/10">
+                                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white" aria-hidden="true">{{ $loop->iteration }}</span>
+                                    <p class="mt-3 text-base font-bold text-zinc-900 dark:text-white">{{ $stepTitle }}</p>
+                                    <p class="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{{ $stepBody }}</p>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </div>
+                </section>
+        @endunless
 
         {{-- Similar brands --}}
         @if ($similar->isNotEmpty())
@@ -1465,52 +1296,14 @@
             </section>
         @endif
 
-        {{-- Customer reviews for THIS gift card - shared per-brand carousel
-             (also shown on the order confirmation page). Self-guarding:
-             renders nothing when the brand has no approved reviews. --}}
+        {{-- Customer reviews for THIS gift card: the score with the spread of
+             ratings, then the reviews themselves. Self-guarding, so it renders
+             nothing when the brand has no approved reviews. The order
+             confirmation page keeps the carousel. --}}
         @if ($isGiftCard)
-            <div class="mt-12">
-                <x-shop.brand-reviews :brand-key="$brandKey" :brand-name="$brandName" />
-            </div>
+            <x-shop.product-reviews :brand-key="$brandKey" :brand-name="$brandName" />
         @endif
 
-        {{-- Long-form, data-driven brand copy. Everything here is derived from
-             THIS brand's real catalog data (denomination range, the countries it
-             sells in, category), so every brand page carries genuinely unique,
-             indexable text instead of a shared template - the fix for Search
-             Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
-        <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
-            <div class="max-w-3xl">
-                @php
-                    $aboutReplace = ['brand' => $brandName, 'country' => $countryName, 'site' => $siteName, 'range' => (string) $rangeText];
-                @endphp
-                <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
-                    {{ $kindText('products.detail_about_heading_gift_card', 'products.detail_about_heading_topup', 'products.detail_about_heading_bill', $aboutReplace) }}
-                </h2>
-
-                <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
-                    {{ $rangeText ? $kindText('products.detail_about_delivery_ranged_gift_card', 'products.detail_about_delivery_ranged_topup', 'products.detail_about_delivery_ranged_bill', $aboutReplace) : $kindText('products.detail_about_delivery_gift_card', 'products.detail_about_delivery_topup', 'products.detail_about_delivery_bill', $aboutReplace) }} {{ $kindText('products.detail_about_payment_gift_card', 'products.detail_about_payment_topup', 'products.detail_about_payment_bill') }} {{ __('products.detail_about_refund') }}
-                </p>
-
-                @if ($brandCountries->count() > 1)
-                    @php
-                        $aboutReplace['countries'] = $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' '.__('products.detail_list_and').' ');
-                    @endphp
-                    <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
-                        {{ $kindText('products.detail_about_countries_gift_card', 'products.detail_about_countries_topup', 'products.detail_about_countries_bill', $aboutReplace) }} {{ __('products.detail_about_switch_country') }}
-                    </p>
-                @endif
-
-                <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">{{ $kindText('products.detail_how_to_gift_card', 'products.detail_how_to_topup', 'products.detail_how_to_bill', $aboutReplace) }}</h3>
-                <ol class="mt-3 list-decimal space-y-2 pl-5 text-base leading-relaxed text-zinc-600 marker:font-semibold marker:text-zinc-400 dark:text-zinc-300">
-                    <li>{{ $kindText('products.detail_step_amount_gift_card', 'products.detail_step_amount_topup', 'products.detail_step_amount_bill', $aboutReplace) }}</li>
-                    <li>{{ __('products.detail_step_pay') }}</li>
-                    {{-- The "then redeem it at" tail is gift cards only; any other category that lands here gets the plain line. --}}
-                    <li>{{ $isGiftCard ? __('products.detail_step_receive_gift_card', $aboutReplace) : $kindText('products.detail_step_receive_code', 'products.detail_step_receive_topup', 'products.detail_step_receive_bill') }}</li>
-                </ol>
-            </div>
-        </section>
-    </div>
 
     <script>
         window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig, purchasable }) {
@@ -1701,9 +1494,17 @@
                 },
 
                 formatCryptoFor(code) {
+                    return this.formatUsdIn(code, this.totalUsd());
+                },
+
+                {{-- One USD figure in one pay currency. The total and every value
+                     tile both come through here, so a tile can never show a figure
+                     the total then contradicts. (A Blade comment, not a script one:
+                     script comments ship in the page, in English, to every locale.) --}}
+                formatUsdIn(code, usd) {
                     const meta = this.cryptos[code];
                     if (! meta) return '0 ' + code;
-                    let value = this.totalUsd() * meta.perUsd;
+                    let value = Number(usd || 0) * meta.perUsd;
                     // Charm rounding for fiat, mirroring CharmPrice::roundUp -
                     // UP only, to the step the currency's people pay in
                     // (₦1,056.80 → ₦1,060). Crypto amounts stay exact.
