@@ -209,4 +209,7 @@ return [
     'detail_step_title_amount' => 'اختر المبلغ',
     'detail_step_title_pay' => 'ادفع بالطريقة التي تناسبك',
     'detail_step_title_receive' => 'جاهز للاستخدام',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'مسار التنقل',
 ];

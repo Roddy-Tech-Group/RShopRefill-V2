@@ -206,4 +206,7 @@ return [
     'detail_step_title_amount' => '选择金额',
     'detail_step_title_pay' => '选择你的付款方式',
     'detail_step_title_receive' => '完成，立即可用',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => '面包屑导航',
 ];

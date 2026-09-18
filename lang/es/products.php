@@ -207,4 +207,7 @@ return [
     'detail_step_title_amount' => 'Elige el importe',
     'detail_step_title_pay' => 'Paga como prefieras',
     'detail_step_title_receive' => 'Listo para usar',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Ruta de navegación',
 ];

@@ -207,4 +207,7 @@ return [
     'detail_step_title_amount' => 'Zaɓi adadin',
     'detail_step_title_pay' => 'Biya yadda kake so',
     'detail_step_title_receive' => 'Shi ke nan, a shirye don amfani',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Hanyar kewayawa',
 ];

@@ -205,4 +205,7 @@ return [
     'detail_step_title_amount' => 'Betrag wählen',
     'detail_step_title_pay' => 'Bezahlen wie Sie möchten',
     'detail_step_title_receive' => 'Fertig, sofort nutzbar',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Brotkrümelnavigation',
 ];

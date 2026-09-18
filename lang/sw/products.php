@@ -205,4 +205,7 @@ return [
     'detail_step_title_amount' => 'Chagua kiasi',
     'detail_step_title_pay' => 'Lipa upendavyo',
     'detail_step_title_receive' => 'Tayari kutumika',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Njia ya urambazaji',
 ];

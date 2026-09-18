@@ -222,4 +222,7 @@ return [
     'detail_step_title_amount' => 'Enter the amount',
     'detail_step_title_pay' => 'Pay how you like',
     'detail_step_title_receive' => 'That is it, ready to use',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Breadcrumb',
 ];

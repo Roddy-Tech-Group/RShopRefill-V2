@@ -212,4 +212,7 @@ return [
     'detail_step_title_amount' => 'Choisissez le montant',
     'detail_step_title_pay' => 'Payez comme vous voulez',
     'detail_step_title_receive' => 'C\'est prêt à utiliser',
+
+    // The heading's breadcrumb landmark.
+    'detail_breadcrumb' => 'Fil d\'Ariane',
 ];

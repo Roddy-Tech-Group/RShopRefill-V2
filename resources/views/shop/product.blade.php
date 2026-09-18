@@ -755,9 +755,34 @@
                 <div class="flex min-w-0 flex-col gap-5 max-lg:order-1 lg:col-start-1 lg:row-start-1">
             @endif
 
-                {{-- Heading --}}
+                @php
+                    $redeemLabel = $isTopup
+                        ? __('products.detail_badge_credited_to_number')
+                        : ($isBill ? __('products.detail_badge_paid_to_account') : __('products.detail_badge_online_redeemable'));
+
+                    $badges = [
+                        ['label' => __('products.detail_badge_instant_delivery'), 'd' => 'M13 10V3L4 14h7v7l9-11h-7z'],
+                        ['label' => $redeemLabel,       'd' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                        ['label' => __('products.detail_badge_fair_refund'), 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                    ];
+                @endphp
+
+                {{-- Heading: where the page sits, what it is, how it is rated, and what
+                     it does for you, in that order. --}}
                 <div>
-                    <h1 class="text-[24px] font-bold leading-tight text-zinc-900">{{ $productLabel }}</h1>
+                    @if ($isGiftCard)
+                        {{-- The same trail the page's BreadcrumbList carries, country
+                             first: where a card can be used narrows it before its kind. --}}
+                        <nav aria-label="{{ __('products.detail_breadcrumb') }}" class="mb-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            <a href="{{ route($crumbListing, ['country' => $product->country_code]) }}" wire:navigate class="underline underline-offset-2 transition-colors hover:text-blue-700">{{ $countryName }}</a>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                            <a href="{{ route($crumbListing) }}" wire:navigate class="underline underline-offset-2 transition-colors hover:text-blue-700">{{ $crumbLabel }}</a>
+                        </nav>
+                    @endif
+
+                    <h1 class="{{ $isGiftCard ? 'text-[30px] sm:text-[36px]' : 'text-[24px]' }} font-bold leading-tight text-zinc-900">{{ $productLabel }}</h1>
 
                     {{-- Per-brand customer rating, from reviews left on delivered
                          orders for this gift card. Only shown for gift cards that
@@ -766,14 +791,27 @@
                         <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ trans_choice('products.detail_rating_aria', $brandReviewAgg['count'], ['rating' => number_format($brandReviewAgg['rating'], 1), 'count' => $brandReviewAgg['count']]) }}">
                             <span class="flex items-center gap-0.5">
                                 @for ($i = 1; $i <= 5; $i++)
-                                    <svg class="h-4 w-4 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <svg class="h-5 w-5 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-blue-600 dark:text-blue-500' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                                     </svg>
                                 @endfor
                             </span>
-                            <span class="text-sm font-bold text-zinc-900">{{ number_format($brandReviewAgg['rating'], 1) }}</span>
-                            <span class="text-sm text-zinc-500 hover:text-blue-700">({{ trans_choice('products.detail_review_count', $brandReviewAgg['count'], ['count' => $brandReviewAgg['count']]) }})</span>
+                            <span class="text-base font-bold text-zinc-900 dark:text-white">{{ number_format($brandReviewAgg['rating'], 1) }}</span>
+                            <span class="text-base text-zinc-500 hover:text-blue-700">({{ trans_choice('products.detail_review_count', $brandReviewAgg['count'], ['count' => $brandReviewAgg['count']]) }})</span>
                         </a>
+                    @endif
+
+                    @if ($isGiftCard)
+                        <ul class="mt-4 space-y-2 text-base text-zinc-800 dark:text-zinc-200">
+                            @foreach ($badges as $badge)
+                                <li class="flex items-start gap-2.5">
+                                    <svg class="mt-[7px] h-2.5 w-2.5 shrink-0 text-blue-600 dark:text-blue-500" viewBox="0 0 8 10" fill="currentColor" aria-hidden="true">
+                                        <path d="M0 0l8 5-8 5z"/>
+                                    </svg>
+                                    {{ $badge['label'] }}
+                                </li>
+                            @endforeach
+                        </ul>
                     @endif
 
                     @if ($product->description)
@@ -796,20 +834,10 @@
                 {{-- Trust badges — each is a small emerald-tinted circle + label,
                      mirroring the reference. Mobile keeps them on one scrollable row;
                      sm+ wraps naturally. --}}
-                @php
-                    $redeemLabel = $isTopup
-                        ? __('products.detail_badge_credited_to_number')
-                        : ($isBill ? __('products.detail_badge_paid_to_account') : __('products.detail_badge_online_redeemable'));
-
-                    $badges = [
-                        ['label' => __('products.detail_badge_instant_delivery'), 'd' => 'M13 10V3L4 14h7v7l9-11h-7z'],
-                        ['label' => $redeemLabel,       'd' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                        ['label' => __('products.detail_badge_fair_refund'), 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                    ];
-                @endphp
-                {{-- py-1 stops the overflow-x container clipping the badge
-                     circles' ring at the top and bottom on mobile (sm+ is
-                     overflow-visible so it needs none). --}}
+                {{-- Top-ups and bills keep the badge row; a gift card prints the same
+                     three as bullets in its heading. py-1 stops the overflow-x container
+                     clipping the badge circles' ring on mobile (sm+ needs none). --}}
+                @unless ($isGiftCard)
                 <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto py-1 text-sm font-medium text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:py-0 dark:text-zinc-200">
                     @foreach ($badges as $badge)
                         <span class="flex shrink-0 items-center gap-2">
@@ -822,6 +850,7 @@
                         </span>
                     @endforeach
                 </div>
+                @endunless
 
                 {{-- Category type pill — small chip below the trust badges so the
                      buyer instantly knows what kind of product this is (matches the
@@ -911,7 +940,7 @@
                                                     <span class="block space-y-2 text-sm text-zinc-900 dark:text-white">
                                                         @foreach ($features as [$fIcon, $fLabel])
                                                             <span class="flex items-center gap-2">
-                                                                <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
+                                                                <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
                                                                 <span>{{ $fLabel }}</span>
                                                             </span>
                                                         @endforeach
