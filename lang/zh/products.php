@@ -217,4 +217,14 @@ return [
     'detail_purpose_travel' => '可在 :country 通过 :brand 支付行程、住宿与出行。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
     'detail_purpose_dating' => '可在 :country 支付 :brand 会员费。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
     'detail_purpose_general' => '可在 :country 的 :brand 门店与线上支付任何商品。用加密货币、银行卡或移动钱包购买，当场即可兑换。',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => '打开我们发送的邮件，或你的订单页面，复制兑换码。登录 :brand，找到添加礼品卡或兑换码的位置并粘贴，余额会立即到账。',
+    'detail_faq_gift_card_delivery_q' => '我如何收到兑换码？',
+    'detail_faq_gift_card_delivery_a' => '付款确认后立即通过邮件发送，同时保存在你的订单页面，随时可以再次复制。',
+    'detail_faq_gift_card_payment_q' => '可以怎样付款？',
+    'detail_faq_gift_card_payment_a' => '可用加密货币、银行卡或移动钱包付款。你所选币种下显示的价格即为实付价格。',
+    'detail_faq_gift_card_expiry_q' => '兑换码会过期吗？',
+    'detail_faq_gift_card_expiry_a' => '有效期由 :brand 设定，不是我们，并写在本页的条款中。只要账号还在，订单页面就会一直保留兑换码。',
 ];

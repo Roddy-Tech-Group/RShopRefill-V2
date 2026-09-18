@@ -216,4 +216,14 @@ return [
     'detail_purpose_travel' => 'Bezahlt Reisen, Übernachtungen und Ausflüge bei :brand in :country. Mit Krypto, Karte oder Mobile Money kaufen und sofort einlösen.',
     'detail_purpose_dating' => 'Bezahlt die :brand Mitgliedschaft in :country. Mit Krypto, Karte oder Mobile Money kaufen und sofort einlösen.',
     'detail_purpose_general' => 'Bezahlt alles, was :brand in :country verkauft, im Laden wie online. Mit Krypto, Karte oder Mobile Money kaufen und sofort einlösen.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Öffnen Sie unsere E-Mail oder Ihre Bestellseite und kopieren Sie den Code. Melden Sie sich bei :brand an, gehen Sie dorthin, wo Geschenkkarten oder Codes hinzugefügt werden, und fügen Sie ihn ein. Das Guthaben ist sofort da.',
+    'detail_faq_gift_card_delivery_q' => 'Wie bekomme ich meinen Code?',
+    'detail_faq_gift_card_delivery_a' => 'Per E-Mail, sobald Ihre Zahlung bestätigt ist. Er liegt außerdem auf Ihrer Bestellseite und lässt sich jederzeit erneut kopieren.',
+    'detail_faq_gift_card_payment_q' => 'Wie kann ich bezahlen?',
+    'detail_faq_gift_card_payment_a' => 'Mit Krypto, Bankkarte oder Mobile Money. Der Preis in Ihrer gewählten Währung ist der Preis, den Sie zahlen.',
+    'detail_faq_gift_card_expiry_q' => 'Läuft der Code ab?',
+    'detail_faq_gift_card_expiry_a' => 'Eine Gültigkeitsfrist legt :brand fest, nicht wir, und sie steht in den Bedingungen auf dieser Seite. Ihre Bestellseite bewahrt den Code auf, solange Sie Ihr Konto haben.',
 ];

@@ -218,4 +218,14 @@ return [
     'detail_purpose_travel' => 'Paga viaggi, soggiorni e gite con :brand in :country. Acquistala in cripto, con carta o mobile money e usala subito.',
     'detail_purpose_dating' => 'Paga l\'abbonamento :brand in :country. Acquistala in cripto, con carta o mobile money e usala subito.',
     'detail_purpose_general' => 'Paga tutto ciò che :brand vende in :country, in negozio e online. Acquistala in cripto, con carta o mobile money e usala subito.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Apri l\'e-mail che ti inviamo, o la pagina del tuo ordine, e copia il codice. Accedi a :brand, vai dove si aggiungono carte regalo o codici e incollalo. Il credito arriva subito.',
+    'detail_faq_gift_card_delivery_q' => 'Come riceverò il codice?',
+    'detail_faq_gift_card_delivery_a' => 'Via e-mail, appena il pagamento è confermato. Resta anche nella pagina del tuo ordine, così puoi ricopiarlo quando vuoi.',
+    'detail_faq_gift_card_payment_q' => 'Come posso pagare?',
+    'detail_faq_gift_card_payment_a' => 'In cripto, con carta o mobile money. Il prezzo mostrato nella valuta scelta è quello che paghi.',
+    'detail_faq_gift_card_expiry_q' => 'Il codice scade?',
+    'detail_faq_gift_card_expiry_a' => 'Ogni scadenza la decide :brand, non noi, ed è scritta nelle condizioni di questa pagina. La pagina del tuo ordine conserva il codice finché hai il tuo account.',
 ];

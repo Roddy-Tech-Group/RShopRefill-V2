@@ -1155,11 +1155,19 @@
                 </a>
             @endif
 
-            @if ($product->redeem_instructions)
+            {{-- How to redeem. Suppliers send steps for some brands and nothing for
+                 others, which left those pages with no answer to the first question a
+                 buyer has, so a gift card without them falls back to the steps that
+                 are true of every gift card we sell. --}}
+            @if ($product->redeem_instructions || $isGiftCard)
                 <x-accordion :title="$categorySlug === 'gift-cards' ? __('products.detail_how_to_redeem') : __('products.detail_how_it_works')" :open="true">
-                    <div class="[&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&>ol>li]:mb-1.5 [&>ul>li]:mb-1.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-700">
-                        {!! $linkify($product->redeem_instructions) !!}
-                    </div>
+                    @if ($product->redeem_instructions)
+                        <div class="[&>p]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ul]:list-disc [&>ul]:pl-5 [&>ol>li]:mb-1.5 [&>ul>li]:mb-1.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-700">
+                            {!! $linkify($product->redeem_instructions) !!}
+                        </div>
+                    @else
+                        <p>{{ __('products.detail_redeem_fallback_gift_card', ['brand' => $brandName]) }}</p>
+                    @endif
                 </x-accordion>
             @endif
 
@@ -1200,7 +1208,10 @@
                 } else {
                     $faqs = [
                         [__('products.detail_faq_gift_card_speed_q'), __('products.detail_faq_gift_card_speed_a')],
+                        [__('products.detail_faq_gift_card_delivery_q'), __('products.detail_faq_gift_card_delivery_a')],
                         [__('products.detail_faq_gift_card_country_q', ['brand' => $brandName]), __('products.detail_faq_gift_card_country_a', ['country' => $countryName])],
+                        [__('products.detail_faq_gift_card_payment_q'), __('products.detail_faq_gift_card_payment_a')],
+                        [__('products.detail_faq_gift_card_expiry_q'), __('products.detail_faq_gift_card_expiry_a', ['brand' => $brandName])],
                         [__('products.detail_faq_gift_card_failed_q'), __('products.detail_faq_gift_card_failed_a')],
                     ];
                 }

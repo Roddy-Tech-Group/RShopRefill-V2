@@ -44,6 +44,54 @@ class ProductAccordionTest extends TestCase
         return $this->withoutVite()->get(route('shop.brand', ['brandSlug' => 'acme']))->assertOk()->getContent();
     }
 
+    /**
+     * A gift card answers at least five questions. The supplier sends none of
+     * these, so a brand page is never left with one or two.
+     */
+    public function test_a_gift_card_answers_at_least_five_questions(): void
+    {
+        $html = $this->page();
+
+        preg_match_all('/<summary[^>]*>\s*([^<]{6,95}?)\s*<span/', $html, $rows);
+        $questions = array_filter($rows[1], fn (string $row) => str_contains($row, '?'));
+
+        $this->assertGreaterThanOrEqual(5, count($questions), 'A gift card should answer at least five questions.');
+
+        foreach ([
+            'How will I receive my code?',
+            'How can I pay for it?',
+            'Does the code expire?',
+        ] as $question) {
+            $this->assertStringContainsString(e($question), $html);
+        }
+
+        // The expiry answer names the brand, because the brand sets it.
+        $this->assertStringContainsString('Any expiry is set by Acme, not by us', $html);
+    }
+
+    /**
+     * Suppliers send redemption steps for some brands and nothing for others.
+     * A gift card without them falls back to the steps that are true of every
+     * gift card, so the first question a buyer has is always answered.
+     */
+    public function test_a_gift_card_with_no_supplier_steps_still_says_how_to_redeem(): void
+    {
+        $html = $this->page();
+
+        $this->assertStringContainsString('How to redeem', $html);
+        $this->assertStringContainsString('Open the email we send you', $html);
+        $this->assertStringContainsString('Sign in at Acme', $html);
+    }
+
+    /** A brand whose supplier does send steps shows those, not the fallback. */
+    public function test_supplier_steps_win_over_the_fallback(): void
+    {
+        $html = $this->page(['redeem_instructions' => '<p>Go to acme.example/redeem and enter the code.</p>']);
+
+        $this->assertStringContainsString('Go to acme.example/redeem and enter the code.', $html);
+        $this->assertStringNotContainsString('Open the email we send you', $html);
+    }
+
     public function test_each_question_is_its_own_row(): void
     {
         $html = $this->page();

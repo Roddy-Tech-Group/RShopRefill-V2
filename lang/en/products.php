@@ -233,4 +233,14 @@ return [
     'detail_purpose_travel' => 'Pays for trips, stays and days out with :brand in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
     'detail_purpose_dating' => 'Pays for :brand membership in :country. Buy it with crypto, a card or mobile money and redeem it the same minute.',
     'detail_purpose_general' => 'Pays for anything :brand sells in :country, in store and online. Buy it with crypto, a card or mobile money and redeem it the same minute.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Open the email we send you, or your order page, and copy the code. Sign in at :brand, go to where gift cards or codes are added, and paste it in. The value lands in your account straight away.',
+    'detail_faq_gift_card_delivery_q' => 'How will I receive my code?',
+    'detail_faq_gift_card_delivery_a' => 'By email, the moment your payment is confirmed. It is also saved in your order page, so you can copy it again at any time.',
+    'detail_faq_gift_card_payment_q' => 'How can I pay for it?',
+    'detail_faq_gift_card_payment_a' => 'With crypto, a bank card or mobile money. The price shown in your chosen currency is the price you pay.',
+    'detail_faq_gift_card_expiry_q' => 'Does the code expire?',
+    'detail_faq_gift_card_expiry_a' => 'Any expiry is set by :brand, not by us, and is written in the terms on this page. Your order page keeps the code for as long as you have your account.',
 ];

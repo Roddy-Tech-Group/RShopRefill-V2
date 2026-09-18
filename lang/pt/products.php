@@ -218,4 +218,14 @@ return [
     'detail_purpose_travel' => 'Paga viagens, estadias e passeios com a :brand em :country. Compre com cripto, cartão ou mobile money e resgate no mesmo minuto.',
     'detail_purpose_dating' => 'Paga a sua subscrição :brand em :country. Compre com cripto, cartão ou mobile money e resgate no mesmo minuto.',
     'detail_purpose_general' => 'Paga tudo o que a :brand vende em :country, em loja e online. Compre com cripto, cartão ou mobile money e resgate no mesmo minuto.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Abra o e-mail que enviamos, ou a sua página de encomenda, e copie o código. Entre na :brand, vá a onde se adicionam cartões ou códigos e cole-o. O saldo entra de imediato.',
+    'detail_faq_gift_card_delivery_q' => 'Como vou receber o meu código?',
+    'detail_faq_gift_card_delivery_a' => 'Por e-mail, assim que o pagamento for confirmado. Fica também guardado na sua página de encomenda, para copiar quando quiser.',
+    'detail_faq_gift_card_payment_q' => 'Como posso pagar?',
+    'detail_faq_gift_card_payment_a' => 'Com cripto, cartão bancário ou mobile money. O preço mostrado na sua moeda é o que paga.',
+    'detail_faq_gift_card_expiry_q' => 'O código expira?',
+    'detail_faq_gift_card_expiry_a' => 'Qualquer validade é definida pela :brand, não por nós, e consta nos termos desta página. A sua página de encomenda guarda o código enquanto tiver a sua conta.',
 ];

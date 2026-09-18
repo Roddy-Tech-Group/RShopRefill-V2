@@ -220,4 +220,14 @@ return [
     'detail_purpose_travel' => 'تدفع بها ثمن الرحلات والإقامة والأنشطة مع :brand في :country. اشترها بالعملات الرقمية أو البطاقة أو المحفظة، واستخدمها في الحال.',
     'detail_purpose_dating' => 'تدفع بها اشتراك :brand في :country. اشترها بالعملات الرقمية أو البطاقة أو المحفظة، واستخدمها في الحال.',
     'detail_purpose_general' => 'تدفع بها ثمن كل ما تبيعه :brand في :country، في المتجر وعبر الإنترنت. اشترها بالعملات الرقمية أو البطاقة أو المحفظة، واستخدمها في الحال.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'افتح البريد الذي نرسله إليك أو صفحة طلبك وانسخ الرمز. سجّل الدخول لدى :brand، واذهب إلى موضع إضافة بطاقات الهدايا أو الرموز، والصقه هناك. يُضاف الرصيد في الحال.',
+    'detail_faq_gift_card_delivery_q' => 'كيف سأستلم الرمز؟',
+    'detail_faq_gift_card_delivery_a' => 'عبر البريد الإلكتروني فور تأكيد الدفع. كما يبقى محفوظًا في صفحة طلبك لنسخه في أي وقت.',
+    'detail_faq_gift_card_payment_q' => 'كيف يمكنني الدفع؟',
+    'detail_faq_gift_card_payment_a' => 'بالعملات الرقمية أو البطاقة البنكية أو المحفظة عبر الهاتف. السعر الظاهر بعملتك هو ما تدفعه.',
+    'detail_faq_gift_card_expiry_q' => 'هل ينتهي صلاحية الرمز؟',
+    'detail_faq_gift_card_expiry_a' => 'أي مدة صلاحية تحددها :brand وليس نحن، وهي مذكورة في الشروط في هذه الصفحة. وتحتفظ صفحة طلبك بالرمز ما دام حسابك قائمًا.',
 ];

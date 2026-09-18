@@ -223,4 +223,14 @@ return [
     'detail_purpose_travel' => 'Règle vos voyages, séjours et sorties avec :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
     'detail_purpose_dating' => 'Règle votre abonnement :brand en :country. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
     'detail_purpose_general' => 'Règle tout ce que vend :brand en :country, en boutique comme en ligne. Payez en crypto, par carte ou en mobile money, et utilisez le code dans la minute.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Ouvrez l\'e-mail que nous vous envoyons, ou votre page de commande, et copiez le code. Connectez-vous chez :brand, allez là où l\'on ajoute une carte cadeau ou un code, et collez-le. Le montant est crédité aussitôt.',
+    'detail_faq_gift_card_delivery_q' => 'Comment vais-je recevoir mon code ?',
+    'detail_faq_gift_card_delivery_a' => 'Par e-mail, dès la confirmation du paiement. Il est aussi conservé dans votre page de commande, où vous pouvez le recopier à tout moment.',
+    'detail_faq_gift_card_payment_q' => 'Comment puis-je payer ?',
+    'detail_faq_gift_card_payment_a' => 'En crypto, par carte bancaire ou en mobile money. Le prix affiché dans la devise choisie est celui que vous payez.',
+    'detail_faq_gift_card_expiry_q' => 'Le code expire-t-il ?',
+    'detail_faq_gift_card_expiry_a' => 'Toute date de validité est fixée par :brand, pas par nous, et figure dans les conditions de cette page. Votre page de commande conserve le code tant que vous avez votre compte.',
 ];

@@ -218,4 +218,14 @@ return [
     'detail_purpose_travel' => 'Paga viajes, estancias y planes con :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
     'detail_purpose_dating' => 'Paga tu suscripción de :brand en :country. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
     'detail_purpose_general' => 'Paga cualquier cosa que venda :brand en :country, en tienda y online. Cómprala con cripto, tarjeta o dinero móvil y canjéala en el momento.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Abre el correo que te enviamos, o tu página de pedido, y copia el código. Inicia sesión en :brand, ve a donde se añaden tarjetas regalo o códigos y pégalo. El saldo se acredita al instante.',
+    'detail_faq_gift_card_delivery_q' => '¿Cómo recibiré mi código?',
+    'detail_faq_gift_card_delivery_a' => 'Por correo, en cuanto se confirme el pago. También queda guardado en tu página de pedido, para copiarlo cuando quieras.',
+    'detail_faq_gift_card_payment_q' => '¿Cómo puedo pagar?',
+    'detail_faq_gift_card_payment_a' => 'Con cripto, tarjeta bancaria o dinero móvil. El precio que ves en tu moneda es el que pagas.',
+    'detail_faq_gift_card_expiry_q' => '¿El código caduca?',
+    'detail_faq_gift_card_expiry_a' => 'Cualquier caducidad la fija :brand, no nosotros, y consta en los términos de esta página. Tu página de pedido guarda el código mientras tengas tu cuenta.',
 ];

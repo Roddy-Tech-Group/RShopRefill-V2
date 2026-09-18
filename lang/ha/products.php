@@ -218,4 +218,14 @@ return [
     'detail_purpose_travel' => 'Tana biyan kuɗin tafiye-tafiye, masauki da yawon shakatawa da :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
     'detail_purpose_dating' => 'Tana biyan kuɗin rajistar :brand cikin :country. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
     'detail_purpose_general' => 'Tana biyan duk abin da :brand ke sayarwa cikin :country, a shago da kuma kan layi. Saya da kuɗin dijital, kati ko kuɗin waya, sannan ka yi amfani da ita nan take.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Buɗe imel ɗin da muke aiko maka, ko shafin odarka, sannan ka kwafi lambar. Shiga :brand, je inda ake ƙara katin kyauta ko lamba, sannan ka liƙa ta. Kuɗin zai shiga nan take.',
+    'detail_faq_gift_card_delivery_q' => 'Ta yaya zan karɓi lambata?',
+    'detail_faq_gift_card_delivery_a' => 'Ta imel, da zarar an tabbatar da biyan kuɗi. Ana kuma ajiye ta a shafin odarka domin ka sake kwafinta kowane lokaci.',
+    'detail_faq_gift_card_payment_q' => 'Ta yaya zan biya?',
+    'detail_faq_gift_card_payment_a' => 'Da kuɗin dijital, katin banki ko kuɗin waya. Farashin da ka gani a kuɗin da ka zaɓa shi ne abin da za ka biya.',
+    'detail_faq_gift_card_expiry_q' => 'Lambar tana ƙarewa?',
+    'detail_faq_gift_card_expiry_a' => 'Duk wani lokacin ƙarewa :brand ce ke sakawa, ba mu ba, kuma an rubuta shi cikin sharuɗɗan wannan shafin. Shafin odarka yana ajiye lambar muddin kana da asusunka.',
 ];

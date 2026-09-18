@@ -216,4 +216,14 @@ return [
     'detail_purpose_travel' => 'Inalipia safari, malazi na matembezi na :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
     'detail_purpose_dating' => 'Inalipia usajili wa :brand nchini :country. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
     'detail_purpose_general' => 'Inalipia chochote kinachouzwa na :brand nchini :country, dukani na mtandaoni. Inunue kwa sarafu ya kidijitali, kadi au pesa ya simu, kisha uitumie papo hapo.',
+
+    // Redeeming when the supplier sends no steps, and the rest of the questions
+    // every gift card answers.
+    'detail_redeem_fallback_gift_card' => 'Fungua barua pepe tunayokutumia, au ukurasa wa oda yako, kisha nakili msimbo. Ingia kwenye :brand, nenda mahali kadi za zawadi au misimbo huongezwa, na ubandike. Salio linaingia papo hapo.',
+    'detail_faq_gift_card_delivery_q' => 'Nitapokeaje msimbo wangu?',
+    'detail_faq_gift_card_delivery_a' => 'Kwa barua pepe, mara malipo yanapothibitishwa. Pia huhifadhiwa kwenye ukurasa wa oda yako ili unakili tena wakati wowote.',
+    'detail_faq_gift_card_payment_q' => 'Naweza kulipaje?',
+    'detail_faq_gift_card_payment_a' => 'Kwa sarafu ya kidijitali, kadi ya benki au pesa ya simu. Bei unayoona kwa sarafu uliyochagua ndiyo unayolipa.',
+    'detail_faq_gift_card_expiry_q' => 'Je, msimbo huisha muda?',
+    'detail_faq_gift_card_expiry_a' => 'Muda wowote wa kuisha huwekwa na :brand, si sisi, na umeandikwa katika masharti ya ukurasa huu. Ukurasa wa oda yako huhifadhi msimbo kadri unavyokuwa na akaunti yako.',
 ];
