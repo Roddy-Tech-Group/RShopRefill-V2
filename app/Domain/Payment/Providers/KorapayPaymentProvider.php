@@ -245,7 +245,7 @@ class KorapayPaymentProvider implements PaymentProviderInterface
                     'payment_reference' => $attempt->idempotency_key,
                     'reference' => 'RF-'.Str::upper(Str::random(20)),
                     'amount' => $amount,
-                    'reason' => 'RshopRefills refund',
+                    'reason' => 'RshopRefill refund',
                 ]);
 
             if ($response->failed() || ($response->json('status') ?? false) !== true) {

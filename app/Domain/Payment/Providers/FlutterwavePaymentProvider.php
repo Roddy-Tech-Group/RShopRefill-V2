@@ -38,7 +38,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         $txRef = $attempt->idempotency_key;
         $payable = $attempt->payable;
 
-        $title = 'RshopRefills';
+        $title = 'RshopRefill';
         $description = $attempt->order ? "Order #{$attempt->order->order_number}" : "Payment Ref #{$txRef}";
 
         if ($payable instanceof WalletFunding) {
@@ -70,7 +70,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             'customizations' => [
                 'title' => $title,
                 'description' => $description,
-                'logo' => asset('assets/Rshoprefillslogo.webp'),
+                'logo' => asset('assets/logo.webp').'?v=4',
             ],
             'gateway_reference' => $txRef,
         ];
@@ -338,9 +338,9 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
     {
         if (str_contains($this->secretKey, 'MOCK')) {
             $bankDetails = [
-                'bank_name' => 'Wema Bank (RshopRefills Mock)',
+                'bank_name' => 'Wema Bank (RshopRefill Mock)',
                 'account_number' => '9982'.rand(100000, 999999),
-                'account_name' => 'RshopRefills-Deposit-'.$attempt->user->id,
+                'account_name' => 'RshopRefill-Deposit-'.$attempt->user->id,
                 'amount' => (float) $attempt->amount,
                 'expires_at' => now()->addHour()->toIso8601String(),
             ];
@@ -800,7 +800,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                         'name' => $attempt->user->name,
                     ],
                     'customizations' => [
-                        'title' => 'RshopRefills Payment',
+                        'title' => 'RshopRefill Payment',
                         'description' => $attempt->order
                             ? "Order #{$attempt->order->order_number}"
                             : "Payment Ref #{$attempt->idempotency_key}",

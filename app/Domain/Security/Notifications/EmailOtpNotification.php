@@ -27,7 +27,7 @@ class EmailOtpNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Your RShopRefill Authentication Code')
+            ->subject('Your RshopRefill Authentication Code')
             ->greeting('Hello '.$notifiable->name.',')
             ->line($this->context === 'recovery'
                 ? 'You are attempting to recover your Protected Mode account.'
