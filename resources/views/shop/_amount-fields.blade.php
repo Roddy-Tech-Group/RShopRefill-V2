@@ -1,0 +1,320 @@
+{{--
+    The Amount field with everything that prices it: a gift card's grid of values,
+    the other kinds' amount dropdown, the custom amount input, and then either the
+    pay currency (gift cards, which hold quantity and the price in their purchase
+    card) or the quantity and estimated price fields.
+
+    One copy: the buy panel draws it for top-ups and bills, and a gift card draws it
+    in its buy rail, under the purchase card. Reads the product page's variables and
+    its root Alpine state (amount, selectedVariantId, customMode, quantity, ttab).
+--}}
+{{-- Amount / Quantity / Estimated price. Mobile: Amount on its own full
+     row, Quantity + Estimated price share a 2-col row. sm+: one row. --}}
+<div class="grid gap-3 {{ $isGiftCard ? 'max-w-[400px] grid-cols-1' : (! ($isTopup && $topupHasPlans) ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : '') }}"
+    @if ($isTopup && $topupHasPlans) :class="ttab === 'credit' ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_1fr]'" @endif>
+
+    {{-- Amount field — plain typeable input with $ prefix. Suggested denominations
+         render as small clickable chips below so users can one-tap a common value. --}}
+    <div class="{{ $isGiftCard ? '' : 'col-span-2 sm:col-span-1' }}" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
+        {{-- A gift card's tiles say what they are on their face, so they carry no
+             label; the other kinds' amount field still needs one. --}}
+        @unless ($isGiftCard)
+            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? __('products.detail_credit_amount') : __('products.detail_amount') }}</label>
+        @endunless
+        @if ($isGiftCard)
+            {{-- Gift cards choose from a standing grid, not a dropdown: every
+                 value is on the page with what it costs beneath it, largest
+                 first. The figure under each value is the cart engine's own
+                 unit price (the same call the plan cards use), so a tile can
+                 never promise a price the checkout contradicts. Selection is
+                 carried by the variant id, which is also what prices it. Small
+                 square tiles, four to a row, beside the art. --}}
+            <div class="grid grid-cols-4 gap-2" role="radiogroup" aria-label="{{ __('products.detail_amount') }}">
+                @php
+                    // Smallest first, and no tile is singled out: only the customer's
+                    // own choice is marked.
+                    $denomTiles = $fixedDenoms->sortBy(fn ($denom) => (float) ($denom->face_value ?? $denom->retail_price))->values();
+                @endphp
+                @foreach ($denomTiles as $v)
+                    @php
+                        $v->setRelation('product', $product);
+                        $face = (float) ($v->face_value ?? $v->retail_price);
+                        // `amount` keeps the value the dropdown used to set, so
+                        // nothing downstream of it changes. It does not price a
+                        // fixed value: the variant id does.
+                        $disp = round((float) $v->retail_price * $displayRate, 2);
+                    @endphp
+                    <button
+                        type="button"
+                        role="radio"
+                        @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false"
+                        :aria-checked="(! customMode && selectedVariantId === {{ $v->id }}).toString()"
+                        :class="(! customMode && selectedVariantId === {{ $v->id }}) ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-white/10 dark:hover:border-blue-400/50'"
+                        class="pure-card relative flex aspect-square flex-col items-center justify-center rounded-[12px] border bg-white px-2 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        {{-- The chosen tile also carries a check, so the choice reads at a
+                             glance and not only from the outline. --}}
+                        <span x-show="! customMode && selectedVariantId === {{ $v->id }}" x-cloak class="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white ring-2 ring-white dark:ring-[#1a1a1e]" aria-hidden="true">
+                            <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                        </span>
+                        {{-- The face value alone. What it costs is in the purchase card,
+                             which follows the chosen tile. --}}
+                        <span class="text-xs font-bold leading-tight tabular-nums text-zinc-900 dark:text-white">{{ rtrim(rtrim(number_format($face, 2, '.', ','), '0'), '.') }} {{ strtoupper($v->currency ?: $currency) }}</span>
+                    </button>
+                @endforeach
+                @if ($variable)
+                    <button
+                        type="button"
+                        role="radio"
+                        @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''"
+                        :aria-checked="customMode.toString()"
+                        :class="customMode ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-white/10 dark:hover:border-blue-400/50'"
+                        class="pure-card col-span-4 flex flex-col items-center justify-center rounded-[12px] border bg-white px-2 py-3 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        <span class="text-sm font-bold leading-tight text-zinc-900 dark:text-white">{{ __('products.detail_custom_amount') }}</span>
+                        <span class="mt-0.5 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
+                    </button>
+                @endif
+            </div>
+        @else
+        <div
+            x-data="{ open: false, locked: false }"
+            @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
+            @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
+            @click.outside="open = false; locked = false"
+            class="relative"
+        >
+            <button
+                type="button"
+                @click="open = ! open; locked = open"
+                :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
+                class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+            >
+                <span class="font-semibold text-zinc-600">{{ $variable ? $customSymbol : $displaySymbol }}</span>
+                <span
+                    x-data="valueFlip()"
+                    x-effect="selectedVariantId; customMode; flash()"
+                    class="flex-1 truncate text-left tabular-nums"
+                    :class="amount ? 'text-zinc-900' : 'font-medium text-zinc-500'"
+                    x-text="amount ? amount : @js(__('products.detail_select_amount'))"
+                >{{ __('products.detail_select_amount') }}</span>
+                {{-- Clear the selected denomination. @click.stop so it doesn't toggle the dropdown. --}}
+                <span
+                    x-show="selectedVariantId || amount"
+                    @click.stop="amount = ''; selectedVariantId = null; customMode = false; open = false"
+                    @keydown.enter.stop="amount = ''; selectedVariantId = null; customMode = false; open = false"
+                    role="button"
+                    tabindex="0"
+                    aria-label="{{ __('products.detail_clear_amount') }}"
+                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300"
+                >
+                    <img src="{{ asset('assets/' . rawurlencode('x button.webp')) }}" alt="" class="h-3.5 w-3.5 object-contain" loading="lazy">
+                </span>
+                <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                style="display:none;"
+                class="absolute left-0 right-0 top-full z-20 max-h-[27rem] overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                role="listbox"
+            >
+                @if ($isTopup)
+                    {{-- Credit selector: airtime-credit denominations only (Data/Bundle
+                         are chosen from their cards above). Labeled by FACE VALUE (the
+                         $35 the listing advertises and the carrier prints), not the
+                         charged price - the charge shows in Estimated price, mirroring
+                         the gift-card flow. Selection is carried by the variant id, so
+                         the card and the cart still can never disagree. --}}
+                    @foreach ($topupPicks as $pick)
+                        @if (isset($pick['plan']))
+                            @php $plan = $pick['plan']; @endphp
+                            <button
+                                type="button"
+                                @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
+                                :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                            >
+                                <span class="flex min-w-0 flex-col">
+                                    <span class="font-bold">{{ $conv($plan['face']) }}</span>
+                                    @php $pickNote = trim((string) ($plan['summary'] ?? '')); @endphp
+                                    @if ($pickNote !== '')
+                                        <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $pickNote }}</span>
+                                    @endif
+                                </span>
+                            </button>
+                        @else
+                            {{-- Synthesized round amount served through the custom-amount
+                                 variant - this slot has no clean face in the catalog. --}}
+                            <button
+                                type="button"
+                                @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = {{ $pick['amount'] }}; open = false"
+                                :class="(customMode && Number(amount) === {{ $pick['amount'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                            >
+                                <span class="font-bold">{{ $conv($pick['amount']) }}</span>
+                            </button>
+                        @endif
+                    @endforeach
+                    @foreach ($topupCreditPlans as $plan)
+                        <button
+                            type="button"
+                            @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
+                            :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                        >
+                            <span class="flex min-w-0 flex-col">
+                                <span class="font-bold">{{ $conv($plan['face']) }}</span>
+                                @php $creditNote = trim((string) ($plan['summary'] ?? '')); @endphp
+                                @if ($creditNote !== '')
+                                    {{-- The supplier's own description, verbatim. Deliberately NOT
+                                         chips derived from dataGB / dataUnlimited: those fields are
+                                         populated on plain credit offers too, so rendering them here
+                                         would advertise data the carrier does not actually sell. --}}
+                                    <span class="mt-0.5 truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $creditNote }}</span>
+                                @endif
+                            </span>
+                        </button>
+                    @endforeach
+                    @if ($variable)
+                        <button
+                            type="button"
+                            @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
+                            :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                            class="flex w-full items-center justify-between rounded-[12px] {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                        >
+                            <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
+                            <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
+                        </button>
+                    @endif
+                @else
+                @foreach ($fixedDenoms as $i => $v)
+                    @php
+                        $val  = (float) $v->retail_price;
+                        $disp = round($val * $displayRate, 2); // value in the display currency
+                    @endphp
+                    <button
+                        type="button"
+                        @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false; open = false"
+                        :class="(! customMode && Number(amount) === {{ $disp }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                        class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                    >
+                        <span class="font-bold">{{ $conv($val) }}</span>
+                        @if ($i === $fixedDenoms->count() - 1 && $fixedDenoms->count() > 1)
+                            <span class="inline-flex items-center rounded-[12px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">{{ __('products.detail_popular') }}</span>
+                        @endif
+                    </button>
+                @endforeach
+                @if ($variable)
+                    <button
+                        type="button"
+                        @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
+                        :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                        class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                    >
+                        <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
+                        <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
+                    </button>
+                @endif
+                @endif
+            </div>
+        </div>
+        @endif
+
+        @if ($variable)
+            {{-- Custom-amount input. The amount is entered in the variant's own
+                 currency ({{ $customCurrency }} for this product). A value outside the
+                 min-max range is rejected: the error shows and the buy buttons
+                 disable via canAddToCart(). --}}
+            <div x-show="customMode" x-transition class="mt-2">
+                <div class="relative">
+                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-zinc-600">{{ $customSymbol }}</span>
+                    <input
+                        type="number"
+                        inputmode="decimal"
+                        x-model="amount"
+                        min="{{ (float) $customDisplayMin }}"
+                        max="{{ (float) $customDisplayMax }}"
+                        step="any"
+                        placeholder="{{ rtrim(rtrim(number_format((float) $customDisplayMin, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $customDisplayMax, 2), '0'), '.') }}"
+                        class="w-full rounded-[12px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
+                        :class="(amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)) ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-[color:var(--brand)]'"
+                    />
+                </div>
+                <p
+                    x-show="amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)"
+                    x-cloak
+                    class="mt-1.5 text-xs font-medium text-red-600"
+                >
+                    {{ __('products.detail_amount_out_of_range', ['min' => $customMoney($customDisplayMin), 'max' => $customMoney($customDisplayMax)]) }}
+                </p>
+            </div>
+        @endif
+
+        {{-- A gift card with fixed values only shows every value and its
+             price as a tile, so a range line would say nothing new. --}}
+        @if ($rangeMin !== null && $rangeMax !== null && ! ($isGiftCard && ! $variable))
+            <p class="mt-1.5 text-xs text-zinc-600">
+                {{ __('products.detail_range_hint', ['min' => $variable ? $customMoney($rangeMin) : $conv($rangeMin), 'max' => $variable ? $customMoney($rangeMax) : $conv($rangeMax)]) }}
+            </p>
+        @endif
+    </div>
+
+    {{-- Gift cards hold the quantity, the pay currency and the price in their
+         purchase card instead: here they are only values. --}}
+    @unless ($isGiftCard)
+    {{-- Quantity — custom dropdown so it visually matches the Amount + Estimated price fields. --}}
+    <div class="sm:min-w-[6rem]">
+        <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_quantity') }}</label>
+        <div
+            x-data="{ open: false, locked: false }"
+            @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
+            @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
+            @click.outside="open = false; locked = false"
+            class="relative"
+        >
+            <button
+                type="button"
+                @click="open = ! open; locked = open"
+                :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
+                class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+            >
+                <span x-data="valueFlip()" x-effect="quantity; flash()" class="flex-1 text-left tabular-nums" x-text="quantity">1</span>
+                <svg class="h-4 w-4 shrink-0 text-zinc-600 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                style="display:none;"
+                class="absolute left-0 right-0 top-full z-20 max-h-60 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                role="listbox"
+            >
+                @for ($n = 1; $n <= 10; $n++)
+                    <button
+                        type="button"
+                        @click="quantity = {{ $n }}; open = false"
+                        :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
+                        class="flex w-full items-center justify-center rounded-[12px] px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
+                    >
+                        {{ $n }}
+                    </button>
+                @endfor
+            </div>
+        </div>
+    </div>
+
+    {{-- Estimated price — crypto currency selector. Each option shows the equivalent
+         in that crypto using a placeholder rate (rate table lives in Alpine state). --}}
+    @include('shop._pay-currency-picker')
+    @endunless
+</div>

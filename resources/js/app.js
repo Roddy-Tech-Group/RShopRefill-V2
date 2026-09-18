@@ -2940,3 +2940,70 @@ window.umAreaChart = function (payload) {
         },
     };
 };
+
+/**
+ * A product's review list: how many are shown, and in what order.
+ *
+ * Every review is already in the page, so this only hides the ones past the
+ * cursor and gives each a CSS order under the chosen sort. Nothing is fetched
+ * and nothing is re-rendered, which keeps the reviews readable with scripting
+ * off and leaves them in the HTML for search engines.
+ *
+ * Every label it prints comes from the page, so the list speaks the visitor's
+ * language like the rest of the markup around it.
+ *
+ *   x-data="productReviews(rows, labels)"  where a row is { i, rating, at } and
+ *   labels is { sorts: {key: text}, showing: 'text with :shown and :total' }.
+ */
+window.productReviews = function (rows = [], labels = {}) {
+    return {
+        rows,
+        perPage: 10,
+        shown: 10,
+        sort: 'relevant',
+        sorts: labels.sorts || {},
+        showing: labels.showing || '',
+
+        get total() {
+            return this.rows.length;
+        },
+
+        /** The rows in the chosen order, which is also the order they are placed in. */
+        get ranked() {
+            const rows = [...this.rows];
+
+            if (this.sort === 'newest') {
+                rows.sort((a, b) => b.at - a.at);
+            } else if (this.sort === 'highest') {
+                rows.sort((a, b) => b.rating - a.rating || b.at - a.at);
+            } else if (this.sort === 'lowest') {
+                rows.sort((a, b) => a.rating - b.rating || b.at - a.at);
+            }
+
+            return rows;
+        },
+
+        /** Where a review sits under the current sort, as its CSS order. */
+        place(index) {
+            return this.ranked.findIndex((row) => row.i === index);
+        },
+
+        shows(index) {
+            return this.place(index) < this.shown;
+        },
+
+        more() {
+            this.shown = Math.min(this.shown + this.perPage, this.total);
+        },
+
+        showingLabel() {
+            return this.showing
+                .replace(':shown', Math.min(this.shown, this.total).toLocaleString())
+                .replace(':total', this.total.toLocaleString());
+        },
+
+        progress() {
+            return `${Math.round(Math.min(this.shown, this.total) / this.total * 100)}%`;
+        },
+    };
+};
