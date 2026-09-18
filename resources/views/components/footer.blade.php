@@ -102,10 +102,15 @@
                 <div class="order-1">
                     <a href="{{ route('home') }}" wire:navigate class="-ml-1 flex rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
                         <span class="flex h-12 items-center">
+                            {{-- The mark alone down here: the wordmark is at the top of
+                                 the page and the name is written in the line under this
+                                 one, so the footer only needs the R. site-logo is what
+                                 flips it white on the dark slab, the same class the nav's
+                                 phone logo carries, since this is the same file. --}}
                             <img
-                                src="{{ asset('assets/logo.webp').'?v=4' }}"
+                                src="{{ asset('assets/PWAicon.webp') }}"
                                 alt="{{ $siteName }}"
-                                class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
+                                class="site-logo h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />
                         </span>
                     </a>
