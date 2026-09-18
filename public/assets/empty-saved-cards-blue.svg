@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="318" height="263" viewBox="0 0 318 263" fill="none" role="img" aria-label="No saved cards">
+  <!--
+    Empty state: no saved cards.
+
+    Drawn to sit beside empty-state-blue: thin navy outline, flat mid-blue
+    fills, white highlights, transparent ground. True vector - one path per
+    shape, no embedded raster - so it stays sharp at any size and weighs a
+    couple of kilobytes.
+
+    Palette is the storefront's own blue ramp:
+      #0c1a36 ink   #2563eb primary   #60a5fa mid   #bfdbfe tint   #ffffff
+  -->
+
+  <!-- Ground shadow: a soft ellipse so the cards read as lifted, not floating. -->
+  <ellipse cx="159" cy="213" rx="96" ry="15" fill="#bfdbfe" opacity="0.55"/>
+
+  <!-- Back card, tilted away. Tint fill keeps it behind without a drop shadow. -->
+  <g transform="rotate(-14 159 132)">
+    <rect x="74" y="80" width="170" height="106" rx="14" fill="#bfdbfe" stroke="#0c1a36" stroke-width="3"/>
+    <rect x="74" y="102" width="170" height="18" fill="#60a5fa"/>
+    <path d="M74 102h170" stroke="#0c1a36" stroke-width="2.4"/>
+    <path d="M74 120h170" stroke="#0c1a36" stroke-width="2.4"/>
+  </g>
+
+  <!-- Front card. -->
+  <g transform="rotate(6 159 138)">
+    <rect x="80" y="92" width="176" height="110" rx="15" fill="#2563eb" stroke="#0c1a36" stroke-width="3"/>
+
+    <!-- Magnetic stripe. -->
+    <rect x="80" y="112" width="176" height="21" fill="#0c1a36"/>
+
+    <!-- Chip: rounded square with two contact lines. -->
+    <rect x="97" y="145" width="30" height="23" rx="5" fill="#ffffff" stroke="#0c1a36" stroke-width="2.6"/>
+    <path d="M97 153h30M112 145v23" stroke="#0c1a36" stroke-width="2.2"/>
+
+    <!-- Card number, abstracted into four groups so it reads as a card at any size. -->
+    <g stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.9">
+      <path d="M140 157h22"/>
+      <path d="M172 157h22"/>
+      <path d="M204 157h22"/>
+    </g>
+
+    <!-- Name line. -->
+    <path d="M98 183h58" stroke="#bfdbfe" stroke-width="4.5" stroke-linecap="round"/>
+
+    <!-- Contactless waves, top right. -->
+    <g stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" fill="none" opacity="0.95">
+      <path d="M222 96q7 7 0 14"/>
+      <path d="M230 92q12 11 0 22"/>
+    </g>
+  </g>
+
+  <!-- Plus badge: the action this empty state invites. -->
+  <g transform="translate(226 60)">
+    <circle cx="26" cy="26" r="25" fill="#ffffff" stroke="#0c1a36" stroke-width="3"/>
+    <path d="M26 14v24M14 26h24" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Two small sparkles for lightness, matching the house illustration style. -->
+  <g stroke="#60a5fa" stroke-width="2.6" stroke-linecap="round">
+    <path d="M56 66v14M49 73h14"/>
+    <path d="M268 158v10M263 163h10"/>
+  </g>
+</svg>
