@@ -187,4 +187,22 @@ return [
     'detail_step_receive_topup' => 'Pokea salio lako papo hapo, pamoja na uthibitisho kwa barua pepe.',
     'detail_step_receive_bill' => 'Pokea uthibitisho wa malipo kwa barua pepe papo hapo.',
     'detail_step_receive_code' => 'Pokea msimbo wako wa kutumia kwa barua pepe papo hapo.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'Maoni ya wateja kuhusu :brand',
+    'reviews_count' => '{1} Maoni :count|[2,*] Maoni :count',
+    'reviews_stars_aria' => ':rating kati ya nyota 5',
+    'reviews_sort_relevant' => 'Yanayohusiana zaidi',
+    'reviews_sort_newest' => 'Mapya zaidi',
+    'reviews_sort_highest' => 'Yenye alama za juu',
+    'reviews_sort_lowest' => 'Yenye alama za chini',
+    'reviews_show_more' => 'Onyesha zaidi',
+    'reviews_show_less' => 'Onyesha kidogo',
+    'reviews_showing' => 'Yanaonyeshwa :shown kati ya :total',
+    'reviews_load_more' => 'Pakia zaidi',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Chagua kiasi',
+    'detail_step_title_pay' => 'Lipa upendavyo',
+    'detail_step_title_receive' => 'Tayari kutumika',
 ];

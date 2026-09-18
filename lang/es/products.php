@@ -189,4 +189,22 @@ return [
     'detail_step_receive_topup' => 'Recibe tu saldo al instante, con confirmación por correo.',
     'detail_step_receive_bill' => 'Recibe tu confirmación de pago por correo al instante.',
     'detail_step_receive_code' => 'Recibe tu código de canje por correo al instante.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'Opiniones de clientes sobre :brand',
+    'reviews_count' => '{1} :count opinión|[2,*] :count opiniones',
+    'reviews_stars_aria' => ':rating de 5 estrellas',
+    'reviews_sort_relevant' => 'Más relevantes',
+    'reviews_sort_newest' => 'Más recientes',
+    'reviews_sort_highest' => 'Mejor valoradas',
+    'reviews_sort_lowest' => 'Peor valoradas',
+    'reviews_show_more' => 'Mostrar más',
+    'reviews_show_less' => 'Mostrar menos',
+    'reviews_showing' => 'Mostrando :shown de :total',
+    'reviews_load_more' => 'Ver más opiniones',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Elige el importe',
+    'detail_step_title_pay' => 'Paga como prefieras',
+    'detail_step_title_receive' => 'Listo para usar',
 ];

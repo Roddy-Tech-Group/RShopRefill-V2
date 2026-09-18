@@ -204,4 +204,22 @@ return [
     'detail_step_receive_topup' => 'Receive your airtime by email instantly.',
     'detail_step_receive_bill' => 'Receive your payment confirmation by email instantly.',
     'detail_step_receive_code' => 'Receive your redemption code by email instantly.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => ':brand customer reviews',
+    'reviews_count' => '{1} :count Review|[2,*] :count Reviews',
+    'reviews_stars_aria' => ':rating out of 5 stars',
+    'reviews_sort_relevant' => 'Most relevant',
+    'reviews_sort_newest' => 'Newest',
+    'reviews_sort_highest' => 'Highest rating',
+    'reviews_sort_lowest' => 'Lowest rating',
+    'reviews_show_more' => 'Show more',
+    'reviews_show_less' => 'Show less',
+    'reviews_showing' => 'Showing :shown out of :total',
+    'reviews_load_more' => 'Load more',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Enter the amount',
+    'detail_step_title_pay' => 'Pay how you like',
+    'detail_step_title_receive' => 'That is it, ready to use',
 ];

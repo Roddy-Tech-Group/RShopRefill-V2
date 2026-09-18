@@ -188,4 +188,22 @@ return [
     'detail_step_receive_topup' => '话费即时到账，并通过邮件确认。',
     'detail_step_receive_bill' => '立即通过邮件收到缴费确认。',
     'detail_step_receive_code' => '立即通过邮件收到兑换码。',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => ':brand 客户评价',
+    'reviews_count' => '{1} :count 条评价|[2,*] :count 条评价',
+    'reviews_stars_aria' => '5 星中的 :rating 星',
+    'reviews_sort_relevant' => '最相关',
+    'reviews_sort_newest' => '最新',
+    'reviews_sort_highest' => '评分最高',
+    'reviews_sort_lowest' => '评分最低',
+    'reviews_show_more' => '显示更多',
+    'reviews_show_less' => '收起',
+    'reviews_showing' => '正在显示 :total 条中的 :shown 条',
+    'reviews_load_more' => '加载更多',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => '选择金额',
+    'detail_step_title_pay' => '选择你的付款方式',
+    'detail_step_title_receive' => '完成，立即可用',
 ];

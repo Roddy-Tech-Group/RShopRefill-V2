@@ -189,4 +189,22 @@ return [
     'detail_step_receive_topup' => 'Karɓi kuɗin wayarka nan take, tare da tabbaci ta imel.',
     'detail_step_receive_bill' => 'Karɓi tabbacin biyan kuɗi ta imel nan take.',
     'detail_step_receive_code' => 'Karɓi lambar amfaninka ta imel nan take.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'Ra\'ayoyin abokan ciniki kan :brand',
+    'reviews_count' => '{1} Ra\'ayi :count|[2,*] Ra\'ayoyi :count',
+    'reviews_stars_aria' => ':rating cikin taurari 5',
+    'reviews_sort_relevant' => 'Mafi dacewa',
+    'reviews_sort_newest' => 'Sabbi',
+    'reviews_sort_highest' => 'Mafi girman kima',
+    'reviews_sort_lowest' => 'Mafi ƙasƙancin kima',
+    'reviews_show_more' => 'Nuna ƙari',
+    'reviews_show_less' => 'Nuna kaɗan',
+    'reviews_showing' => 'Ana nuna :shown daga :total',
+    'reviews_load_more' => 'Ɗauko ƙari',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Zaɓi adadin',
+    'detail_step_title_pay' => 'Biya yadda kake so',
+    'detail_step_title_receive' => 'Shi ke nan, a shirye don amfani',
 ];

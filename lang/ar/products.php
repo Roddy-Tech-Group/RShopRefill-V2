@@ -191,4 +191,22 @@ return [
     'detail_step_receive_topup' => 'استلم رصيدك فورًا مع تأكيد عبر البريد الإلكتروني.',
     'detail_step_receive_bill' => 'استلم تأكيد الدفع عبر البريد الإلكتروني فورًا.',
     'detail_step_receive_code' => 'استلم رمز الاستخدام عبر البريد الإلكتروني فورًا.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'آراء العملاء عن :brand',
+    'reviews_count' => '{1} تقييم واحد|[2,*] :count تقييم',
+    'reviews_stars_aria' => ':rating من 5 نجوم',
+    'reviews_sort_relevant' => 'الأكثر صلة',
+    'reviews_sort_newest' => 'الأحدث',
+    'reviews_sort_highest' => 'الأعلى تقييمًا',
+    'reviews_sort_lowest' => 'الأدنى تقييمًا',
+    'reviews_show_more' => 'عرض المزيد',
+    'reviews_show_less' => 'عرض أقل',
+    'reviews_showing' => 'عرض :shown من :total',
+    'reviews_load_more' => 'تحميل المزيد',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'اختر المبلغ',
+    'detail_step_title_pay' => 'ادفع بالطريقة التي تناسبك',
+    'detail_step_title_receive' => 'جاهز للاستخدام',
 ];

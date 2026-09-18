@@ -189,4 +189,22 @@ return [
     'detail_step_receive_topup' => 'Receba seu crédito na hora, com confirmação por e-mail.',
     'detail_step_receive_bill' => 'Receba a confirmação do pagamento por e-mail na hora.',
     'detail_step_receive_code' => 'Receba seu código de resgate por e-mail na hora.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'Avaliações de clientes sobre :brand',
+    'reviews_count' => '{1} :count avaliação|[2,*] :count avaliações',
+    'reviews_stars_aria' => ':rating de 5 estrelas',
+    'reviews_sort_relevant' => 'Mais relevantes',
+    'reviews_sort_newest' => 'Mais recentes',
+    'reviews_sort_highest' => 'Melhor avaliadas',
+    'reviews_sort_lowest' => 'Pior avaliadas',
+    'reviews_show_more' => 'Mostrar mais',
+    'reviews_show_less' => 'Mostrar menos',
+    'reviews_showing' => 'A mostrar :shown de :total',
+    'reviews_load_more' => 'Ver mais avaliações',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Escolha o valor',
+    'detail_step_title_pay' => 'Pague como preferir',
+    'detail_step_title_receive' => 'Pronto a usar',
 ];

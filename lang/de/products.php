@@ -187,4 +187,22 @@ return [
     'detail_step_receive_topup' => 'Erhalten Sie Ihr Guthaben sofort, mit Bestätigung per E-Mail.',
     'detail_step_receive_bill' => 'Erhalten Sie Ihre Zahlungsbestätigung sofort per E-Mail.',
     'detail_step_receive_code' => 'Erhalten Sie Ihren Einlösecode sofort per E-Mail.',
+
+    // The product's own review section: the score, the spread and the list.
+    'reviews_heading' => 'Kundenbewertungen zu :brand',
+    'reviews_count' => '{1} :count Bewertung|[2,*] :count Bewertungen',
+    'reviews_stars_aria' => ':rating von 5 Sternen',
+    'reviews_sort_relevant' => 'Relevanteste',
+    'reviews_sort_newest' => 'Neueste',
+    'reviews_sort_highest' => 'Beste Bewertung',
+    'reviews_sort_lowest' => 'Schlechteste Bewertung',
+    'reviews_show_more' => 'Mehr anzeigen',
+    'reviews_show_less' => 'Weniger anzeigen',
+    'reviews_showing' => ':shown von :total werden angezeigt',
+    'reviews_load_more' => 'Mehr laden',
+
+    // The three step cards under "How to buy".
+    'detail_step_title_amount' => 'Betrag wählen',
+    'detail_step_title_pay' => 'Bezahlen wie Sie möchten',
+    'detail_step_title_receive' => 'Fertig, sofort nutzbar',
 ];
