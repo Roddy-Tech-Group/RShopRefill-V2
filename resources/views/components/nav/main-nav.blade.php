@@ -632,6 +632,7 @@
                     // The active category is the OPEN page, resolved from the route —
                     // so the highlight is never statically stuck on Gift Cards.
                     $currentCat = match (true) {
+                        request()->routeIs('home')                          => 'Home',
                         request()->routeIs('shop.gift-cards', 'shop.brand') => 'Gift Cards',
                         request()->routeIs('shop.gomarket')                 => 'GoMarket',
                         request()->routeIs('shop.esims', 'shop.esim')       => 'eSIMs',
@@ -663,6 +664,13 @@
                     // "temporarily unavailable"; the purchase itself is blocked server-side.
                     $catOff = 'cursor-not-allowed text-zinc-400 dark:text-zinc-600';
                 @endphp
+
+                {{-- Home opens the row: the categories narrow the catalogue, and the
+                     first step of that is the whole of it. It carries no feature flag
+                     because there is no home page to switch off. --}}
+                <a href="{{ route('home') }}" wire:navigate class="{{ $catLinkClass }} {{ $catLinkState('Home') }}" @if ($catLinkCurrent('Home')) aria-current="page" @endif>
+                    {{ __('products.detail_crumb_home') }}
+                </a>
 
                 {{-- Gift Cards. Wrapped in the mega menu, which opens the
                      whole catalogue's navigation on hover or focus. The link
