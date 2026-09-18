@@ -11,13 +11,14 @@
     <head>
         @include('partials.head')
 
-        {{-- Storefront-only head additions (Urbanist display font for the hero
-             headings, Turnstile loader). All SEO (title, description, OG,
-             Twitter, JSON-LD) lives in one place in partials/head, overridable
-             per page via the props above. Urbanist is the only extra font here;
-             Instrument Sans was dropped (nothing references it). --}}
-        <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
-        <link href="https://fonts.bunny.net/css?family=urbanist:800" rel="stylesheet" />
+        {{-- Storefront-only head additions (Turnstile loader). All SEO (title,
+             description, OG, Twitter, JSON-LD) lives in one place in
+             partials/head, overridable per page via the props above.
+
+             No second font here any more. The hero headings used to load
+             Urbanist from a third origin purely for display type; DM Sans is
+             the whole site's face now, so that request and that origin are
+             gone. --}}
 
         @if(config('services.turnstile.enabled') && (config('services.turnstile.enforce_auth') || config('services.turnstile.enforce_contact') || config('services.turnstile.enforce_checkout')))
             {{-- Cloudflare Turnstile (explicit render mode) - loaded once per
@@ -58,10 +59,11 @@
             {{-- Announcement / coupon bar - blue strip rotating admin-set promos. --}}
             @include('partials.announcement-bar')
 
-            {{-- The header scrolls away with the page - it is NOT sticky.
-                 main-nav still carries a mobile-only scroll-collapse for the
-                 primary row; with nothing pinned it simply never gets seen,
-                 since the nav is off-screen before its 140px threshold.
+            {{-- The header PINS to the top. Only its first row rides along:
+                 main-nav collapses the search row and the category strip on
+                 scroll below lg, so what stays with the viewport is the logo,
+                 the hamburger and the account and cart controls, and what
+                 scrolls away is everything a shopper only needs on arrival.
 
                  There is no separate top utility bar any more: Help, region and
                  currency, account, cart and the theme picker share the logo's
@@ -75,7 +77,10 @@
                  The eSIM and discover floating bars used to measure
                  `header.sticky` to place themselves below the pinned nav; with
                  nothing pinned they take a plain offset instead. --}}
-            <header class="nav-surface relative z-50 w-full pt-[env(safe-area-inset-top)]">
+            {{-- rounded-b only, no overflow-hidden: the background is clipped to the
+                 rounded border box anyway, and hiding overflow here would cut off the
+                 search results panel and the mega menu, which both hang below. --}}
+            <header class="nav-surface sticky top-0 z-50 w-full rounded-b-[10px] pt-[env(safe-area-inset-top)]">
                 <x-nav.main-nav />
             </header>
 

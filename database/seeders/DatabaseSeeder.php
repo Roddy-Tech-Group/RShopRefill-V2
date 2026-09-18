@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             PressArticleSeeder::class,
             ReviewSeeder::class,
             FaqSeeder::class,
+            GiftCardFaqSeeder::class,
+            EsimFaqSeeder::class,
         ]);
     }
 }

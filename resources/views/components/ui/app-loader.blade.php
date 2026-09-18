@@ -1,5 +1,5 @@
 {{--
-    Site preloader. Motion Code x hostinger-style: a faint static ring with a rotating
+    Site preloader. Motion Code house style: a faint static ring with a rotating
     brand-blue arc and the R icon centred. Used by the admin + customer dashboard
     layouts AND the storefront shell, so a hard reload anywhere follows the active
     theme (light / dark / Extra Dark) instead of flashing unbranded.
@@ -34,7 +34,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #eff6ff;
+        background: #f4f6f5;
         opacity: 1;
         transition: opacity 300ms ease;
     }
@@ -52,7 +52,14 @@
        .dark unconditionally, so a separate .dark.pure-dark rule could only
        ever restate this one. */
     .dark .app-loader {
-        background: var(--ground, #060607);
+        background-color: var(--ground, #060607);
+        /* The page ground is colour PLUS grain. Painting only the colour made
+           every reload flash a smooth black slab and then hand over to a
+           textured page - a visible seam at exactly the moment the loader
+           exists to hide. The literal fallback matters here: this <style> is
+           inline and runs before app.css defines --grain. */
+        background-image: var(--grain, none);
+        background-size: 220px 220px;
     }
     /* Hidden state: fade out, then drop out of the layout so it can't trap
        clicks once the page is usable. */
@@ -100,8 +107,8 @@
             app-loader-glow 1.6s ease-in-out infinite;
     }
     .dark .app-loader__progress {
-        stroke: #60a5fa;
-        --glow: rgba(96, 165, 250, 0.85);
+        stroke: #e5e5e5;
+        --glow: rgba(229, 229, 229, 0.6);
     }
     .app-loader__logo {
         position: absolute;

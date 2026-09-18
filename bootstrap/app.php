@@ -112,11 +112,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // engine so the server can paint the right dark / Extra Dark ramp on the
         // first byte. They carry no sensitive data; exclude them from cookie
         // encryption or they decrypt to null and the pre-paint frame flashes.
+        //
+        // region_suggest_dismissed is the same shape: the region suggestion
+        // popup writes a plain '1' from JavaScript when it is dismissed, and
+        // the component checks it server-side so a dismissed popup is never
+        // rendered at all. Encrypted, that check reads null on every request -
+        // the cookie would still hide the popup client-side, but only after it
+        // had already been sent to someone who said no.
         $middleware->encryptCookies(except: [
             'theme_web_dark',
             'theme_admin_dark',
             'theme_web_puredark',
             'theme_admin_puredark',
+            'region_suggest_dismissed',
         ]);
 
         // Locks the storefront catalog to the customer's chosen country/region.

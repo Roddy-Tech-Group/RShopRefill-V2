@@ -194,7 +194,7 @@
             html.dark.admin-sidebar-collapsed [data-flux-sidebar] .nav-submenu a:hover,
             html.dark.admin-sidebar-collapsed [data-flux-sidebar] .nav-submenu button:hover {
                 background: #070f1c !important;
-                color: #60a5fa !important; /* blue-400 */
+                color: #ffffff !important;
                 font-weight: 600 !important;
             }
             /* Active sub-item: rose accent matches the project's secondary accent.
@@ -265,9 +265,9 @@
                  the square favicon when collapsed (swap is CSS-driven via the
                  admin-sidebar-collapsed class on <html>). --}}
             <a href="{{ auth('admin')->user()?->canAccessAdminRoute('dashboard') ? route('admin.dashboard') : route('admin.account') }}" wire:navigate class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
-                <span class="brand-full flex h-10 items-center">
+                <span class="brand-full flex h-12 items-center">
                     <img
-                        src="{{ asset('assets/Rshoprefillslogo.webp') }}"
+                        src="{{ asset('assets/logo.webp').'?v=4' }}"
                         alt="{{ $siteName }}"
                         class="h-full w-auto object-contain"
                     />
@@ -278,9 +278,7 @@
                         alt="{{ $siteName }}"
                         class="h-12 w-12 rounded-[12px] object-contain"
                     />
-                    <span class="mt-0.5 text-[9px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
                 </span>
-                <span class="brand-full mt-0.5 pl-1 text-[10px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
             </a>
 
             {{--

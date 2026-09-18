@@ -40,9 +40,9 @@ class SiteIdentityComposer
 
         if (! $attributes->has($memoKey)) {
             try {
-                $attributes->set($memoKey, (string) SiteSetting::get('site.name', 'RshopRefills'));
+                $attributes->set($memoKey, (string) SiteSetting::get('site.name', 'RshopRefill'));
             } catch (\Throwable $e) {
-                return 'RshopRefills';
+                return 'RshopRefill';
             }
         }
 

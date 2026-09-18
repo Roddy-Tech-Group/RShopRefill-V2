@@ -56,29 +56,32 @@ class ContactController extends Controller
     }
 
     /**
-     * Show the Partnerships inquiry page.
+     * Show the Influencers and Affiliates inquiry page. It replaced the
+     * separate Partnerships and Suppliers pages, whose URLs now redirect here.
      */
-    public function partnerships()
+    public function affiliates()
     {
-        return view('shop.partnerships');
+        return view('shop.affiliates');
     }
 
     /**
-     * Show the Suppliers inquiry page.
+     * Show the "Request a product" page: a customer telling us about a brand or
+     * service they want us to stock. Shares the inquiry form with the
+     * influencers page, so a request lands in Support Tickets like any other.
      */
-    public function suppliers()
+    public function requestProduct()
     {
-        return view('shop.suppliers');
+        return view('shop.request-product');
     }
 
     /**
-     * Shared handler for the partnerships + suppliers inquiry forms. Stores a
-     * ContactMessage with a category-tagged subject and notifies the admin
-     * feed, so partnership / supplier leads land in the same Support Tickets
-     * page as general enquiries (just filterable by subject prefix).
+     * Handler for the inquiry form. Stores a ContactMessage with a
+     * category-tagged subject and notifies the admin feed, so influencer and
+     * affiliate leads land in the same Support Tickets page as general
+     * enquiries (just filterable by subject prefix).
      *
-     * $kind: 'partnership' | 'supplier' - drives the subject prefix and the
-     *        redirect route on success.
+     * $kind: 'affiliate' today. Kept as a parameter so another inquiry form
+     *        can reuse this handler with its own subject and redirect.
      */
     public function storeInquiry(Request $request, AdminNotificationService $adminNotifications, string $kind)
     {
@@ -96,18 +99,29 @@ class ContactController extends Controller
             'message' => ['required', 'string', 'min:10', 'max:5000'],
         ]);
 
-        $isSupplier = $kind === 'supplier';
-        $subjectPrefix = $isSupplier ? 'Supplier inquiry' : 'Partnership inquiry';
-        $redirectRoute = $isSupplier ? 'shop.suppliers' : 'shop.partnerships';
-
-        // Compose a structured message body so the admin reading the support
-        // ticket sees the company + URL + role inline instead of needing a
+        // The form posts one set of field names (company, company_url, role,
+        // category) whatever the inquiry is; what a person actually typed into
+        // them depends on the form they filled in. These labels say so, so the
+        // admin reading the support ticket sees it inline instead of needing a
         // separate column on the model.
+        [$subjectPrefix, $redirectRoute, $labels] = match ($kind) {
+            'product' => [
+                'Product request',
+                'shop.request-product',
+                ['company' => 'Product or brand', 'company_url' => 'Where they have seen it', 'role' => 'Country or region', 'category' => 'Product type'],
+            ],
+            default => [
+                'Influencer and affiliate inquiry',
+                'shop.affiliates',
+                ['company' => 'Brand, channel or handle', 'company_url' => 'Profile or website', 'role' => 'Audience size', 'category' => 'Main platform'],
+            ],
+        };
+
         $body = collect([
-            'Company: '.$data['company'],
-            ! empty($data['company_url']) ? 'Website: '.$data['company_url'] : null,
-            ! empty($data['role']) ? 'Role: '.$data['role'] : null,
-            ! empty($data['category']) ? 'Category: '.$data['category'] : null,
+            $labels['company'].': '.$data['company'],
+            ! empty($data['company_url']) ? $labels['company_url'].': '.$data['company_url'] : null,
+            ! empty($data['role']) ? $labels['role'].': '.$data['role'] : null,
+            ! empty($data['category']) ? $labels['category'].': '.$data['category'] : null,
             '',
             $data['message'],
         ])->filter(fn ($l) => $l !== null)->implode("\n");
@@ -127,6 +141,18 @@ class ContactController extends Controller
             message: $contact->name.' from '.$data['company'],
             data: ['contact_message_id' => $contact->id, 'email' => $contact->email, 'kind' => $kind],
         );
+
+        // Back where they submitted from, when that was one of our own pages.
+        // The same form now renders inside the dashboard's Partnership program
+        // tab, and a fixed redirect there threw a signed-in customer out to the
+        // storefront to read their own confirmation. Falls back to the named
+        // route when there is no usable referer, which is also what keeps the
+        // plain page's redirect exactly as it was.
+        $referer = (string) $request->headers->get('referer');
+
+        if ($referer !== '' && str_starts_with($referer, url('/'))) {
+            return redirect()->to($referer)->with('contact_sent', true);
+        }
 
         return redirect()->route($redirectRoute)->with('contact_sent', true);
     }

@@ -39,7 +39,7 @@
         -webkit-backdrop-filter: blur(14px) saturate(160%);
     }
     html.dark .rshop-ptr-circle {
-        color: #60a5fa;
+        color: #e5e5e5;
         background: rgba(12, 26, 54, .55);
         border-color: rgba(255, 255, 255, .12);
         box-shadow: 0 6px 18px rgba(0, 0, 0, .35);

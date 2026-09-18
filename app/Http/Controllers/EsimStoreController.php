@@ -44,16 +44,17 @@ class EsimStoreController extends Controller
      */
     public static function catalogSummary(): Collection
     {
-        // Popular destinations, mirroring Airalo's "Popular" set for this market.
-        // US is intentionally left out: the pinned "Discover Global USA eSIM" card
-        // (a real +1 USA number with worldwide coverage) fills the USA slot here.
-        $popularIso = ['CM', 'FR', 'GB', 'CG', 'MA', 'CF', 'EG', 'IN', 'CI', 'CD', 'SN', 'GH', 'GA', 'KE', 'AZ', 'AU', 'ZA', 'TR', 'TH'];
+        // The destinations under the store's "Popular" tab, from config so the
+        // set can change without a deploy. A code we do not sell, or one with no
+        // flag, never appears; the reasoning and the USA exception live in
+        // config/esims.php.
+        $popularIso = (array) config('esims.popular_countries', []);
 
         // Cache key carries the Zendit-eSIM flag so toggling it doesn't serve a
         // stale catalog (the summary is cached for an hour). v6 added the per-card
         // data-size label; v7 pins the Discover Global USA card first + drops US
         // from Popular.
-        $cacheKey = 'esim-catalog-summary-v7-z'.(FeatureFlag::on('zendit_esims') ? '1' : '0');
+        $cacheKey = 'esim-catalog-summary-v15-z'.(FeatureFlag::on('zendit_esims') ? '1' : '0');
 
         return Cache::remember($cacheKey, now()->addHour(), function () use ($popularIso) {
             $pricing = app(CartPricingService::class);
@@ -85,6 +86,43 @@ class EsimStoreController extends Controller
                     }
                     $from = round((float) $pricing->calculatePricing($cheapest, 1)['unit_price_snapshot'], 2);
 
+                    // What this destination actually holds, summarised from the
+                    // variants already loaded for pricing, so it costs no extra
+                    // query: the span of data allowances, the span of validity
+                    // days, and whether any package is unlimited. An unlimited
+                    // package carries amount 0, so it is counted as unlimited
+                    // rather than dragging the low end of the data span to zero.
+                    $amounts = [];
+                    $days = [];
+                    $unlimited = false;
+                    $withNumber = false;
+
+                    foreach ($group as $product) {
+                        foreach ($product->variants as $variant) {
+                            $raw = (array) data_get($variant->metadata, 'raw_payload', []);
+
+                            if (! empty($raw['is_unlimited'])) {
+                                $unlimited = true;
+                            } elseif (($mb = (float) ($raw['amount'] ?? 0)) > 0) {
+                                $amounts[] = $mb;
+                            }
+
+                            if (($d = (int) ($raw['day'] ?? 0)) > 0) {
+                                $days[] = $d;
+                            }
+
+                            // A plan that carries voice or SMS comes with a phone
+                            // number; one that does not is data only. Read from
+                            // the supplier's own plan_type and its voice/text
+                            // allowances rather than inferred from the name.
+                            if (str_contains((string) data_get($variant->metadata, 'plan_type', ''), 'voice')
+                                || (float) ($raw['voice'] ?? 0) > 0
+                                || (float) ($raw['text'] ?? 0) > 0) {
+                                $withNumber = true;
+                            }
+                        }
+                    }
+
                     return [
                         'slug' => $rep->slug,
                         'name' => $meta['name'],
@@ -92,20 +130,57 @@ class EsimStoreController extends Controller
                         'from' => $from,
                         'data' => self::planDataLabel($cheapest),
                         'scope' => $meta['scope'],
-                        'popular' => $hasFlag && in_array($meta['cc'], $popularIso, true),
+                        'cc' => $meta['cc'],
+                        // Popular is the curated list PLUS every destination that
+                        // sells a phone number, which is the richest thing this
+                        // catalogue offers and the reason someone picks an eSIM
+                        // over roaming. Making it number AND unlimited only would
+                        // leave the tab with three cards.
+                        'popular' => $withNumber || ($hasFlag && in_array($meta['cc'], $popularIso, true)),
+                        'unlimited' => $unlimited,
+                        'data_range' => self::spanLabel(
+                            $amounts,
+                            fn (float $mb) => self::dataLabel($mb),
+                        ),
+                        'days_range' => self::spanLabel(
+                            $days,
+                            // Plain integer. Trimming trailing zeros here, as the
+                            // data formatter does, turned 30 days into 3.
+                            fn (float $d) => (string) (int) $d,
+                            ' days',
+                        ),
+                        'plan_count' => $group->sum(fn ($p) => $p->variants->count()),
+                        // "Data only" unless some package includes calls or texts,
+                        // in which case the destination can also be sold with a
+                        // phone number.
+                        'with_number' => $withNumber,
                     ];
                 })
                 ->filter()
-                ->sortBy('name')
+                // Destinations that sell a phone number come first, then A-Z
+                // within each group. A number is the scarce thing here (5 of
+                // 214 destinations have one) and the reason someone picks an
+                // eSIM over roaming, so it should not be buried in the middle
+                // of an alphabetical list.
+                // Ranked by what a plan carries, then A-Z inside each rank: a
+                // number first, unlimited data next, everything else after.
+                ->sortBy(fn ($item) => [
+                    $item['with_number'] ? 0 : 1,
+                    $item['unlimited'] ? 0 : 1,
+                    $item['name'],
+                ])
                 ->values();
 
-            // Pin the worldwide eSIM to the front of every grid, rebadged as a USA
-            // number card (real +1 number, worldwide coverage) with the US flag and
-            // surfaced in Popular - so country browsers meet it before the A-Z list.
+            // Pin the worldwide eSIM to the front of every grid, shown as "Global
+            // eSIM" with the US flag (it carries a real +1 number alongside its
+            // worldwide coverage) and surfaced in Popular, so country browsers meet
+            // it before the A-Z list. The supplier's own product name is not used
+            // here: a shopper looking for worldwide coverage does not search for a
+            // supplier's brand.
             $key = $catalog->search(fn ($item) => str_contains($item['slug'], 'discover-global'));
             if ($key !== false) {
                 $global = $catalog[$key];
-                $global['name'] = 'Discover Global USA eSIM';
+                $global['name'] = 'Global eSIM';
                 $global['flag'] = Product::flagUrl('US');
                 $global['popular'] = true;
                 $catalog = $catalog->forget($key)->prepend($global)->values();
@@ -145,6 +220,15 @@ class EsimStoreController extends Controller
             ->title();
         $label = str_replace([' And ', ' Of ', ' The '], [' and ', ' of ', ' the '], $label);
         if ($label === '' || strtolower($label) === 'esim') {
+            $label = 'Global';
+        }
+
+        // The worldwide plan is sold as "Global", not under the supplier's own
+        // product name, which is a brand a shopper has no reason to know. Keyed
+        // on the slug because that is the stable identifier, and kept here so
+        // the page title, heading, breadcrumb and region picker all agree; the
+        // catalogue grid adds the " eSIM" suffix for its card label.
+        if (str_contains($slug, 'discover-global')) {
             $label = 'Global';
         }
 
@@ -302,6 +386,39 @@ class EsimStoreController extends Controller
      * just the "from" price. Mirrors the country page's data logic: prefer the
      * clean data_limit, fall back to the raw payload (Zendit dataGB / unlimited).
      */
+    /**
+     * "1 GB - 100 GB" from a set of values, or "1 GB" when they are all the
+     * same, or null when there are none. Keeps the card honest: a single-plan
+     * destination should not read as a range.
+     *
+     * @param  array<int, float>  $values
+     */
+    private static function spanLabel(array $values, callable $format, string $suffix = ''): ?string
+    {
+        if ($values === []) {
+            return null;
+        }
+
+        $min = min($values);
+        $max = max($values);
+
+        return $min === $max
+            ? $format($min).$suffix
+            : $format($min).' - '.$format($max).$suffix;
+    }
+
+    /** Megabytes as the supplier counts them, shown as MB below 1 GB. */
+    private static function dataLabel(float $mb): string
+    {
+        if ($mb >= 1024) {
+            $gb = $mb / 1024;
+
+            return rtrim(rtrim(number_format($gb, 2), '0'), '.').' GB';
+        }
+
+        return rtrim(rtrim(number_format($mb, 2), '0'), '.').' MB';
+    }
+
     private static function planDataLabel($variant): ?string
     {
         $meta = $variant->metadata ?? [];

@@ -60,11 +60,18 @@ new class extends Component {
     };
 @endphp
 
+{{-- Hidden until something is unread, per the reference: this control is a
+     notice, not a permanent fixture, so an empty bell is noise. The root
+     element itself always renders and only toggles `hidden`, because Livewire
+     morphs this component in place and needs a root to update; returning
+     nothing would strand it and the bell would never reappear when the first
+     notification arrived. Notifications stay reachable meanwhile from the row
+     inside the account menu. --}}
 <div
     x-data="{ open: false }"
     @click.outside="open = false"
     @keydown.escape.window="open = false"
-    class="relative"
+    @class(['relative', 'hidden' => $this->unreadCount < 1])
 >
     {{-- Bell button --}}
     <button
@@ -73,16 +80,22 @@ new class extends Component {
         :aria-expanded="open.toString()"
         aria-label="Notifications"
         @class([
-            'relative flex h-10 w-10 shrink-0 items-center justify-center transition-colors active:scale-95',
+            'relative flex shrink-0 items-center justify-center transition-colors active:scale-95',
+            'h-10 w-10' => $tone !== 'chip',
             'rounded-full bg-blue-100 ring-2 ring-blue-200 text-blue-700 hover:bg-blue-200 dark:bg-white/15 dark:ring-white/30 dark:text-white dark:hover:bg-white/25' => $tone === 'light',
             'rounded-full text-zinc-700 hover:bg-zinc-100' => $tone === 'dark',
-            // 'chip' matches the admin header: square grey chip that fills blue on hover.
-            'rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 hover:bg-blue-600 hover:text-white' => $tone === 'chip',
+            // 'chip' is the dashboard top bar's round outlined button (white on the blue bar), matching the cart beside it.
+            'h-9 w-9 rounded-full text-white ring-1 ring-white/30 transition-all hover:bg-white/15 hover:ring-2 hover:ring-white/60 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:ring-white/25' => $tone === 'chip',
         ])
     >
         @if ($tone === 'chip')
-            {{-- Masked so the bell inherits the chip's text colour (dark on grey, white on blue hover) - an <img> can't be recoloured. --}}
-            <span class="h-5 w-5 shrink-0 bg-current" style="-webkit-mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/'.rawurlencode('notification 2.svg')) }}') center / contain no-repeat;"></span>
+            {{-- Drawn inline, not masked: a mask can only ever produce a
+                 silhouette of the source file, and the reference's bell is an
+                 outline. currentColor keeps it on the button's own ink. --}}
+            <svg class="h-[18px] w-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 8.5a6 6 0 1 0-12 0c0 4.2-1.2 5.9-1.9 6.6a.8.8 0 0 0 .55 1.4h14.7a.8.8 0 0 0 .55-1.4c-.7-.7-1.9-2.4-1.9-6.6Z"/>
+                <path d="M10.2 19.5a2.1 2.1 0 0 0 3.6 0"/>
+            </svg>
         @else
             <img
                 src="{{ asset('assets/'.rawurlencode('notification 2.svg')) }}"
@@ -95,7 +108,7 @@ new class extends Component {
             >
         @endif
         @if ($this->unreadCount > 0)
-            <span class="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-[12px] bg-red-500 px-1 text-[10px] font-bold text-white ring-2 {{ $tone === 'light' ? 'ring-[#eff6ff] dark:ring-[#0c1a36]' : 'ring-white' }}">
+            <span class="absolute inline-flex items-center justify-center rounded-full bg-red-500 px-1 font-bold text-white ring-2 {{ $tone === 'chip' ? '-top-1 -right-1 h-4 min-w-[16px] text-[9px]' : '-top-0.5 -right-0.5 h-5 min-w-[20px] text-[10px]' }} {{ $tone === 'light' ? 'ring-[#f4f6f5] dark:ring-[#0c1a36]' : 'ring-white' }}">
                 {{ $this->unreadCount > 99 ? '99+' : $this->unreadCount }}
             </span>
         @endif

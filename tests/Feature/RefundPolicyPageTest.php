@@ -18,6 +18,7 @@ class RefundPolicyPageTest extends TestCase
             ->assertSee('Refund and Cancellation Policy')
             ->assertSee('Global wallet-first refund policy')
             ->assertSee('Automatic refund after a fast system check.')
-            ->assertSee('info@rshoprefill.com');
+            ->assertSee('support@rshoprefill.com')
+            ->assertDontSee('info@rshoprefill.com');
     }
 }

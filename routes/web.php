@@ -471,19 +471,25 @@ Route::post('contact', [ContactController::class, 'store'])
     ->middleware(['throttle:5,1', 'verify-turnstile:contact'])
     ->name('contact.send');
 
-// Partnerships + Suppliers - dedicated inquiry forms that funnel into the
-// same ContactMessage / admin notification flow with a category-tagged
-// subject. The contact.url_partnerships_form / contact.url_suppliers_form
-// SiteSettings default to these routes when an admin hasn't set a URL.
-Route::get('partnerships', [ContactController::class, 'partnerships'])->name('shop.partnerships');
-Route::post('partnerships', fn (Request $r, AdminNotificationService $a) => app(ContactController::class)->storeInquiry($r, $a, 'partnership'))
+// Influencers and Affiliates - one inquiry form that funnels into the same
+// ContactMessage / admin notification flow as the contact page, with a
+// category-tagged subject. It replaced the separate Partnerships and
+// Suppliers pages; their old URLs 301 here so links and search results that
+// still point at them land on a live page.
+Route::get('influencers-affiliates', [ContactController::class, 'affiliates'])->name('shop.affiliates');
+Route::post('influencers-affiliates', fn (Request $r, AdminNotificationService $a) => app(ContactController::class)->storeInquiry($r, $a, 'affiliate'))
     ->middleware(['throttle:5,1', 'verify-turnstile:contact'])
-    ->name('partnerships.send');
+    ->name('affiliates.send');
 
-Route::get('suppliers', [ContactController::class, 'suppliers'])->name('shop.suppliers');
-Route::post('suppliers', fn (Request $r, AdminNotificationService $a) => app(ContactController::class)->storeInquiry($r, $a, 'supplier'))
+// Customers asking us to stock a brand or service we do not carry yet. Same
+// inquiry handler and Support Tickets destination as the influencers form.
+Route::get('request-a-product', [ContactController::class, 'requestProduct'])->name('shop.request-product');
+Route::post('request-a-product', fn (Request $r, AdminNotificationService $a) => app(ContactController::class)->storeInquiry($r, $a, 'product'))
     ->middleware(['throttle:5,1', 'verify-turnstile:contact'])
-    ->name('suppliers.send');
+    ->name('request-product.send');
+
+Route::permanentRedirect('partnerships', '/influencers-affiliates');
+Route::permanentRedirect('suppliers', '/influencers-affiliates');
 
 // Refund and Cancellation Policy.
 Route::view('refund-policy', 'shop.refund-policy')->name('shop.refund-policy');
@@ -496,6 +502,19 @@ Route::view('cookie-policy', 'shop.cookie-policy')->name('shop.cookie-policy');
 
 // Compliance and Regulatory Framework.
 Route::view('compliance', 'shop.compliance')->name('shop.compliance');
+
+// Security - how codes, eSIMs, wallet balance and Rcoin are protected, and how
+// customers keep them safe. The bare /security path is free: the security.*
+// group below only registers paths UNDER it (verify-device, compromise,
+// recover), so this public page and those signed-in flows never collide.
+// /digital-assets-security was its first name and still 301s here.
+Route::view('security', 'shop.security')->name('shop.security');
+Route::permanentRedirect('digital-assets-security', '/security');
+
+// eSIM Installation Guide - general install steps for iPhone and Android.
+// A plan's own device-specific steps stay on its order page; this is the
+// public version a visitor can read before buying.
+Route::view('esim-installation-guide', 'shop.esim-installation-guide')->name('shop.esim-guide');
 
 // About.
 Route::view('about', 'shop.about')->name('shop.about');
@@ -574,7 +593,9 @@ Route::get('feeds/google-merchant.xml', [GoogleMerchantFeedController::class, 'e
 // pages + one URL per product brand (gift cards / top-ups / bill payments).
 // Cached for 6 hours so the brand query never runs on a hot crawl.
 Route::get('sitemap.xml', function () {
-    $xml = Cache::remember('sitemap.xml.v3', now()->addHours(6), function () {
+    // v4: /partnerships, /suppliers and /digital-assets-security became
+    // redirects, so a cached v3 copy would keep advertising them for 6 hours.
+    $xml = Cache::remember('sitemap.xml.v4', now()->addHours(6), function () {
         $urls = [];
         $push = function (string $loc, string $priority = '0.7', string $freq = 'weekly') use (&$urls) {
             $urls[$loc] = ['loc' => $loc, 'priority' => $priority, 'freq' => $freq];
@@ -588,9 +609,10 @@ Route::get('sitemap.xml', function () {
             'shop.flights' => '0.6', 'shop.stays' => '0.6', 'shop.reviews' => '0.6', 'shop.blog' => '0.6',
             'shop.how-it-works' => '0.5', 'shop.help' => '0.5', 'shop.faq' => '0.5', 'shop.contact' => '0.5',
             'shop.about' => '0.5', 'shop.mobile-app' => '0.5', 'shop.earn-points' => '0.5',
-            'shop.partnerships' => '0.4', 'shop.suppliers' => '0.4', 'shop.press' => '0.4',
+            'shop.affiliates' => '0.4', 'shop.press' => '0.4',
             'shop.privacy' => '0.3', 'shop.terms' => '0.3', 'shop.cookie-policy' => '0.3',
             'shop.refund-policy' => '0.3', 'shop.compliance' => '0.3', 'shop.accessibility' => '0.3',
+            'shop.security' => '0.3', 'shop.esim-guide' => '0.5',
             'shop.sitemap' => '0.3',
         ];
         // Routes that 404 behind a feature flag must not be advertised here:
@@ -906,6 +928,11 @@ Route::middleware(['auth'])->group(function () {
     Route::view('dashboard/kyc', 'dashboard.kyc')->name('dashboard.kyc');
 
     Volt::route('dashboard/orders', 'dashboard.orders')->name('dashboard.orders');
+
+    // My eSIMs - every eSIM the customer bought, lifted out of their orders
+    // (App\Support\CustomerEsims) with its QR, install links and top-ups, so it
+    // can be tracked without searching order history.
+    Volt::route('dashboard/esims', 'dashboard.esims')->name('dashboard.esims');
 
     // Native eSIM top-up - refill an existing Airalo eSIM from the dashboard
     // without leaving the site. The controller hits Airalo's /sims/{iccid}/topups

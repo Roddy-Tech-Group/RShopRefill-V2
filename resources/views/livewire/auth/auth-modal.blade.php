@@ -506,9 +506,9 @@ new class extends Component {
                 type="button"
                 @click="close()"
                 aria-label="Close"
-                class="flex h-9 w-9 items-center justify-center rounded-[12px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"
             >
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
                 </svg>
             </button>

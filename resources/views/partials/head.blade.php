@@ -125,7 +125,7 @@
     // Public-facing brand name. Shared globally by SiteIdentityComposer from the
     // admin "Site -> name" setting; the ?? keeps a literal fallback for the rare
     // view that renders outside the composer (defensive, should not happen).
-    $siteName = $siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefills');
+    $siteName = $siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefill');
 
     // Admin-controlled SEO defaults (System Settings -> SEO). Each falls back to
     // the built-in default when the admin field is blank, so the panel is the
@@ -169,10 +169,10 @@
     // Brand-entity signals so Google resolves every spelling of the name to ONE
     // entity (this site) and ranks us for brand searches. alternateName covers
     // the singular/plural + .com variants people actually type (the site brand is
-    // "RshopRefills" but the domain is rshoprefill.com); sameAs points at the
+    // "RshopRefill" but the domain is rshoprefill.com); sameAs points at the
     // official profiles, read from the same settings the footer uses so there's a
     // single place to edit them.
-    $brandAliases = ['Rshop Refills', 'rshoprefills', 'rshoprefills.com', 'rshoprefill', 'rshoprefill.com'];
+    $brandAliases = ['RshopRefill', 'rshoprefills', 'rshoprefills.com', 'rshoprefill', 'rshoprefill.com'];
 
     $brandProfiles = array_values(array_filter([
         \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills'),
@@ -183,7 +183,7 @@
     ]));
 
     // Organization schema: the brand, the founders, and the mission - written so
-    // search engines and AI crawlers can pick up who built RshopRefills and why.
+    // search engines and AI crawlers can pick up who built RshopRefill and why.
     $orgJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'Organization',
@@ -297,13 +297,14 @@
     }
 </script>
 
-{{-- Satoshi is the only web font we load (the primary --font-sans). It is
-     @imported inside app.css, so its connection only opens after the CSS
-     parses. Pre-opening api.fontshare.com here lets the font fetch start in
-     parallel with the CSS, cutting first-text delay. We deliberately do NOT
-     load Instrument Sans any more: it was only ever a fallback behind Satoshi,
-     so system-ui covers the brief pre-Satoshi window without a second origin. --}}
-<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+{{-- DM Sans is the only web font we load (the primary --font-sans). It is
+     pulled by an @import at the top of app.css, which the browser cannot start
+     until the stylesheet parses. Pre-opening both Google Fonts origins here
+     lets the fetch begin in parallel: googleapis serves the CSS, gstatic serves
+     the font files, and the second needs crossorigin because fonts are always
+     fetched anonymously. --}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
 {{-- Flag CDN used by the locale modal, top-bar country chip, and admin
      country pickers. Pre-resolving the DNS shaves ~50-100ms off the first

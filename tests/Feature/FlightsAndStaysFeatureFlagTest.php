@@ -103,7 +103,23 @@ class FlightsAndStaysFeatureFlagTest extends TestCase
         $response->assertDontSee('Turn digital currency into real-world travel', escape: false);
         $response->assertSee('sm:grid-cols-1', escape: false);
         // The lone eSIM card is still there - only the teasers are gated.
-        $response->assertSee('Ditch physical SIM cards', escape: false);
+        //
+        // This used to prove that by looking for the card's caption, "Ditch
+        // physical SIM cards...". The homepage redesign deliberately dropped
+        // that caption from the eSIM tile: the dark backdrop-blur strip it sat
+        // on was built to sit over the Flights and Stays photographs, and on
+        // the eSIM tile it covered the bottom third of an animated inline-SVG
+        // scene instead. Flights and Stays keep their captions, because they
+        // are coming-soon teasers whose copy is the whole point, while the eSIM
+        // tile is a plain link into the eSIM shop and takes its name from the
+        // section heading above it.
+        //
+        // So the proof moved to the two things the tile cannot render without:
+        // the illustration that fills it, and the full-bleed link into /esims.
+        // Neither string appears anywhere else on the homepage, so neither can
+        // be satisfied by some other mention of eSIMs on the page.
+        $response->assertSee('aria-label="Three people using their phones with eSIM connectivity"', escape: false);
+        $response->assertSee('aria-label="Browse eSIMs"', escape: false);
     }
 
     public function test_admin_sidebar_links_follow_the_flags(): void

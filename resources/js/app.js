@@ -1,3 +1,30 @@
+// ── Viewport content width, measured ─────────────────────────────────────────
+// `.full-bleed` must span the page's usable width. Two earlier attempts were
+// both wrong for the same underlying reason:
+//
+//   100vw               counts the scrollbar, so tracks overhang it.
+//   body.clientWidth    GROWS when anything overflows, so a track that is too
+//                       wide makes the next measurement wider still. A loop.
+//
+// A fixed-position probe is immune to both. Its containing block is the
+// viewport itself, so its width is the usable area regardless of how wide the
+// document content happens to be, and it cannot feed back into itself.
+const publishPageWidth = () => {
+    if (!document.body) { return; }
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;top:0;left:0;right:0;height:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(probe);
+    const w = Math.round(probe.getBoundingClientRect().width);
+    probe.remove();
+    if (w > 0) {
+        document.documentElement.style.setProperty('--page-w', `${w}px`);
+    }
+};
+if (document.body) { publishPageWidth(); }
+else { document.addEventListener('DOMContentLoaded', publishPageWidth); }
+window.addEventListener('resize', publishPageWidth);
+window.addEventListener('livewire:navigated', publishPageWidth);
+
 // Flatpickr — modern date picker used by admin forms (e.g. coupon expiry).
 // Exposed on window so Alpine x-init expressions can call flatpickr() directly.
 import flatpickr from 'flatpickr';
@@ -418,26 +445,28 @@ const ILLOS = {
             return tweens;
         },
     },
-    payout: {
+    delivery: {
+        // Mirrors the completed-order screen. Content settles after entering;
+        // only the success badge and surrounding sparks move during the idle.
         set: (g) => {
-            g.set('#isx-card', { y: 46, opacity: 0 });
-            g.set('#isx-medal', { scale: 0, transformOrigin: '50% 50%' });
-            g.set('#isx-check', { strokeDasharray: 52, strokeDashoffset: 52 });
-            g.set('.isx-line-l', { scaleX: 0, transformOrigin: '100% 50%' });
-            g.set('.isx-line-r', { scaleX: 0, transformOrigin: '0% 50%' });
-            g.set('.isx-dot', { scale: 0, transformOrigin: '50% 50%' });
+            g.set('#idl-phone', { y: 10, opacity: 0 });
+            g.set('#idl-badge', { scale: 0, transformOrigin: '50% 50%' });
+            g.set('#idl-check', { strokeDasharray: 24, strokeDashoffset: 24 });
+            g.set('#idl-heading, #idl-download, #idl-credentials, #idl-actions', { opacity: 0 });
+            g.set('#idl-card', { y: 8, opacity: 0 });
+            g.set('.idl-spark', { opacity: 0 });
         },
-        build: (tl) => tl.to('#isx-card', { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out' })
-            .to('#isx-medal', { scale: 1, duration: 0.55, ease: 'back.out(2)' }, '-=0.25')
-            .to('#isx-check', { strokeDashoffset: 0, duration: 0.45, ease: 'power2.out' })
-            .to('.isx-line-l, .isx-line-r', { scaleX: 1, duration: 0.4, ease: 'power3.out', stagger: 0.05 }, '-=0.2')
-            .to('.isx-dot', { scale: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.08 }, '-=0.2'),
+        build: (tl) => tl
+            .to('#idl-phone', { y: 0, opacity: 1, duration: 0.55, ease: 'power3.out' })
+            .to('#idl-badge', { scale: 1, duration: 0.5, ease: 'back.out(1.5)' }, '-=0.25')
+            .to('#idl-check', { strokeDashoffset: 0, duration: 0.3, ease: 'power2.out' }, '-=0.15')
+            .to('#idl-heading, #idl-download', { opacity: 1, duration: 0.35, stagger: 0.08 }, '-=0.2')
+            .to('#idl-card', { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, '-=0.1')
+            .to('#idl-credentials, #idl-actions', { opacity: 1, duration: 0.3, stagger: 0.12 }, '-=0.15')
+            .to('.idl-spark', { opacity: 1, duration: 0.45, stagger: 0.08 }, '-=0.3'),
         idle: (g) => [
-            // Pulse the medal + shimmer the speed lines, but DON'T float the card:
-            // it holds the <text>, and continuously sub-pixel-transforming text makes
-            // the letters shimmer/shake. Keeping the card still keeps the text crisp.
-            g.to('#isx-medal', { scale: 1.04, duration: 1.5, yoyo: true, repeat: -1, ease: 'sine.inOut' }),
-            g.to('.isx-line-l, .isx-line-r', { opacity: 0.5, duration: 1, yoyo: true, repeat: -1, ease: 'sine.inOut', stagger: 0.15 }),
+            g.to('#idl-badge', { scale: 1.045, duration: 1.8, yoyo: true, repeat: -1, ease: 'sine.inOut' }),
+            g.to('.idl-spark', { opacity: 0.3, duration: 1.8, yoyo: true, repeat: -1, stagger: 0.25, ease: 'sine.inOut' }),
         ],
     },
 };
@@ -632,22 +661,49 @@ document.addEventListener('alpine:init', () => {
     // so both shells get the same UX (glass toggle, icon-only rail, hover
     // popups). Separate localStorage key so the two layouts remember
     // independently. CSS rules live in resources/views/components/layouts/dashboard.blade.php.
+    //
+    // `folded` is a second, page-level reason to show the icon rail: a page with
+    // its own sub-navigation (the shop category panel, teleported next to the
+    // rail) folds it so the two read as one sidebar. It is never saved, so the
+    // customer's own collapse preference comes back on every other page. The
+    // arrow on a folded page simply unfolds it for that visit.
     window.Alpine.store('dashboardSidebar', {
         collapsed: false,
+        folded: false,
+        get isCollapsed() {
+            return this.collapsed || this.folded;
+        },
         init() {
             try { this.collapsed = localStorage.getItem('dashboard.sidebar.collapsed') === '1'; } catch (e) {}
+            this.folded = this._pageHasSubnav();
             this._sync();
         },
         toggle() {
+            if (this.folded) {
+                this.folded = false;
+                this._sync();
+                return;
+            }
             this.collapsed = ! this.collapsed;
             try { localStorage.setItem('dashboard.sidebar.collapsed', this.collapsed ? '1' : '0'); } catch (e) {}
             this._sync();
         },
+        _pageHasSubnav() {
+            return !! document.querySelector('template[data-subnav-teleport]');
+        },
         _sync() {
-            document.documentElement.classList.toggle('dashboard-sidebar-collapsed', this.collapsed);
+            document.documentElement.classList.toggle('dashboard-sidebar-collapsed', this.isCollapsed);
         },
     });
     window.Alpine.store('dashboardSidebar').init();
+
+    // wire:navigate swaps the page without re-running store init, so re-read
+    // whether the new page carries a sub-navigation panel.
+    document.addEventListener('livewire:navigated', () => {
+        const store = window.Alpine.store('dashboardSidebar');
+        store.folded = store._pageHasSubnav();
+        store._sync();
+    });
 
     /**
      * Customer-dashboard preferences. Persisted in localStorage so each customer's
@@ -1157,6 +1213,59 @@ window.navBrandSearch = function () {
             this.showPopular();
         },
     };
+};
+
+/**
+ * Theme switch with a circular reveal. The new theme opens out as a circle from
+ * the control that was pressed, growing until it covers the screen, the same
+ * way in both directions (to dark and to light).
+ *
+ * Uses the View Transitions API: the browser snapshots the page, the theme is
+ * applied (window.setTheme, partials/theme-engine), and the new snapshot is
+ * clipped to a circle that grows from the click point. CSS transitions are
+ * paused for that frame (html.theme-switching) so the new snapshot shows the
+ * finished colours rather than a hover or colour fade caught half way.
+ * Browsers without the API, and reduced-motion users, get the plain switch.
+ *
+ * @param {MouseEvent|KeyboardEvent|null} event the click (its position is the circle's centre)
+ * @param {'light'|'dark'|'system'} choice
+ */
+window.rshopThemeReveal = function (event, choice) {
+    const apply = () => window.setTheme && window.setTheme(choice);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (! document.startViewTransition || reduced) {
+        apply();
+        return;
+    }
+
+    // Keyboard activation reports 0,0; centre on the pressed control instead.
+    let x = event && event.clientX;
+    let y = event && event.clientY;
+    if (! x && ! y && event && event.currentTarget && event.currentTarget.getBoundingClientRect) {
+        const r = event.currentTarget.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+    }
+    if (! x && ! y) {
+        x = window.innerWidth / 2;
+        y = window.innerHeight / 2;
+    }
+
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const root = document.documentElement;
+
+    root.classList.add('theme-switching');
+    const transition = document.startViewTransition(apply);
+
+    transition.ready.then(() => {
+        root.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+            { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', pseudoElement: '::view-transition-new(root)' }
+        );
+    }).catch(() => {});
+
+    transition.finished.finally(() => root.classList.remove('theme-switching'));
 };
 
 /**
@@ -1878,7 +1987,7 @@ window.bestSellingCountriesMap = function (payload) {
             // every lookup return undefined, which SVG paints BLACK - the
             // "black country" bug.) Four brand-blue intensity tiers; _values()
             // buckets each country's USD total into one of them.
-            return { t1: '#93c5fd', t2: '#60a5fa', t3: '#3b82f6', t4: '#1d4ed8' };
+            return { t1: '#c9d0cd', t2: '#a3aaa7', t3: '#3b82f6', t4: '#1d4ed8' };
         },
 
         // Numeric USD totals per country for the current view + continent
@@ -2125,7 +2234,7 @@ function buildGlassTooltipRenderer(dark, valueFormatter) {
 
 window.salesCostChart = function (series) {
     const SALES_COLOR = '#34d399'; // emerald-400
-    const COST_COLOR  = '#60a5fa'; // blue-400
+    const COST_COLOR  = '#a3aaa7'; // neutral grey (no light blue in the app)
 
     return {
         chart: null,
@@ -2534,7 +2643,7 @@ window.confirmModal = function () {
  */
 window.reportChart = function (series, chartType) {
     const SALES_COLOR = '#34d399'; // emerald-400
-    const COST_COLOR = '#60a5fa';  // blue-400
+    const COST_COLOR = '#a3aaa7';  // neutral grey (no light blue in the app)
 
     return {
         chart: null,

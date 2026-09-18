@@ -3,7 +3,7 @@
     <head>
         @include('partials.head')
 
-        {{-- Fonts: Satoshi only (from partials/head). The old Instrument Sans
+        {{-- Fonts: DM Sans only (from partials/head). The old Instrument Sans
              link was dropped - nothing on these pages referenced it. --}}
 
         {{-- Entrance: a bottom-sheet that slides up from the bottom edge on
@@ -44,9 +44,9 @@
                 <main class="relative flex flex-col bg-white px-6 py-[50px] sm:px-10 sm:py-10">
                     {{-- Brand (centered at the top) --}}
                     <a href="{{ route('home') }}" wire:navigate class="flex shrink-0 flex-col items-center rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
-                        <span class="flex h-10 items-center">
+                        <span class="flex h-14 items-center">
                             <img
-                                src="{{ asset('assets/Rshoprefillslogo.webp') }}"
+                                src="{{ asset('assets/logo.webp').'?v=4' }}"
                                 alt="{{ $siteName }}"
                                 class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />

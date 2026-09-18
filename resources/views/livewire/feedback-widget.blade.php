@@ -97,6 +97,91 @@ new class extends Component {
     x-data="{
         open: false,
         turnstileWidget: null,
+
+        /* ── Draggable dock ──────────────────────────────────────────────
+           The tab can be moved up and down, and flipped to the other edge by
+           dragging past the middle of the screen. Position is remembered per
+           browser.
+
+           `moved` is what separates a drag from a click: a pointer that
+           travels more than a few pixels suppresses the click that would
+           otherwise open the panel, so repositioning never posts feedback. */
+        side: 'right',
+        topPx: 0,
+        dragging: false,
+        moved: false,
+        startY: 0,
+        startX: 0,
+        grabOffset: 0,
+
+        initDock() {
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem('feedback.dock') || 'null'); } catch (e) {}
+            this.side  = (saved && saved.side === 'left') ? 'left' : 'right';
+            this.topPx = (saved && typeof saved.topPx === 'number')
+                ? saved.topPx
+                : Math.round(window.innerHeight / 2 - this.tabHeight() / 2);
+            this.clamp();
+            window.addEventListener('resize', () => this.clamp());
+        },
+
+        tabHeight() {
+            return this.$refs.tab ? this.$refs.tab.offsetHeight : 120;
+        },
+
+        /* Never let it leave the viewport, including after a rotate or resize. */
+        clamp() {
+            const max = Math.max(8, window.innerHeight - this.tabHeight() - 8);
+            this.topPx = Math.min(Math.max(8, this.topPx), max);
+        },
+
+        save() {
+            try {
+                localStorage.setItem('feedback.dock', JSON.stringify({ side: this.side, topPx: this.topPx }));
+            } catch (e) {}
+        },
+
+        startDrag(event) {
+            if (event.button !== undefined && event.button !== 0) { return; }
+            this.dragging = true;
+            this.moved = false;
+            this.startY = event.clientY;
+            this.startX = event.clientX;
+            this.grabOffset = event.clientY - this.$el.getBoundingClientRect().top;
+            event.target.setPointerCapture?.(event.pointerId);
+        },
+
+        onDrag(event) {
+            if (! this.dragging) { return; }
+            if (Math.abs(event.clientY - this.startY) > 4 || Math.abs(event.clientX - this.startX) > 4) {
+                this.moved = true;
+                if (this.open) { this.open = false; this.resetTurnstile(); }
+            }
+            this.topPx = event.clientY - this.grabOffset;
+            this.clamp();
+            /* Crossing the midpoint re-docks it to the nearer edge. */
+            this.side = event.clientX < window.innerWidth / 2 ? 'left' : 'right';
+        },
+
+        endDrag(event) {
+            if (! this.dragging) { return; }
+            this.dragging = false;
+            event.target.releasePointerCapture?.(event.pointerId);
+            if (this.moved) { this.save(); }
+        },
+
+        /* Keyboard equivalent, so the dock is not mouse-only. */
+        nudge(dy) {
+            this.topPx += dy;
+            this.clamp();
+            this.save();
+        },
+
+        flip() {
+            this.side = this.side === 'right' ? 'left' : 'right';
+            this.save();
+        },
+
         toggle() {
             this.open = !this.open;
             if (this.open) {
@@ -137,7 +222,15 @@ new class extends Component {
     }"
     @click.outside="if (open) { open = false; resetTurnstile(); }"
     @keydown.escape.window="if (open) { open = false; resetTurnstile(); }"
-    class="fixed right-0 top-1/2 z-[55] -translate-y-1/2 hidden md:block"
+    x-init="initDock()"
+    {{-- Position comes from the dock state, so the tab can be dragged. The
+         translate that used to centre it is gone: top is an explicit pixel
+         value now, and keeping both would double-offset it. --}}
+    :style="side === 'right'
+        ? `top:${topPx}px; right:0; left:auto;`
+        : `top:${topPx}px; left:0; right:auto;`"
+    :class="dragging && 'select-none'"
+    class="fixed z-[55] hidden md:block"
     aria-label="Site feedback"
 >
     <div class="relative flex items-center">
@@ -155,7 +248,8 @@ new class extends Component {
             x-transition:leave="transition ease-in duration-150"
             x-transition:leave-start="opacity-100 translate-x-0 scale-100"
             x-transition:leave-end="opacity-0 translate-x-4 scale-75"
-            class="absolute right-full mr-2 w-72 origin-right rounded-[12px] bg-[#eff6ff] p-4 shadow-2xl shadow-zinc-900/25 ring-1 ring-zinc-200 motion-reduce:transition-none dark:bg-[#0c1a36] dark:ring-white/15"
+            :class="side === 'right' ? 'right-full mr-2 origin-right' : 'left-full ml-2 origin-left'"
+            class="absolute w-72 rounded-[12px] bg-[#eff6ff] p-4 shadow-2xl shadow-zinc-900/25 ring-1 ring-zinc-200 motion-reduce:transition-none dark:bg-[#0c1a36] dark:ring-white/15"
             role="dialog"
             aria-modal="false"
             aria-labelledby="feedback-title"
@@ -179,8 +273,8 @@ new class extends Component {
             @else
                 <div class="mb-2 flex items-start justify-between gap-2">
                     <h3 id="feedback-title" class="text-sm font-bold text-zinc-900 dark:text-white">Send feedback</h3>
-                    <button type="button" @click="open = false" aria-label="Close" class="-mt-0.5 -mr-0.5 flex h-6 w-6 items-center justify-center rounded-[6px] text-zinc-500 hover:bg-zinc-100 dark:text-white/60 dark:hover:bg-white/10">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <button type="button" @click="open = false" aria-label="Close" class="-mt-0.5 -mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
                         </svg>
                     </button>
@@ -230,10 +324,23 @@ new class extends Component {
         {{-- Edge tab button --}}
         <button
             type="button"
-            @click="toggle()"
+            x-ref="tab"
+            @pointerdown="startDrag($event)"
+            @pointermove="onDrag($event)"
+            @pointerup="endDrag($event)"
+            @pointercancel="endDrag($event)"
+            {{-- A drag must not also register as a click, or moving the tab
+                 would open the panel every time. --}}
+            @click="moved ? (moved = false) : toggle()"
+            @keydown.up.prevent="nudge(-24)"
+            @keydown.down.prevent="nudge(24)"
+            @keydown.left.prevent="side = 'left'; save()"
+            @keydown.right.prevent="side = 'right'; save()"
             :aria-expanded="open.toString()"
-            aria-label="Send us feedback"
-            class="flex items-center gap-2 rounded-l-[10px] bg-blue-600 px-3 py-4 text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-900/30 transition-colors hover:bg-blue-700"
+            aria-label="Send us feedback. Drag to move, or use the arrow keys."
+            title="Drag to move"
+            :class="[side === 'right' ? 'rounded-l-[10px]' : 'rounded-r-[10px]', dragging ? 'cursor-grabbing' : 'cursor-grab']"
+            class="flex cursor-grab items-center gap-2 bg-blue-600 px-3 py-4 text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-900/30 transition-colors hover:bg-blue-700"
             style="writing-mode: vertical-rl;"
         >
             <svg class="h-4 w-4 -rotate-90 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

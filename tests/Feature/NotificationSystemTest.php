@@ -390,10 +390,19 @@ class NotificationSystemTest extends TestCase
 
         // 3. Try unsubscribing with VALID signature
         $unsubResponse2 = $this->getJson($unsubscribeUrl);
+        // The confirmation copy names the brand, and the brand is now written
+        // "RshopRefill", singular, everywhere it is spoken to a customer: the
+        // APP_NAME the application boots with, the rshoprefill.com domain, every
+        // transactional mail and the admin surfaces. This expectation still held
+        // the older plural "RshopRefills" and was left behind when the name was
+        // corrected. Nothing about the route's behaviour changed with the
+        // wording, which is the part worth guarding: a valid signature is still
+        // required, the row is still flipped to unsubscribed, and the answer is
+        // still a 200 carrying a success status.
         $unsubResponse2->assertStatus(200)
             ->assertJson([
                 'status' => 'success',
-                'message' => 'You have been successfully unsubscribed from RshopRefills newsletter.',
+                'message' => 'You have been successfully unsubscribed from RshopRefill newsletter.',
             ]);
 
         $this->assertDatabaseHas('newsletter_subscribers', [

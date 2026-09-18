@@ -19,6 +19,7 @@ class CompliancePageTest extends TestCase
             ->assertSee('zero tolerance')
             ->assertSee('Know Your Customer')
             ->assertSee('Sanctions and geographic restrictions')
-            ->assertSee('info@rshoprefill.com');
+            ->assertSee('support@rshoprefill.com')
+            ->assertDontSee('info@rshoprefill.com');
     }
 }

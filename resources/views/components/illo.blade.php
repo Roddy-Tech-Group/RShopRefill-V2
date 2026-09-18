@@ -22,8 +22,8 @@
           · notFound  — 420x200, the animated "404" characters (used on errors/404)
           · emptyCart — 520x400 dark panel, desert cart (cart page + nav popups)
           · cardFan   — 320x260 dark panel, fanned gift cards (how-it-works step 1)
-          · payWeb    — 320x260 dark panel, payment network w/ travelling dots (step 2)
-          · payout    — 320x260 dark panel, instant-delivery card (step 3)
+          · payWeb    — 320x260 dark panel, checkout hub linked to each accepted payment method, w/ travelling dots (step 2)
+          · delivery  — 320x260 dark panel, a card flying into a phone: delivered notification + code (step 3)
 
     ADDING A NEW ONE (keep it reusable):
         1. Add a @case('myName') here with the inline <svg> (namespace every id/class,
@@ -298,6 +298,131 @@
             @break
 
         @case('cardFan')
+            {{-- The fan is the catalogue: real gift card art, top-up operator
+                 logos and eSIM cards, the same artwork the home rows show.
+
+                 Gift cards come from the region's curated Popular row and
+                 top-ups from the region's own operators first, both limited to
+                 brands with a hand-made asset in config/brand_assets.php (the
+                 synced logo_url is sometimes a grey placeholder). eSIM cards
+                 reuse the eSIM row's own data: region colour and flags, with a
+                 SIM chip in place of words, because the cards float in the idle
+                 loop and moving text shimmers.
+
+                 Cached per region: this renders on every home page view. With
+                 no catalogue at all (a fresh install) the original abstract fan
+                 below is drawn instead. .gc-card and .gc-spark are unchanged,
+                 so the GSAP entrance and float in app.js still apply. --}}
+            @php
+                $fanRegion = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
+
+                $fanArt = \Illuminate\Support\Facades\Cache::remember("illo:card-fan:v1:{$fanRegion}", now()->addMinutes(30), function () use ($fanRegion) {
+                    $localLogos = (array) config('brand_assets.logos', []);
+                    $giftCategoryId = \App\Models\Category::where('slug', 'gift-cards')->value('id');
+
+                    $gifts = \App\Models\Product::popularForRegion($fanRegion)
+                        ->filter(fn ($p) => $giftCategoryId && (int) $p->category_id === (int) $giftCategoryId && isset($localLogos[$p->brand_key]))
+                        ->unique('brand_key')
+                        ->take(5)
+                        ->map(fn ($p) => ['kind' => 'art', 'label' => \App\Models\Product::brandDisplayName($p->brand_key), 'file' => $localLogos[$p->brand_key]])
+                        ->values()
+                        ->all();
+
+                    $topups = \App\Models\Product::query()
+                        ->where('is_active', true)
+                        ->whereIn('brand_key', array_keys($localLogos))
+                        ->whereHas('category', fn ($q) => $q->where('slug', 'mobile-airtime'))
+                        ->orderByRaw('country_code = ? DESC', [$fanRegion])
+                        ->get(['brand_key', 'country_code'])
+                        ->unique('brand_key')
+                        ->take(3)
+                        ->map(fn ($p) => ['kind' => 'art', 'label' => \App\Models\Product::brandDisplayName($p->brand_key), 'file' => $localLogos[$p->brand_key]])
+                        ->values()
+                        ->all();
+
+                    $esims = \App\Support\EsimCardPresenter::family()
+                        ->take(2)
+                        ->map(fn (array $c) => [
+                            'kind' => 'esim',
+                            'label' => str_contains($c['name'], 'eSIM') ? $c['name'] : $c['name'].' eSIM',
+                            'accent' => $c['accentColor'],
+                            'flags' => array_slice($c['flagUrls'] ?? [], 0, 3),
+                        ])
+                        ->values()
+                        ->all();
+
+                    return ['gifts' => $gifts, 'topups' => $topups, 'esims' => $esims];
+                });
+
+                // Front card first, then the fan; extras only fill in when a
+                // kind runs short, so a region with no eSIMs still gets seven.
+                $fanItems = array_slice(array_values(array_filter([
+                    $fanArt['gifts'][0] ?? null,
+                    $fanArt['esims'][0] ?? null,
+                    $fanArt['topups'][0] ?? null,
+                    $fanArt['gifts'][1] ?? null,
+                    $fanArt['esims'][1] ?? null,
+                    $fanArt['topups'][1] ?? null,
+                    $fanArt['gifts'][2] ?? null,
+                    $fanArt['gifts'][3] ?? null,
+                    $fanArt['topups'][2] ?? null,
+                    $fanArt['gifts'][4] ?? null,
+                ])), 0, 7);
+
+                // The original fan's geometry, in paint order (back to front):
+                // x, y, w, h, radius, angle, pivot x, pivot y. The last is the
+                // front card and takes the first item.
+                $fanSlots = [
+                    [56, 50, 88, 56, 8, -20, 100, 78],
+                    [178, 50, 88, 56, 8, 16, 222, 78],
+                    [34, 112, 88, 56, 8, -28, 78, 140],
+                    [200, 114, 88, 56, 8, 22, 244, 142],
+                    [66, 168, 88, 56, 8, -12, 110, 196],
+                    [172, 170, 88, 56, 8, 14, 216, 198],
+                    [113, 110, 96, 60, 9, -3, 161, 140],
+                ];
+                $fanPlain = ['#1E3A8A', '#2563EB', '#93C5FD', '#FFFFFF', '#1D4ED8', '#60A5FA', '#FFFFFF'];
+
+                // Unique per render: the clip ids must not collide if the fan
+                // appears twice on a page.
+                $fanUid = 'gcf'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6));
+
+                $fanLabels = array_slice(array_column($fanItems, 'label'), 0, 4);
+                $fanAria = 'Gift cards, mobile top-ups and eSIMs'.($fanLabels ? ', including '.\Illuminate\Support\Arr::join($fanLabels, ', ', ' and ') : '');
+            @endphp
+            @if ($fanItems)
+            <svg viewBox="0 0 320 260" role="img" aria-label="{{ $fanAria }}" preserveAspectRatio="xMidYMid slice" class="h-full w-full">
+                <title>Choose a gift card, top-up or eSIM</title>
+                <rect width="320" height="260" rx="18" fill="#0E1626"/>
+                <path class="gc-spark" d="M52 56v10M47 61h10" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round"/>
+                <circle class="gc-spark" cx="272" cy="208" r="3" fill="#2563EB"/>
+                <circle class="gc-spark" cx="282" cy="62" r="2.5" fill="#60A5FA"/>
+                @foreach ($fanSlots as $slot => [$x, $y, $w, $h, $rx, $angle, $px, $py])
+                    @php $item = $fanItems[($slot + 1) % 7] ?? null; @endphp
+                    <g class="gc-card" data-fan-kind="{{ $item['kind'] ?? 'plain' }}" transform="rotate({{ $angle }} {{ $px }} {{ $py }})">
+                        @if (($item['kind'] ?? null) === 'art')
+                            <clipPath id="{{ $fanUid }}-{{ $slot }}"><rect x="{{ $x }}" y="{{ $y }}" width="{{ $w }}" height="{{ $h }}" rx="{{ $rx }}"/></clipPath>
+                            <rect x="{{ $x }}" y="{{ $y }}" width="{{ $w }}" height="{{ $h }}" rx="{{ $rx }}" fill="#FFFFFF"/>
+                            <image href="{{ asset('assets/'.rawurlencode($item['file'])) }}" x="{{ $x }}" y="{{ $y }}" width="{{ $w }}" height="{{ $h }}" preserveAspectRatio="xMidYMid slice" clip-path="url(#{{ $fanUid }}-{{ $slot }})"/>
+                        @elseif (($item['kind'] ?? null) === 'esim')
+                            <rect x="{{ $x }}" y="{{ $y }}" width="{{ $w }}" height="{{ $h }}" rx="{{ $rx }}" fill="{{ $item['accent'] }}"/>
+                            @foreach ($item['flags'] as $flag => $flagUrl)
+                                @php $fx = $x + 16 + $flag * 12; $fy = $y + 16; @endphp
+                                <clipPath id="{{ $fanUid }}-{{ $slot }}-f{{ $flag }}"><circle cx="{{ $fx }}" cy="{{ $fy }}" r="8"/></clipPath>
+                                <circle cx="{{ $fx }}" cy="{{ $fy }}" r="9.5" fill="#FFFFFF"/>
+                                <image href="{{ $flagUrl }}" x="{{ $fx - 12 }}" y="{{ $fy - 8 }}" width="24" height="16" preserveAspectRatio="xMidYMid slice" clip-path="url(#{{ $fanUid }}-{{ $slot }}-f{{ $flag }})"/>
+                            @endforeach
+                            {{-- SIM chip: a card with one clipped corner and two contacts. --}}
+                            @php $sx = $x + $w - 24; $sy = $y + $h - 25; @endphp
+                            <path d="M{{ $sx + 1.5 }} {{ $sy }}h7.5l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5h-11a1.5 1.5 0 0 1-1.5-1.5v-15a1.5 1.5 0 0 1 1.5-1.5z" fill="#FFFFFF" opacity="0.92"/>
+                            <path d="M{{ $sx + 4 }} {{ $sy + 8 }}h6M{{ $sx + 4 }} {{ $sy + 12 }}h6" stroke="{{ $item['accent'] }}" stroke-width="1.4" stroke-linecap="round"/>
+                        @else
+                            <rect x="{{ $x }}" y="{{ $y }}" width="{{ $w }}" height="{{ $h }}" rx="{{ $rx }}" fill="{{ $fanPlain[$slot] }}"/>
+                        @endif
+                    </g>
+                @endforeach
+            </svg>
+            @else
             <svg viewBox="0 0 320 260" role="img" aria-label="Choose your gift card" preserveAspectRatio="xMidYMid slice" class="h-full w-full">
                 <title>Choose your gift card</title>
                 <rect width="320" height="260" rx="18" fill="#0E1626"/>
@@ -312,10 +437,54 @@
                 <g class="gc-card" transform="rotate(14 216 198)"><rect x="172" y="170" width="88" height="56" rx="8" fill="#60A5FA"/><circle cx="194" cy="198" r="9" fill="none" stroke="#0F172A" stroke-width="4"/><rect x="212" y="188" width="30" height="5" rx="2.5" fill="#0F172A" opacity="0.7"/><rect x="212" y="198" width="20" height="5" rx="2.5" fill="#0F172A" opacity="0.45"/></g>
                 <g class="gc-card" transform="rotate(-3 161 140)"><rect x="113" y="110" width="96" height="60" rx="9" fill="#FFFFFF"/><path d="M141 140l12-14 12 14-12 14z" fill="#2563EB"/><rect x="168" y="128" width="32" height="6" rx="3" fill="#0F172A" opacity="0.85"/><rect x="168" y="140" width="24" height="5" rx="2.5" fill="#0F172A" opacity="0.45"/><rect x="125" y="158" width="70" height="4" rx="2" fill="#0F172A" opacity="0.25"/></g>
             </svg>
+            @endif
             @break
 
         @case('payWeb')
-            <svg viewBox="0 0 320 260" role="img" aria-label="Pay your way" preserveAspectRatio="xMidYMid slice" class="h-full w-full">
+            {{-- The hub is checkout; every node it links to is a payment mark
+                 from the "Payment Methods We Accept" strip, read from the same
+                 PaymentStripBadges list. So the picture can never show a rail or
+                 coin checkout does not take: a coin the gateway stops accepting
+                 drops out of both at once.
+
+                 Owned logo files (Visa, Mastercard, MoMo, the coin icons) load
+                 as SVG <image>, which the dark-mode img invert never matches.
+                 The rest are the strip's own inline marks (payment-mark), with
+                 the same path data drawn at node size.
+
+                 Positions, .ipay-node / .ipay-link / .ipay-dot and #ipay-hub are
+                 unchanged, so the GSAP entrance and the dots running along each
+                 link in app.js still line up with the nodes. --}}
+            @php
+                $payBadges = collect(\App\Domain\Payment\Support\PaymentStripBadges::all());
+                $payBadge = fn (string $key) => $payBadges->first(fn ($b) => ($b['svg'] ?? $b['img'] ?? null) === $key);
+                $payCoins = $payBadges->where('method', 'crypto')->values();
+
+                // Eight circles, filled in this order. The tail entries only
+                // appear if something earlier is missing, so a thin coin lineup
+                // never leaves an empty node.
+                $payCircles = array_slice(array_values(array_filter([
+                    $payBadge('mtn_momo'),
+                    $payCoins[0] ?? null,
+                    $payBadge('orange_money'),
+                    $payBadge('bank'),
+                    $payBadge('apple_pay'),
+                    $payCoins[1] ?? null,
+                    $payBadge('ussd'),
+                    $payBadge('bank_qr'),
+                    $payBadge('airtel_money'),
+                    $payBadge('mobile_wallet'),
+                    $payBadge('bank_online'),
+                ])), 0, 8);
+
+                $payCards = array_values(array_filter([$payBadge('visa.svg'), $payBadge('mastercard.svg')]));
+
+                $payPositions = [[70, 52], [152, 36], [236, 52], [262, 120], [248, 196], [168, 222], [60, 222], [44, 128]];
+
+                $payLabels = collect($payCards)->concat($payCircles)->pluck('label')->unique()->values()->all();
+                $payAria = $payLabels ? 'Pay with '.\Illuminate\Support\Arr::join($payLabels, ', ', ' or ') : 'Pay your way';
+            @endphp
+            <svg viewBox="0 0 320 260" role="img" aria-label="{{ $payAria }}" preserveAspectRatio="xMidYMid slice" class="h-full w-full">
                 <title>Pay your way</title>
                 <rect width="320" height="260" rx="18" fill="#0E1626"/>
                 <g fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -329,45 +498,198 @@
                     <path class="ipay-link" d="M132 130 L61 130"/>
                     <path class="ipay-link" d="M132 146 L110 146 L110 158"/>
                 </g>
-                <g class="ipay-node"><circle cx="70" cy="52" r="15" fill="#2563EB"/><path d="M66 44l-5 9h5l-4 9 10-12h-5l4-6z" fill="#FFFFFF"/></g>
-                <g class="ipay-node"><circle cx="152" cy="36" r="15" fill="#FFFFFF"/><path d="M152 28l7 8-7 8-7-8z" fill="#0F172A"/></g>
-                <g class="ipay-node"><circle cx="236" cy="52" r="15" fill="#1D4ED8"/><path d="M236 44l8 14h-16z" fill="#FFFFFF"/></g>
-                <g class="ipay-node"><circle cx="262" cy="120" r="15" fill="#60A5FA"/><path d="M262 111l8 4.5v9l-8 4.5-8-4.5v-9z" fill="#0F172A"/></g>
-                <g class="ipay-node"><circle cx="248" cy="196" r="15" fill="#FFFFFF"/><circle cx="248" cy="196" r="5.5" fill="none" stroke="#2563EB" stroke-width="3"/></g>
-                <g class="ipay-node"><circle cx="168" cy="222" r="15" fill="#93C5FD"/><path d="M164 214l-5 9h5l-4 9 10-12h-5l4-6z" fill="#0F172A"/></g>
-                <g class="ipay-node"><circle cx="60" cy="222" r="15" fill="#1E3A8A"/><path d="M60 213l2.5 6.5 6.5 2.5-6.5 2.5-2.5 6.5-2.5-6.5-6.5-2.5 6.5-2.5z" fill="#FFFFFF"/></g>
-                <g class="ipay-node"><circle cx="44" cy="128" r="15" fill="#FFFFFF"/><path d="M36 128q4-5 8 0t8 0" fill="none" stroke="#0F172A" stroke-width="2.5" stroke-linecap="round"/></g>
-                <g class="ipay-node"><rect x="84" y="160" width="52" height="34" rx="8" fill="#1D4ED8"/><path d="M99 176c0-5 8-5 8 0" fill="none" stroke="#FFFFFF" stroke-width="2"/><rect x="96" y="176" width="14" height="12" rx="2" fill="none" stroke="#FFFFFF" stroke-width="2"/><rect x="114" y="180" width="14" height="4" rx="2" fill="#FFFFFF" opacity="0.8"/></g>
+                @foreach ($payPositions as $payIndex => [$cx, $cy])
+                    @php $mark = $payCircles[$payIndex] ?? null; @endphp
+                    <g class="ipay-node" data-pay-mark="{{ $mark['svg'] ?? ($mark ? 'coin' : 'none') }}">
+                        @switch($mark['svg'] ?? ($mark ? 'coin' : null))
+                            @case('mtn_momo')
+                                {{-- The strip's MoMo tile: the owned PNG on its #004f70 card. --}}
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#004F70"/>
+                                <image href="{{ asset('assets/'.rawurlencode('MTN MOMO.png')) }}" x="{{ $cx - 13 }}" y="{{ $cy - 13 }}" width="26" height="26" preserveAspectRatio="xMidYMid meet"/>
+                                @break
+                            @case('coin')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <image href="{{ asset('assets/'.rawurlencode($mark['img'])) }}" x="{{ $cx - 11 }}" y="{{ $cy - 11 }}" width="22" height="22" preserveAspectRatio="xMidYMid meet"/>
+                                @break
+                            @case('orange_money')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 9 }}" y="{{ $cy - 9 }}" width="18" height="18" viewBox="0 0 30 30"><rect width="30" height="30" fill="#FF7900"/><rect x="4" y="22" width="22" height="4" fill="#ffffff"/></svg>
+                                @break
+                            @case('apple_pay')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 11 }}" width="20" height="20" viewBox="0 0 24 24" fill="#0F172A"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                                @break
+                            @case('bank')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 10 }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.25 9.5 12 4.25l8.75 5.25"/><path d="M5.5 9.75v8M9.833 9.75v8M14.167 9.75v8M18.5 9.75v8"/><path d="M3 20.25h18"/></svg>
+                                @break
+                            @case('ussd')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 10 }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4.25" y="2.25" width="15.5" height="19.5" rx="3"/><path d="M8.5 7.5h.01M12 7.5h.01M15.5 7.5h.01M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01" stroke-width="2.3"/><path d="M10.25 18.5h3.5"/></svg>
+                                @break
+                            @case('bank_qr')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 10 }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M6.5 6.5h.01M17.5 6.5h.01M6.5 17.5h.01" stroke-width="2.3"/><path d="M14 14h3v3h-3z"/><path d="M20.5 14h.01M14 20.5h.01M17.5 20.5h.01M20.5 17.5h.01M20.5 20.5h.01" stroke-width="2.3"/></svg>
+                                @break
+                            @case('airtel_money')
+                                <svg x="{{ $cx - 15 }}" y="{{ $cy - 15 }}" width="30" height="30" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="#E40000"/><path d="M14 5 A9 9 0 0 1 23 14 L19.5 14 A5.5 5.5 0 0 0 14 8.5 Z" fill="#ffffff"/></svg>
+                                @break
+                            @case('mobile_wallet')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 10 }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.75A2.75 2.75 0 0 1 5.75 6H18a3 3 0 0 1 3 3v7.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M3 8.75V7.5A2.5 2.5 0 0 1 5.5 5h9.75"/><path d="M21 11.5h-3.25a1.75 1.75 0 0 0 0 3.5H21"/><path d="M17.9 13.25h.01" stroke-width="2.3"/></svg>
+                                @break
+                            @case('bank_online')
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#FFFFFF"/>
+                                <svg x="{{ $cx - 10 }}" y="{{ $cy - 10 }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.75" width="19" height="16.5" rx="2.5"/><path d="M2.5 8.25h19"/><path d="M5.5 5.9h.01M8 5.9h.01"/><path d="M8 15.75 12 13.25l4 2.5"/><path d="M9.25 16v1.75M12 16v1.75M14.75 16v1.75"/></svg>
+                                @break
+                            @default
+                                {{-- Nothing left to show: a plain node rather than a gap in the web. --}}
+                                <circle cx="{{ $cx }}" cy="{{ $cy }}" r="15" fill="#1E3A8A"/>
+                        @endswitch
+                    </g>
+                @endforeach
+
+                {{-- Card networks: the strip's Visa and Mastercard files side by side on a white card. --}}
+                <g class="ipay-node" data-pay-mark="cards">
+                    <rect x="84" y="160" width="52" height="34" rx="8" fill="#FFFFFF"/>
+                    @foreach ($payCards as $cardIndex => $card)
+                        <image href="{{ asset('assets/'.rawurlencode($card['img'])) }}" x="{{ count($payCards) === 1 ? 97 : 87 + $cardIndex * 24 }}" y="167" width="{{ count($payCards) === 1 ? 26 : 22 }}" height="20" preserveAspectRatio="xMidYMid meet"/>
+                    @endforeach
+                </g>
                 <g id="ipay-hub"><rect x="132" y="102" width="56" height="56" rx="14" fill="#0F172A" stroke="#2563EB" stroke-width="2"/><circle cx="146" cy="117" r="5" fill="none" stroke="#FFFFFF" stroke-width="3"/><rect x="158" y="112" width="10" height="10" rx="2" fill="#FFFFFF"/><circle cx="174" cy="117" r="5" fill="#2563EB"/><circle cx="147" cy="140" r="5" fill="#FFFFFF"/><rect x="159" y="135" width="10" height="10" rx="2" fill="none" stroke="#FFFFFF" stroke-width="2.5"/><circle cx="174" cy="140" r="4" fill="#60A5FA"/></g>
                 <g fill="#60A5FA"><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/><circle class="ipay-dot" cx="160" cy="130" r="2.5"/></g>
             </svg>
             @break
 
-        @case('payout')
-            <svg viewBox="0 0 320 260" role="img" aria-label="Receive instantly" preserveAspectRatio="xMidYMid slice" class="h-full w-full">
-                <title>Receive instantly</title>
+        @case('delivery')
+            {{-- A miniature of shop/order's completed mobile view. Only public
+                 catalogue data supplies the example card; no order or credential
+                 is read. Text stays still after the entrance so it remains sharp.
+                 With no eligible card, neutral shapes replace the catalogue data. --}}
+            @php
+                $deliveryRegion = strtoupper((string) (request()->attributes->get('region') ?: 'US'));
+                $deliveryPreview = \Illuminate\Support\Facades\Cache::remember("illo:delivery-preview:v1:{$deliveryRegion}", now()->addMinutes(30), function () use ($deliveryRegion) {
+                    $deliveryVariantQuery = fn ($query) => $query
+                        ->where('is_available', true)
+                        ->where('is_variable', false)
+                        ->where('face_value', '>', 0)
+                        ->whereColumn('currency', 'products.currency_code');
+
+                    $deliveryProduct = \App\Models\Product::query()
+                        ->where('is_active', true)
+                        ->where('is_out_of_stock', false)
+                        ->where('country_code', $deliveryRegion)
+                        ->whereIn('brand_key', array_keys((array) config('brand_assets.logos', [])))
+                        ->whereHas('category', fn ($query) => $query->where('slug', 'gift-cards'))
+                        ->whereHas('variants', $deliveryVariantQuery)
+                        ->orderByDesc('is_popular')
+                        ->orderByDesc('is_featured')
+                        ->orderBy('name')
+                        ->orderBy('id')
+                        ->first();
+
+                    if (! $deliveryProduct) {
+                        return [];
+                    }
+
+                    $deliveryVariant = $deliveryProduct->variants()
+                        ->where('is_available', true)
+                        ->where('is_variable', false)
+                        ->where('face_value', '>', 0)
+                        ->where('currency', $deliveryProduct->currency_code)
+                        ->orderBy('face_value')
+                        ->first();
+
+                    if (! $deliveryVariant) {
+                        return [];
+                    }
+
+                    return [
+                        'brand' => $deliveryProduct->brand_key,
+                        'color' => \App\Models\Product::brandColor($deliveryProduct->brand_key, $deliveryProduct->brand_color),
+                        'country' => $deliveryProduct->country_code,
+                        'currency' => $deliveryVariant->currency,
+                        'value' => $deliveryVariant->face_value,
+                    ];
+                });
+                $deliveryColor = $deliveryPreview['color'] ?? '#f4f4f5';
+                $deliveryInk = \App\Models\Product::colorIsDark($deliveryColor) ? '#ffffff' : '#0c1a36';
+                $deliveryCountry = array_flip(config('countries.codes', []))[$deliveryPreview['country'] ?? ''] ?? ($deliveryPreview['country'] ?? '');
+                $deliveryValue = $deliveryPreview && filled($deliveryPreview['currency'])
+                    ? \App\Models\Product::currencySymbol($deliveryPreview['currency']).rtrim(rtrim(number_format((float) $deliveryPreview['value'], 2), '0'), '.')
+                    : '';
+            @endphp
+            <svg viewBox="0 0 320 260" role="img" aria-label="{{ __('orders.success_heading') }}: {{ __('orders.credential_code') }}" preserveAspectRatio="xMidYMid slice" class="h-full w-full" font-family="'DM Sans', sans-serif">
+                <title>{{ __('orders.success_heading') }}</title>
                 <rect width="320" height="260" rx="18" fill="#0E1626"/>
-                <g stroke="#22C55E" stroke-width="2.5" stroke-linecap="round">
-                    <path class="isx-line-l" d="M48 56 L118 56"/>
-                    <path class="isx-line-l" d="M58 70 L116 70"/>
-                    <path class="isx-line-r" d="M202 56 L272 56"/>
-                    <path class="isx-line-r" d="M204 70 L262 70"/>
-                </g>
-                <circle class="isx-dot" cx="84" cy="44" r="2.5" fill="#4ADE80"/>
-                <circle class="isx-dot" cx="238" cy="84" r="2.5" fill="#4ADE80"/>
-                <circle class="isx-dot" cx="262" cy="42" r="2" fill="#4ADE80"/>
-                <circle class="isx-dot" cx="128" cy="92" r="1.8" fill="#4ADE80"/>
-                <g id="isx-medal"><circle cx="160" cy="64" r="37" fill="none" stroke="#22C55E" stroke-width="2" opacity="0.35"/><circle cx="160" cy="64" r="30" fill="#22C55E"/><path id="isx-check" d="M147 65 L158 76 L176 52" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g>
-                <g id="isx-card">
-                    <rect x="52" y="118" width="216" height="112" rx="14" fill="#FFFFFF"/>
-                    <path d="M140 126 L108 162 L140 162 Z" fill="#93C5FD"/>
-                    <path d="M140 126 L124 162 L140 162 Z" fill="#BFDBFE"/>
-                    <path d="M140 126 L172 162 L140 162 Z" fill="#60A5FA"/>
-                    <path d="M108 162 L140 196 L140 162 Z" fill="#2563EB"/>
-                    <path d="M172 162 L140 196 L140 162 Z" fill="#1D4ED8"/>
-                    <text x="68" y="216" font-size="14.5" font-weight="600" fill="#0F172A">Your Product</text>
-                    <text x="252" y="170" font-size="28" font-weight="700" fill="#0F172A" text-anchor="end">$100</text>
-                    <text x="252" y="188" font-size="10.5" fill="#64748B" text-anchor="end">Your Region</text>
+                <circle cx="160" cy="132" r="108" fill="none" stroke="#1e293b" stroke-width="1"/>
+                <ellipse cx="160" cy="244" rx="73" ry="4" fill="#020617" opacity="0.45"/>
+                <path class="idl-spark" d="M47 74v8M43 78h8" stroke="#60a5fa" stroke-width="1.7" stroke-linecap="round"/>
+                <path class="idl-spark" d="M272 170v8M268 174h8" stroke="#2563eb" stroke-width="1.7" stroke-linecap="round"/>
+                <circle class="idl-spark" cx="267" cy="54" r="2.5" fill="#60a5fa"/>
+                <circle class="idl-spark" cx="52" cy="201" r="2" fill="#2563eb"/>
+
+                <g id="idl-phone">
+                    <rect x="74" y="65" width="2" height="22" rx="1" fill="#64748b"/>
+                    <rect x="244" y="83" width="2" height="31" rx="1" fill="#64748b"/>
+                    <rect x="76" y="12" width="168" height="234" rx="23" fill="#182231" stroke="#64748b" stroke-width="1.5"/>
+                    <rect x="82" y="18" width="156" height="222" rx="18" fill="#fafafa"/>
+                    <rect x="142" y="24" width="36" height="6" rx="3" fill="#182231"/>
+
+                    {{-- The same success tick and heading as the completed order. --}}
+                    <g id="idl-badge">
+                        <circle cx="160" cy="60" r="17" fill="#10b981" opacity="0.12"/>
+                        <circle cx="160" cy="60" r="13" fill="#10b981"/>
+                        <path id="idl-check" d="M153.5 60l4.5 4.5 8.5-10" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </g>
+                    <g id="idl-heading" text-anchor="middle">
+                        <text x="160" y="87" fill="#0c1a36" font-size="9.5" font-weight="700">{{ __('orders.success_heading') }}</text>
+                        <text x="160" y="98" fill="#4a5a72" font-size="5.8">{{ __('orders.success_thanks') }}</text>
+                    </g>
+                    <g id="idl-download">
+                        <path d="M117 108v5m-2-2 2 2 2-2m-5 3v2h6v-2" fill="none" stroke="#0c1a36" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <text x="164" y="114" text-anchor="middle" fill="#0c1a36" font-size="5.7" font-weight="600" text-decoration="underline">{{ __('orders.download_csv') }}</text>
+                    </g>
+
+                    <g id="idl-card">
+                        <rect x="92" y="126" width="136" height="75" rx="6" fill="{{ $deliveryColor }}" stroke="{{ \App\Models\Product::colorIsDark($deliveryColor) ? $deliveryColor : '#dee3e1' }}" stroke-width="0.8"/>
+                        @if ($deliveryPreview)
+                            <image href="{{ \App\Models\Product::brandLogoUrl($deliveryPreview['brand']) }}" x="101" y="135" width="43" height="27" preserveAspectRatio="xMinYMid meet"/>
+                            @if ($deliveryValue !== '')
+                                <text x="219" y="145" text-anchor="end" fill="{{ $deliveryInk }}" font-size="9" font-weight="800">{{ $deliveryValue }}</text>
+                            @else
+                                <rect x="190" y="140" width="29" height="5" rx="2.5" fill="{{ $deliveryInk }}" opacity="0.15"/>
+                            @endif
+                            <text x="219" y="156" text-anchor="end" fill="{{ $deliveryInk }}" opacity="0.75" font-size="5.2">{{ $deliveryCountry }}</text>
+                            @unless (\App\Models\Product::logoCarriesName($deliveryPreview['brand']))
+                                <text x="101" y="170" fill="{{ $deliveryInk }}" font-size="5.4" font-weight="700">{{ __('orders.card_for_brand', ['brand' => \App\Models\Product::brandDisplayName($deliveryPreview['brand'])]) }}</text>
+                            @endunless
+                        @else
+                            <rect x="102" y="137" width="26" height="20" rx="3" fill="#ffffff"/>
+                            <path d="M109 143h12v8h-12zm6 0v8m-6-5h12" fill="none" stroke="#4a5a72" stroke-width="1.1"/>
+                            <rect x="185" y="140" width="32" height="6" rx="3" fill="#c9d0cd"/>
+                            <rect x="194" y="153" width="23" height="3" rx="1.5" fill="#c9d0cd"/>
+                            <text x="102" y="170" fill="#0c1a36" font-size="5.4" font-weight="700">{{ __('orders.card_fallback_name') }}</text>
+                        @endif
+
+                        {{-- Masked drawing, never a credential from a customer's order. --}}
+                        <g id="idl-credentials">
+                            <rect x="99" y="178" width="122" height="16" rx="8" fill="#ffffff" stroke="#dee3e1" stroke-width="0.5"/>
+                            <text x="106" y="188" fill="#6b7a90" font-size="4.7" font-weight="600">{{ __('orders.credential_code') }}</text>
+                            @foreach ([131, 136, 141, 149, 154, 159, 167, 172, 177] as $deliveryDotX)
+                                <circle class="idl-char" cx="{{ $deliveryDotX }}" cy="186" r="1.3" fill="#0c1a36"/>
+                            @endforeach
+                            <g class="idl-copy" fill="none" stroke="#6b7a90" stroke-width="0.8" stroke-linejoin="round">
+                                <rect x="208" y="183" width="5" height="6" rx="1"/>
+                                <path d="M210 181h4a1 1 0 0 1 1 1v5"/>
+                            </g>
+                        </g>
+                    </g>
+                    <g id="idl-actions" fill="#6b7a90" font-size="4.7" text-anchor="middle">
+                        <text x="126" y="214">{{ __('orders.redeem_instructions') }}</text>
+                        <text x="194" y="214">{{ __('orders.terms_and_conditions') }}</text>
+                    </g>
+                    <rect x="140" y="231" width="40" height="3" rx="1.5" fill="#0c1a36" opacity="0.22"/>
                 </g>
             </svg>
             @break

@@ -98,7 +98,10 @@ Route::prefix('storefront')->name('api.storefront.')->group(function () {
 });
 
 // Newsletter Subscriptions (Public)
-Route::post('newsletter/subscribe', [NewsletterApiController::class, 'subscribe'])->name('newsletter.subscribe');
+// Throttled: this is a public write endpoint that creates a subscriber row,
+// so without a limit it is an open door for list-stuffing. The footer form
+// carries its own honeypot and per-IP limit; this is the API equivalent.
+Route::post('newsletter/subscribe', [NewsletterApiController::class, 'subscribe'])->middleware('throttle:6,1')->name('newsletter.subscribe');
 Route::get('newsletter/unsubscribe', [NewsletterApiController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
 // One-click unsubscribe for optional email (RFC 8058). POST is the mail
