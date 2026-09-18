@@ -58,13 +58,7 @@
                         {{ trans_choice('products.reviews_count', $reviewTotal, ['count' => number_format($reviewTotal)]) }}
                     </span>
                 </div>
-                <div class="mt-2 flex gap-0.5" aria-hidden="true">
-                    @for ($star = 1; $star <= 5; $star++)
-                        <svg class="h-6 w-6 {{ $star <= (int) round($reviewAverage) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
-                        </svg>
-                    @endfor
-                </div>
+                <x-ui.star-rating :rating="$reviewAverage" size="h-6 w-6" class="mt-2" />
             </div>
 
             <div class="min-w-0 flex-1 sm:border-l sm:border-zinc-200 sm:pl-10 dark:sm:border-white/10">
@@ -135,7 +129,7 @@
                     {{-- Their profile photo if they set one, otherwise the same plain user
                          glyph the account button falls back to. An anonymous review shows
                          the glyph either way: the photo would say whose account it is. --}}
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-100 text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200 dark:bg-white/10 dark:text-zinc-300 dark:ring-0">
                         @if (! $review->is_anonymous && $review->user?->avatar_url)
                             <img src="{{ $review->user->avatar_url }}" alt="" class="h-full w-full object-cover" loading="lazy">
                         @else
@@ -151,13 +145,10 @@
                         </p>
 
                         <p class="mt-0.5 flex items-center gap-2">
-                            <span class="flex gap-0.5" aria-label="{{ __('products.reviews_stars_aria', ['rating' => number_format((float) $review->rating, 1)]) }}">
-                                @for ($star = 1; $star <= 5; $star++)
-                                    <svg class="h-4 w-4 {{ $star <= (int) round((float) $review->rating) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
-                                    </svg>
-                                @endfor
-                            </span>
+                            <x-ui.star-rating
+                                :rating="$review->rating"
+                                :label="__('products.reviews_stars_aria', ['rating' => number_format((float) $review->rating, 1)])"
+                            />
                             <span class="text-xs text-zinc-600 dark:text-zinc-400">{{ $review->reviewed_at->format('M j, Y') }}</span>
                         </p>
 
@@ -192,12 +183,15 @@
             <span class="h-1 w-56 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
                 <span class="block h-full rounded-full bg-blue-600 transition-[width] duration-300 dark:bg-blue-500" :style="{ width: progress() }"></span>
             </span>
-            <button
-                type="button"
+            {{-- The same row pill the carousel headers wear, doing something
+                 rather than going somewhere. --}}
+            <x-ui.row-controls
                 x-show="shown < total"
-                @click="more()"
-                class="mt-1 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-            >{{ __('products.reviews_load_more') }}</button>
+                action="more()"
+                :label="__('products.reviews_load_more')"
+                :arrows="false"
+                class="mt-1"
+            />
         </div>
     </section>
 @endif

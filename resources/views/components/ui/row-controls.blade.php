@@ -27,6 +27,9 @@
 
     Props:
       href            - pill destination; omit for arrows only.
+      action          - Alpine expression for a pill that does something rather
+                        than going somewhere, e.g. 'more()'. Use href or action,
+                        not both; the pill looks the same either way.
       label           - pill text. Defaults to the reviews row's wording, which
                         every row uses, so the pill is the same width sitewide.
       navigate        - add wire:navigate to the pill (SPA nav). Default true.
@@ -44,6 +47,7 @@
 --}}
 @props([
     'href' => null,
+    'action' => null,
     'label' => 'See more',
     'navigate' => true,
     'arrows' => true,
@@ -77,6 +81,10 @@
         <a href="{{ $href }}" @if ($navigate) wire:navigate @endif class="{{ $pillClasses }}">
             {{ $label }}
         </a>
+    @elseif ($action)
+        <button type="button" x-on:click="{!! $action !!}" class="{{ $pillClasses }}">
+            {{ $label }}
+        </button>
     @endif
 
     @if ($showArrows)

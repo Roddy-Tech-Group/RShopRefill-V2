@@ -11,7 +11,7 @@
     // rather than re-render their content here.
     // withText: the experience prompt lets a customer leave a score alone, and a
     // card with nothing to say has nothing to show here.
-    $reviews = \App\Models\Review::published()->ownCollected()->withText()->with('user:id,kyc_status')->ordered()->get();
+    $reviews = \App\Models\Review::published()->ownCollected()->withText()->with('user:id,kyc_status,avatar_url')->ordered()->get();
     $trustpilotProfileUrl = config('services.trustpilot.profile_url');
 @endphp
 <section

@@ -829,13 +829,7 @@
                          have at least one approved review. --}}
                     @if ($isGiftCard && ($brandReviewAgg['count'] ?? 0) > 0)
                         <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ trans_choice('products.detail_rating_aria', $brandReviewAgg['count'], ['rating' => number_format($brandReviewAgg['rating'], 1), 'count' => $brandReviewAgg['count']]) }}">
-                            <span class="flex items-center gap-0.5">
-                                @for ($i = 1; $i <= 5; $i++)
-                                    <svg class="h-5 w-5 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
-                                    </svg>
-                                @endfor
-                            </span>
+                            <x-ui.star-rating :rating="$brandReviewAgg['rating']" size="h-5 w-5" />
                             <span class="text-base font-bold text-zinc-900 dark:text-white">{{ number_format($brandReviewAgg['rating'], 1) }}</span>
                             <span class="text-base text-zinc-500 hover:text-blue-700">({{ trans_choice('products.detail_review_count', $brandReviewAgg['count'], ['count' => $brandReviewAgg['count']]) }})</span>
                         </a>
@@ -1352,9 +1346,13 @@
             <section class="mt-12">
                 <div class="mb-4 flex items-baseline justify-between">
                     <h2 class="text-lg font-bold text-zinc-900">{{ __('products.detail_similar_in', ['country' => $countryName]) }}</h2>
-                    <a href="{{ route($listingRoute, array_filter(['country' => $product->country_code, 'subcategory' => $product->subcategory?->slug])) }}" wire:navigate class="text-sm font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700 dark:text-white dark:hover:text-blue-300">
-                        {{ __('products.view_all') }}
-                    </a>
+                    {{-- The site's own row pill, the one every carousel header wears,
+                         with no arrows on it. --}}
+                    <x-ui.row-controls
+                        :href="route($listingRoute, array_filter(['country' => $product->country_code, 'subcategory' => $product->subcategory?->slug]))"
+                        :label="__('products.view_all')"
+                        :arrows="false"
+                    />
                 </div>
 
                 {{-- Horizontal carousel on mobile (scrollbar hidden); a static grid from sm up. --}}

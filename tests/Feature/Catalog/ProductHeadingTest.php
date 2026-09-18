@@ -178,21 +178,22 @@ class ProductHeadingTest extends TestCase
     }
 
     /**
-     * No decorative arrow on the link out to the listing: it reads like the
-     * review list's own "show more", an underlined word and nothing else. This
-     * is a source check because the link only draws when the brand has
-     * neighbours in its subcategory, which a fixture here would be inventing.
+     * The link out to the listing is the site's own row pill, the one every
+     * carousel header wears, and it carries no arrow. This is a source check
+     * because the link only draws when the brand has neighbours in its
+     * subcategory, which a fixture here would be inventing.
      */
-    public function test_the_view_all_link_carries_no_arrow(): void
+    public function test_the_view_all_link_is_the_shared_pill_without_arrows(): void
     {
         $source = file_get_contents(resource_path('views/shop/product.blade.php'));
 
-        $this->assertStringContainsString("{{ __('products.view_all') }}", $source);
+        $this->assertStringContainsString('<x-ui.row-controls', $source);
+        $this->assertStringContainsString(":label=\"__('products.view_all')\"", $source);
+        $this->assertStringContainsString(':arrows="false"', $source);
+
+        // No arrow, and no hand-rolled copy of the pill.
         $this->assertStringNotContainsString("{{ __('products.view_all') }} \u{2192}", $source);
-        $this->assertMatchesRegularExpression(
-            '/underline underline-offset-2[^"]*"[^>]*>\s*\{\{ __\(\'products\.view_all\'\) \}\}\s*<\/a>/',
-            $source
-        );
+        $this->assertStringNotContainsString("{{ __('products.view_all') }}", $source);
     }
 
     public function test_the_name_leads_at_heading_size(): void
@@ -213,6 +214,9 @@ class ProductHeadingTest extends TestCase
         // 4.5 over two, linking to where the reviews are read.
         $this->assertStringContainsString('>4.5</span>', $html);
         $this->assertStringContainsString('(2 reviews)', $html);
+
+        // The stars follow the score: 4.5 is nine tenths of the row, not five stars.
+        $this->assertStringContainsString('style="width: 90%"', $html);
         $this->assertStringContainsString('href="'.e(route('shop.reviews')).'"', $html);
 
         $rating = strpos($html, '>4.5</span>');

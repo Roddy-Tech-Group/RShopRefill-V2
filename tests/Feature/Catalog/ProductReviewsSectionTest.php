@@ -167,10 +167,10 @@ class ProductReviewsSectionTest extends TestCase
         $this->assertStringContainsString($review->reviewed_at->format('M j, Y'), $section);
         $this->assertStringContainsString('Delivered in under a minute and the code worked first time.', $section);
 
-        // Four filled stars and one empty for a four-star review.
-        // The closing quote matters: the empty star's class starts with the same text.
-        $this->assertSame(4, substr_count($section, 'h-4 w-4 text-[#2563eb]"'));
-        $this->assertSame(1, substr_count($section, 'h-4 w-4 text-[#2563eb]/25"'));
+        // Four stars out of five is a row filled four fifths of the way, drawn to
+        // the fraction rather than rounded to whole stars.
+        $this->assertStringContainsString('style="width: 80%"', $section);
+        $this->assertStringContainsString('aria-label="4.0 out of 5 stars"', $section);
     }
 
     /**
