@@ -1,12 +1,17 @@
 {{--
     One payment-method brand mark, drawn inline.
 
-    Inline <svg> rather than <img> on purpose: we own no logo asset for these,
-    and the blanket dark-mode invert in app.css targets `img[src$=".svg"]` only,
-    so inline artwork keeps its brand colours in both themes without needing an
-    exception rule per mark. Neutral parts pair `text-zinc-*` with a `dark:`
-    variant; brand hues are pinned with arbitrary values, because the global dark
-    remaps in app.css rewrite the named `bg-zinc-*` / `text-blue-*` tokens.
+    Inline <svg> rather than <img> on purpose: we own no logo asset for most of
+    these, and the blanket dark-mode invert in app.css targets `img[src$=".svg"]`
+    only, so inline artwork keeps its brand colours in both themes without
+    needing an exception rule per mark. Neutral parts pair `text-zinc-*` with a
+    `dark:` variant; brand hues are pinned with arbitrary values, because the
+    global dark remaps in app.css rewrite the named `bg-zinc-*` / `text-blue-*`
+    tokens.
+
+    MoMo is the one exception, and it is an exception to the FIRST clause only:
+    we do own that artwork, so it loads as an <img>. It is a PNG, which the
+    dark-mode invert never matches, so it still needs no exception rule.
 
     The bank / USSD / QR / wallet marks are deliberately GENERIC. The customer
     picks their own bank, short code or wallet on the gateway's page, so naming
@@ -54,13 +59,59 @@
         </span>
         @break
 
+    @case('mtn_momo')
+        {{-- MoMo, the real mark.
+
+             The only <img> in this file, and the exception that proves the
+             rule above rather than breaking it. Everything else here is drawn
+             inline because we own no artwork for it; we do own this one, and a
+             hand-drawn approximation of a brand mark is worse than the mark.
+
+             A PNG specifically, not an SVG: the blanket dark-mode rule in
+             app.css inverts img[src$=".svg"], which would turn MTN's yellow
+             purple. A PNG never matches that selector, so the file needs no
+             exception rule and no .no-dark-invert hatch.
+
+             The art is 79x81 with fully transparent corners, so on its own it
+             floated as a bare yellow shape with no edge, while Orange Money
+             beside it is a solid block of colour. It gets a filled card of its
+             own in #004f70, the MoMo tile, with the logo centred on it. The
+             yellow needs a dark ground: on the white chip it was a pale shape
+             on a pale field, which is the one thing a payment mark cannot be.
+
+             No text beside it. This mark is the logo alone. Note that the
+             assurance strip hides a span that FOLLOWS the mark, so a label
+             here would be hidden there and visible in the full payment block,
+             which is exactly the kind of quiet difference nobody intends.
+
+             rawurlencode because the filename carries a space. --}}
+        <span class="flex h-7 w-7 shrink-0 items-center justify-center bg-[#004f70]">
+            {{-- Drawn at the full size of the card rather than inset in it.
+                 The file carries its own margin - the ink covers 77% of the
+                 canvas width and 67% of its height, with 15px of nothing above
+                 it - so an image box smaller than the card renders a mark
+                 smaller again, twice over. At the card's own size the visible
+                 logo lands at about 21px, which is the margin the artwork was
+                 drawn with. --}}
+            <img
+                src="{{ asset('assets/'.rawurlencode('MTN MOMO.png')) }}"
+                alt=""
+                class="h-7 w-7 object-contain"
+                width="28"
+                height="28"
+                loading="lazy"
+                decoding="async"
+            >
+        </span>
+        @break
+
     @case('orange_money')
         <span class="flex items-center gap-2">
             <svg class="h-7 w-7 shrink-0" viewBox="0 0 30 30" aria-hidden="true">
                 <rect width="30" height="30" fill="#FF7900"/>
                 <rect x="4" y="22" width="22" height="4" fill="#ffffff"/>
             </svg>
-            <span class="text-[13px] font-bold leading-[1.1] text-zinc-900 dark:text-white">Orange<br>Money</span>
+            <span class="text-[13px] font-bold leading-[1.1] text-zinc-900 dark:text-white">OM</span>
         </span>
         @break
 

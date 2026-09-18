@@ -1,7 +1,13 @@
-{{-- Services + referral promo strip. Dark glass panel with a looping ambient
-     video background. Left = pitch copy. Right = primary CTAs + a copy-the-
-     referral-code chip (or guest prompt to set up an account). Echoes the
-     Cryptorefills "agents" panel structure but for the storefront. --}}
+{{-- Services + referral promo strip. Dark glass panel with a still background
+     image. Left = pitch copy. Right = primary CTAs + a copy-the-referral-code
+     chip (or guest prompt to set up an account). Echoes the Cryptorefills
+     "agents" panel structure but for the storefront.
+
+     Background art lives at public/assets/services-promo.webp. It replaced a
+     self-hosted looping .mp4 that needed a whole Alpine component to stay off
+     the critical path (no src, no preload, attach the source only after the
+     load event AND an IntersectionObserver hit). A still image gets the same
+     deferral from two native attributes, so all of that is gone. --}}
 @php
     $authUser = auth()->user();
     $referralCode = $authUser?->referral_code;
@@ -17,58 +23,37 @@
 
 <section
     aria-label="Our services"
-    class="relative overflow-hidden rounded-[40px] bg-zinc-950 text-white ring-1 ring-white/10 shadow-xl shadow-zinc-900/30"
+    class="relative overflow-hidden rounded-[20px] bg-zinc-950 text-white ring-1 ring-white/10 shadow-xl shadow-zinc-900/30"
 >
-    {{-- Ambient looping background — self-hosted storefront video. LAZY by design:
-         it carries no src and never preloads, so the (heavy) file stays OFF the
-         critical path and can't hurt LCP or jank the main thread. We attach the
-         source and start playback only once the page has fully loaded AND the
-         section scrolls within 300px of the viewport. Before that the panel just
-         shows its black background, which is fine for a decorative layer. --}}
+    {{-- Still background art. loading="lazy" + decoding="async" defer it off the
+         critical path natively, which is all the old video's hand-rolled
+         deferral was buying. The panel's own bg-zinc-950 shows until it lands,
+         and would keep showing if the file were ever missing, so a failed fetch
+         degrades to the plain dark panel rather than a hole. --}}
     <div class="absolute inset-0 overflow-hidden" aria-hidden="true">
-        <video
-            x-data="{
-                started: false,
-                start() {
-                    if (this.started) { return; }
-                    this.started = true;
-                    const v = this.$el;
-                    const s = document.createElement('source');
-                    s.src = v.dataset.src;
-                    s.type = 'video/mp4';
-                    v.appendChild(s);
-                    v.load();
-                    v.play().catch(() => {});
-                },
-                init() {
-                    const io = new IntersectionObserver((entries) => {
-                        entries.forEach((e) => { if (e.isIntersecting) { this.start(); io.disconnect(); } });
-                    }, { rootMargin: '300px' });
-                    const arm = () => io.observe(this.$el);
-                    if (document.readyState === 'complete') { arm(); }
-                    else { window.addEventListener('load', arm, { once: true }); }
-                },
-            }"
+        <img
+            src="{{ asset('assets/services-promo.webp') }}"
+            alt=""
             class="absolute inset-0 h-full w-full object-cover"
-            muted
-            loop
-            playsinline
-            preload="none"
-            data-src="{{ asset('assets/'.rawurlencode('store front video youtube replacement.mp4')) }}"
-        ></video>
+            loading="lazy"
+            decoding="async"
+        >
     </div>
 
-    {{-- Pure-black overlay so the copy stays readable on every frame of the
-         video. Solid 70% black tint plus a sideways gradient that deepens
-         toward the left where the headline sits. --}}
-    <div class="pointer-events-none absolute inset-0 bg-black/70" aria-hidden="true"></div>
-    <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/40" aria-hidden="true"></div>
+    {{-- One light solid tint, where the video needed a 70% black wash AND a
+         sideways black gradient on top of it. That stack existed because a
+         video frame could be anything - a bright phone screen, a lit room -
+         and the copy had to stay readable over all of them. The art here is
+         deliberately near-black, so the old stack would have crushed its
+         banding to flat black and hidden the thing we just put in. 30% keeps a
+         contrast floor under the headline without erasing the image. --}}
+    <div class="pointer-events-none absolute inset-0 bg-black/30" aria-hidden="true"></div>
 
-    <div class="relative z-20 grid gap-10 px-6 py-10 sm:px-10 sm:py-12 lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-14 lg:py-16">
+    <div class="relative z-20 grid min-w-0 gap-10 px-6 py-10 sm:px-10 sm:py-12 lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-14 lg:py-16">
 
         {{-- Left: section heading + pitch copy --}}
-        <div class="max-w-xl">
-            <h2 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl lg:text-[34px]">
+        <div class="min-w-0 max-w-xl">
+            <h2 class="text-2xl tracking-tight text-white sm:text-3xl lg:text-[34px]">
                 What Rshop has to offer you
             </h2>
             <p class="mt-4 text-base leading-relaxed text-zinc-200 sm:text-lg">
@@ -96,7 +81,7 @@
         </div>
 
         {{-- Right: actions --}}
-        <div class="flex flex-col items-stretch gap-5 sm:items-center">
+        <div class="flex min-w-0 flex-col items-stretch gap-5 sm:items-center">
 
             {{-- Referral link pill (logged-in) or guest prompt --}}
             @auth

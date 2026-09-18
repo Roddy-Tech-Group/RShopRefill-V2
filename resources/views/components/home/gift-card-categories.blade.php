@@ -76,10 +76,10 @@
 
     $icons = config('gift_card_category_icons', []);
 
-    $itemClass = 'group flex shrink-0 flex-col items-center gap-2 rounded-[12px] px-4 py-3 text-center transition-colors hover:bg-[#ffffff] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:hover:bg-white/10';
-    $markClass = 'h-7 w-7 shrink-0 text-zinc-900 dark:text-white';
-    $labelClass = 'whitespace-nowrap text-[14px] font-bold leading-tight text-zinc-900 dark:text-white';
-    $arrowClass = 'flex h-10 w-10 items-center justify-center rounded-full bg-[#ffffff] text-zinc-900 shadow-md shadow-zinc-900/10 ring-1 ring-[#dee3e1] transition-colors hover:bg-[#e8ecea] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-[#1d3252] dark:text-white dark:ring-white/10 dark:hover:bg-[#26416b]';
+    $itemClass = 'group flex shrink-0 flex-col items-center gap-1.5 rounded-[12px] px-2 py-2 text-center sm:gap-2 sm:px-4 sm:py-3 transition-colors hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:hover:text-blue-300';
+    $markClass = 'h-5 w-5 shrink-0 text-zinc-900 sm:h-7 sm:w-7 dark:text-white';
+    $labelClass = 'whitespace-nowrap text-[11px] font-bold leading-tight text-zinc-900 sm:text-[14px] dark:text-white';
+    $arrowClass = 'flex h-12 w-12 items-center justify-center rounded-full bg-white/45 backdrop-blur-md backdrop-saturate-150 text-zinc-900 shadow-md shadow-zinc-900/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-white';
 @endphp
 
 @if ($categories->isNotEmpty() && \App\Support\FeatureFlag::on('gift_cards'))
@@ -87,7 +87,7 @@
          strip uses so the panel reads as one card with three bands rather than
          a card with something bolted on. --}}
     <nav
-        class="mt-10 border-t border-zinc-200 pt-10 dark:border-white/12"
+        class="mt-10 pt-10"
         aria-label="{{ __('products.gift_card_categories') }}"
         x-data="{
             canPrev: false,
@@ -114,7 +114,12 @@
                 // one press the row sits mid-item and the error compounds.
                 // Measuring to the next edge instead is right whatever the
                 // labels are.
+                // A screenful per press, then settle on the nearest item edge so
+                // nothing sits half-cut. Stepping to the very next edge instead
+                // meant one chip per press: eleven presses to cross eleven
+                // categories, which read as the row barely moving.
                 const edge = track.getBoundingClientRect().left;
+                const reach = Math.max(160, track.clientWidth * 0.8);
                 const offsets = Array.from(track.querySelectorAll('li'))
                     .map((item) => Math.round(item.getBoundingClientRect().left - edge))
                     .filter((offset) => (direction > 0 ? offset > 1 : offset < -1));
@@ -125,13 +130,31 @@
                     return;
                 }
 
-                track.scrollBy({
-                    left: direction > 0 ? offsets[0] : offsets[offsets.length - 1],
-                    behavior: 'smooth',
-                });
+                const target = direction > 0
+                    ? (offsets.filter((o) => o <= reach).pop() ?? offsets[0])
+                    : (offsets.filter((o) => o >= -reach).shift() ?? offsets[offsets.length - 1]);
+
+                track.scrollBy({ left: target, behavior: 'smooth' });
             },
         }"
-        x-init="$nextTick(() => refresh())"
+        {{-- Re-measure on the element's OWN width, not just the window's: the
+             dashboard pane resizes when the sidebar folds and fires no window
+             resize, which leaves the track at its old width. --}}
+        x-init="
+            $nextTick(() => { refresh(); });
+            if (window.ResizeObserver) {
+                let seen = 0, queued = false;
+                $el._chipsObserver = new ResizeObserver(() => {
+                    const w = Math.round($el.getBoundingClientRect().width);
+                    if (! w || w === seen || queued) { return; }
+                    seen = w;
+                    queued = true;
+                    requestAnimationFrame(() => { queued = false; refresh(); });
+                });
+                $el._chipsObserver.observe($el);
+            }
+        "
+        x-on:livewire:navigating.window="$el._chipsObserver?.disconnect()"
         x-on:livewire:navigated.window="$nextTick(() => refresh())"
         @resize.window.debounce.200ms="refresh()"
     >
@@ -141,7 +164,7 @@
                 @scroll.debounce.100ms="refresh()"
                 class="overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] scroll-smooth"
             >
-                <ul class="flex w-max items-stretch gap-1">
+                <ul class="flex w-max items-stretch gap-0.5 sm:gap-1">
                     @foreach ($categories as $category)
                         <li>
                             @php $icon = $icons[$category['icon']] ?? $icons['default']; @endphp
@@ -169,22 +192,21 @@
             </div>
 
             {{-- Arrows float over the track's edges, each appearing only when
-                 there is something that way. The gradient beside each one fades
-                 the row out rather than letting an item sit half-cut under the
-                 button. --}}
+                 there is something that way. No fade beside them: it was a
+                 gradient to the panel's base colour, and the panel does not
+                 render that colour, so it read as a pale block rather than a
+                 fade. The button's own fill is enough to sit over a row. --}}
             <div x-show="canPrev" x-cloak class="pointer-events-none absolute inset-y-0 left-0 flex items-center pr-8">
-                <span aria-hidden="true" class="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#f4f6f5] to-transparent dark:from-[#0c1a36]"></span>
                 <button type="button" @click="page(-1)" aria-label="{{ __('products.previous_page', ['category' => __('products.gift_card_categories')]) }}" class="pointer-events-auto relative {{ $arrowClass }}">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M15 6l-6 6 6 6" />
                     </svg>
                 </button>
             </div>
 
             <div x-show="canNext" x-cloak class="pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end pl-8">
-                <span aria-hidden="true" class="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#f4f6f5] to-transparent dark:from-[#0c1a36]"></span>
                 <button type="button" @click="page(1)" aria-label="{{ __('products.next_page', ['category' => __('products.gift_card_categories')]) }}" class="pointer-events-auto relative {{ $arrowClass }}">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M9 6l6 6-6 6" />
                     </svg>
                 </button>

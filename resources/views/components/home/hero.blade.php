@@ -60,7 +60,7 @@
 
         @php
             // Shared heading classes used by both the visible h1 and the glowing overlay copy
-            $headingClass = 'mx-auto my-0 max-w-[1300px] p-0 text-center text-[34px] font-extrabold leading-[1.15] tracking-tight text-zinc-900 sm:text-[42px] md:text-[54px] lg:text-[64px] lg:leading-[1.1]';
+            $headingClass = 'mx-auto my-0 max-w-[1300px] p-0 text-center text-[34px] leading-[1.15] tracking-tight text-zinc-900 sm:text-[42px] md:text-[54px] lg:text-[64px] lg:leading-[1.1]';
         @endphp
 
         <div
@@ -76,7 +76,7 @@
             class="relative"
         >
             {{-- Base (visible) heading --}}
-            <h1 style="font-family: 'Urbanist', sans-serif;" class="{{ $headingClass }}">
+            <h1 class="{{ $headingClass }}">
                 {{ __('home.hero_heading_line_one') }}<br class="hidden lg:inline">
                 {{ __('home.hero_heading_line_two') }}
             </h1>
@@ -89,7 +89,7 @@
                 class="pointer-events-none absolute inset-0"
                 :style="`mask-image: radial-gradient(circle 170px at ${x}px ${y}px, #000 0%, #000 80%, transparent 100%); -webkit-mask-image: radial-gradient(circle 170px at ${x}px ${y}px, #000 0%, #000 80%, transparent 100%);`"
             >
-                <div style="font-family: 'Urbanist', sans-serif;" class="{{ $headingClass }} hero-glow-accent">
+                <div class="{{ $headingClass }} hero-glow-accent">
                     {{ __('home.hero_heading_line_one') }}<br class="hidden lg:inline">
                     {{ __('home.hero_heading_line_two') }}
                 </div>

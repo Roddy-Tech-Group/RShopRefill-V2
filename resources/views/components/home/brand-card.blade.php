@@ -12,11 +12,17 @@
     Brand card for the home rows. The slot is the visual that fills the card
     (logo, wordmark, etc.). Name + price range render below. The tile carries a
     pointer-tracked 3D tilt + glare (cardTilt() in app.js) for a premium feel.
+
+    keep-light rides on the tile in every theme. The default cardClass is the
+    literal bg-[#ffffff], which the light redesign turned into the DASHBOARD card
+    marker - and dark mode repaints that class. This component renders inside the
+    dashboard overview as well as on home, so without the opt-out its plate goes
+    card-grey in dark and any brand logo drawn in dark linework is lost on it.
 --}}
 <li data-reveal-item class="w-32 shrink-0 sm:w-auto">
     <a href="{{ $href }}" class="group block focus:outline-none">
         <div
-            {{ $attributes->merge(['class' => 'relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] ring-1 ring-zinc-200 shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-blue-500/40 '.$cardClass]) }}
+            {{ $attributes->merge(['class' => 'relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] ring-1 ring-zinc-200 shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-blue-500/40 keep-light '.$cardClass]) }}
         >
             {{ $slot }}
         </div>

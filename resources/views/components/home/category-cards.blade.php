@@ -13,8 +13,9 @@
     tiles divide evenly at both, so neither breakpoint leaves an orphan on
     its last row.
 
-    Each tile carries a "Check it out" CTA at its foot: it fades in on hover
-    from sm up, and stays visible below that, where there is no hover.
+    Each tile carries its OWN call to action at its foot, naming that tile's
+    destination rather than repeating one line across all four. It fades in on
+    hover from sm up, and stays visible below that, where there is no hover.
 --}}
 @php
     $gcOn    = \App\Support\FeatureFlag::on('gift_cards');
@@ -22,11 +23,14 @@
     $topupOn = \App\Support\FeatureFlag::on('topups');
     $billOn  = \App\Support\FeatureFlag::on('bills');
 
+    // Each card names its own action. They all said "Check it out", which is
+    // the same sentence four times and tells nobody what happens next; the
+    // destination differs on every tile, so the button should too.
     $cards = [
-        ['label' => __('navigation.gift_cards'),     'icon' => 'digital-gift-cards.svg', 'desc' => __('products.gift_cards_desc'),       'url' => $gcOn ? route('shop.gift-cards') : null],
-        ['label' => __('navigation.esims'),          'icon' => 'esims.svg',              'desc' => __('products.esims_desc'),           'url' => $esimOn ? route('shop.esims') : null],
-        ['label' => __('navigation.mobile_refill'),  'icon' => 'mobile-top-ups.svg',     'desc' => __('products.mobile_refill_desc'), 'url' => $topupOn ? route('shop.topups') : null],
-        ['label' => __('navigation.bill_payments'),  'icon' => 'prepaid-utilities.svg',  'desc' => __('products.bill_payments_desc'),           'url' => $billOn ? route('shop.bills') : null],
+        ['label' => __('navigation.gift_cards'),     'icon' => 'digital-gift-cards.svg', 'desc' => __('products.gift_cards_desc'),    'cta' => __('products.cta_gift_cards'), 'url' => $gcOn ? route('shop.gift-cards') : null],
+        ['label' => __('navigation.esims'),          'icon' => 'esims.svg',              'desc' => __('products.esims_desc'),         'cta' => __('products.cta_esims'),      'url' => $esimOn ? route('shop.esims') : null],
+        ['label' => __('navigation.mobile_refill'),  'icon' => 'mobile-top-ups.svg',     'desc' => __('products.mobile_refill_desc'), 'cta' => __('products.cta_topups'),     'url' => $topupOn ? route('shop.topups') : null],
+        ['label' => __('navigation.bill_payments'),  'icon' => 'prepaid-utilities.svg',  'desc' => __('products.bill_payments_desc'), 'cta' => __('products.cta_bills'),      'url' => $billOn ? route('shop.bills') : null],
     ];
 @endphp
 {{-- sm+: -mt lifts the row up over the hero's bottom edge (the parent
@@ -36,13 +40,23 @@
     {{-- The blue behind the row - see .cat-cards-wash in app.css. --}}
     <span aria-hidden="true" class="cat-cards-wash"></span>
 
-    <ul data-reveal-group class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 lg:auto-rows-[minmax(280px,auto)]">
+    {{-- Phone: a snapping carousel. Four full-width cards stacked meant four
+         screens of scrolling before the page even started, and the section
+         below it was invisible. Each card takes most of the width so the
+         next one peeks in and the row reads as swipeable without a hint.
+         From sm it is the grid again, unchanged. --}}
+    <ul
+        data-reveal-group
+        class="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+               sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0
+               lg:grid-cols-4 lg:auto-rows-[minmax(280px,auto)]"
+    >
         @foreach ($cards as $card)
-            <li data-reveal-item>
+            <li data-reveal-item class="w-[80%] shrink-0 snap-start sm:w-auto sm:shrink">
                 <a
                     @if ($card['url']) href="{{ $card['url'] }}" wire:navigate @else aria-disabled="true" title="{{ __('products.temporarily_unavailable') }}" @endif
                     @class([
-                        'group relative isolate flex h-full flex-col overflow-hidden rounded-[20px] bg-[#f4f6f5] px-5 pb-6 pt-5 ring-1 ring-[#dee3e1] transition-all duration-300 ease-out will-change-transform hover:-translate-y-1 hover:shadow-lg hover:shadow-zinc-900/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-transparent dark:ring-zinc-700/60 dark:hover:shadow-black/20',
+                        'group relative isolate flex h-full flex-col overflow-hidden rounded-[20px] bg-[#ffffff] px-5 pb-6 pt-5 transition-all duration-300 ease-out will-change-transform hover:-translate-y-1 hover:shadow-lg hover:shadow-zinc-900/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-[var(--ash)] dark:hover:shadow-black/40',
                         'pointer-events-none cursor-not-allowed opacity-50 grayscale' => ! $card['url'],
                     ])
                 >
@@ -92,7 +106,7 @@
                     <span
                         aria-hidden="true"
                         class="mt-5 block w-full rounded-[12px] bg-gradient-to-r from-[#0a1740] via-[#153a9e] to-[#2563eb] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition-[opacity,transform] duration-300 ease-out sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100"
-                    >{{ __('products.check_it_out') }}</span>
+                    >{{ $card['cta'] }}</span>
                 </a>
             </li>
         @endforeach
