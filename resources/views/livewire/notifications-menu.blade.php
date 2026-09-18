@@ -60,18 +60,13 @@ new class extends Component {
     };
 @endphp
 
-{{-- Hidden until something is unread, per the reference: this control is a
-     notice, not a permanent fixture, so an empty bell is noise. The root
-     element itself always renders and only toggles `hidden`, because Livewire
-     morphs this component in place and needs a root to update; returning
-     nothing would strand it and the bell would never reappear when the first
-     notification arrived. Notifications stay reachable meanwhile from the row
-     inside the account menu. --}}
+{{-- Keep the bell reachable even when the inbox is empty. The unread badge
+     continues to appear only when there are unread notifications. --}}
 <div
     x-data="{ open: false }"
     @click.outside="open = false"
     @keydown.escape.window="open = false"
-    @class(['relative', 'hidden' => $this->unreadCount < 1])
+    class="relative"
 >
     {{-- Bell button --}}
     <button
@@ -81,11 +76,12 @@ new class extends Component {
         aria-label="Notifications"
         @class([
             'relative flex shrink-0 items-center justify-center transition-colors active:scale-95',
+            'dashboard-notification-chip' => $tone === 'chip',
             'h-10 w-10' => $tone !== 'chip',
             'rounded-full bg-blue-100 ring-2 ring-blue-200 text-blue-700 hover:bg-blue-200 dark:bg-white/15 dark:ring-white/30 dark:text-white dark:hover:bg-white/25' => $tone === 'light',
             'rounded-full text-zinc-700 hover:bg-zinc-100' => $tone === 'dark',
             // 'chip' is the dashboard top bar's round outlined button (white on the blue bar), matching the cart beside it.
-            'h-9 w-9 rounded-full text-white ring-1 ring-white/30 transition-all hover:bg-white/15 hover:ring-2 hover:ring-white/60 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:ring-white/25' => $tone === 'chip',
+            'h-9 w-9 rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60' => $tone === 'chip',
         ])
     >
         @if ($tone === 'chip')
@@ -123,7 +119,11 @@ new class extends Component {
         x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-100"
         x-transition:leave-end="opacity-0 -translate-y-1"
-        class="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+        {{-- Same surface as the search, cart and account pull-downs: 12px, frosted
+             white, pinned inside the frame on desktop by dashboard-frame-popup.
+             The edge is the border app.css gives every dashboard popup, so no
+             ring on top of it. --}}
+        class="dashboard-frame-popup dashboard-notification-panel absolute right-0 top-full z-50 mt-3 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
         role="menu"
     >
         {{-- Header --}}

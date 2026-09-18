@@ -135,20 +135,20 @@ class DashboardFrameLayoutTest extends TestCase
         $bell = file_get_contents(resource_path('views/livewire/notifications-menu.blade.php'));
 
         $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15', $layout);
-        $this->assertStringContainsString("rounded-full border border-white/30 text-white hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5' => \$tone === 'chip'", $bell);
+        $this->assertStringContainsString("'dashboard-notification-chip' => \$tone === 'chip'", $bell);
+        $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/10', $bell);
         $this->assertStringNotContainsString('hover:bg-blue-600 hover:text-white', $bell);
     }
 
-    /** Top bar buttons are 36px; the bell only shrinks in its dashboard (chip) tone. */
+    /** Search, bell and avatar match the cart's 36px footprint. */
     public function test_top_bar_buttons_are_36px(): void
     {
         $header = $this->header($this->page());
         $bell = file_get_contents(resource_path('views/livewire/notifications-menu.blade.php'));
 
-        $this->assertStringContainsString('relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30', $header);
-        $this->assertStringContainsString('relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full', $header);
+        $this->assertStringContainsString('dashboard-avatar-button relative flex h-9 w-9', $header);
+        $this->assertStringContainsString('h-9 w-9 rounded-full border-2 border-white/30', $bell);
         $this->assertStringContainsString("'h-10 w-10' => \$tone !== 'chip'", $bell);
-        $this->assertStringContainsString("'h-9 w-9 rounded-full border border-white/30", $bell);
     }
 
     /** The wallpaper paints the page pane only, under a readability veil; the sidebar is untouched. */
@@ -157,9 +157,18 @@ class DashboardFrameLayoutTest extends TestCase
         $layout = $this->layout();
 
         $this->assertMatchesRegularExpression("/html:root:not\(\.dark\) body\.dashboard > \[data-flux-main\] \{\s*background-image: url\('\{\{ \\\$wallpaperUrl\(\\\$dashWallpaperLight\)/", $layout);
-        // Dark wears no photograph at all: the flat ground with the grain over
-        // it, so there is no near-black image to band on a stretched pane.
-        $this->assertMatchesRegularExpression('/html:root\.dark body\.dashboard > \[data-flux-main\] \{\s*background-color: #101011 !important;\s*background-image: var\(--grain\)/', $layout);
+        // Dark wears no photograph: the dotted world map, whose gaps show the
+        // near-black ground, over the grain. The map is drawn once, centred,
+        // never tiled, so there is no near-black image to band on a stretched pane.
+        $this->assertMatchesRegularExpression(
+            '/html:root\.dark body\.dashboard > \[data-flux-main\] \{\s*background-color: #101011 !important;\s*'
+            .'background-image: url\(\'\{\{ \$wallpaperUrl\(\'assets\/dotted-world-map\.svg\'\) \}\}\'\), var\(--grain\) !important;\s*'
+            .'background-size: min\(1600px, 100%\) auto, 220px 220px !important;\s*'
+            .'background-position: center center, 0 0 !important;\s*'
+            .'background-repeat: no-repeat, repeat !important;/',
+            $layout
+        );
+        $this->assertFileExists(public_path('assets/dotted-world-map.svg'));
         $this->assertStringNotContainsString('dashWallpaperDark', $layout);
         $this->assertMatchesRegularExpression('/html:not\(\.dark\) body\.dashboard > \[data-flux-main\] \[data-page-content\] \{\s*background-color: var\(--dash-wallpaper-veil\) !important;/', $layout);
         $this->assertDoesNotMatchRegularExpression('/\[data-flux-sidebar\][^{]*\{[^}]*wallpaper/', $layout);
@@ -247,10 +256,12 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('<p class="mt-1 text-sm text-[#0c1337] dark:text-zinc-300">Happy shopping, great Rcoin cashback rewards.</p>', $overview);
     }
 
-    /** The desktop top bar has no bell; notifications live in the account menu. */
-    public function test_the_top_bar_has_no_notification_bell(): void
+    /** The desktop bell remains available beside the account control. */
+    public function test_the_top_bar_has_a_notification_bell(): void
     {
-        $this->assertStringNotContainsString('<livewire:notifications-menu tone="chip" />', $this->layout());
+        $this->assertStringContainsString('<livewire:notifications-menu tone="chip" wire:key="header-notif" />', $this->layout());
+        $bell = file_get_contents(resource_path('views/livewire/notifications-menu.blade.php'));
+        $this->assertStringNotContainsString("'hidden' => \$this->unreadCount < 1", $bell);
     }
 
     /**
@@ -260,11 +271,17 @@ class DashboardFrameLayoutTest extends TestCase
      */
     public function test_the_account_menu_is_grouped_with_preference_switches(): void
     {
-        $user = User::factory()->create(['name' => 'Menu Person', 'email' => 'menu.person@example.com', 'kyc_status' => null]);
+        $user = User::factory()->create(['name' => 'Menu Person', 'email' => 'menu.person@example.com', 'kyc_status' => 'unsubmitted']);
         $this->withoutVite();
         $header = $this->header($this->actingAs($user)->get('/dashboard')->assertOk()->getContent());
 
-        $menuStart = strpos($header, 'w-[320px] overflow-hidden rounded-[15px]');
+        $avatarStart = strpos($header, 'dashboard-avatar-button');
+        $this->assertNotFalse($avatarStart);
+        $avatar = substr($header, $avatarStart, strpos($header, '</button>', $avatarStart) - $avatarStart);
+        $this->assertStringContainsString('data-flux-icon', $avatar);
+        $this->assertStringNotContainsString('<img', $avatar);
+
+        $menuStart = strpos($header, 'dashboard-account-menu');
         $this->assertNotFalse($menuStart, 'The account menu did not render.');
         $menu = substr($header, $menuStart);
 
@@ -284,10 +301,10 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('$store.dashPrefs.setCompactMode(', $menu);
         $this->assertSame(5, substr_count($menu, 'mx-4 border-t border-zinc-200/80'), 'Five inset dividers split the six groups.');
 
-        // One 16px gutter: header px-4, row groups p-2 + rows px-2, dividers mx-4.
+        // The identity and grouped rows retain their original order and links.
         $this->assertStringContainsString('<div class="px-4 pb-3.5 pt-4">', $menu);
         $this->assertSame(5, substr_count($menu, '<div class="p-2">'));
-        $this->assertStringContainsString('rounded-[10px] px-2 py-2.5 text-left text-sm font-medium', $menu);
+        $this->assertStringContainsString('dashboard-account-row flex w-full items-center justify-between', $menu);
     }
 
     /** Sidebar and account menu icons wear the dark blue in light mode. */
@@ -299,7 +316,7 @@ class DashboardFrameLayoutTest extends TestCase
             $this->assertStringContainsString('<x-ui.anim-icon file="'.$file.'" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />', $layout, $file.' is not dark blue in the sidebar.');
         }
 
-        $this->assertStringContainsString("\$menuIcon = 'flex items-center gap-3 text-[#0c1337] dark:text-zinc-300';", $layout);
+        $this->assertStringContainsString("\$menuIcon = 'dashboard-account-row-icon flex items-center gap-4 text-[#0c1337] dark:text-zinc-300';", $layout);
         $this->assertStringContainsString("? 'h-[18px] w-[18px] shrink-0 text-[#0c1337] dark:text-white'", $layout);
         $this->assertStringContainsString('<x-ui.anim-icon file="support.svg" tone="inherit" class="h-5 w-5" />', $layout);
     }

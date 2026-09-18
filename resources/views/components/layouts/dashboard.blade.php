@@ -345,19 +345,16 @@
             }
             @endif
 
-            /* Dark: no photograph, just a flat surface with the grain over it.
-               A near-black image stretched across the pane bands and softens
-               under any compression, and the grain gives the surface the same
-               life without a file to download.
-
-               The page keeps its own tone, darker than the sidebar beside it,
-               so the two panes stay distinct. The pane never scrolls, so the
-               grain tile holds still while the page moves over it. */
+            /* The supplied dotted world map sits on the stationary dark pane,
+               behind the scrolling content. Its transparent gaps reveal the
+               existing near-black ground and grain. Keep the full map visible
+               without repeating it, including when the pane is narrower. */
             html:root.dark body.dashboard > [data-flux-main] {
                 background-color: #101011 !important;
-                background-image: var(--grain) !important;
-                background-size: 220px 220px !important;
-                background-repeat: repeat !important;
+                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+                background-size: min(1600px, 100%) auto, 220px 220px !important;
+                background-position: center center, 0 0 !important;
+                background-repeat: no-repeat, repeat !important;
             }
             html.dark body.dashboard > [data-flux-main] [data-page-content] {
                 background-color: transparent !important;
@@ -447,10 +444,6 @@
             // The bell dropdown (<livewire:notifications-menu />) computes its own.
             $notificationCount = $user?->notifications()->whereNull('read_at')->count() ?? 0;
 
-            // Initials avatar fallback when the user has no real photo (Google
-            // picture / uploaded avatar). Deterministic per user, works for
-            // everyone - no gender needed.
-            $defaultAvatar = $user?->initialsAvatar() ?? '';
         @endphp
 
         {{-- Geometry (pane position, corners) lives in the panel layout rules
@@ -970,7 +963,13 @@
                             x-transition:leave="transition ease-in duration-150"
                             x-transition:leave-start="opacity-100 translate-y-0"
                             x-transition:leave-end="opacity-0 -translate-y-1"
-                            class="absolute left-0 top-full z-50 mt-3"
+                            {{-- Stays anchored LEFT under the pill: it is not a
+                                 dashboard-frame-popup, which would pin it to the
+                                 frame's right corner with the other three. The
+                                 class is what app.css keys on to give the shared
+                                 card the same 12px frosted surface here without
+                                 touching the storefront's copy. --}}
+                            class="dashboard-refer-popup absolute left-0 top-full z-50 mt-3"
                         >
                             <x-nav.referral-panel
                                 role="dialog"
@@ -1020,7 +1019,7 @@
                 @keydown.escape.window="open = false"
                 @keydown.window.prevent.ctrl.k="open = true; $nextTick(() => $refs.searchInput.focus())"
                 @keydown.window.prevent.meta.k="open = true; $nextTick(() => $refs.searchInput.focus())"
-                class="relative shrink-0"
+                class="dashboard-search relative shrink-0"
             >
                 <button
                     type="button"
@@ -1044,14 +1043,14 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[560px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-[#ffffff] shadow-xl shadow-zinc-900/10 dark:ring-1 dark:ring-[#24364f]"
+                    class="dashboard-frame-popup dashboard-search-panel absolute right-0 top-full z-50 mt-2 w-[860px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                 >
                     {{-- Search field --}}
                     <div role="search" class="px-3 pb-2 pt-3">
                         <div
                             @click="$refs.searchInput.focus()"
                             :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700'"
-                            class="flex cursor-text items-center gap-3 rounded-[15px] border bg-[#f4f6f5] px-4 py-2.5 transition-all duration-200 dark:bg-white/[0.06]"
+                            class="dashboard-search-field flex cursor-text items-center gap-3 rounded-[15px] border bg-[#f4f6f5] px-4 py-2.5 transition-all duration-200 dark:bg-white/[0.06]"
                         >
                         <svg class="h-5 w-5 shrink-0 text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -1086,7 +1085,7 @@
                     </div>
 
                     {{-- Filter tabs --}}
-                    <div class="border-b border-zinc-100 p-3">
+                    <div class="dashboard-search-tabs border-b border-zinc-100 p-3">
                         <div class="flex flex-wrap gap-2">
                             <template x-for="tab in tabs" :key="tab">
                                 <button
@@ -1102,7 +1101,7 @@
 
                     {{-- Product & brand results — live catalogue search (2+ characters),
                          same /api/search/brands endpoint as the storefront nav search. --}}
-                    <div x-show="searching" class="p-2">
+                    <div x-show="searching" class="dashboard-search-results p-2">
                         <p class="px-3 pb-1 pt-2 text-xs font-semibold text-zinc-600">Products &amp; brands</p>
 
                         {{-- Loading --}}
@@ -1152,7 +1151,7 @@
                     </div>
 
                     {{-- Most used — shown until the user starts a product search. --}}
-                    <div x-show="! searching" class="p-2">
+                    <div x-show="! searching" class="dashboard-search-results p-2">
                         <p class="px-3 pb-1 pt-2 text-xs font-semibold text-zinc-600">Most used</p>
 
                         @php
@@ -1184,7 +1183,7 @@
                     </div>
 
                     {{-- Help footer --}}
-                    <div class="border-t border-zinc-100 px-4 py-3">
+                    <div class="dashboard-search-footer border-t border-zinc-100 px-4 py-3">
                         <p class="text-xs text-zinc-600">Type above to search products, brands, orders or account settings.</p>
                     </div>
                 </div>
@@ -1195,9 +1194,9 @@
                  store the storefront nav uses. The popup drops open automatically when an
                  item is added (store.add sets open = true). --}}
             <div
-                x-data="{ locked: false }"
-                @mouseenter="if (!locked) $store.cart.open = true"
-                @mouseleave="if (!locked) $store.cart.open = false"
+                x-data="{ locked: false, closeTimer: null }"
+                @mouseenter="clearTimeout(closeTimer); if (!locked) $store.cart.open = true"
+                @mouseleave="if (!locked) closeTimer = setTimeout(() => { if (!locked) $store.cart.open = false }, 250)"
                 @click.outside="$store.cart.open = false; locked = false"
                 @keydown.escape.window="$store.cart.open = false; locked = false"
                 class="relative"
@@ -1232,7 +1231,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="cart-panel absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[12px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
+                    class="dashboard-frame-popup cart-panel absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[12px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                     role="menu"
                 >
                     {{-- Empty state --}}
@@ -1294,10 +1293,8 @@
                  changes the catalog region, which doesn't apply to account pages.
                  The user's own account country is set in profile settings. --}}
 
-            {{-- The desktop bar carries a bell again, beside the avatar on a
-                 shared plate. Notifications also stays as a row inside the
-                 account menu, so the count is reachable either way, and the
-                 mobile chrome keeps its own bell. --}}
+            {{-- The desktop bar carries a bell beside the avatar. Notifications
+                 also stays as a row inside the account menu. --}}
 
             {{-- Profile dropdown.
                  Owns its own dropdown state + a small inline currency picker.
@@ -1306,12 +1303,8 @@
                  so the modal can render outside flux:header (avoids broken centering
                  from transformed sticky ancestors). The locale chip values here listen
                  to a 'locale-updated' window event dispatched by the modal wrapper. --}}
-            {{-- Notifications and account share ONE plate, following the
-                 reference: two round controls on a single dark rounded
-                 surface rather than sitting loose in the bar. The bell uses
-                 the `chip` tone, which is already drawn white-on-dark for
-                 exactly this kind of surface. --}}
-            <div class="flex items-center gap-1 rounded-[12px] bg-[#0c1337] p-1 dark:bg-white/10">
+            {{-- Separate outlined bell and account controls match the reference. --}}
+            <div class="dashboard-header-controls flex items-center gap-3">
                 <livewire:notifications-menu tone="chip" wire:key="header-notif" />
             <div
                 x-data="{
@@ -1329,11 +1322,14 @@
                 @locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode"
                 class="relative"
             >
-                {{-- Avatar button. Opens the account menu; the unread notification
-                     count shows on that menu's Notifications row (the top bar has
-                     no bell on desktop). --}}
-                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f4f6f5] ring-1 ring-white/30 transition-all hover:ring-2 hover:ring-white/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white dark:ring-white/10 dark:hover:ring-white/25">
-                    <img src="{{ $user?->avatar_url ?: $defaultAvatar }}" alt="{{ $user?->name ?? 'Account' }}" class="h-full w-full object-cover">
+                {{-- Avatar button opens the account menu; the unread count also
+                     appears on that menu's Notifications row. --}}
+                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="dashboard-avatar-button relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                    @if ($user?->avatar_url)
+                        <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
+                    @else
+                        <flux:icon.user class="h-5 w-5" />
+                    @endif
                 </button>
 
                 {{-- KYC verified tick on the desktop header avatar. --}}
@@ -1350,7 +1346,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-[15px] bg-[#ffffff] shadow-xl shadow-zinc-900/10 dark:ring-1 dark:ring-white/10"
+                    class="dashboard-frame-popup dashboard-account-menu absolute right-0 top-full z-50 mt-3 w-[360px] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                     role="menu"
                 >
                     {{-- Account menu: identity header, then groups split by inset
@@ -1360,8 +1356,8 @@
                          Customize panel used to hold (theme, hide balances,
                          compact mode), so removing that panel lost nothing. --}}
                     @php
-                        $menuRow = 'flex w-full items-center justify-between gap-3 rounded-[10px] px-2 py-2.5 text-left text-sm font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200';
-                        $menuIcon = 'flex items-center gap-3.5 text-[#0c1337] dark:text-zinc-300';
+                        $menuRow = 'dashboard-account-row flex w-full items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 text-left text-[15px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200';
+                        $menuIcon = 'dashboard-account-row-icon flex items-center gap-4 text-[#0c1337] dark:text-zinc-300';
                         $menuDivider = 'mx-4 border-t border-zinc-200/80 dark:border-white/10';
                         $menuSwitchTrack = 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors';
                         $menuSwitchKnob = 'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform';
@@ -1369,7 +1365,7 @@
                     @endphp
 
                     <div class="px-4 pb-3.5 pt-4">
-                        <p class="truncate text-[15px] font-semibold text-zinc-900 dark:text-white">{{ $user?->name ?? 'Account' }}</p>
+                        <p class="truncate text-[18px] font-semibold text-zinc-900 dark:text-white">{{ $user?->name ?? 'Account' }}</p>
                         <p class="mt-0.5 truncate text-[13px] text-zinc-500 dark:text-zinc-400">{{ $user?->email ?? '' }}</p>
                     </div>
 
@@ -1458,7 +1454,7 @@
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg>
                                 <span class="text-zinc-800 dark:text-zinc-200">Dark mode</span>
                             </span>
-                            <span :class="dark ? 'bg-[#0c1337] dark:bg-blue-500' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
+                            <span :class="dark ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
                                 <span :class="dark ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
                             </span>
                         </button>
@@ -1473,7 +1469,7 @@
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.244 7.244L19.5 19.5m-2.876-2.876L13.875 13.875M9.878 9.878a3 3 0 105.249 5.249"/></svg>
                                 <span class="text-zinc-800 dark:text-zinc-200">Hide balances</span>
                             </span>
-                            <span :class="$store.dashPrefs.hideBalance ? 'bg-[#0c1337] dark:bg-blue-500' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
+                            <span :class="$store.dashPrefs.hideBalance ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
                                 <span :class="$store.dashPrefs.hideBalance ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
                             </span>
                         </button>
@@ -1488,7 +1484,7 @@
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5"/></svg>
                                 <span class="text-zinc-800 dark:text-zinc-200">Compact mode</span>
                             </span>
-                            <span :class="$store.dashPrefs.compactMode ? 'bg-[#0c1337] dark:bg-blue-500' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
+                            <span :class="$store.dashPrefs.compactMode ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
                                 <span :class="$store.dashPrefs.compactMode ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
                             </span>
                         </button>
@@ -1500,7 +1496,7 @@
                     <div class="p-2">
                         <form method="POST" action="{{ route('logout') }}" class="w-full">
                             @csrf
-                            <button type="submit" class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
+                            <button type="submit" class="dashboard-account-row flex w-full items-center gap-4 rounded-[12px] px-3 py-2.5 text-left text-[15px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200">
                                 <x-ui.logout-icon class="h-5 w-5" />
                                 Log out
                             </button>
@@ -1574,11 +1570,11 @@
                          handles reloading fresh wallet / order data, so the tap is
                          free for the more useful destination. --}}
                     <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
-                        <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
+                        <span class="dashboard-mobile-avatar flex h-10 w-10 items-center justify-center overflow-hidden rounded-full">
                             @if ($user?->avatar_url)
                                 <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
                             @else
-                                {{ str($user?->name ?? '?')->substr(0, 1) }}
+                                <flux:icon.user class="h-5 w-5" />
                             @endif
                         </span>
                         @if (($user?->kyc_status ?? null) === 'verified')

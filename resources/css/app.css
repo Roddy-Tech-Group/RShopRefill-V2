@@ -2573,3 +2573,159 @@ html:not(.dark) .hover\:bg-zinc-100:hover { background-color: #e5e5e5; }
 @media (prefers-reduced-motion: reduce) {
     .pay-marquee-track { animation: none; }
 }
+/* Dashboard header menus, based on the supplied dark account and search references. */
+body.dashboard .dashboard-mobile-avatar {
+    color: #fff;
+    background: transparent;
+    border: 1.5px solid rgb(255 255 255 / .24);
+    box-shadow: 0 0 0 2px rgb(0 0 0 / .28);
+}
+body.dashboard .dashboard-mobile-avatar:hover {
+    background: rgb(255 255 255 / .1);
+    border-color: rgb(255 255 255 / .55);
+}
+@media (max-width: 1023px) {
+    html:not(.dark) body.dashboard .dashboard-mobile-avatar {
+        color: #0c1337;
+        background: #f4f6f5;
+        border-color: #cbd5e1;
+        box-shadow: none;
+    }
+    html:not(.dark) body.dashboard .dashboard-mobile-avatar:hover { background: #e8ecf0; }
+}
+body.dashboard .dashboard-account-menu,
+body.dashboard .dashboard-search-panel,
+body.dashboard .dashboard-notification-panel {
+    border: 1px solid #dfe2e5;
+    max-height: calc(100dvh - 88px);
+    scrollbar-width: thin;
+}
+body.dashboard .dashboard-account-row { min-height: 49px; }
+body.dashboard .dashboard-account-row-icon { color: #667085; }
+body.dashboard .dashboard-account-row-icon > svg,
+body.dashboard .dashboard-account-row-icon .anim-icon { flex: 0 0 20px; }
+body.dashboard .dashboard-search-panel { max-height: calc(100dvh - 92px); overflow-y: auto; }
+/* The refer pull-down is the shared x-nav.referral-panel card, which draws
+   itself at 15px on solid white for the storefront nav. On the dashboard it
+   sits beside the other three pull-downs and wears their surface instead.
+   Keyed on the dashboard wrapper so the storefront copy is left alone. */
+body.dashboard .dashboard-refer-popup > div {
+    border-radius: 12px;
+    border: 1px solid #dfe2e5;
+    background-color: rgb(255 255 255 / .8);
+    backdrop-filter: blur(24px);
+}
+@media (min-width: 1024px) {
+    /* The frame begins below the 72px header and ends 8px from the viewport.
+       Keep each popup 12px inside its top/right edges and clear of the bottom. */
+    body.dashboard .dashboard-frame-popup {
+        position: fixed;
+        top: 84px;
+        right: 20px;
+        margin-top: 0;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100dvh - 104px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
+body.dashboard .dashboard-search-panel [role="search"] { padding: 14px 14px 8px; }
+body.dashboard .dashboard-search-field { min-height: 52px; border-radius: 12px; } /* the 12px standard, inside a 12px panel */
+/* The focus border takes the brand blue. The class is .border-blue-500 and the
+   override painted it violet, so a focused search field was the one control on
+   the dashboard that did not read as ours. */
+body.dashboard .dashboard-search-field.border-blue-500 {
+    border-color: var(--color-brand);
+    --tw-ring-color: rgb(0 68 255 / .28);
+}
+body.dashboard .dashboard-search-tabs { padding: 8px 28px 12px; border: 0; }
+body.dashboard .dashboard-search-tabs button { border-radius: 9999px; padding: 9px 18px; font-size: 14px; }
+body.dashboard .dashboard-search-results { padding: 8px 20px 28px; }
+body.dashboard .dashboard-search-results > p { padding: 8px 8px 12px; font-size: 13px; }
+body.dashboard .dashboard-search-results > a,
+body.dashboard .dashboard-search-results > template + a { min-height: 72px; padding: 10px 8px; }
+body.dashboard .dashboard-search-results a > span > span:first-child { width: 48px; height: 48px; }
+body.dashboard .dashboard-search-footer { padding: 18px 28px; }
+
+/* One dark surface for all four dashboard pull-downs. The cart panel already
+   wears the page ground with the grain (see html.dark .cart-panel), so the
+   dropdown reads as a piece of the page lifted up; the other three used a
+   flat off-token #1d1d1f and looked like a different kit. Opaque, blur off. */
+html.dark body.dashboard .dashboard-account-menu,
+html.dark body.dashboard .dashboard-search-panel,
+html.dark body.dashboard .dashboard-notification-panel,
+html.dark body.dashboard .dashboard-refer-popup > div {
+    background-color: var(--ground);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+    backdrop-filter: none;
+    border-color: #3b3b3f;
+    box-shadow: 0 22px 48px rgb(0 0 0 / .38);
+}
+html.dark body.dashboard .dashboard-account-menu > div[class*="border-t"] { border-color: #39393d; }
+html.dark body.dashboard .dashboard-account-row { color: #f4f4f5; }
+html.dark body.dashboard .dashboard-account-row:hover,
+html.dark body.dashboard .dashboard-account-menu form button:hover {
+    background-color: #343438;
+    background-image: none;
+    color: #fff;
+}
+html.dark body.dashboard .dashboard-account-row-icon { color: #a6a7ae; }
+html.dark body.dashboard .dashboard-account-row-icon span { color: #f4f4f5; }
+html.dark body.dashboard .dashboard-account-menu [role="menuitemcheckbox"]:first-child[aria-checked="true"] {
+    background-color: #39393d;
+}
+html.dark body.dashboard .dashboard-account-menu [role="menuitemcheckbox"][aria-checked="true"] > span:last-child {
+    background-color: #0c1337;
+}
+html.dark body.dashboard .dashboard-search-field {
+    background-color: #202023;
+    background-image: none;
+    border-color: #48484d;
+}
+html.dark body.dashboard .dashboard-search-field.border-blue-500 {
+    /* blue-500, the colour the class already names. The brand blue is too
+       deep to read as a ring on #202023, and the paler blues are banned
+       across the app (see NoLightBlueTest), so this is the one honest step up. */
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+}
+html.dark body.dashboard .dashboard-search-field > svg { color: #a7a8b0; }
+html.dark body.dashboard .dashboard-search-tabs button {
+    background-color: #343438;
+    background-image: none;
+    color: #f4f4f5;
+}
+html.dark body.dashboard .dashboard-search-tabs button[class~="bg-zinc-900"] {
+    background-color: #fff;
+    background-image: none;
+    color: #171719;
+}
+html.dark body.dashboard .dashboard-search-tabs button:hover,
+html.dark body.dashboard .dashboard-search-results a:hover {
+    background-color: #3b3b40;
+    background-image: none;
+    color: #fff;
+}
+html.dark body.dashboard .dashboard-search-tabs button[class~="bg-zinc-900"]:hover {
+    background-color: #fff;
+    color: #171719;
+}
+html.dark body.dashboard .dashboard-search-results a > span > span:first-child {
+    background-color: #151517;
+    background-image: none;
+}
+html.dark body.dashboard .dashboard-search-results a span[class*="text-zinc-900"],
+html.dark body.dashboard .dashboard-notification-panel .text-zinc-900 { color: #f4f4f5; }
+html.dark body.dashboard .dashboard-search-results a span[class*="text-zinc-600"],
+html.dark body.dashboard .dashboard-search-results a > svg,
+html.dark body.dashboard .dashboard-search-results > p,
+html.dark body.dashboard .dashboard-search-footer p,
+html.dark body.dashboard .dashboard-notification-panel .text-zinc-600 { color: #aaabb3; }
+html.dark body.dashboard .dashboard-search-footer,
+html.dark body.dashboard .dashboard-notification-panel .border-b,
+html.dark body.dashboard .dashboard-notification-panel .border-t { border-color: #39393d; }
+html.dark body.dashboard .dashboard-notification-panel [role="menuitem"]:hover {
+    background-color: #343438;
+    background-image: none;
+}
