@@ -51,7 +51,9 @@
 
     // Inside the dashboard chrome, swap to the dashboard.shop.* equivalents so
     // the "see more" + similar-brand links keep the user in the dashboard.
-    if (request()->is('dashboard/shop*') && auth()->check()) {
+    $inDashboard = request()->is('dashboard/shop*') && auth()->check();
+
+    if ($inDashboard) {
         $listingRoute = 'dashboard.'.$listingRoute;
         $detailRoute  = 'dashboard.'.$detailRoute;
     }
@@ -803,9 +805,11 @@
                 {{-- Heading: where the page sits, what it is, how it is rated, and what
                      it does for you, in that order. --}}
                 <div>
-                    @if ($isGiftCard)
-                        {{-- The same trail the page's BreadcrumbList carries, country
-                             first: where a card can be used narrows it before its kind. --}}
+                    {{-- The dashboard has its own sidebar saying where you are, so the
+                         trail is a storefront thing only. --}}
+                    @if ($isGiftCard && ! $inDashboard)
+                        {{-- The same trail the page's BreadcrumbList carries: home, the
+                             category, then the family of brands this one belongs to. --}}
                         <nav aria-label="{{ __('products.detail_breadcrumb') }}" class="mb-2 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
                             @foreach ($crumbTrail as $crumb)
                                 @if (! $loop->first)

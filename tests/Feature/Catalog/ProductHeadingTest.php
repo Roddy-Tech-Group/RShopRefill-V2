@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
 use App\Models\Subcategory;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -127,6 +128,39 @@ class ProductHeadingTest extends TestCase
         }
         $this->assertStringContainsString('"name":"Digital Apps"', $html);
         $this->assertStringContainsString('"name":"Acme Gift Card"', $html);
+    }
+
+    /**
+     * The dashboard renders this same view inside its own chrome, where the
+     * sidebar already says where you are, so the trail is a storefront thing.
+     */
+    public function test_the_dashboard_mirror_draws_no_trail(): void
+    {
+        $this->product->update([
+            'subcategory_id' => Subcategory::create([
+                'category_id' => $this->product->category_id,
+                'name' => 'Digital Apps',
+                'slug' => 'digital-apps',
+            ])->id,
+        ]);
+
+        $html = $this->withoutVite()
+            ->actingAs(User::factory()->create())
+            ->get(route('dashboard.shop.brand', ['brandSlug' => 'acme']))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('aria-label="Breadcrumb"', $html);
+
+        // The page itself is still the page.
+        $this->assertStringContainsString('<h1', $html);
+        $this->assertStringContainsString('Acme gift card', $html);
+
+        // The storefront, which is the indexed one, keeps both the trail and
+        // the markup that describes it.
+        $storefront = $this->page();
+        $this->assertStringContainsString('aria-label="Breadcrumb"', $storefront);
+        $this->assertStringContainsString('"@type":"BreadcrumbList"', $storefront);
     }
 
     /** A brand with no subcategory simply has a shorter trail. */
