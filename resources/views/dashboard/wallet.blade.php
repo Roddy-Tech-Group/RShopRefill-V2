@@ -79,7 +79,7 @@
         {{-- Summary strip - count chip + add-wallet CTA. Glass surface with
              a subtle ring + tinted shadow to lift it off the page bg without
              feeling heavy. --}}
-        <div class="flex flex-wrap items-center justify-between gap-4 rounded-[12px] bg-[#eff6ff] p-5 border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+        <div class="flex flex-wrap items-center justify-between gap-4 rounded-[12px] bg-[#ffffff] p-5 shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             <div class="flex min-w-0 items-center gap-4">
                 <span class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm shadow-blue-600/30">
                     <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
@@ -103,29 +103,32 @@
                          rounded-[12px] keeps it consistent with the rest of the
                          dashboard. --}}
                     <div
-                        class="wallet-glass group relative flex flex-col gap-4 overflow-hidden rounded-2xl p-5 text-blue-950 transition-transform duration-200 hover:-translate-y-0.5 dark:text-white"
+                        class="wallet-glass group relative flex flex-col gap-4 overflow-hidden rounded-2xl p-5 text-white"
                     >
                         <div class="relative flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <div class="inline-flex items-center gap-1.5 rounded-full bg-blue-600/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-1 ring-blue-600/15 dark:bg-white/10 dark:text-blue-100 dark:ring-white/15">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(52,211,153,0.9)] dark:bg-emerald-400"></span>
+                                <div class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/15">
+                                    {{-- emerald-400 in both themes: the brighter
+                                         value was the dark-mode one, and this card
+                                         is dark in light mode too. --}}
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]"></span>
                                     Wallet Balance
                                 </div>
                                 <p class="mt-3 truncate text-3xl font-extrabold tracking-tight tabular-nums">{{ $w['formatted'] }}</p>
-                                <p class="mt-1 text-xs font-medium text-blue-700/80 dark:text-blue-100/90">{{ $w['code'] }} &middot; {{ $w['label'] }}</p>
+                                <p class="mt-1 text-xs font-medium text-white/70">{{ $w['code'] }} &middot; {{ $w['label'] }}</p>
                             </div>
-                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-600/10 ring-1 ring-blue-600/15 dark:bg-white/15 dark:ring-white/20">
+                            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white/15 ring-1 ring-white/20">
                                 @if ($w['icon'])
                                     <img src="{{ $w['icon'] }}" alt="" class="h-7 w-7 object-contain" loading="lazy">
                                 @else
-                                    <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-6 w-6 brightness-0 dark:invert" loading="lazy">
+                                    <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
                                 @endif
                             </span>
                         </div>
 
                         {{-- Hairline divider so the Top Up button feels like its
                              own action surface inside the card. --}}
-                        <div class="relative h-px w-full bg-gradient-to-r from-transparent via-blue-900/10 to-transparent dark:via-white/15" aria-hidden="true"></div>
+                        <div class="relative h-px w-full bg-white/15" aria-hidden="true"></div>
 
                         {{-- In-card Top Up - fund-wallet Volt component, pre-set to this currency. --}}
                         <div class="relative">
@@ -136,7 +139,7 @@
             </div>
         @else
             {{-- Empty state - modern centered card with a soft tinted icon halo. --}}
-            <div class="relative overflow-hidden rounded-[12px] bg-[#eff6ff] px-6 py-16 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+            <div class="relative overflow-hidden rounded-[12px] bg-[#ffffff] px-6 py-16 text-center shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                 {{-- Soft background glow behind the icon. --}}
                 <div class="pointer-events-none absolute left-1/2 top-8 h-32 w-32 -translate-x-1/2 rounded-full bg-blue-100/60 blur-2xl dark:bg-blue-500/10" aria-hidden="true"></div>
                 <span class="relative mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg shadow-blue-600/30 ring-4 ring-white dark:ring-[#0c1a36]">

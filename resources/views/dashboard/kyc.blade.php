@@ -50,11 +50,11 @@
 
         {{-- ─── Current status ─── --}}
         <section>
-            <div class="rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6">
+            <div class="rounded-[12px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         {{-- The user's real profile photo (or their initials avatar), matching the settings page - not a generic icon. --}}
-                        <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-blue-50">
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#f4f6f5]">
                             <img src="{{ $user?->avatar_url ?: ($user?->initialsAvatar() ?? '') }}" alt="{{ $user?->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
                         </span>
                         <div>
@@ -93,7 +93,7 @@
 
         {{-- Email verification --}}
         <section>
-            <div class="flex items-center justify-between gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+            <div class="flex items-center justify-between gap-4 rounded-[12px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                 <div class="flex items-center gap-4">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] {{ $emailVerified ? 'bg-emerald-50' : 'bg-amber-50' }}">
                         <svg class="h-5 w-5 {{ $emailVerified ? 'text-emerald-600' : 'text-amber-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
@@ -119,7 +119,7 @@
         {{-- ID verification (KYC) --}}
         <section>
             @if ($kycStatus === 'verified')
-                <div class="flex items-center gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+                <div class="flex items-center gap-4 rounded-[12px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50">
                         <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
@@ -132,7 +132,7 @@
                 </div>
 
             @elseif ($kycStatus === 'pending')
-                <div class="mt-3 flex items-center gap-4 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+                <div class="mt-3 flex items-center gap-4 rounded-[12px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-amber-50">
                         <svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -187,10 +187,10 @@
                             }
                         }
                     }"
-                    class="mt-3 rounded-[12px] bg-[#eff6ff] p-5 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none sm:p-6"
+                    class="mt-3 rounded-[12px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none sm:p-6"
                 >
                     <div class="flex items-start gap-4">
-                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-blue-50">
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-[#f4f6f5]">
                             <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
@@ -204,21 +204,21 @@
 
                     {{-- What you'll need --}}
                     <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                        <div class="flex items-center gap-3 rounded-[12px] bg-[#f4f6f5] px-3 py-3">
                             <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 9.75h4.5M6 12.75h3"/>
                             </svg>
                             <span class="text-xs font-semibold text-zinc-700">A government-issued ID <span class="block font-normal text-zinc-500">Passport, national ID, or driver&rsquo;s license</span></span>
                         </div>
-                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                        <div class="flex items-center gap-3 rounded-[12px] bg-[#f4f6f5] px-3 py-3">
                             <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
                             </svg>
                             <span class="text-xs font-semibold text-zinc-700">A quick selfie <span class="block font-normal text-zinc-500">Using your device&rsquo;s camera</span></span>
                         </div>
-                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                        <div class="flex items-center gap-3 rounded-[12px] bg-[#f4f6f5] px-3 py-3">
                             <svg class="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
@@ -245,7 +245,7 @@
                         <span x-text="starting ? 'Starting...' : '{{ $kycStatus === 'rejected' ? 'Try again' : 'Verify now' }}'"></span>
                     </button>
 
-                    <div class="mt-4 flex items-start gap-2 rounded-[12px] bg-zinc-50 px-3 py-2.5">
+                    <div class="mt-4 flex items-start gap-2 rounded-[12px] bg-[#f4f6f5] px-3 py-2.5">
                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
                         </svg>
@@ -264,9 +264,9 @@
             <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {{-- Standard limits --}}
                 <div @class([
-                    'rounded-[12px] p-5 ring-1 transition-colors',
-                    'bg-blue-600 text-white ring-blue-600' => ! $kycVerified,
-                    'bg-white text-zinc-900 ring-zinc-100' => $kycVerified,
+                    'rounded-[12px] p-5 shadow-md shadow-zinc-900/[0.06]',
+                    'bg-blue-600 text-white' => ! $kycVerified,
+                    'bg-[#ffffff] text-zinc-900' => $kycVerified,
                 ])>
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-bold">Standard</p>
@@ -287,9 +287,9 @@
 
                 {{-- KYC limits --}}
                 <div @class([
-                    'rounded-[12px] p-5 ring-1 transition-colors',
-                    'bg-blue-600 text-white ring-blue-600' => $kycVerified,
-                    'bg-white text-zinc-900 ring-zinc-100' => ! $kycVerified,
+                    'rounded-[12px] p-5 shadow-md shadow-zinc-900/[0.06]',
+                    'bg-blue-600 text-white' => $kycVerified,
+                    'bg-[#ffffff] text-zinc-900' => ! $kycVerified,
                 ])>
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-bold">Verified (KYC)</p>

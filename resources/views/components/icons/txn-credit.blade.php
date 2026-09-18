@@ -1,15 +1,13 @@
-{{-- Animated credit (money-in) transaction icon: green incoming arrow with a
-     soft ping ring. Inline SVG, honors prefers-reduced-motion. Size via the
-     class attribute (e.g. class="h-10 w-10"). --}}
-<svg {{ $attributes->merge(['class' => 'shrink-0']) }} viewBox="0 0 48 48" role="img" aria-label="Credited transaction">
+{{-- Money-in transaction icon: an arrow pointing in (down-left), drawn in
+     currentColor so it takes the dark blue of the dashboard (light grey in dark
+     mode) instead of green. A gentle nudge animation, off under
+     prefers-reduced-motion. Sits inside a small rounded tile at the call site;
+     size via the class attribute (e.g. class="h-4 w-4"). --}}
+<svg {{ $attributes->merge(['class' => 'shrink-0 text-[#0c1337] dark:text-zinc-200']) }} viewBox="0 0 24 24" fill="none" role="img" aria-label="Money in">
     <style>
         .tc-arrow { animation: tc-nudge 2.4s ease-in-out infinite; }
-        .tc-ping { transform-box: fill-box; transform-origin: center; opacity: 0; animation: tc-ping 2.4s ease-out infinite; }
-        @keyframes tc-nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-2.5px, 2.5px); } }
-        @keyframes tc-ping { 0% { transform: scale(0.8); opacity: 0.5; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
-        @media (prefers-reduced-motion: reduce) { .tc-arrow, .tc-ping { animation: none; } }
+        @keyframes tc-nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-1.25px, 1.25px); } }
+        @media (prefers-reduced-motion: reduce) { .tc-arrow { animation: none; } }
     </style>
-    <circle cx="24" cy="24" r="21" fill="#2BD576" opacity="0.14"/>
-    <circle class="tc-ping" cx="24" cy="24" r="21" fill="none" stroke="#2BD576" stroke-width="2"/>
-    <path class="tc-arrow" d="M30.5 17.5 L19 29 M19 21.5 V29 H26.5" stroke="#2BD576" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path class="tc-arrow" d="M17 7 L7.5 16.5 M7.5 9.5 V16.5 H14.5" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

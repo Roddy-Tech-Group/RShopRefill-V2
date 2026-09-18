@@ -84,7 +84,7 @@ class extends Component {
     </div>
 
     @if ($notifications->isNotEmpty())
-        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 dark:border-zinc-700">
+        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:shadow-none">
             @foreach ($notifications as $note)
                 <div
                     wire:key="note-{{ $note->id }}"
@@ -138,7 +138,7 @@ class extends Component {
         @endif
     @else
         {{-- Empty state --}}
-        <div class="rounded-[12px] bg-white px-6 py-16 text-center ring-1 ring-zinc-200">
+        <div class="rounded-[12px] bg-[#ffffff] px-6 py-16 text-center shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50">
                 <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-7 w-7" style="filter: brightness(0) saturate(100%) invert(40%) sepia(95%) saturate(1500%) hue-rotate(205deg);" loading="lazy">
             </span>
@@ -184,7 +184,7 @@ class extends Component {
 
             <div class="flex items-start gap-2">
                 <h2 class="flex-1 text-base font-bold text-zinc-900" x-text="note.title"></h2>
-                <button type="button" @click="close()" class="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[5px] text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700" aria-label="Close">
+                <button type="button" @click="close()" class="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white" aria-label="Close">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                 </button>
             </div>
