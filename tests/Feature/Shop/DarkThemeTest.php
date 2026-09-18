@@ -323,9 +323,11 @@ class DarkThemeTest extends TestCase
             $css
         );
 
-        // Storefront controls that also have the light near-white hover declare
-        // their own visible dark tint instead of relying on a global repaint.
-        $this->assertStringContainsString('dark:hover:bg-white/10', $regionPill);
+        // Storefront controls that also have a light hover declare their own
+        // visible dark tint instead of relying on a global repaint. The region
+        // pill is the dashboard's pill now and carries the dashboard's dark
+        // hover (RegionPillChipTest pins it against that markup).
+        $this->assertStringContainsString('dark:hover:bg-white/5', $regionPill);
         $this->assertStringContainsString('dark:hover:bg-white/10', $footer);
     }
 

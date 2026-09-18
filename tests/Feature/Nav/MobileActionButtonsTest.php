@@ -64,13 +64,13 @@ class MobileActionButtonsTest extends TestCase
      */
     public function test_the_action_chips_share_the_locale_pill_fill(): void
     {
+        // The utility links keep the page-tone hover fill. The region pill no
+        // longer sets that tone: it is the dashboard's outlined pill now, and
+        // RegionPillChipTest pins it against the dashboard's own markup.
         $links = file_get_contents(resource_path('views/components/nav/utility-links.blade.php'));
-        $pill = file_get_contents(resource_path('views/components/nav/region-pill.blade.php'));
 
-        foreach ([$links, $pill] as $source) {
-            $this->assertStringContainsString('hover:bg-[#f4f6f5]', $source);
-            $this->assertStringContainsString('dark:hover:bg-white/10', $source);
-        }
+        $this->assertStringContainsString('hover:bg-[#f4f6f5]', $links);
+        $this->assertStringContainsString('dark:hover:bg-white/10', $links);
 
         // The search field wears the same fill at rest, and drops it for a
         // white surface once it has focus.

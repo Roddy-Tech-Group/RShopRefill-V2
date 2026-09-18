@@ -59,7 +59,7 @@ class NavTypeScaleTest extends TestCase
         // locale modal, not on the nav rows, so it wears the modal's type.
         foreach ([
             'utility-links' => 1,       // Help. The region pill is its own file
-            'region-pill' => 1,         // ...here, shared by the row and the sheet
+            'region-pill' => 0,         // ...here, shared by the row and the sheet. It is the dashboard's pill now, in its 13px semibold (RegionPillChipTest)
             'invite-link' => 1,
             'account-cart' => 1,        // Login. Cart is an icon-only chip now, with no text to face
             'main-nav' => 1,            // the shared category-tab class
