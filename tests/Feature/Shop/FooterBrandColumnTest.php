@@ -7,68 +7,92 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The footer on the Roddy Technologies layout: the logo, five link columns that
+ * The footer on the Roddy Technologies layout: the logo, four link columns that
  * collapse to disclosures on mobile, a social band, the utility row, and the
  * legal bar. The brand strapline that used to sit under the logo was removed.
+ *
+ * Four columns, not five: the fifth was the app badge column, and the badges
+ * themselves are gone. FooterAppBadgesTest is where that decision is written
+ * down and held.
  */
 class FooterBrandColumnTest extends TestCase
 {
     use RefreshDatabase;
 
     /**
-     * The brand column is the logo alone now. Every strapline this footer has
-     * carried is asserted gone, current one included, so none of them can come
-     * back through an old copy edit.
+     * The brand column carries one line under the logo, from the translation
+     * file so it follows the visitor's language. Every strapline this footer
+     * carried before is still asserted gone, so none of them can come back
+     * through an old copy edit.
      */
-    public function test_the_brand_column_carries_no_strapline(): void
+    public function test_the_brand_column_carries_the_translated_tagline_only(): void
     {
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
+        $this->assertStringContainsString("__('footer.tagline')", $footer);
         $this->assertStringNotContainsString('Digital Marketplace', $footer);
         $this->assertStringNotContainsString('Access global digital services', $footer);
         $this->assertStringNotContainsString('Your everyday digital marketplace', $footer);
 
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('Your marketplace for gift cards, travel eSIMs, mobile top-ups and bill payments.', $html);
         $this->assertStringNotContainsString('Your everyday digital marketplace', $html);
     }
 
-    /** The logo still opens the brand column, directly above the link grid. */
+    /**
+     * The logo still opens the brand column, directly above the link grid.
+     *
+     * Both halves of what this used to measure moved. The asset is
+     * assets/logo.webp now, the retired Rshoprefillslogo.webp file having gone
+     * with the rename to RshopRefill, and the "Get the app" heading the logo was
+     * measured against left with the store badges. The first link column is what
+     * follows the brand now, so that is the marker: the claim is unchanged, that
+     * the logo opens the block rather than trailing the links.
+     *
+     * The search starts at the footer element rather than taking the last match
+     * on the page, because the same wordmark file is used in the nav and in
+     * several layouts, and "last occurrence" would quietly follow whichever
+     * component happens to render after the footer.
+     */
     public function test_the_logo_still_opens_the_brand_column(): void
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $logo = strrpos($html, 'Rshoprefillslogo.webp');
-        $getTheApp = strpos($html, 'Get the app');
+        $footerAt = strpos($html, 'footer-ground');
+        $this->assertNotFalse($footerAt, 'The footer slab is missing.');
 
-        $this->assertNotFalse($logo);
-        $this->assertNotFalse($getTheApp);
-        $this->assertLessThan($getTheApp, $logo);
+        $logo = strpos($html, 'assets/logo.webp', $footerAt);
+        $shopCol = strpos($html, 'id="footer-col-shop"');
+
+        $this->assertNotFalse($logo, 'The footer carries no logo.');
+        $this->assertNotFalse($shopCol);
+        $this->assertLessThan($shopCol, $logo);
     }
 
     public function test_bottom_bar_names_the_operator_and_registered_address(): void
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        // The standalone "Roddy Technologies 2024 - YYYY" line was removed. The
-        // legal paragraph below still carries the copyright and the operator, so
-        // nothing legally required left the page with it.
-        $this->assertStringNotContainsString('Roddy Technologies 2024 - '.date('Y'), $html);
-        $this->assertStringContainsString('&copy; '.date('Y'), $html);
-        $this->assertStringContainsString('All rights reserved', $html);
+        // Two lines now: the copyright on its own, then the operator. The year
+        // is written out (2026), not read from the clock.
+        $this->assertStringNotContainsString('Roddy Technologies 2024 - ', $html);
+        $this->assertStringContainsString('&copy; 2026', $html);
+        $this->assertStringContainsString('All rights reserved.', $html);
 
-        $this->assertStringContainsString('This website is owned and operated by Roddy Technologies LTD, RC - (9385422)', $html);
-        $this->assertStringContainsString('5 Tetlow Road, Njemenze, Owerri, Imo State, Nigeria', $html);
+        $this->assertStringContainsString('Owned and operated by Roddy Technologies Ltd, RC 9385422, registered at 5 Tetlow Road, Njemenze, Owerri, Imo State, Nigeria.', $html);
 
         // The CAC verification link stays alongside it.
         $this->assertStringContainsString('https://icrp.cac.gov.ng/public-search', $html);
+        $this->assertStringContainsString('>Verify company</a>', $html);
     }
 
     public function test_link_columns_are_disclosures_on_mobile_and_open_on_desktop(): void
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        // 'app' is not in this list any more: the badges moved under the logo,
-        // out of the grid, so they are no longer a disclosure at any width.
+        // 'app' is not in this list any more. The badges first came out of the
+        // grid to sit under the logo, which already ended their life as a
+        // disclosure, and then came out of the footer altogether.
         foreach (['shop', 'company', 'help', 'legal'] as $slug) {
             $this->assertStringContainsString('aria-controls="footer-col-'.$slug.'"', $html);
             $this->assertStringContainsString('id="footer-col-'.$slug.'"', $html);
@@ -80,8 +104,8 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringContainsString(":class=\"{ 'hidden': ! open }\"", $html);
 
         // Every link is in the markup either way, so crawlers still see them.
-        $this->assertStringContainsString('>Gift cards</a>', $html);
-        $this->assertStringContainsString('>Refund policy</a>', $html);
+        $this->assertStringContainsString('>Gift Cards</a>', $html);
+        $this->assertStringContainsString('>Refund Policy</a>', $html);
     }
 
     public function test_core_networks_render_in_order(): void
@@ -240,19 +264,38 @@ class FooterBrandColumnTest extends TestCase
         $this->assertLessThan($copyright, $followUs);
     }
 
-    public function test_social_links_sit_above_the_divider_not_in_the_copyright_bar(): void
+    /**
+     * The social icons belong to the brand column: directly under the tagline
+     * on desktop. In the DOM they sit between the logo and the first link
+     * group, and never in the legal lines.
+     *
+     * On a phone they are shown AFTER the link groups instead. That is done
+     * with CSS order rather than a second copy of the icons, so the brand
+     * wrapper is display:contents below lg and the icon block carries order-3
+     * against the link groups' order-2.
+     */
+    public function test_social_links_sit_in_the_brand_column_and_follow_the_links_on_mobile(): void
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $getTheApp = strpos($html, 'Get the app');
+        $footerAt = strpos($html, 'footer-ground');
+        $logo = strpos($html, 'assets/logo.webp', $footerAt);
         $facebook = strpos($html, 'aria-label="Visit our Facebook page"');
+        $shopCol = strpos($html, 'id="footer-col-shop"');
         $copyright = strpos($html, 'All rights reserved');
 
         $this->assertNotFalse($facebook);
-        $this->assertNotFalse($copyright);
+        $this->assertGreaterThan($logo, $facebook, 'Social links sit under the logo.');
+        $this->assertLessThan($shopCol, $facebook, 'Social links belong to the brand column.');
+        $this->assertLessThan($copyright, $facebook, 'Social links stay out of the legal lines.');
 
-        $this->assertGreaterThan($getTheApp, $facebook, 'Social links follow the link columns.');
-        $this->assertLessThan($copyright, $facebook, 'Social links belong above the legal bar.');
+        // One copy of each icon, reordered by CSS on mobile.
+        $this->assertSame(1, substr_count($html, 'aria-label="Visit our Facebook page"'));
+
+        $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
+        $this->assertStringContainsString('<div class="contents lg:block">', $footer);
+        $this->assertStringContainsString('<div class="order-3 mt-8 lg:mt-6">', $footer);
+        $this->assertStringContainsString('class="order-2 mt-10 grid grid-cols-1', $footer);
     }
 
     public function test_theme_picker_carries_a_visible_label(): void
@@ -286,28 +329,61 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringContainsString('self-start', $m[1]);
     }
 
-    public function test_logos_use_the_reduced_size_in_footer_and_nav(): void
+    /**
+     * The footer and the nav give the wordmark the taller band the replaced logo
+     * asset needs, and they do it in step with each other.
+     *
+     * This used to pin a reduced band - h-9 in the footer, h-8/md:h-9 in the nav
+     * - and that was right for the file it was written against. The old
+     * Rshoprefillslogo.webp was 701x165, near enough 4.25:1, so 36px of height
+     * still bought about 153px of wordmark. The replacement, assets/logo.webp,
+     * is 419x140, close to 3:1: in the old band it drew about 108px wide, the
+     * same brand rendered visibly smaller than the one it replaced. Both bands
+     * went up together, which is why this test covers both views rather than one
+     * - the footer drifting away from the nav is the failure worth catching.
+     *
+     * The sizes are still pinned, and the superseded reduced values are asserted
+     * gone, so a revert of the band that does not also revert the asset cannot
+     * pass here.
+     */
+    public function test_logos_use_the_taller_band_the_new_wordmark_needs(): void
     {
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
         $nav = file_get_contents(resource_path('views/components/nav/main-nav.blade.php'));
 
-        $this->assertStringContainsString('<span class="flex h-9 items-center">', $footer);
-        $this->assertStringNotContainsString('<span class="flex h-12 items-center">', $footer);
+        $this->assertStringContainsString('<span class="flex h-12 items-center">', $footer);
+        $this->assertStringNotContainsString('<span class="flex h-9 items-center">', $footer);
 
-        $this->assertStringContainsString('<span class="flex items-center h-8 md:h-9">', $nav);
-        $this->assertStringNotContainsString('<span class="flex items-center h-10 md:h-12">', $nav);
+        $this->assertStringContainsString('<span class="flex items-center h-11 md:h-12">', $nav);
+        $this->assertStringNotContainsString('<span class="flex items-center h-8 md:h-9">', $nav);
+
+        // Both read the same replaced asset, so neither view can be pointed back
+        // at the retired file on its own and take its old band with it.
+        foreach (['footer' => $footer, 'nav' => $nav] as $name => $view) {
+            $this->assertStringContainsString("asset('assets/logo.webp')", $view, $name.' does not use the current wordmark.');
+            $this->assertStringNotContainsString('Rshoprefillslogo', $view, $name.' still points at the retired wordmark.');
+        }
     }
 
     /**
-     * The app badges sit under the logo in the brand column, and the link
-     * column headings start on the same left edge the logo does.
+     * The brand column is the logo and nothing under it, and the link column
+     * headings start on the same left edge the logo does.
      *
-     * That edge needed a fix: the wordmark carries a 20px transparent margin,
-     * which renders as ~4.4px at h-9, but the anchor pulled -ml-3 (12px) - so
-     * the logo hung ~8px left of every heading beside it. -ml-1 matches the
-     * real margin instead of overshooting it.
+     * The app badges used to be what sat under the logo here, which is what this
+     * test was named for. They are gone, so the subject is now the other half of
+     * the same claim: the brand column ends at the wordmark, with no block
+     * standing between it and the first link column. FooterAppBadgesTest carries
+     * the reasoning for the removal - in short, there is no app, so a pair of
+     * "coming soon" store pills advertised a download nobody could get.
+     *
+     * The left edge is the fiddly part and still worth pinning. The wordmark file
+     * carries transparent margin down its left side, 12px of a 419px canvas,
+     * which lands at about 4px once the image is drawn in the footer's 48px band.
+     * So the anchor pulls -ml-1 (4px) to put the ink itself on the headings'
+     * edge. The -ml-3 (12px) it used to pull overshot that and hung the logo
+     * clear of every heading beside it.
      */
-    public function test_the_app_badges_sit_under_the_logo_on_the_heading_edge(): void
+    public function test_the_brand_column_is_the_logo_alone_on_the_heading_edge(): void
     {
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
@@ -321,16 +397,24 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringContainsString('sm:grid-cols-2', $footer);
         $this->assertStringNotContainsString('lg:grid-cols-5', $footer);
 
-        // Rendered: the badges follow the logo and precede the first column.
+        // Rendered: the first link column follows the logo directly, with no
+        // badge block left in the gap between them.
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $logo = strrpos($html, 'Rshoprefillslogo.webp');
-        $getTheApp = strpos($html, 'Get the app');
+        $footerAt = strpos($html, 'footer-ground');
+        $this->assertNotFalse($footerAt, 'The footer slab is missing.');
+
+        $logo = strpos($html, 'assets/logo.webp', $footerAt);
         $shopCol = strpos($html, 'id="footer-col-shop"');
 
-        $this->assertNotFalse($getTheApp);
-        $this->assertGreaterThan($logo, $getTheApp);
-        $this->assertLessThan($shopCol, $getTheApp);
+        $this->assertNotFalse($logo, 'The footer carries no logo.');
+        $this->assertNotFalse($shopCol);
+        $this->assertLessThan($shopCol, $logo);
+
+        $betweenLogoAndColumns = substr($html, $logo, $shopCol - $logo);
+        $this->assertStringNotContainsString('Get the app', $betweenLogoAndColumns);
+        $this->assertStringNotContainsString('App Store', $betweenLogoAndColumns);
+        $this->assertStringNotContainsString('Google Play', $betweenLogoAndColumns);
     }
 
     /**
@@ -341,8 +425,16 @@ class FooterBrandColumnTest extends TestCase
      * display:contents at lg so its navs become direct children of the brand
      * row; without it they lay out inside their own box below the logo, which
      * is the stacked layout this replaced. And the headings take the wordmark's
-     * own 36px band (lg:h-9) so they centre against it rather than merely
-     * sharing its left edge.
+     * own band (lg:h-12) so they centre against it rather than merely sharing
+     * its left edge.
+     *
+     * That band is 48px now, not the 36px this test was written against. The
+     * logo went from h-9 to h-12 when the wordmark asset was replaced, and the
+     * heading band did not follow it, so the headings were centring in a 36px
+     * box against a 48px logo and sitting 6px high of it. The markup was what
+     * was wrong there, and lg:h-9 became lg:h-12. The pairing is the point of
+     * the test, so both numbers are asserted together below: if one moves the
+     * other has to move with it.
      */
     public function test_the_headings_share_the_logos_row_from_lg(): void
     {
@@ -353,19 +445,23 @@ class FooterBrandColumnTest extends TestCase
             $footer
         );
         $this->assertStringContainsString('lg:contents', $footer);
-        $this->assertStringContainsString('sm:pointer-events-none sm:py-0 lg:h-9', $footer);
+        $this->assertStringContainsString('sm:pointer-events-none sm:py-0 lg:h-12', $footer);
 
-        // The logo's band is what lg:h-9 matches - if one moves the other must.
-        $this->assertStringContainsString('<span class="flex h-9 items-center">', $footer);
+        // The logo's band is what lg:h-12 matches - if one moves the other must.
+        $this->assertStringContainsString('<span class="flex h-12 items-center">', $footer);
 
         // Rendered: brand still precedes every column in the DOM, so the row
         // reads left-to-right and screen readers keep the same order.
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $logo = strrpos($html, 'Rshoprefillslogo.webp');
+        $footerAt = strpos($html, 'footer-ground');
+        $this->assertNotFalse($footerAt, 'The footer slab is missing.');
+
+        $logo = strpos($html, 'assets/logo.webp', $footerAt);
         $shop = strpos($html, 'id="footer-col-shop"');
         $legal = strpos($html, 'id="footer-col-legal"');
 
+        $this->assertNotFalse($logo, 'The footer carries no logo.');
         $this->assertNotFalse($shop);
         $this->assertGreaterThan($logo, $shop);
         $this->assertLessThan($legal, $shop);
@@ -386,9 +482,93 @@ class FooterBrandColumnTest extends TestCase
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
         $this->assertStringNotContainsString('>Order status</a>', $html);
 
-        // The rest of the column is untouched.
-        foreach (['Help center', 'FAQs', 'Contact us', 'How it works', 'Earn points'] as $link) {
-            $this->assertStringContainsString('>'.$link.'</a>', $html);
+        // The Help & Support group, in its order.
+        $help = $this->column($html, 'help');
+        $this->assertLinksInOrder($help, ['Help Center', 'FAQs', 'Contact Support', 'How It Works', 'Refund Policy', 'eSIM Installation Guide']);
+
+        // Earn points left Support. The Shop column lists what a customer can
+        // BUY, so the referral link moved on from it: what belongs there is the
+        // way to ask us to stock something we do not carry. Invite a Friend
+        // still ships, one column over under Company.
+        $this->assertStringNotContainsString('Earn points', $help);
+        $this->assertStringContainsString('>Request a product</a>', $this->column($html, 'shop'));
+        $this->assertStringNotContainsString('>Invite a Friend</a>', $this->column($html, 'shop'));
+        $this->assertStringContainsString('>Invite a Friend</a>', $this->column($html, 'company'));
+    }
+
+    /**
+     * Each group holds exactly the links it was specified with, in order, and
+     * no link appears twice anywhere in the footer. Privacy and Terms used to
+     * render in the Legal column AND a bottom link bar.
+     */
+    public function test_every_group_holds_its_links_once(): void
+    {
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+
+        $this->assertLinksInOrder($this->column($html, 'shop'), ['Gift Cards', 'Travel eSIMs', 'Mobile Top-Ups', 'Data Bundles', 'Bill Payments']);
+        $this->assertLinksInOrder($this->column($html, 'company'), ['About Us', 'Blog', 'Customer Reviews', 'Influencers and Affiliates', 'Press &amp; Media']);
+        $this->assertLinksInOrder($this->column($html, 'legal'), ['Terms of Service', 'Privacy Policy', 'Cookie Policy', 'Compliance', 'Security', 'Accessibility']);
+
+        // The groups run Shop, Help & Support, Company, Legal & Trust.
+        $positions = array_map(fn ($slug) => strpos($html, 'id="footer-col-'.$slug.'"'), ['shop', 'help', 'company', 'legal']);
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+
+        // Bounded by </footer>: the cookie banner renders after it and links the
+        // privacy policy on its own, which is not a footer duplicate.
+        $start = strpos($html, 'footer-ground');
+        $footer = substr($html, $start, strpos($html, '</footer>', $start) - $start);
+        foreach ([route('shop.terms'), route('shop.privacy'), route('shop.accessibility')] as $url) {
+            $this->assertSame(1, substr_count($footer, 'href="'.$url.'"'), $url.' is linked more than once in the footer.');
+        }
+        $this->assertStringNotContainsString('href="'.route('shop.sitemap').'"', $footer);
+    }
+
+    /**
+     * The settings row runs theme, language and currency, cookie settings,
+     * version - and sits above the legal lines.
+     */
+    public function test_the_settings_row_order(): void
+    {
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
+        $footer = substr($html, strpos($html, 'footer-ground'));
+
+        $theme = strpos($footer, '>Theme</span>');
+        $locale = strpos($footer, 'localeModalOpen = true');
+        $cookies = strpos($footer, '>Cookie Settings</button>');
+        $version = strpos($footer, 'Version 2.0.0');
+        $copyright = strpos($footer, '&copy; 2026');
+
+        foreach ([$theme, $locale, $cookies, $version, $copyright] as $at) {
+            $this->assertNotFalse($at);
+        }
+
+        $this->assertLessThan($locale, $theme);
+        $this->assertLessThan($cookies, $locale);
+        $this->assertLessThan($version, $cookies);
+        $this->assertLessThan($copyright, $version);
+    }
+
+    /** One link group's list markup, from its id to the end of the list. */
+    private function column(string $html, string $slug): string
+    {
+        $start = strpos($html, 'id="footer-col-'.$slug.'"');
+        $this->assertNotFalse($start, 'Missing footer group '.$slug);
+
+        return substr($html, $start, strpos($html, '</ul>', $start) - $start);
+    }
+
+    /** @param  array<int, string>  $labels */
+    private function assertLinksInOrder(string $column, array $labels): void
+    {
+        $last = -1;
+
+        foreach ($labels as $label) {
+            $at = strpos($column, '>'.$label.'</a>');
+            $this->assertNotFalse($at, $label.' is missing from its footer group.');
+            $this->assertGreaterThan($last, $at, $label.' is out of order.');
+            $last = $at;
         }
     }
 
@@ -399,6 +579,14 @@ class FooterBrandColumnTest extends TestCase
      * so it had to move onto the blocks below them. Leaving an empty spacer div
      * would not have worked - with no height its top and bottom margins collapse
      * into one, halving the gap.
+     *
+     * The social band's share of that spacing is smaller now, mt-6/lg:mt-8 in
+     * place of mt-8/lg:mt-10, and it moved off the icon row onto a wrapper that
+     * right-aligns the row from lg. Both changes came with the redesign that
+     * tightened the footer's padding throughout, so the reduction is the new
+     * spec and not a leak. What this test defends is unchanged and is still
+     * asserted the same way: the gap belongs to the block, so removing a rule
+     * cannot take a block's top margin with it.
      */
     public function test_the_horizontal_rules_are_gone_but_the_spacing_is_not(): void
     {
@@ -407,16 +595,29 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringNotContainsString('h-px bg-zinc-200', $footer);
         $this->assertStringNotContainsString('aria-hidden="true"></div>', $footer);
 
-        // Each block the rule used to precede carries the gap itself now.
-        $this->assertStringContainsString('mt-8 flex flex-wrap items-center gap-3 lg:mt-10', $footer);
+        // Each block the rule used to precede carries the gap itself now: the
+        // social icons, the settings row and the legal lines.
+        $this->assertStringContainsString('order-3 mt-8 lg:mt-6', $footer);
         $this->assertStringContainsString('mt-8 flex flex-col gap-4 text-sm text-zinc-600', $footer);
-        $this->assertStringContainsString('mt-8 flex flex-col gap-4 text-base text-zinc-600', $footer);
+        $this->assertStringContainsString('<div class="mt-8 space-y-2">', $footer);
+
+        // The bottom link bar that repeated Terms and Privacy is gone.
+        $this->assertStringNotContainsString('mt-8 flex flex-col gap-4 text-base text-zinc-600', $footer);
 
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
         $this->assertStringNotContainsString('h-px bg-zinc-200', $html);
 
-        // Everything the rules separated still renders.
-        foreach (['Follow us', 'Theme', 'All rights reserved'] as $section) {
+        // Everything the rules separated still renders. The social band is
+        // checked by an icon label rather than by the words "Follow us": that
+        // heading was dropped from the row in the redesign, and the phrase only
+        // still appears on the page inside the icons' own aria-labels, so
+        // matching on it would have read like a check on a visible heading that
+        // is not there any more.
+        foreach ([
+            'aria-label="Visit our Facebook page"',
+            '>Theme</span>',
+            'All rights reserved',
+        ] as $section) {
             $this->assertStringContainsString($section, $html);
         }
     }

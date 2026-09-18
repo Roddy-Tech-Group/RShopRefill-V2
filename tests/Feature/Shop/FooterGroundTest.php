@@ -54,7 +54,10 @@ class FooterGroundTest extends TestCase
         // rather than the card grey a bare div would get.
         $layout = file_get_contents(resource_path('views/components/layouts/app/header.blade.php'));
         $this->assertStringContainsString('<x-footer />', $layout);
-        $this->assertStringContainsString('<section class="rounded-t-[20px] bg-[#ffffff] p-4 sm:p-6 lg:px-8">', $blade);
+        // The band's padding is what insets the card, so it is also what sets
+        // how wide the footer reads. It was thinned to p-2/p-3 when the footer
+        // was asked to run almost the full width of a phone.
+        $this->assertStringContainsString('<section class="rounded-t-[20px] bg-[#ffffff] p-2 sm:p-3 lg:px-4 lg:py-5">', $blade);
         // Comments stripped: the note explaining the opt-out names bg-white, and
         // prose must not be able to fail this.
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $blade);
@@ -165,23 +168,60 @@ class FooterGroundTest extends TestCase
         $this->assertStringContainsString('.tex-grain::after', $css);
     }
 
-    public function test_footer_shares_the_navs_content_column(): void
+    /**
+     * The footer deliberately does NOT share the nav's column any more. It runs
+     * to the window, inset only by the white band's thin padding, so it reads
+     * as a floor under the page rather than one more column in it.
+     *
+     * The nav column is asserted here anyway, because the FAQ slab above the
+     * footer is aligned to the footer rather than to the nav - and if the nav's
+     * width ever silently became the footer's again, the breakout would be
+     * invisible rather than broken.
+     */
+    public function test_the_footer_runs_wider_than_the_nav_column(): void
     {
-        // Same max-width and the same horizontal padding as the nav, so the two
-        // line up once the viewport is wide enough for the max-width to bind.
         $nav = file_get_contents(resource_path('views/components/nav/main-nav.blade.php'));
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
-        $this->assertStringContainsString('max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8', $nav);
+        // The page column. Both nav strips share it; the footer does not.
+        $this->assertStringContainsString('max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8', $nav);
 
-        // The cap is on the SLAB, not on a column inside it - the card stops at
-        // the page width rather than running to the viewport edge.
+        // No cap on the slab: it spans whatever the band leaves it.
         $this->assertStringContainsString(
-            'footer-ground tex-grain mx-auto max-w-[1420px] rounded-[15px]',
+            'footer-ground tex-grain mx-auto w-full rounded-[15px]',
             $footer
         );
-        $this->assertStringContainsString('<section class="rounded-t-[20px] bg-[#ffffff] p-4', $footer);
+        $this->assertStringNotContainsString('max-w-[1420px]', $footer);
         $this->assertStringNotContainsString('max-w-[1550px]', $footer);
+
+        // The band's padding is the only inset, and it is thin on a phone -
+        // the footer was asked to read as almost full width there.
+        $this->assertStringContainsString(
+            '<section class="rounded-t-[20px] bg-[#ffffff] p-2 sm:p-3 lg:px-4 lg:py-5">',
+            $footer
+        );
+    }
+
+    /**
+     * The FAQ sits directly above the footer, so the two slabs must share an
+     * edge. It gets there the same way: .full-bleed out of the page column,
+     * then the footer band's own horizontal padding.
+     */
+    public function test_the_faq_slab_lines_up_with_the_footer(): void
+    {
+        $faq = file_get_contents(resource_path('views/components/home/faq.blade.php'));
+
+        // The top margin is a prop now, so the gift-cards page can run its FAQ
+        // straight on from the row above it without changing the spacing here.
+        // full-bleed and the footer band's padding - what this test is actually
+        // about - are unchanged.
+        $this->assertStringContainsString('class="full-bleed {{ $topMargin }} px-2 sm:px-3 lg:px-4"', $faq);
+        $this->assertStringContainsString("'topMargin' => 'mt-12 lg:mt-16'", $faq);
+
+        // .full-bleed measures the page rather than trusting 100vw, which
+        // includes the scrollbar and so overhangs by its width.
+        $css = file_get_contents(resource_path('css/app.css'));
+        $this->assertStringContainsString('width: var(--page-w, 100vw)', $css);
     }
 
     /**
@@ -196,7 +236,7 @@ class FooterGroundTest extends TestCase
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
         $this->assertStringContainsString(
-            '<section class="rounded-t-[20px] bg-[#ffffff] p-4 sm:p-6 lg:px-8">',
+            '<section class="rounded-t-[20px] bg-[#ffffff] p-2 sm:p-3 lg:px-4 lg:py-5">',
             $footer
         );
         $this->assertStringNotContainsString('rounded-b-[20px]', $footer);
