@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\SiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
@@ -37,9 +38,43 @@ class SystemSettingsSectionsTest extends TestCase
             ->assertSee('features.risk_engine_enforce_enabled')
             ->assertSee('features.kyc_enforce_enabled')
             ->assertSee('features.kyc_tier2_threshold_usd')
+            ->assertSee('features.kyc_cumulative_threshold_usd')
             ->assertSee('features.gomarket_enabled')
             ->assertSee('features.newsletter_signup_enabled')
             ->assertDontSee('>Other<', false);
+    }
+
+    public function test_the_transaction_caps_render_under_verification_and_limits(): void
+    {
+        Volt::test('admin.system-settings')
+            ->assertSee('features.spend_limit_standard_day_usd')
+            ->assertSee('features.spend_limit_standard_week_usd')
+            ->assertSee('features.spend_limit_verified_day_usd')
+            ->assertSee('features.spend_limit_verified_week_usd')
+            ->assertSee('features.spend_limit_verified_month_usd')
+            // The standard monthly cap is the cumulative KYC dial, not a row.
+            ->assertDontSee('features.spend_limit_standard_month_usd')
+            ->assertDontSee('>Other<', false);
+    }
+
+    /**
+     * site_settings.description is VARCHAR(255) on production MariaDB. The
+     * suite runs on sqlite, which does not enforce the length, so a seed
+     * migration with a longer description passes every test and then fails the
+     * production deploy with "Data too long for column". Caught on a local
+     * MariaDB run on 2026-09-17; this is the guard.
+     */
+    public function test_every_seeded_setting_description_fits_the_production_column(): void
+    {
+        $tooLong = SiteSetting::query()
+            ->whereNotNull('description')
+            ->get(['key', 'description'])
+            ->filter(fn (SiteSetting $row) => mb_strlen((string) $row->description) > 255)
+            ->map(fn (SiteSetting $row) => $row->key.' ('.mb_strlen((string) $row->description).')')
+            ->values()
+            ->all();
+
+        $this->assertSame([], $tooLong, 'These seeded descriptions will not fit site_settings.description (255) on MariaDB.');
     }
 
     public function test_the_other_cards_are_untouched(): void

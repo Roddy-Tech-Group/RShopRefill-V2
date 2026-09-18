@@ -177,7 +177,7 @@ class CheckoutService
         //     exactly like the old KYC gate. The intentional step-up/review/deny
         //     exceptions are surfaced by the controller. Raw USD total is the
         //     transaction's exposure value.
-        $this->riskGate->guard($this->orderRiskContext($user, $cart, (float) $validatedTotals['total'], $displayCurrency));
+        $this->riskGate->guard($this->orderRiskContext($user, $cart, (float) $validatedTotals['total'], $displayCurrency, $paymentMethod));
 
         // 1b. Resolve the display currency rate via CurrencyRateService so the
         //     same freshness gate that protects wallet funding protects the order
@@ -619,7 +619,7 @@ class CheckoutService
      * step-up/review/deny exceptions are intentional control flow the controller
      * handles.
      */
-    private function orderRiskContext(User $user, Cart $cart, float $amountUsd, string $displayCurrency): RiskContext
+    private function orderRiskContext(User $user, Cart $cart, float $amountUsd, string $displayCurrency, string $paymentMethod): RiskContext
     {
         $categories = [];
 
@@ -645,6 +645,10 @@ class CheckoutService
             categories: $categories,
             subjectType: 'cart',
             subjectId: (string) $cart->id,
+            // Paying from wallet balance brings no new money in: KYC's
+            // cumulative count must not add the order to a sum that already
+            // holds the funding it spends.
+            bringsNewMoney: ! in_array($paymentMethod, PaymentBackoffManager::BALANCE_PROVIDERS, true),
         );
     }
 

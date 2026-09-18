@@ -27,7 +27,7 @@ class KycVerificationFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => 'approved',
-            'result_code' => '1012',
+            'result_code' => '0810',
             'decided_at' => now(),
         ]);
     }

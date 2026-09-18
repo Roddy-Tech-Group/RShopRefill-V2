@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\ClosedAccountIdentity;
-use App\Models\KycSubmission;
 use App\Models\KycVerification;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
@@ -117,7 +116,6 @@ class RetentionEnforceCommand extends Command
                     WalletTransaction::query()->where('user_id', $user->id)->delete();
                     Wallet::query()->where('user_id', $user->id)->delete();
                     KycVerification::query()->where('user_id', $user->id)->delete();
-                    KycSubmission::query()->where('user_id', $user->id)->delete();
 
                     foreach (['rcoin_withdrawals', 'referrals'] as $table) {
                         if (! Schema::hasTable($table)) {

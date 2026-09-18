@@ -58,7 +58,7 @@ class RiskGate
         // KYC value-based requirement, respecting the KYC enforcement flag on its
         // own. Computed up front so it can layer under any risk outcome.
         $kycRequired = $context->user !== null
-            ? $this->tiers->requiredStepUp($context->user, $context->amountUsd, $context->context)
+            ? $this->tiers->requiredStepUp($context->user, $context->amountUsd, $context->context, bringsNewMoney: $context->bringsNewMoney)
             : null;
 
         if ($decision->enforced) {
@@ -82,11 +82,12 @@ class RiskGate
             $this->kycGate->stepUp($context->user, $kycRequired, $context->context);
         }
 
-        // Spending caps, orders only (funding is deliberately uncounted: funded
-        // balance can only leave through checkout, where this catches it).
-        // Behind its own enforce flag; shadow logs and passes.
-        if ($context->context === 'order' && $context->user !== null && ! $context->isGuest()) {
-            $this->spendingLimits->guard($context->user, $context->amountUsd);
+        // Transaction caps on money in: fundings and gateway-paid orders alike,
+        // on the same meter as the cumulative KYC dial. An action that spends
+        // balance already held brings nothing in and is never capped. Behind
+        // its own enforce flag; shadow logs and passes.
+        if ($context->user !== null && ! $context->isGuest()) {
+            $this->spendingLimits->guard($context->user, $context->amountUsd, $context->context, $context->bringsNewMoney);
         }
     }
 

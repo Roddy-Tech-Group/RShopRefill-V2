@@ -185,6 +185,9 @@ class EsimTopupController extends Controller
                 categories: array_values(array_filter([$orderItem->product?->category?->slug])),
                 subjectType: 'order_item',
                 subjectId: (string) $orderItem->id,
+                // Paid from wallet balance: money that was counted when it was
+                // funded, so it adds nothing to the KYC dial or the caps.
+                bringsNewMoney: false,
             ));
         } catch (KycStepUpRequiredException|SpendingLimitExceededException|RiskReviewRequiredException|RiskDeniedException $e) {
             return $this->topupError($orderItem, $e->customerMessage());

@@ -30,17 +30,37 @@ return [
     |--------------------------------------------------------------------------
     | Tier 2 — identity verification (paid provider)
     |--------------------------------------------------------------------------
-    | Triggered when a single money action reaches this USD amount, OR when a
-    | customer's cumulative lifetime volume crosses it. This is the admin-tunable
-    | "amount that works for us"; the CEO/CTO edits `features.kyc_tier2_threshold_usd`
-    | on the admin Settings page and this is only the default. Driven by RISK EXPOSURE,
-    | not profit, but set high enough that realised margin has typically covered
-    | a paid check by the time one fires.
+    | Two independent dials, the way a bank sets a per-transaction limit and a
+    | cumulative one. Either crossing demands identity verification. Both are
+    | admin-tunable on the Settings page (Verification & Limits); the values
+    | here are only the fallback defaults. Driven by RISK EXPOSURE, not profit,
+    | but set high enough that realised margin has typically covered a paid
+    | check by the time one fires.
+    |
+    | Single transaction: one order or one wallet funding at or above this USD
+    | amount. Site setting `features.kyc_tier2_threshold_usd` (the key predates
+    | the split; the risk engine's high-value signal reads the same number).
     */
     'tier2_threshold_usd' => (float) env('KYC_TIER2_THRESHOLD_USD', 500),
 
+    /*
+    | Cumulative: the customer's MONEY IN over the rolling window, plus the
+    | action in hand, at or above this USD amount. Money in is every completed
+    | wallet funding and every paid order settled by card, mobile money or
+    | crypto; an order paid from wallet balance is not counted (that money was
+    | counted when it was funded) and does not add itself. Site setting
+    | `features.kyc_cumulative_threshold_usd`.
+    */
+    'cumulative_threshold_usd' => (float) env('KYC_CUMULATIVE_THRESHOLD_USD', 2000),
+
+    // How far back money in is summed. Thirty days, the same window as the
+    // standard monthly spending cap (config/limits.php), so the amount an
+    // unverified customer is shown as their monthly limit is the amount at
+    // which they are asked to verify. Keep the two in step.
+    'cumulative_window_days' => (int) env('KYC_CUMULATIVE_WINDOW_DAYS', 30),
+
     // Optional velocity trigger: this many orders within 24h forces Tier 2.
-    // 0 = disabled.
+    // 0 = disabled. Left off: Engine 4 (spending limits) owns velocity.
     'tier2_orders_in_24h' => (int) env('KYC_TIER2_ORDERS_24H', 0),
 
     /*

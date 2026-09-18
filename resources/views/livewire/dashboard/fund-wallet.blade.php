@@ -289,7 +289,7 @@ new class extends Component
             );
         } catch (\App\Domain\Kyc\Exceptions\KycStepUpRequiredException $e) {
             $this->dispatch('kyc-step-up-required', payload: $e->toResponse());
-        } catch (\App\Domain\Risk\Exceptions\RiskReviewRequiredException|\App\Domain\Risk\Exceptions\RiskDeniedException $e) {
+        } catch (\App\Domain\Risk\Exceptions\RiskReviewRequiredException|\App\Domain\Risk\Exceptions\RiskDeniedException|\App\Domain\Kyc\Exceptions\SpendingLimitExceededException $e) {
             $this->dispatch('risk-hold', message: $e->customerMessage());
         } catch (\App\Domain\Wallet\Exceptions\WalletFundingException|\App\Domain\Payment\Exceptions\GatewayDisabledException|\InvalidArgumentException $e) {
             // Customer-safe by construction: coin gate, kill switch, bounds,
@@ -368,6 +368,10 @@ new class extends Component
         } catch (\App\Domain\Risk\Exceptions\RiskReviewRequiredException $e) {
             $this->dispatch('risk-hold', message: $e->customerMessage());
         } catch (\App\Domain\Risk\Exceptions\RiskDeniedException $e) {
+            $this->dispatch('risk-hold', message: $e->customerMessage());
+        } catch (\App\Domain\Kyc\Exceptions\SpendingLimitExceededException $e) {
+            // Rolling transaction cap reached: the same calm notice, with the
+            // nudge toward verification that raises the cap.
             $this->dispatch('risk-hold', message: $e->customerMessage());
         } catch (\Throwable $e) {
             $this->addError('amount', $e->getMessage());

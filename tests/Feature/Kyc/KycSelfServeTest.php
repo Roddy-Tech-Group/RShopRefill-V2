@@ -5,9 +5,15 @@ namespace Tests\Feature\Kyc;
 use App\Domain\Kyc\Contracts\KycProvider;
 use App\Domain\Kyc\DTOs\KycSession;
 use App\Domain\Kyc\DTOs\KycVerdict;
+use App\Domain\Kyc\Providers\SmileKycProvider;
+use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Domain\Kyc\Services\KycProviderFactory;
+use App\Models\KycVerification;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
@@ -18,6 +24,170 @@ use Tests\TestCase;
 class KycSelfServeTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        SiteSetting::put('features.kyc_verification_enabled', 'on', 'features');
+        Cache::flush();
+    }
+
+    /**
+     * The real Smile provider with its two network calls replaced: the token
+     * mint answers with Smile's "already enrolled" refusal, and the job-status
+     * lookup answers with the given result for every attempt.
+     *
+     * @param  array<string, mixed>|null  $jobResult
+     */
+    private function enrolledSmileProvider(?array $jobResult): SmileKycProvider
+    {
+        $provider = new class extends SmileKycProvider
+        {
+            public ?array $jobResult = null;
+
+            protected function mintWebToken(string $userId, string $jobId, string $product): ?string
+            {
+                return $this->tokenFromResponse(['code' => '2209', 'error' => 'Wrong job type. This user is already enrolled.', 'statusCode' => 400]);
+            }
+
+            public function queryJobStatus(KycVerification $verification): array
+            {
+                return $this->jobResult === null
+                    ? ['job_complete' => false]
+                    : ['job_complete' => true, 'result' => array_merge($this->jobResult, [
+                        'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$verification->user_id, 'job_type' => '6'],
+                    ])];
+            }
+        };
+
+        $provider->jobResult = $jobResult;
+
+        $this->mock(KycProviderFactory::class, function ($mock) use ($provider) {
+            $mock->shouldReceive('forUser')->andReturn($provider);
+        });
+
+        return $provider;
+    }
+
+    /**
+     * Production has no live identity provider yet. A customer who pressed
+     * Verify there started a session that could never end verified; with the
+     * switch off nothing reaches the provider at all.
+     */
+    public function test_start_says_verification_is_not_available_while_the_switch_is_off(): void
+    {
+        SiteSetting::put('features.kyc_verification_enabled', 'off', 'features');
+        Cache::flush();
+
+        $this->mock(KycProviderFactory::class, function ($mock) {
+            $mock->shouldReceive('forUser')->never();
+        });
+        $user = User::factory()->create(['kyc_status' => 'unsubmitted']);
+
+        $this->actingAs($user)->postJson('/api/kyc/start')
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'Verification is currently unavailable, try again later.');
+
+        $this->assertSame(0, KycVerification::count());
+    }
+
+    /**
+     * A confirmed email comes before identity verification. The refusal happens
+     * before anything reaches the provider, so no session or attempt is started.
+     */
+    public function test_start_requires_a_verified_email_first(): void
+    {
+        $this->mock(KycProviderFactory::class, function ($mock) {
+            $mock->shouldReceive('forUser')->never();
+        });
+        $user = User::factory()->unverified()->create(['kyc_status' => 'unsubmitted']);
+
+        $this->actingAs($user)->postJson('/api/kyc/start')
+            ->assertStatus(403)
+            ->assertJsonPath('email_unverified', true);
+
+        $this->assertSame(0, KycVerification::count());
+    }
+
+    /**
+     * The button reads the same whether or not the email is confirmed; the
+     * refusal (and the fresh verification link) arrive when it is tapped,
+     * exactly as they do while the verification switch is off.
+     */
+    public function test_the_page_still_offers_verify_now_before_the_email_is_confirmed(): void
+    {
+        $user = User::factory()->unverified()->create(['kyc_status' => 'unsubmitted']);
+
+        $this->actingAs($user)->get('/dashboard/kyc')
+            ->assertOk()
+            ->assertSee('Verify now')
+            ->assertDontSee('Confirm your email address before verifying your identity.');
+    }
+
+    /**
+     * A refusal used to come back as a session with no token: the customer
+     * saw a generic message and a pending attempt was left that nothing
+     * could ever resolve.
+     */
+    public function test_a_provider_refusal_leaves_no_dead_attempt_behind(): void
+    {
+        $provider = new class extends SmileKycProvider
+        {
+            protected function mintWebToken(string $userId, string $jobId, string $product): ?string
+            {
+                return $this->tokenFromResponse(['code' => '2204', 'error' => 'Unauthorized', 'statusCode' => 401]);
+            }
+        };
+        $this->mock(KycProviderFactory::class, function ($mock) use ($provider) {
+            $mock->shouldReceive('forUser')->andReturn($provider);
+        });
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        $earlier = KycVerification::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->postJson('/api/kyc/start')
+            ->assertStatus(502)
+            ->assertJsonPath('message', 'We could not start verification right now. Please try again in a moment.');
+
+        $this->assertSame(1, KycVerification::count());
+        $this->assertSame('pending', $earlier->fresh()->status);
+    }
+
+    /**
+     * Smile refuses a new session for someone it already passed. That pass is
+     * read back and applied, correcting the attempt that recorded it wrongly,
+     * instead of leaving the customer at a dead end.
+     */
+    public function test_an_already_enrolled_customer_is_verified_from_their_earlier_pass(): void
+    {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            $mock->shouldReceive('verified')->once();
+        });
+        $this->enrolledSmileProvider(['ResultCode' => '0810', 'ResultText' => 'Document Verified']);
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        $wronglyRejected = KycVerification::factory()->rejected('Document Verified')->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->postJson('/api/kyc/start')
+            ->assertOk()
+            ->assertJsonPath('already_verified', true);
+
+        $this->assertSame('verified', $user->fresh()->kyc_status);
+        $this->assertSame('approved', $wronglyRejected->fresh()->status);
+        $this->assertSame(1, KycVerification::count());
+    }
+
+    public function test_an_already_enrolled_customer_without_a_readable_pass_is_sent_to_support(): void
+    {
+        $this->enrolledSmileProvider(null);
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        KycVerification::factory()->rejected()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->postJson('/api/kyc/start')
+            ->assertStatus(502)
+            ->assertJsonPath('message', 'We could not start verification right now. Please contact support.');
+
+        $this->assertSame('rejected', $user->fresh()->kyc_status);
+    }
 
     private function fakeProvider(): KycProvider
     {
@@ -130,6 +300,23 @@ class KycSelfServeTest extends TestCase
         $this->actingAs($user)->postJson('/api/kyc/start')
             ->assertStatus(502)
             ->assertJsonStructure(['message']);
+    }
+
+    /**
+     * Identity is only ever verified by the provider. The old document upload
+     * and its admin approve/reject review are gone, so no second, unwatched
+     * way to become verified remains.
+     */
+    public function test_there_is_no_manual_document_upload_or_review(): void
+    {
+        foreach (['kyc.submit', 'admin.kyc.approve', 'admin.kyc.reject', 'admin.kyc.document'] as $name) {
+            $this->assertFalse(Route::has($name), "{$name} still exists");
+        }
+
+        $user = User::factory()->create(['kyc_status' => 'unsubmitted']);
+
+        $this->actingAs($user)->post('/dashboard/kyc', ['kyc_full_name' => 'Jane Doe'])->assertStatus(405);
+        $this->assertSame('unsubmitted', $user->fresh()->kyc_status);
     }
 
     // --- POST /api/kyc/submitted --------------------------------------------

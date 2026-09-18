@@ -153,10 +153,19 @@ return [
         // Smile's sid_server convention: 0 = sandbox, 1 = production.
         'server' => (int) env('SMILE_SERVER', 0),
         'callback_url' => env('SMILE_CALLBACK_URL'),
-        // Smile ResultCodes accepted as "identity verified". Default is the KYC
-        // exact-match code; confirm/extend against Smile's result-code docs and
-        // sandbox before switching KYC enforcement on.
-        'approved_result_codes' => ['1012'],
+        // Smile ResultCodes accepted as "identity verified", PER PRODUCT. Each
+        // product reports success with its own code, and one product's pass
+        // code must never approve a job run on another. A job whose product
+        // cannot be resolved is never approved.
+        //  - doc_verification 0810 "Document Verified": confirmed in sandbox
+        //    2026-09-15 (kyc_467_fisqf7qbcfto).
+        //  - biometric_kyc 1020 "Exact Match": NOT yet confirmed in sandbox.
+        //    Biometric routing is off (biometric_countries is empty); run one
+        //    sandbox job and confirm before repopulating that list.
+        'approved_result_codes' => [
+            'doc_verification' => ['0810'],
+            'biometric_kyc' => ['1020'],
+        ],
         // Countries routed to Biometric KYC (government ID + selfie match)
         // instead of Global Document Verification. EMPTY by CTO decision
         // (2026-08-16): every customer gets the worldwide Document Verification

@@ -34,7 +34,20 @@ class KycStepUpRequiredException extends RuntimeException
     {
         $noun = $this->context === 'funding' ? 'request' : 'purchase';
 
+        if ($this->inReview()) {
+            return "Your identity verification is being reviewed. Tap Verify to check on it, and your {$noun} continues as soon as it is done.";
+        }
+
         return "To continue with this {$noun}, please complete a quick identity verification.";
+    }
+
+    /**
+     * The customer already submitted a verification that is waiting on the
+     * provider's verdict, so there is no new session to launch.
+     */
+    public function inReview(): bool
+    {
+        return (bool) ($this->session->metadata['in_review'] ?? false);
     }
 
     /**
@@ -57,6 +70,7 @@ class KycStepUpRequiredException extends RuntimeException
                 'environment' => $this->session->metadata['environment'] ?? null,
                 'callback_url' => $this->session->metadata['callback_url'] ?? null,
                 'user_id' => $this->session->metadata['user_id'] ?? null,
+                'in_review' => $this->inReview(),
             ],
         ];
     }

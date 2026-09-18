@@ -146,7 +146,9 @@ Route::middleware('auth')->group(function () {
     // Self-serve identity verification: the KYC page's "Verify now" button mints
     // a Smile session here, and the modal marks the capture as submitted so the
     // page can show an honest "in review" state while the verdict is in flight.
-    Route::post('kyc/start', [KycStatusController::class, 'start'])->middleware('throttle:6,1')->name('api.kyc.start');
+    // A confirmed email comes first: verified-email refuses (and re-sends the
+    // link) before anything reaches the identity provider.
+    Route::post('kyc/start', [KycStatusController::class, 'start'])->middleware(['throttle:6,1', 'verified-email'])->name('api.kyc.start');
     Route::post('kyc/submitted', [KycStatusController::class, 'submitted'])->middleware('throttle:6,1')->name('api.kyc.submitted');
 
     Route::prefix('wallets')->name('api.wallets.')->group(function () {

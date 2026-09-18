@@ -3,30 +3,41 @@
 namespace App\Domain\Kyc\Services;
 
 use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
-use App\Domain\Payment\Enums\PaymentStatus;
-use App\Models\Setting;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Support\FeatureFlag;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The per-verification-level spending caps: rolling 24h / 7d / 30d sums of PAID
- * order value (settlement USD) against the limits the KYC page displays.
+ * The per-verification-level transaction caps: rolling daily / weekly / monthly
+ * sums of MONEY IN (settled USD) against the limits the KYC page displays.
  *
- * One source of truth: sets() resolves each amount from the settings table with
- * the config/limits.php default, and BOTH the page and this gate read it, so
- * display and enforcement can never disagree.
+ * One meter with the KYC tier engine. Money in is KycTierService::moneyInUsd():
+ * every completed wallet funding plus every paid order settled by card, mobile
+ * money or crypto. An order paid from wallet balance is not counted, because
+ * that money was counted when it was funded, and it is never refused here,
+ * because spending a balance the customer already holds brings nothing new in.
+ * So the caps apply to fundings and to gateway-paid orders alike, and a
+ * customer cannot reach past a daily cap by parking money in the wallet first.
  *
- * Purchases only: wallet funding is deliberately not counted, because funded
- * balance can only leave through checkout, where these caps catch it; counting
- * both would charge the same dollar twice against the limit.
+ * One ladder with the KYC dials. The standard (unverified) monthly cap IS the
+ * cumulative KYC dial: the same site_settings row over the same window, so the
+ * ceiling an unverified customer is shown is the amount at which they are asked
+ * to verify, and the two engines cannot drift apart. The other five amounts are
+ * their own rows on the admin Settings page (Verification & Limits).
+ *
+ * One source of truth: sets() resolves every amount, and BOTH the KYC page and
+ * this gate read it, so display and enforcement can never disagree.
  *
  * Enforcement is behind features.spending_limits_enforce_enabled (seeded off).
- * In shadow the gate logs the refusal it WOULD issue and lets the order pass.
+ * In shadow the gate logs the refusal it WOULD issue and lets the action pass.
  */
 class SpendingLimitService
 {
+    public function __construct(
+        private readonly KycTierService $tiers,
+    ) {}
+
     public function enforcementEnabled(): bool
     {
         return FeatureFlag::on('spending_limits_enforce', false);
@@ -40,21 +51,17 @@ class SpendingLimitService
      */
     public function sets(): array
     {
-        $resolve = fn (string $tier, string $window): float => (float) Setting::get(
-            "spend_limit_{$tier}_{$window}_usd",
-            (float) config("limits.{$tier}.{$window}", 0),
-        );
-
         return [
             'standard' => [
-                'day' => $resolve('standard', 'day'),
-                'week' => $resolve('standard', 'week'),
-                'month' => $resolve('standard', 'month'),
+                'day' => $this->amount('standard', 'day'),
+                'week' => $this->amount('standard', 'week'),
+                // The cumulative KYC dial, not a row of its own.
+                'month' => $this->tiers->cumulativeThresholdUsd(),
             ],
             'verified' => [
-                'day' => $resolve('verified', 'day'),
-                'week' => $resolve('verified', 'week'),
-                'month' => $resolve('verified', 'month'),
+                'day' => $this->amount('verified', 'day'),
+                'week' => $this->amount('verified', 'week'),
+                'month' => $this->amount('verified', 'month'),
             ],
         ];
     }
@@ -70,19 +77,27 @@ class SpendingLimitService
     }
 
     /**
-     * Refuse the order when it would push any rolling window past its cap.
-     * A cap of 0 means "no limit on this window". Inert in shadow mode.
+     * Refuse the action when it would push any rolling window past its cap.
+     * A cap of 0 means "no limit on this window". Inert in shadow mode, and
+     * never applied to an action that spends balance already held.
+     *
+     * @param  string  $context  'order' | 'funding'
      *
      * @throws SpendingLimitExceededException
      */
-    public function guard(User $user, float $amountUsd): void
+    public function guard(User $user, float $amountUsd, string $context = 'order', bool $bringsNewMoney = true): void
     {
+        if (! $bringsNewMoney) {
+            return;
+        }
+
         $limits = $this->limitsFor($user);
 
         $windows = [
             'daily' => ['limit' => $limits['day'], 'since' => now()->subDay()],
             'weekly' => ['limit' => $limits['week'], 'since' => now()->subWeek()],
-            'monthly' => ['limit' => $limits['month'], 'since' => now()->subMonth()],
+            // The same window the cumulative KYC dial sums over.
+            'monthly' => ['limit' => $limits['month'], 'since' => now()->subDays($this->tiers->cumulativeWindowDays())],
         ];
 
         foreach ($windows as $window => $rule) {
@@ -90,18 +105,19 @@ class SpendingLimitService
                 continue;
             }
 
-            $spent = $this->spentSince($user, $rule['since']);
+            $moneyIn = $this->tiers->moneyInUsd($user, $rule['since']);
 
-            if ($spent + $amountUsd <= $rule['limit']) {
+            if ($moneyIn + $amountUsd <= $rule['limit']) {
                 continue;
             }
 
             if (! $this->enforcementEnabled()) {
                 Log::info('limits.shadow_exceeded', [
                     'user_id' => $user->getKey(),
+                    'context' => $context,
                     'window' => $window,
                     'limit_usd' => $rule['limit'],
-                    'spent_usd' => round($spent, 2),
+                    'money_in_usd' => round($moneyIn, 2),
                     'amount_usd' => round($amountUsd, 2),
                     'kyc_verified' => $user->isKycVerified(),
                 ]);
@@ -109,25 +125,18 @@ class SpendingLimitService
                 return;
             }
 
-            throw new SpendingLimitExceededException($window, $rule['limit'], $user->isKycVerified());
+            throw new SpendingLimitExceededException($window, $rule['limit'], $user->isKycVerified(), KycGate::verificationAvailable());
         }
     }
 
     /**
-     * Settled USD the customer has spent since the window opened (paid orders).
-     * Orders with suspect pricing (non-USD display currency, no recorded
-     * exchange rate) are excluded: usdTotal() would read their display amount
-     * at face value as USD and one degraded NGN order could jam every window
-     * shut for its owner. The rolling windows are recent, where every healthy
-     * order carries its settlement snapshot, so nothing real is lost.
+     * One cap in USD, from its admin-editable site_settings row, falling back
+     * to config/limits.php when the row is unset or non-numeric.
      */
-    private function spentSince(User $user, Carbon $since): float
+    private function amount(string $tier, string $window): float
     {
-        return (float) $user->orders()
-            ->where('payment_status', PaymentStatus::Paid)
-            ->where('created_at', '>=', $since)
-            ->get()
-            ->reject(fn ($order) => $order->hasSuspectPricing())
-            ->sum(fn ($order) => $order->usdTotal());
+        $value = SiteSetting::get("features.spend_limit_{$tier}_{$window}_usd");
+
+        return is_numeric($value) ? (float) $value : (float) config("limits.{$tier}.{$window}", 0);
     }
 }

@@ -52,9 +52,16 @@ class extends Component {
             'features.device_restriction_enabled',
         ],
         'Verification & Limits' => [
+            'features.kyc_verification_enabled',
             'features.kyc_enforce_enabled',
             'features.kyc_tier2_threshold_usd',
+            'features.kyc_cumulative_threshold_usd',
             'features.spending_limits_enforce_enabled',
+            'features.spend_limit_standard_day_usd',
+            'features.spend_limit_standard_week_usd',
+            'features.spend_limit_verified_day_usd',
+            'features.spend_limit_verified_week_usd',
+            'features.spend_limit_verified_month_usd',
         ],
         'Users & Auth' => [
             'features.signup_enabled',
