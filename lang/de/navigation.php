@@ -18,7 +18,7 @@ return [
     'cart' => 'Warenkorb',
     'account' => 'Konto',
     'my_orders' => 'Meine Bestellungen',
-    'redeem' => 'Einlösen',
+    'rcoin_rewards' => 'Rcoin-Prämien',
     'settings' => 'Einstellungen',
     'limits' => 'Limits',
     'logout' => 'Abmelden',

@@ -20,7 +20,7 @@ return [
     'cart' => 'Carrello',
     'account' => 'Account',
     'my_orders' => 'I miei ordini',
-    'redeem' => 'Riscatta',
+    'rcoin_rewards' => 'Premi Rcoin',
     'settings' => 'Impostazioni',
     'limits' => 'Limiti',
     'logout' => 'Esci',

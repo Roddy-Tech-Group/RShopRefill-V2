@@ -20,7 +20,7 @@ return [
     'cart' => 'Kwando',
     'account' => 'Asusu',
     'my_orders' => 'Odojina',
-    'redeem' => 'Yi amfani da maki',
+    'rcoin_rewards' => 'Ladan Rcoin',
     'settings' => 'Saituna',
     'limits' => 'Iyaka',
     'logout' => 'Fita',

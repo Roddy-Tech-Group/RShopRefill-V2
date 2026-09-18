@@ -18,7 +18,7 @@ return [
     'cart' => 'Kikapu',
     'account' => 'Akaunti',
     'my_orders' => 'Oda zangu',
-    'redeem' => 'Tumia pointi',
+    'rcoin_rewards' => 'Zawadi za Rcoin',
     'settings' => 'Mipangilio',
     'limits' => 'Viwango',
     'logout' => 'Toka',

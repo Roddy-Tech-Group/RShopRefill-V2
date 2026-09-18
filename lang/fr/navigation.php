@@ -18,7 +18,7 @@ return [
     'cart' => 'Panier',
     'account' => 'Compte',
     'my_orders' => 'Mes commandes',
-    'redeem' => 'Utiliser mes points',
+    'rcoin_rewards' => 'Récompenses Rcoin',
     'settings' => 'Paramètres',
     'limits' => 'Plafonds',
     'logout' => 'Déconnexion',

@@ -18,7 +18,7 @@ return [
     'cart' => '购物车',
     'account' => '账户',
     'my_orders' => '我的订单',
-    'redeem' => '兑换',
+    'rcoin_rewards' => 'Rcoin 奖励',
     'settings' => '设置',
     'limits' => '额度',
     'logout' => '退出登录',

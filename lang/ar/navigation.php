@@ -20,7 +20,7 @@ return [
     'cart' => 'السلة',
     'account' => 'الحساب',
     'my_orders' => 'طلباتي',
-    'redeem' => 'استبدال النقاط',
+    'rcoin_rewards' => 'مكافآت Rcoin',
     'settings' => 'الإعدادات',
     'limits' => 'الحدود',
     'logout' => 'تسجيل الخروج',

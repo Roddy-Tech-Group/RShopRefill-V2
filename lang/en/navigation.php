@@ -20,7 +20,7 @@ return [
     'cart' => 'Cart',
     'account' => 'Account',
     'my_orders' => 'My orders',
-    'redeem' => 'Redeem',
+    'rcoin_rewards' => 'Rcoin Rewards',
     'settings' => 'Settings',
     'limits' => 'Limits',
     'logout' => 'Logout',
