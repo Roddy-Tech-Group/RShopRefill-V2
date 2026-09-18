@@ -1,4 +1,6 @@
-/*  */@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
+/* DM Sans is the site face. Loaded as a VARIABLE font (wght 100..1000) because
+   the design calls for 399 - an off-axis weight a static cut cannot render. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 @import 'tailwindcss';
 @import '../../vendor/livewire/flux/dist/flux.css';
 
@@ -7,6 +9,20 @@
 @source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
 @source '../../vendor/livewire/flux/stubs/**/*.blade.php';
 
+/* :where, which contributes ZERO specificity. That is Tailwind's own default
+   for class-based dark mode, and it has to stay.
+
+   It was briefly :is() here, to make dark: utilities outrank their light
+   counterparts and settle the dark-mode hover bugs in one line. It settles
+   those and breaks something worse: with :is(), a plain `dark:bg-X` becomes as
+   specific as a `hover:bg-Y` on the same element, so on every element that has
+   a dark background but only a LIGHT hover, the dark background wins and the
+   hover stops painting at all. Dark mode then looks like it is refusing hovers.
+
+   A dark hover that loses to its light twin gets fixed where it lives, with one
+   rule per theme (see .nav-item:hover below, and the refer-pill rules in the
+   rewards view). Two rules cannot tie; a global specificity bump trades one
+   class of bug for a wider one. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ── Stable page width ────────────────────────────────────────────────────
@@ -16,7 +32,36 @@
    the storefront grid looked like it was "shaking" against the category
    labels. */
 html {
+    /* Plain `stable`, reserving the gutter on the RIGHT only, where the
+       scrollbar actually is. It used to be `both-edges`, which spends the same
+       ~10px on the left so a centred block centres in the true window rather
+       than in the space left of the bar. That cost a permanent dark strip down
+       the left edge of every page, which reads as a rendering fault: nobody
+       expects a gutter where there is no scrollbar. The lean it prevents is
+       ~5px on a centred 1550px column, which is not visible; the strip was. */
     scrollbar-gutter: stable;
+}
+
+/* The dashboard used to need its own rule here to drop the left-hand half of
+   `both-edges`, which showed as an empty strip beside its pinned sidebar. The
+   base rule above is plain `stable` now, so every surface gets that behaviour
+   and this override has nothing left to say. */
+
+/* Circular theme reveal (window.rshopThemeReveal in app.js): the new theme opens
+   out as a circle from the pressed control. The browser's default cross-fade of
+   the root snapshots is switched off so only the growing circle shows, and CSS
+   transitions pause while the switch runs, so no element fades its colour
+   inside the new snapshot. Nothing else in the app uses view transitions; a
+   future page transition would need its own named group, not root. */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+    transition: none !important;
 }
 
 /* ── Flatpickr dark theme ─────────────────────────────────────────────────
@@ -41,7 +86,7 @@ html.dark .flatpickr-weekday { color: #9ca3af; }
 html.dark .flatpickr-day { color: #e5e7eb; }
 html.dark .flatpickr-day:hover,
 html.dark .flatpickr-day:focus { background: rgba(255, 255, 255, 0.08); border-color: transparent; }
-html.dark .flatpickr-day.today { border-color: #60a5fa; }
+html.dark .flatpickr-day.today { border-color: #d4d4d4; }
 html.dark .flatpickr-day.selected,
 html.dark .flatpickr-day.selected:hover { background: #2563eb; border-color: #2563eb; color: #fff; }
 html.dark .flatpickr-day.flatpickr-disabled,
@@ -98,7 +143,7 @@ html.dark .flatpickr-months .flatpickr-next-month:hover svg { fill: #fff; }
     cursor: pointer;
     white-space: nowrap;
 }
-.flatpickr-modernSelect-opt:hover { background: #eff6ff; color: #2563eb; }
+.flatpickr-modernSelect-opt:hover { background: #f4f6f5; color: #2563eb; }
 .flatpickr-modernSelect-opt.is-selected { background: #2563eb; color: #fff; font-weight: 600; }
 html.dark .flatpickr-modernSelect-panel { background: var(--ash); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
 html.dark .flatpickr-modernSelect-opt { color: #e5e7eb; }
@@ -146,7 +191,8 @@ body {
 }
 
 @theme {
-    --font-sans: 'Satoshi-Regular', 'Satoshi', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'DM Sans', sans-serif;
+    --font-weight-base: 399;
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -166,13 +212,34 @@ body {
     --color-accent-foreground: var(--color-white);
 
     /* Brand. Single source of truth for the primary action / link color. Tailwind's blue-600 is #2563eb,
-       but RshopRefills brand is the saturated #0044FF used on the hero glow and CTAs. The two are visually
+       but RshopRefill brand is the saturated #0044FF used on the hero glow and CTAs. The two are visually
        close at a glance, so most components can keep using `text-blue-600`/`bg-blue-600` and only swap to
        `text-brand`/`bg-brand` where we want the exact brand hue (hero, marketing CTAs, primary buttons). */
     --color-brand: #0044FF;
     --color-brand-hover: #0036cc;
-    --color-brand-50: #ebf0ff;
-    --color-brand-100: #d6e0ff;
+    --color-brand-50: #f4f6f5;
+    --color-brand-100: #e8ecea;
+
+    /* No light blue anywhere in the app. Tailwind's pale blues (50 to 400) are
+       redefined as the neutral greys the dashboard is built from, so every
+       bg-blue-50 tint, ring-blue-200 edge, text-blue-300 / text-blue-400 accent
+       and hover:bg-blue-100 across the storefront, dashboard and admin turns
+       neutral at once instead of being hunted down one class at a time. The
+       deep blues (500 and up) stay: they are the real accent. Sky and the pale
+       indigos get the same treatment, since they read as light blue too. */
+    --color-blue-50: #f4f6f5;
+    --color-blue-100: #e8ecea;
+    --color-blue-200: #dfe3e1;
+    --color-blue-300: #c9d0cd;
+    --color-blue-400: #a3aaa7;
+    --color-sky-50: #f4f6f5;
+    --color-sky-100: #e8ecea;
+    --color-sky-200: #dfe3e1;
+    --color-sky-300: #c9d0cd;
+    --color-sky-400: #a3aaa7;
+    --color-indigo-50: #f4f6f5;
+    --color-indigo-100: #e8ecea;
+    --color-indigo-200: #dfe3e1;
 
     /* Canonical radii — pick the named size in markup, not arbitrary px values. */
     --radius-sm:  0.5rem;     /* 8px  — pills, badges, tiny chips */
@@ -189,6 +256,17 @@ body {
 
     /* Standard transition. ~180ms with the Material-emphasis curve — fast but not abrupt. */
     --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* DM Sans at 399 is the body weight from the type spec. It sits just under
+   regular, which is the point of an off-axis number: the variable font renders
+   it exactly, where a static family would snap to 400. Set on body rather than
+   html so Tailwind's font-* utilities still win wherever a weight is asked for. */
+html,
+body {
+    font-family: 'DM Sans', sans-serif;
+    font-style: normal;
+    font-weight: var(--font-weight-base, 399);
 }
 
 @layer theme {
@@ -222,11 +300,28 @@ body {
     display: none;
 }
 
-/* Exception: the page itself keeps a modern slim scrollbar. */
+/* Exception: the page itself keeps a modern slim scrollbar.
+   Chromium draws its native Windows scrollbar, up/down arrow buttons and all,
+   whenever scrollbar-width or scrollbar-color is set, and ignores the
+   ::-webkit-scrollbar styling further down. So those two go back to auto
+   here (beating the `*` rule above) and the slim arrow-less bar comes from
+   ::-webkit-scrollbar; only browsers without it (Firefox) use the standard
+   properties, which draw no arrows there. */
 html,
 body {
-    scrollbar-width: thin;
-    scrollbar-color: #c4cad6 transparent;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+@supports not selector(::-webkit-scrollbar) {
+    html,
+    body {
+        scrollbar-width: thin;
+        scrollbar-color: #c4cad6 transparent;
+    }
+}
+html::-webkit-scrollbar-button,
+body::-webkit-scrollbar-button {
+    display: none;
 }
 
 /* Active sidebar item in dark mode — black tile with white icons.
@@ -242,19 +337,37 @@ html.dark .nav-item-active img {
 html.dark .nav-item-active svg {
     color: #ffffff;
 }
-/* The active class also carries `bg-blue-50` for light mode. In dark mode that
-   utility is globally remapped to navy (#15273f) further down the stylesheet,
-   which wins over the inline `dark:bg-black` utility due to source order. Pin
-   the active background to a deep navy here — slightly darker than the
-   sidebar surface so the active state still pops, but tinted toward the
-   brand palette instead of stark pure black. */
+/* The active row in dark mode. It used to be pinned to #0a1729, the soft-dark
+   navy, back when the active class carried `bg-blue-50` for light mode and that
+   utility was remapped to navy further down the stylesheet. Neither is true any
+   more: the active class is `bg-[#ffffff] dark:bg-black!`, whose `!` already
+   beats the remap, and soft dark is retired, so a navy here was the one place
+   it kept surfacing. Black in dark, a neutral charcoal on a true-black sidebar
+   where black would vanish. */
 html.dark .nav-item-active {
-    background-color: #0a1729 !important;
+    background-color: #000000 !important;
 }
-/* Extra Dark: the active link can't keep the navy tint on a true-black sidebar -
-   use a neutral charcoal that still pops against #000 without reintroducing blue. */
 html.dark.pure-dark .nav-item-active {
     background-color: #1a1a1a !important;
+}
+
+/* Hover on an INACTIVE sidebar row. Written here rather than as
+   hover:/dark:hover: utilities because those two tie on specificity, so which
+   one applies comes down to the order Tailwind emits them in - and the light
+   mode wash (white at 70%) landing on the near-black rail, or nothing landing
+   at all, is exactly what that tie looks like. One rule per theme cannot tie.
+   The dark value is deliberately stronger than the 5% it replaced: on #1a1a1e
+   that was invisible on most screens. */
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+    color: #000000;
+}
+html.dark .nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
+}
+html.dark.pure-dark .nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.14);
 }
 
 /* Inset row dividers — used across every admin list so the divider line
@@ -296,9 +409,9 @@ html.dark .divide-inset > *:hover {
 .divide-inset > *:has(+ *:hover)::after {
     background-color: transparent;
 }
-/* Card/row hover that used a white tint -> the deeper grey #1f1f1f, so every row
-   hovers to the same colour (cards rest at var(--ash), hover darkens one step). */
-html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+/* Card/row hover that used a white tint -> the shared interactive lift, so every
+   row visibly rises above cards resting at var(--ash). */
+html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 
 /* ── Admin table pattern ───────────────────────────────────────────────
    Mirrors the products-page variant list on every admin page that uses a
@@ -432,6 +545,16 @@ html.dark .admin-table tbody tr:not(:last-child) td:last-child {
         overflow-x: clip;
     }
 }
+
+/* The storefront clips at EVERY width, not just below lg.
+   The lg exemption above exists for the dashboard, whose collapsed-sidebar
+   flyouts deliberately render past the sidebar's edge. The storefront has no
+   such element, and leaving it unclipped meant any single over-wide track
+   could scroll the whole page sideways and shift every centred block with it.
+   `clip` creates no scroll container, so sticky positioning is unaffected. */
+body.storefront {
+    overflow-x: clip;
+}
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: block;
@@ -444,7 +567,11 @@ body::-webkit-scrollbar {
    `mx-[calc(50%-50vw)] w-screen` pair gave; named so there is one place to
    change it rather than one per carousel.
 
-   It does NOT try to correct for the vertical scrollbar. That was tried:
+   It no longer measures with 100vw, because 100vw counts the vertical
+   scrollbar and the tracks overhung it by exactly that much on every page long
+   enough to scroll.
+
+   Correcting for the bar in pure CSS was tried first and does not work:
    `body { --sbw: calc(100vw - 100%) }` reads like it measures the bar, but a
    custom property is substituted as tokens and its `100%` resolves against the
    element that USES it, not against body. Inside this rule it therefore became
@@ -452,14 +579,23 @@ body::-webkit-scrollbar {
    roughly the content column and the tracks stopped bleeding at all - they
    stopped scrolling edge to edge with them.
 
-   Measuring the bar needs JS (innerWidth - documentElement.clientWidth) written
-   to a real px custom property. Until something needs that, the ~5px offset
-   from 100vw counting the scrollbar is the lesser problem: it is a small
-   visual shift, where the broken version was a functional regression. */
+   Measuring the usable width needs JS. That is now done: app.js sizes a
+   fixed-position probe, whose containing block is the viewport itself, and
+   publishes the result as --page-w in real pixels on load, on resize and after
+   each Livewire navigation. The rule below is written against that. */
 
 .full-bleed {
-  margin-inline: calc(50% - 50vw);
-  width: 100vw;
+  /* --page-w is body's own content width, published by app.js. Centring
+     against THAT rather than against 100vw means the track never has to know
+     where the browser put the scrollbar gutter, or whether it split it across
+     both edges. 50% is half this element's container, which is itself centred
+     in body, so the two halves cancel and the track lands flush with the
+     page's usable area on both sides.
+
+     Falls back to 100vw before the bundle runs. That is the old behaviour: a
+     track a scrollbar's width too wide, rather than a broken one. */
+  width: var(--page-w, 100vw);
+  margin-inline: calc(50% - (var(--page-w, 100vw) / 2));
 }
 
 /* Storefront outline colour ---------------------------------------------
@@ -682,12 +818,20 @@ html.dark .trust-glow {
    repaint - which made the card colour visibly shift while the typewriter
    greeting animated above it. These solid gradients match the old composited
    look (the semi-transparent blue blended over the page) without re-sampling. */
+/* The wallet card is the deep blue of the "Give the Perfect Gift" promo in
+   BOTH themes, so the two hero cards on the overview read as a pair. It was a
+   pale blue gradient, which made it the only gradient left on the dashboard
+   and left it floating between the white cards and the dark promo.
+
+   Solid, not a gradient, and the exact token bg-blue-950 resolves to, so the
+   two cards cannot drift apart if the palette is retuned. Its contents carry
+   white ink unconditionally now, for the same reason. */
 .wallet-glass {
-    background: linear-gradient(180deg, #d5e7fe 0%, #b6d8fe 100%);
+    background: var(--color-blue-950, #172554);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.55),
-        inset 0 -1px 0 rgba(15, 23, 42, 0.06),
-        0 10px 30px -10px rgba(15, 23, 42, 0.20);
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+        0 10px 30px -10px rgba(15, 23, 42, 0.35);
 }
 html.dark .wallet-glass {
     background: var(--ash);
@@ -782,11 +926,29 @@ html.dark .nav-glass {
    so it is invisible at rest and simply hides whatever passes under it.
    The frosted version read as a smeared strip across the top of the screen -
    cards scrolling beneath stayed half-legible through the blur, and its white
-   gradient sat a shade off the #eff6ff page it was covering. No border and no
+   gradient sat a shade off the page it was covering. No border and no
    shadow either: nothing should announce where the band ends. */
 .nav-band-top {
-    background: #eff6ff;
+    background: #f4f6f5;
 }
+/* Cart dropdown / sheet.
+
+   In dark mode it wore a translucent navy (#0c1a36 at 80-90%) that the theme's
+   navy remap never caught, because Tailwind emits an opacity modifier as its
+   own class. So while every other dark surface had been remapped to the black
+   tiers, this one panel stayed blue and read as a different theme.
+
+   It now wears the PAGE ground with the same grain, so the dropdown looks like
+   a piece of the page lifted up rather than a foreign card. Opaque on purpose:
+   the blur behind it was only ever there to stop the translucency turning the
+   content behind into noise. Light mode keeps its frosted white. */
+html.dark .cart-panel {
+    background-color: var(--ground);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+    backdrop-filter: none;
+}
+
 html.dark .nav-band-top {
     background-color: var(--ground);
     background-image: var(--grain);
@@ -858,18 +1020,49 @@ html.dark .nav-band-top {
    the pattern at its own origin, so the bar would seam against the page). */
 
 .nav-surface { background-color: #ffffff; }
-.dark .nav-surface { background-color: transparent; }
+/* Dark used to be transparent so the nav simply showed the body's ground. That
+   worked while the header scrolled away with the page; it PINS now, so a
+   transparent bar lets the page slide underneath and read straight through it.
+
+   It takes --ash rather than --ground: the ground is #060607, near enough to
+   black that a bar painted in it reads as a black strip laid over the page, and
+   a pinned bar is a surface ABOVE the content, which is what --ash is for
+   everywhere else in the app. The grain comes with it, as on every other ash
+   surface. */
+.dark .nav-surface {
+    background-color: var(--ash);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+}
+/* Phones take flat black instead. The bar spans the full width there, with the
+   status-bar strip above it in the installed PWA, so it reads as the top of the
+   device rather than as a card sitting on the page, and #000000 is the only
+   value that meets the screen edge without a seam. No grain: the point of the
+   texture is to stop a large surface looking dead, and this one is a 64px
+   strip. md is where the phone layout ends (the search row is md:hidden). */
+@media (max-width: 767.98px) {
+    .dark .nav-surface {
+        background-color: #000000;
+        background-image: none;
+    }
+}
 
 /* Card text ------------------------------------------------------------
    Supplied spec: Roobert 500, 16/24, #001A18.
 
-   Roobert is a licensed face and is NOT in this repo - there are no font files
-   and no @font-face for it. It leads the stack so the design resolves the
-   moment the woff2 files are added under public/fonts and an @font-face is
-   declared; until then the platform fallbacks carry it. The "bitrefill" entry
-   from the supplied stack is dropped: that is the source site's own icon font,
-   which we do not have, and a dead family name in the middle of a stack only
-   slows matching. */
+   Neither the face nor the weight is the one the spec names, and both
+   departures are deliberate. Roobert is a licensed face and was never in this
+   repo - no font files, no @font-face - so a stack led by it resolved to a
+   platform fallback on every machine and naming it only slowed matching. DM
+   Sans is the site face now, imported at the top of this file as a VARIABLE
+   font, and the card text wears it like everything else.
+
+   399 rather than 500 for the same reason the nav below is 399: the design
+   calls for that exact off-axis cut, which only a variable font can render.
+
+   The "bitrefill" entry from the supplied stack stays dropped: that is the
+   source site's own icon font, which we do not have, and a dead family name in
+   the middle of a stack is the same wasted match Roobert had become. */
 
 /* .card-text-face is the type on its own - stack, weight, and 16/24 metrics
    with no colour. The hero subtitle borrows it: that block keeps light-theme
@@ -877,10 +1070,9 @@ html.dark .nav-band-top {
    pick up the card's dark-mode white along with the face. */
 .card-text-face,
 .card-text {
-  font-family: Roobert, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
-    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  font-family: 'DM Sans', sans-serif;
   font-style: normal;
-  font-weight: 500;
+  font-weight: 399;
   font-size: 16px;
   line-height: 24px;
 }
@@ -890,13 +1082,15 @@ html.dark .nav-band-top {
 
    Same stack as .card-text, at the nav's own metrics.
 
-   The weight is 500, NOT the 750 the spec asks for, and that is deliberate.
-   750 is a variable-font weight, and Roobert is not in this repo (see the note
-   above) - so the platform fallbacks in the stack, none of which are variable,
-   snap it to their nearest cut, which is full bold. At 16px inside a pill that
-   reads far heavier than Roobert 750 would. 500 matches the card face beside
-   it. Restore 750 here once the licensed woff2 files land under public/fonts
-   and there is a real @font-face to interpolate it.
+   Neither the face nor the weight is the one the spec names, and both
+   departures are deliberate. Roobert was never licensed into this repo, so a
+   stack led by a family that does not exist resolved to a platform fallback on
+   every machine and the spec was decorative. DM Sans is the site face now, and
+   the nav wears it like everything else.
+
+   The weight is 399 rather than 750 for the same reason it is 399 in the card
+   face: DM Sans is variable, so it holds that exact cut, and the nav is chrome.
+   At 750 the bar read heavier than the page it sits above.
 
    Line-height equals the font size, so these controls are sized by their own
    padding rather than by leading - which is what keeps a 16px label inside a
@@ -907,10 +1101,9 @@ html.dark .nav-band-top {
    active category pill's inverted ink. The spec colour rides along as a
    text-[#002926] utility on each control instead. */
 .nav-text {
-  font-family: Roobert, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
-    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  font-family: 'DM Sans', sans-serif;
   font-style: normal;
-  font-weight: 500;
+  font-weight: 399;
   font-size: 16px;
   line-height: 16px;
 }
@@ -997,10 +1190,9 @@ html.dark .nav-band-top {
      the same pairing the hero chips have - a neutral edge with a blue glow off
      it, rather than one colour doing both jobs.
 
-     70px, not the 26px this started at. On home the card and the page are now
-     the same #ffffff, so the ring colour travelling well into the face is what
-     gives the card an edge at all - a 26px hairline left it indistinguishable
-     from the page behind it. */
+     70px, not the 26px this started at. The ring colour travelling well into
+     the face gives the card a soft illuminated edge; a 26px hairline made the
+     effect disappear too quickly. */
   background: radial-gradient(120% 78% at 50% 116%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 62%);
   box-shadow: inset 0 0 70px 4px rgba(191, 235, 255, 0.85);
   border-radius: inherit;
@@ -1029,17 +1221,12 @@ html.dark .nav-band-top {
 .trust-panel .cat-card-glow {
   box-shadow: inset 0 0 200px 10px rgba(191, 235, 255, 0.85);
 }
-/* The home panel is the exception, and has to opt back in: at four times a
-   tile's size the same layer reads as a soft wash across a large surface rather
-   than a halo on a small one. Accent, never white - white here is a grey haze
-   on the near-black ground. */
-.dark .trust-panel .cat-card-glow {
-  display: block;
-  background:
-    radial-gradient(120% 78% at 50% 116%, rgba(122, 162, 255, 0.18) 0%, rgba(122, 162, 255, 0) 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0) 58%);
-  box-shadow: inset 0 0 200px 10px rgba(122, 162, 255, 0.22);
-}
+/* The home panel used to opt back into the glow in dark mode, with a blue
+   wash across its whole face. At four times a tile's size that read as a
+   different surface entirely: the panel came out navy while the four category
+   cards above it stayed near-black, so the page looked like two themes meeting.
+   It now inherits the rule above and paints nothing, which is what those cards
+   do. (It was also the last gradient on this page.) */
 
 /* Home panel ------------------------------------------------------------
    The block holding the payment pyramid and the trust row. It wears the SAME
@@ -1135,6 +1322,11 @@ html.dark .nav-band-top {
      lighter fill. A third surface is what makes a dark UI look muddy. */
   --ash: #1a1a1e;
 
+  /* Interactive lift above --ash. Keeping this separate from the resting card
+     token prevents dark buttons, rows and carousel controls from resolving to
+     the same computed colour before and during hover. */
+  --ash-hover: #232328;
+
   /* The grain, as a background-image rather than an overlay layer. The spec
      paints it at 0.14 in the rect and 0.5 on the layer; 0.07 in the rect is
      the same result baked in, and a background can never sit on top of
@@ -1186,8 +1378,8 @@ footer.footer-ground {
 .dark footer.footer-ground .text-zinc-600 { color: #b6bcc6; }
 .dark footer.footer-ground .text-zinc-500 { color: #99a1ad; }
 .dark footer.footer-ground .hover\:text-zinc-900:hover { color: #ffffff; }
-.dark footer.footer-ground .text-blue-600 { color: #93c5fd; }
-.dark footer.footer-ground .hover\:text-blue-700:hover { color: #bfdbfe; }
+.dark footer.footer-ground .text-blue-600 { color: #e5e5e5; }
+.dark footer.footer-ground .hover\:text-blue-700:hover { color: #ffffff; }
 
 /* Tiles that must read as a thing sitting on the ground get --ash, the one
    step up: the social pills and the two app-store pills. Dividers and rings
@@ -1250,6 +1442,45 @@ html.dark .glass-panel {
 #nprogress .spinner-icon {
     border-top-color: #0044FF !important;
     border-left-color: #0044FF !important;
+}
+
+/* Dark mode: the bar goes white. Brand blue on the near-black ground is the
+   one place the brand colour works against itself - it is a 3px line the eye
+   has to catch at the very top of the screen, and blue-on-black is the lowest
+   contrast pairing on the site. #e5e5e5 rather than pure #fff to match the two
+   other loading indicators (.app-loader__progress and .rshop-ptr-circle), which
+   already switch to exactly this. The light rules above use !important, so
+   these have to as well. */
+html.dark #nprogress .bar {
+    background: #e5e5e5 !important;
+}
+html.dark #nprogress .peg {
+    box-shadow: 0 0 10px rgba(229, 229, 229, 0.7), 0 0 5px rgba(229, 229, 229, 0.7) !important;
+}
+html.dark #nprogress .spinner-icon {
+    border-top-color: #e5e5e5 !important;
+    border-left-color: #e5e5e5 !important;
+}
+
+/* iOS Safari zooms the entire page in when a field is focused whose text is
+   smaller than 16px, and it does not zoom back out when the field is blurred.
+   That is what "the page grows when I type" is: not a layout bug, a browser
+   behaviour with one documented trigger.
+
+   The fields on this site are designed at 13-15px, so nearly every form had it:
+   the nav search at 13px, the contact and inquiry forms at 14px, the footer
+   newsletter at 15px. The auth forms were already at 16px, which is why they
+   never did it.
+
+   Only below the md breakpoint, so the designed sizes are untouched on desktop
+   where no zoom happens. Checkboxes and radios are excluded: they have no text
+   to zoom and some are sized in em. */
+@media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+        font-size: 16px;
+    }
 }
 
 /* Keep Alpine x-cloak elements hidden until Alpine initialises them, so
@@ -1381,12 +1612,104 @@ html.dark .dark\:bg-zinc-900 { background-color: var(--ash); background-image: v
 .dark .bg-zinc-200       { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* card surface (one grey) */
 .dark .bg-\[\#eff6ff\]   { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* card (page bodies carry their own dark:bg-[#0c1a36]) */
 
+/* Dashboard light surfaces are white cards on a #f4f6f5 page, with no card
+   borders. Those two classes are the card marker now, the way bg-[#eff6ff]
+   was, so dark mode has to recognise them the same way. Scoped to
+   body.dashboard on purpose: the storefront also uses bg-[#ffffff] and
+   handles its own dark surfaces per element, and must not be caught. */
+html.dark body.dashboard .bg-\[\#ffffff\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* card */
+
+/* Escape hatch, mirroring img.no-dark-invert above.
+   Some surfaces are deliberately dark in BOTH themes - the "Give the Perfect
+   Gift" promo is bg-blue-950 at all times - and the light button sitting on
+   one has to stay light, or a white button with text-blue-950 becomes dark
+   grey text on dark grey and disappears. The rule above would repaint it, so
+   anything inside an always-dark block opts back out here. */
+html.dark body.dashboard .bg-blue-950 .bg-\[\#ffffff\],
+html.dark body.dashboard .bg-zinc-900 .bg-\[\#ffffff\],
+html.dark body.dashboard .keep-light.bg-\[\#ffffff\] {
+    background-color: #ffffff;
+    background-image: none;
+}
+html.dark body.dashboard .bg-blue-950 .bg-\[\#f4f6f5\],
+html.dark body.dashboard .bg-zinc-900 .bg-\[\#f4f6f5\],
+html.dark body.dashboard .keep-light.bg-\[\#f4f6f5\] {
+    background-color: #f4f6f5;
+    background-image: none;
+}
+
+/* The HOVER halves of the same two surfaces.
+   The rules above remap the resting classes, but Tailwind emits the hover
+   variant as its own selector, so `hover:bg-[#ffffff]` was still painting
+   literal white in dark mode - a light row under light text, which is
+   unreadable. Both hovers lift one step above the card instead, matching
+   .divide-inset above, which is the established dark row highlight. */
+html.dark body.dashboard .hover\:bg-\[\#ffffff\]:hover,
+html.dark body.dashboard .hover\:bg-\[\#f4f6f5\]:hover {
+    background-color: #232328;   /* cards rest at var(--ash); hover lifts one step */
+    background-image: none;
+}
+
+/* ...and the escape hatch again: a light control on an always-dark promo
+   hovers within the light palette, not into the dark one. */
+html.dark body.dashboard .bg-blue-950 .hover\:bg-\[\#f4f6f5\]:hover,
+html.dark body.dashboard .bg-zinc-900 .hover\:bg-\[\#f4f6f5\]:hover,
+html.dark body.dashboard .keep-light.hover\:bg-\[\#f4f6f5\]:hover {
+    background-color: #f4f6f5;
+    background-image: none;
+}
+html.dark body.dashboard .bg-blue-950 .hover\:bg-\[\#ffffff\]:hover,
+html.dark body.dashboard .bg-zinc-900 .hover\:bg-\[\#ffffff\]:hover,
+html.dark body.dashboard .keep-light.hover\:bg-\[\#ffffff\]:hover {
+    background-color: #ffffff;
+    background-image: none;
+}
+html.dark body.dashboard .bg-\[\#f4f6f5\] { background-color: var(--ground); }   /* page tone, and a chip sunk into a card */
+
+/* One page ground across the dashboard.
+   The dashboard shop pages reuse the storefront views, and those open with a
+   full-height slab in the storefront's own page tone (bg-[#eff6ff] on gift
+   cards and top-ups, bg-zinc-100 on bills, cart and checkout). Inside the
+   dashboard that slab covered the dashboard's ground and wallpaper, so shop
+   pages wore a different light background, and in dark mode a card-grey one,
+   from every other dashboard page. Only the page-level slab steps aside; the
+   cards inside keep their surfaces. The selector out-ranks the !important
+   dark page-tone rule for .min-h-full wrappers above. */
+html body.dashboard [data-page-content] > div > :is(section, div).min-h-full:is(.bg-\[\#eff6ff\], .bg-zinc-100) {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
 /* Hardcoded navy values used across components (overwhelmingly as dark:bg-[#hex],
    none with !important) remapped to the same black tiers so every surface is
    consistent. `html.dark` lifts specificity above Tailwind's generated dark: rule;
    the plain bg-[#0c1a36] (always-dark pills/banners) is folded in too. */
 .dark .bg-\[\#0c1a36\],
 html.dark .dark\:bg-\[\#0c1a36\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* modals / panels / pills lift to card grey */
+
+/* The nav's category flyout is chrome, not a panel.
+
+   It is a <div>, so the rule above treated it as a modal and lifted it to the
+   card grey - while the header it drops out of keeps the page black. The two
+   met in a visible seam right under the nav bar. It wears the page ground
+   instead, so the flyout reads as the header growing taller. Declared after
+   that rule and at equal specificity, so it wins the tie. */
+html.dark .nav-flyout {
+    /* Matches the bar it hangs from. .nav-surface used to be transparent, so
+       this painted the body's ground to match what showed through; the nav
+       paints --ash itself now that the header is sticky, so the flyout takes
+       --ash too. Any other value puts a seam right under the bar, which is the
+       one place a flyout must not have one: it should read as the header
+       growing taller.
+
+       background-attachment: fixed anchors the texture to the viewport rather
+       than to this element's own box, so the grain lines up with the page's
+       instead of restarting at the flyout's top edge. */
+    background-color: var(--ash);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+    background-attachment: fixed;
+}
 /* Page-level surfaces (body / main / section / page-content / full-height wrappers)
    keep the black page tone; the !important + higher specificity overrides the
    card-grey flip above so only chrome stays black while every panel goes grey. */
@@ -1444,12 +1767,12 @@ html.dark .dark\:bg-\[\#13294d\] { background-color: var(--ash); background-imag
 html.dark .dark\:bg-\[\#1d3252\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* card / elevated */
 html.dark .dark\:bg-\[\#26416b\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }   /* chip / input -> one grey */
 html.dark .dark\:bg-\[\#0a1729\] { background-color: var(--ground); }   /* admin recessed */
-/* Hover tints -> the deeper grey #1f1f1f, matching the card/row hover. */
-html.dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-html.dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-html.dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-html.dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-/* Blue hover tints (admin action rows/buttons) -> the same deeper grey #1f1f1f,
+/* Hover tints -> the shared interactive lift, matching the card/row hover. */
+html.dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+html.dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+html.dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+html.dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+/* Blue hover tints (admin action rows/buttons) -> the same neutral hover lift,
    so every dark-mode hover is neutral instead of a light-blue cast. Matches the
    settings page, whose hover:bg-blue-50 already resolves to grey. */
 html.dark .dark\:hover\:bg-blue-600\/10:hover,
@@ -1459,7 +1782,7 @@ html.dark .dark\:hover\:bg-blue-600\/25:hover,
 html.dark .dark\:hover\:bg-blue-500\/10:hover,
 html.dark .dark\:hover\:bg-blue-500\/15:hover,
 html.dark .dark\:hover\:bg-blue-500\/20:hover,
-html.dark .dark\:hover\:bg-blue-500\/25:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+html.dark .dark\:hover\:bg-blue-500\/25:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 /* Navy borders / rings -> neutral grey so outlines match the black surfaces. */
 html.dark .dark\:border-\[\#24364f\] { border-color: #3a3a3a; }
 html.dark .dark\:ring-\[\#24364f\]   { --tw-ring-color: #3a3a3a; }
@@ -1584,14 +1907,14 @@ html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
    ones to a subtle hover-lift (slightly lighter than the dark surface). */
 .dark .hover\:bg-white:hover,
 .dark .hover\:bg-zinc-50:hover,
-.dark .hover\:bg-zinc-100:hover  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark .hover\:bg-zinc-200:hover  { background-color: #1f3048; }
-.dark .hover\:bg-zinc-300:hover  { background-color: #243752; }
+.dark .hover\:bg-zinc-100:hover,
+.dark .hover\:bg-zinc-200:hover,
+.dark .hover\:bg-zinc-300:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 /* Blue-tinted hovers (nav / menu items) go GREY in every dark mode, not navy -
    Soft Dark previously kept a light-blue cast here; match the neutral #1f1f1f
    hover the rest of the dark UI uses. */
-.dark .hover\:bg-blue-50:hover   { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark .hover\:bg-blue-100:hover  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark .hover\:bg-blue-50:hover   { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark .hover\:bg-blue-100:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 .dark .hover\:bg-white\/70:hover { background-color: rgb(31 31 31 / 0.9); }
 .dark .focus\:bg-white:focus,
 .dark .focus\:bg-zinc-50:focus,
@@ -1621,7 +1944,7 @@ html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
 
 /* Blue accent text lightens so links / selected labels stay legible on dark. */
 .dark .text-blue-600,
-.dark .text-blue-700 { color: #60a5fa; }
+.dark .text-blue-700 { color: #f4f4f5; }
 
 /* Dark icon SVGs (rendered as <img>) are dark artwork — invert every one to
    light so they read on the dark surface. !important beats inline filters.
@@ -1685,10 +2008,37 @@ html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
 .dark img[src*="Latest%20transactions.webp"] {
     filter: brightness(0) invert(1) !important;
 }
-/* RShopRefills brand logo PNG renders as dark wordmark on transparent — flip it
-   to white in dark mode so it reads on the navy chrome (nav, footer, auth, admin
-   sidebar). */
-.dark img[src*="Rshoprefillslogo.webp"] {
+/* The pinned worldwide eSIM card wears a lit blue edge, so it reads as the
+   hero of that grid. Declared here rather than in the card component: that
+   component renders once per destination, and a <style> block inside it would
+   ship the same two rules 214 times. */
+.esim-tile-featured {
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), 0 10px 30px rgba(37, 99, 235, 0.25);
+}
+.esim-tile-featured:hover {
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.18), 0 14px 36px rgba(37, 99, 235, 0.32);
+}
+
+/* Search fields render their own clear button, so the browser's native one is
+   a second X sitting beside ours. Hidden here rather than by switching the
+   inputs to type="text", which would cost the search semantics and the mobile
+   keyboard's search key. Also kills the legacy WebKit results decoration. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+}
+
+/* RshopRefill brand logo PNG renders as a blue wordmark on transparent — flip
+   it to white in dark mode so it reads on the dark chrome (nav, footer, auth,
+   admin sidebar). The named class covers the responsive nav <picture>, whose
+   desktop logo.webp lives on <source> while the underlying <img src> remains
+   PWAicon.webp; an img[src] selector cannot see the selected source. */
+.dark .site-logo,
+.dark img[src*="logo.webp"] {
     filter: brightness(0) invert(1) !important;
 }
 
@@ -1735,13 +2085,20 @@ html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
    area (`.bg-[#eff6ff]`). We don't tighten the sidebar, the modals,
    or any storefront page — just the cards inside the dashboard.
    ------------------------------------------------------------ */
-.compact .bg-\[\#eff6ff\] .gap-6     { gap: 1rem; }
-.compact .bg-\[\#eff6ff\] .gap-5     { gap: 0.75rem; }
-.compact .bg-\[\#eff6ff\] .p-5       { padding: 0.875rem; }
-.compact .bg-\[\#eff6ff\] .p-6       { padding: 1rem; }
-.compact .bg-\[\#eff6ff\] .sm\:p-6   { padding: 1rem; }
-.compact .bg-\[\#eff6ff\] .lg\:py-8  { padding-top: 1rem; padding-bottom: 1rem; }
-.compact .bg-\[\#eff6ff\] .py-6      { padding-top: 1rem; padding-bottom: 1rem; }
+.compact .bg-\[\#eff6ff\] .gap-6,
+.compact body.dashboard .bg-\[\#ffffff\] .gap-6     { gap: 1rem; }
+.compact .bg-\[\#eff6ff\] .gap-5,
+.compact body.dashboard .bg-\[\#ffffff\] .gap-5     { gap: 0.75rem; }
+.compact .bg-\[\#eff6ff\] .p-5,
+.compact body.dashboard .bg-\[\#ffffff\] .p-5       { padding: 0.875rem; }
+.compact .bg-\[\#eff6ff\] .p-6,
+.compact body.dashboard .bg-\[\#ffffff\] .p-6       { padding: 1rem; }
+.compact .bg-\[\#eff6ff\] .sm\:p-6,
+.compact body.dashboard .bg-\[\#ffffff\] .sm\:p-6   { padding: 1rem; }
+.compact .bg-\[\#eff6ff\] .lg\:py-8,
+.compact body.dashboard .bg-\[\#ffffff\] .lg\:py-8  { padding-top: 1rem; padding-bottom: 1rem; }
+.compact .bg-\[\#eff6ff\] .py-6,
+.compact body.dashboard .bg-\[\#ffffff\] .py-6      { padding-top: 1rem; padding-bottom: 1rem; }
 
 /* ------------------------------------------------------------
    ApexCharts glass tooltip overrides
@@ -1793,6 +2150,13 @@ html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
 .dark.pure-dark .bg-zinc-100       { background-color: var(--ground); }
 .dark.pure-dark .bg-zinc-200       { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
 .dark.pure-dark .bg-\[\#eff6ff\]   { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark body.dashboard .bg-\[\#ffffff\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark body.dashboard .bg-blue-950 .bg-\[\#ffffff\],
+.dark.pure-dark body.dashboard .bg-zinc-900 .bg-\[\#ffffff\],
+.dark.pure-dark body.dashboard .keep-light.bg-\[\#ffffff\] { background-color: #ffffff; background-image: none; }
+.dark.pure-dark body.dashboard .bg-\[\#f4f6f5\] { background-color: var(--ground); }
+.dark.pure-dark body.dashboard .hover\:bg-\[\#ffffff\]:hover,
+.dark.pure-dark body.dashboard .hover\:bg-\[\#f4f6f5\]:hover { background-color: #232328; background-image: none; }
 .dark.pure-dark .bg-\[\#f9fafb\]   { background-color: var(--ground); }
 /* Page bodies / mains carry `dark:bg-[#0c1a36]` for the page tone; that variant
    must beat the card-tone bg-[#eff6ff]/bg-white remaps (equal specificity, so it
@@ -1867,11 +2231,11 @@ html.dark .dark\:bg-\[\#0c1a36\]\! { background-color: var(--ash) !important; ba
   background-size: 220px 220px !important;
 }
 .dark.pure-dark .dark\:bg-\[\#13294d\] { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .dark\:hover\:bg-\[\#26416b\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .dark\:hover\:bg-\[\#34507a\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 /* Admin-only base + hover hexes (#0a1729 is the admin deep seam). */
-.dark.pure-dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: var(--ground); }
-.dark.pure-dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .dark\:hover\:bg-\[\#0a1729\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .dark\:hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 
 /* Opacity-suffixed navy overlays (frosted panels, sheets, scrims) — keep the
    alpha, swap the navy base for black/charcoal. Each /NN variant is its own
@@ -1917,13 +2281,13 @@ html.dark .dark\:bg-\[\#0c1a36\]\! { background-color: var(--ash) !important; ba
 /* Hover / focus lifts */
 .dark.pure-dark .hover\:bg-white:hover,
 .dark.pure-dark .hover\:bg-zinc-50:hover,
-.dark.pure-dark .hover\:bg-zinc-100:hover  { background-color: #1a1a1a; }
+.dark.pure-dark .hover\:bg-zinc-100:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 /* Hover lift for the always-dark navy pill (mobile category picker trigger). */
-.dark.pure-dark .hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .hover\:bg-zinc-200:hover  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .hover\:bg-zinc-300:hover  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .hover\:bg-blue-50:hover   { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
-.dark.pure-dark .hover\:bg-blue-100:hover  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .hover\:bg-\[\#1d3252\]:hover { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .hover\:bg-zinc-200:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .hover\:bg-zinc-300:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .hover\:bg-blue-50:hover   { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
+.dark.pure-dark .hover\:bg-blue-100:hover  { background-color: var(--ash-hover); background-image: var(--grain); background-size: 220px 220px; }
 .dark.pure-dark .focus\:bg-white:focus,
 .dark.pure-dark .focus\:bg-zinc-50:focus,
 .dark.pure-dark .focus\:bg-zinc-100:focus  { background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; }
@@ -1957,6 +2321,93 @@ html.dark.pure-dark .dash-shimmer {
     background-color: var(--ash); background-image: var(--grain); background-size: 220px 220px; /* match the card grey; cards already sit at var(--ash) above the black page */
 }
 
+/* Dark interactive-state repairs -----------------------------------------
+   The palette remaps above are intentionally unlayered so they can repaint
+   Tailwind's light-authored utilities. That also puts them above Tailwind's
+   layered hover/group-hover utilities in the cascade. Re-state the interactive
+   colors here, after both dark ramps, so the requested hover state wins while
+   preserving the neutral dark palette. */
+
+/* Text hovers on the element itself. */
+html.dark .hover\:text-black:hover,
+html.dark .hover\:text-zinc-900:hover,
+html.dark .hover\:text-white:hover { color: #ffffff; }
+html.dark .hover\:text-zinc-800:hover { color: #f4f4f5; }
+html.dark .hover\:text-zinc-700:hover { color: #e6e6e8; }
+html.dark .hover\:text-zinc-600:hover { color: #c8c8cd; }
+html.dark .hover\:text-blue-200:hover { color: var(--color-blue-200); }
+html.dark .hover\:text-blue-300:hover { color: var(--color-blue-300); }
+html.dark .hover\:text-blue-500:hover { color: var(--color-blue-500); }
+html.dark .hover\:text-blue-600:hover,
+html.dark .hover\:text-blue-700:hover,
+html.dark .hover\:text-blue-800:hover { color: #ffffff; }
+html.dark .hover\:text-emerald-600:hover { color: var(--color-emerald-400); }
+html.dark .hover\:text-red-600:hover,
+html.dark .hover\:text-red-700:hover { color: var(--color-red-300); }
+html.dark .hover\:text-indigo-700:hover { color: var(--color-indigo-200); }
+
+/* Explicit dark hover variants. */
+html.dark .dark\:hover\:text-white:hover { color: #ffffff; }
+html.dark .dark\:hover\:text-zinc-200:hover { color: #e6e6e8; }
+html.dark .dark\:hover\:text-zinc-300:hover { color: #d6d6da; }
+html.dark .dark\:hover\:text-blue-200:hover { color: var(--color-blue-200); }
+html.dark .dark\:hover\:text-blue-300:hover { color: var(--color-blue-300); }
+html.dark .dark\:hover\:text-blue-400:hover { color: var(--color-blue-400); }
+html.dark .dark\:hover\:text-emerald-400:hover { color: var(--color-emerald-400); }
+html.dark .dark\:hover\:text-red-300:hover { color: var(--color-red-300); }
+
+/* Descendant states driven by a hovered group. */
+html.dark .group:hover .group-hover\:text-white { color: #ffffff; }
+html.dark .group:hover .group-hover\:text-blue-500 { color: var(--color-blue-500); }
+html.dark .group:hover .group-hover\:text-blue-600,
+html.dark .group:hover .group-hover\:text-blue-700 { color: #ffffff; }
+html.dark .group:hover .dark\:group-hover\:text-blue-300 { color: var(--color-blue-300); }
+html.dark .group:hover .group-hover\:bg-white,
+html.dark .group:hover .group-hover\:bg-blue-100 {
+    background-color: var(--ash-hover);
+    background-image: var(--grain);
+    background-size: 220px 220px;
+}
+html.dark .group:hover .group-hover\:bg-blue-600 { background-color: var(--color-blue-600); }
+html.dark .group:hover .dark\:group-hover\:bg-white\/15 { background-color: rgb(255 255 255 / 0.15); }
+
+/* Border hovers. Resting dark borders are #3a3a3a; neutral hovers step up to
+   #4a4a4f while semantic/brand hovers retain their requested color. */
+html.dark .hover\:border-zinc-300:hover,
+html.dark .hover\:border-zinc-400:hover,
+html.dark .hover\:border-zinc-500:hover { border-color: #4a4a4f; }
+html.dark .hover\:border-blue-300:hover { border-color: var(--color-blue-300); }
+html.dark .hover\:border-blue-500:hover { border-color: var(--color-blue-500); }
+html.dark .hover\:border-blue-600:hover { border-color: var(--color-blue-600); }
+html.dark .hover\:border-green-200:hover { border-color: var(--color-green-400); }
+html.dark .hover\:border-red-400:hover { border-color: var(--color-red-400); }
+html.dark .dark\:hover\:border-zinc-500:hover { border-color: #4a4a4f; }
+html.dark .dark\:hover\:border-white:hover { border-color: #ffffff; }
+html.dark .dark\:hover\:border-white\/20:hover { border-color: rgb(255 255 255 / 0.20); }
+html.dark .dark\:hover\:border-white\/30:hover { border-color: rgb(255 255 255 / 0.30); }
+html.dark .dark\:hover\:border-blue-300:hover { border-color: var(--color-blue-300); }
+html.dark .dark\:hover\:border-blue-400\/40:hover { border-color: rgb(163 170 167 / 0.40); }
+html.dark .dark\:hover\:border-blue-400\/50:hover { border-color: rgb(163 170 167 / 0.50); }
+html.dark .dark\:hover\:border-blue-500\/50:hover { border-color: rgb(59 130 246 / 0.50); }
+html.dark .dark\:hover\:border-red-500:hover { border-color: var(--color-red-500); }
+html.dark .group:hover .group-hover\:border-blue-600 { border-color: var(--color-blue-600); }
+html.dark .group:hover .dark\:group-hover\:border-blue-400 { border-color: var(--color-blue-400); }
+
+/* Ring-color hovers. Ring width utilities continue to come from Tailwind. */
+html.dark .hover\:ring-zinc-300:hover { --tw-ring-color: #4a4a4f; }
+html.dark .hover\:ring-blue-400:hover { --tw-ring-color: var(--color-blue-400); }
+html.dark .hover\:ring-gray-900:hover { --tw-ring-color: #4a4a4f; }
+html.dark .hover\:ring-red-200:hover { --tw-ring-color: var(--color-red-300); }
+html.dark .hover\:ring-white\/60:hover { --tw-ring-color: rgb(255 255 255 / 0.60); }
+html.dark .hover\:ring-\[\#c9d0cd\]:hover { --tw-ring-color: #c9d0cd; }
+html.dark .dark\:hover\:ring-white\/25:hover { --tw-ring-color: rgb(255 255 255 / 0.25); }
+html.dark .dark\:hover\:ring-white\/40:hover { --tw-ring-color: rgb(255 255 255 / 0.40); }
+html.dark .dark\:hover\:ring-white\/50:hover { --tw-ring-color: rgb(255 255 255 / 0.50); }
+html.dark .dark\:hover\:ring-blue-400:hover { --tw-ring-color: var(--color-blue-400); }
+html.dark .dark\:hover\:ring-blue-700:hover { --tw-ring-color: var(--color-blue-700); }
+html.dark .dark\:hover\:ring-red-500\/30:hover { --tw-ring-color: rgb(239 68 68 / 0.30); }
+html.dark .group:hover .group-hover\:ring-zinc-300 { --tw-ring-color: #4a4a4f; }
+
 /* ============================================================
    LIGHT THEME SURFACES (gray page + white elevated cards)
    Scoped with html:not(.dark) so it ONLY affects light mode - the
@@ -1977,3 +2428,145 @@ html:not(.dark) .bg-\[\#eff6ff\].dash-shimmer { background-color: #ffffff; }
 html:not(.dark) .divide-inset > *:hover { background-color: #e5e5e5; }
 html:not(.dark) .hover\:bg-zinc-50:hover,
 html:not(.dark) .hover\:bg-zinc-100:hover { background-color: #e5e5e5; }
+
+/* ============================================================
+   BRANDED eSIM DESTINATION CARDS
+   The card's own lift/shadow are Tailwind utilities; only the
+   background motif needs CSS, because it animates a child of the
+   hovered element and Tailwind has no group-hover for a raw SVG
+   transform at this precision.
+
+   Motion is a gentle drift, not a move: the motif is decorative and
+   sits under the destination name, so anything larger reads as the
+   text shifting. prefers-reduced-motion pins it completely - the
+   card still lifts (that is a Tailwind motion-reduce: variant on the
+   element itself) but nothing inside it moves.
+   ============================================================ */
+.esim-card__motif {
+    transform: translate3d(0, 0, 0);
+    transition: transform 220ms ease-out;
+    will-change: transform;
+}
+/* The card box is no longer the focusable element - the link that wraps it
+   is - so the focus half of this has to come off the group, not the box. */
+.esim-card:hover .esim-card__motif,
+.group:focus-visible .esim-card__motif {
+    transform: translate3d(-6px, -3px, 0) scale(1.04);
+}
+@media (prefers-reduced-motion: reduce) {
+    .esim-card__motif { transition: none; will-change: auto; }
+    .esim-card:hover .esim-card__motif,
+    .group:focus-visible .esim-card__motif { transform: none; }
+}
+
+/* ------------------------------------------------------------
+   eSIM destination card ink.
+
+   The card is a white printed object in BOTH themes - it carries
+   the brand lockup, which has its own white ground. That puts it
+   at odds with the global dark repaints further up this file
+   (`.dark .text-zinc-900 { color: #f4f4f5 }` and friends), which
+   would turn every line on it near-white on white.
+
+   So the card does not use the zinc text utilities at all. Its ink
+   is named here once and stated for both themes, which also means
+   no `html:not(.dark) body.storefront .text-zinc-*` rule can reach
+   in and lighten it on the storefront either.
+   ------------------------------------------------------------ */
+.esim-card__label,
+.dark .esim-card__label { color: #0a2ac2; }
+
+.esim-card__feature,
+.dark .esim-card__feature { color: #3f3f46; }
+
+.esim-card__price,
+.dark .esim-card__price { color: #18181b; }
+
+.esim-card__note,
+.dark .esim-card__note { color: #52525b; background-color: #fafafa; }
+
+.esim-card__note--error,
+.dark .esim-card__note--error { color: #78350f; background-color: #fffbeb; }
+
+/* The eSIM card's brand wordmark. Stated for both themes for the same reason
+   the rest of the card's ink is: the card is a white printed object, and the
+   global dark repaints would otherwise lighten this to near-invisible on it. */
+.esim-card__wordmark,
+.dark .esim-card__wordmark { color: #0a2ac2; }
+
+
+/* ------------------------------------------------------------
+   Animated icons (x-ui.anim-icon).
+
+   The dashboard's icons are inline SVGs now, so each one can move when the
+   link or button it sits in is hovered or keyboard-focused. The motion suits
+   the icon: the bell rings, the gear spins, the cart rolls. One short play per
+   hover, back to rest at the end, and nothing at all under reduced motion.
+   ------------------------------------------------------------ */
+.anim-icon > svg { display: block; width: 100%; height: 100%; }
+.anim-icon { transform-origin: 50% 50%; }
+.anim-icon--ring { transform-origin: 50% 8%; }
+
+@keyframes anim-icon-cart    { 0%, 100% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-2px) rotate(-8deg); } 60% { transform: translateX(2px) rotate(6deg); } }
+@keyframes anim-icon-ring    { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(9deg); } 60% { transform: rotate(-6deg); } 75% { transform: rotate(3deg); } }
+@keyframes anim-icon-pop     { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.18); } 70% { transform: scale(0.94); } }
+@keyframes anim-icon-bounce  { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(-4px); } 60% { transform: translateY(0); } 80% { transform: translateY(-1.5px); } }
+@keyframes anim-icon-spin    { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes anim-icon-jiggle  { 0%, 100% { transform: rotate(0) scale(1); } 30% { transform: rotate(-10deg) scale(1.08); } 60% { transform: rotate(8deg) scale(1.08); } }
+@keyframes anim-icon-tilt    { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-12deg) translateY(-1px); } }
+@keyframes anim-icon-shake   { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-2px); } 40% { transform: translateX(2px); } 60% { transform: translateX(-1.5px); } 80% { transform: translateX(1.5px); } }
+@keyframes anim-icon-wiggle  { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+@keyframes anim-icon-nod     { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-2.5px); } 60% { transform: translateY(1px); } }
+@keyframes anim-icon-nudge   { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
+@keyframes anim-icon-squeeze { 0%, 100% { transform: scaleX(1); } 40% { transform: scaleX(0.7); } 70% { transform: scaleX(1.1); } }
+@keyframes anim-icon-flip    { from { transform: perspective(60px) rotateY(0); } to { transform: perspective(60px) rotateY(360deg); } }
+
+:is(a, button):is(:hover, :focus-visible) .anim-icon--cart,    .anim-icon--cart:hover    { animation: anim-icon-cart 0.6s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--ring,    .anim-icon--ring:hover    { animation: anim-icon-ring 0.8s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--pop,     .anim-icon--pop:hover     { animation: anim-icon-pop 0.45s ease-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--bounce,  .anim-icon--bounce:hover  { animation: anim-icon-bounce 0.6s ease-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--spin,    .anim-icon--spin:hover    { animation: anim-icon-spin 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--jiggle,  .anim-icon--jiggle:hover  { animation: anim-icon-jiggle 0.55s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--tilt,    .anim-icon--tilt:hover    { animation: anim-icon-tilt 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--shake,   .anim-icon--shake:hover   { animation: anim-icon-shake 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--wiggle,  .anim-icon--wiggle:hover  { animation: anim-icon-wiggle 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--nod,     .anim-icon--nod:hover     { animation: anim-icon-nod 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--nudge,   .anim-icon--nudge:hover   { animation: anim-icon-nudge 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--squeeze, .anim-icon--squeeze:hover { animation: anim-icon-squeeze 0.5s ease-in-out; }
+:is(a, button):is(:hover, :focus-visible) .anim-icon--flip,    .anim-icon--flip:hover    { animation: anim-icon-flip 0.7s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+    .anim-icon { animation: none !important; }
+}
+
+/* Payment-method marquee ---------------------------------------------------
+   The accepted-methods row scrolls itself instead of sitting in a 10-column
+   grid that collapsed to 3 columns on a phone and pushed the labels onto two
+   lines. The track holds TWO copies of the list and travels exactly -50%, so
+   the second copy sits where the first began at the moment the animation
+   restarts and the loop has no visible seam. That holds for ANY item width,
+   since both copies are identical and half the track is therefore always
+   exactly one copy; the items do not need a fixed width for it to work.
+
+   Paused on hover, because a reader who stops to look at a mark should not
+   have it walk out from under the cursor. Stopped outright under
+   prefers-reduced-motion: the row is decorative, so standing still costs
+   nothing and constant sideways motion is exactly what that setting asks us
+   to drop. */
+@keyframes pay-marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+.pay-marquee-track {
+    animation: pay-marquee 38s linear infinite;
+    will-change: transform;
+}
+
+.pay-marquee:hover .pay-marquee-track {
+    animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pay-marquee-track { animation: none; }
+}

@@ -113,13 +113,13 @@ class DarkThemeTest extends TestCase
         // is why home once read a shade lighter than every other page.
         //
         // Home no longer rides that mapping at all: it pins its own literal
-        // #ffffff and lets the cards take #e8ecea, so the element-type trap
+        // #f4f6f5 and lets the cards take #ffffff, so the element-type trap
         // cannot bite it. The guard still has to hold for anything that goes
         // back to the shared class, though - hence the second assertion.
         $home = file_get_contents(resource_path('views/welcome.blade.php'));
 
         $this->assertStringContainsString(
-            '<section class="relative z-10 bg-[#ffffff] dark:bg-[#0c1a36]">',
+            '<section class="relative z-10 bg-[#f4f6f5] dark:bg-[#0c1a36]">',
             $home
         );
 
@@ -127,11 +127,11 @@ class DarkThemeTest extends TestCase
         // a div the same dark:bg-[#0c1a36] falls to the CARD tone (#1a1a1e) and
         // the hero band reads a shade lighter than the page under it.
         $this->assertStringContainsString(
-            '<section class="relative bg-[#ffffff] dark:bg-[#0c1a36]">',
+            '<section class="relative bg-[#f4f6f5] dark:bg-[#0c1a36]">',
             $home
         );
         $this->assertStringNotContainsString(
-            '<div class="relative bg-[#ffffff] dark:bg-[#0c1a36]">',
+            '<div class="relative bg-[#f4f6f5] dark:bg-[#0c1a36]">',
             $home
         );
 
@@ -144,11 +144,75 @@ class DarkThemeTest extends TestCase
 
     public function test_brand_logo_plates_are_never_darkened(): void
     {
-        // bg-[#ffffff] is an opt-out of the dark flip, on purpose: brand
-        // artwork with dark linework needs a light plate or the mark vanishes.
+        // bg-[#ffffff] used to be a blanket opt-out of the dark flip: nothing in
+        // the stylesheet named it, so a plate authored with the literal hex was
+        // guaranteed to stay white and brand artwork with dark linework always
+        // had something to sit on. That guarantee could not survive the light
+        // redesign, which made the same class the DASHBOARD card marker - white
+        // cards on a #f4f6f5 page. Dark mode has to repaint a card, so it now
+        // repaints this class too, and asserting the class is untouched would be
+        // asserting that dashboard cards stay white in dark mode.
+        //
+        // What the plates actually need is narrower, and it is both halves of
+        // this test. First, the flip is scoped to body.dashboard, so a storefront
+        // plate is still never touched by it. Second, a plate that DOES sit on a
+        // dashboard page opts back out with .keep-light, and that hatch really
+        // repaints white - it is declared after the flip and at higher
+        // specificity, so it wins the cascade rather than merely existing.
+        //
+        // The views that carry brand artwork are checked for the hatch here as
+        // well. A CSS escape hatch nothing uses would pass the rules above while
+        // every logo on the dashboard still sank into the card grey, which is the
+        // regression this test exists to catch.
         $rules = preg_replace("#/\*.*?\*/#s", '', $this->css());
 
-        $this->assertStringNotContainsString("bg-\[\#ffffff\]", $rules);
+        preg_match_all('/([^{}]+)\{([^{}]*)\}/s', $rules, $m, PREG_SET_ORDER);
+
+        $unscoped = [];
+        $hatches = [];
+
+        foreach ($m as [, $selector, $body]) {
+            if (! str_contains($selector, 'bg-\[\#ffffff\]') || ! str_contains($selector, '.dark')) {
+                continue;
+            }
+
+            if (! str_contains($selector, 'body.dashboard')) {
+                $unscoped[] = trim($selector);
+            }
+
+            if (str_contains($selector, '.keep-light')) {
+                $hatches[] = $body;
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $unscoped,
+            'A dark rule repaints bg-[#ffffff] outside body.dashboard, so storefront logo plates go dark with it.'
+        );
+
+        $this->assertNotEmpty($hatches, 'Nothing lets a plate opt back out of the dashboard card flip.');
+
+        foreach ($hatches as $body) {
+            $this->assertStringContainsString('background-color: #ffffff;', $body);
+        }
+
+        // Every view that puts brand artwork (or a QR, which a scanner reads the
+        // same way) on a literal-white plate names the hatch.
+        foreach ([
+            'components/shop/brand-tile.blade.php',
+            'components/home/brand-card.blade.php',
+            'shop/product.blade.php',
+            'shop/topups.blade.php',
+            'shop/bills.blade.php',
+            'livewire/dashboard/fund-wallet.blade.php',
+        ] as $view) {
+            $this->assertStringContainsString(
+                'keep-light',
+                file_get_contents(resource_path('views/'.$view)),
+                $view.' puts artwork on a plate that dark mode is free to repaint.'
+            );
+        }
     }
 
     public function test_esim_plans_carry_the_grain(): void
@@ -220,26 +284,95 @@ class DarkThemeTest extends TestCase
         $this->withoutVite()->get('/')->assertOk();
     }
 
+    public function test_storefront_controls_keep_their_component_dark_hover(): void
+    {
+        $css = $this->css();
+        $regionPill = file_get_contents(resource_path('views/components/nav/region-pill.blade.php'));
+        $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
+
+        // A broad late override used to replace each control's dark:hover value
+        // with --ash. The header already rests on --ash, so that made hover
+        // visually identical to rest across the primary navigation.
+        $this->assertStringNotContainsString(
+            'html.dark body:not(.dashboard) .hover\\:bg-\\[\\#f4f6f5\\]:hover',
+            $css
+        );
+
+        // Storefront controls that also have the light near-white hover declare
+        // their own visible dark tint instead of relying on a global repaint.
+        $this->assertStringContainsString('dark:hover:bg-white/10', $regionPill);
+        $this->assertStringContainsString('dark:hover:bg-white/10', $footer);
+    }
+
+    public function test_dark_interactive_remaps_are_distinct_from_resting_surfaces(): void
+    {
+        $css = $this->css();
+
+        $this->assertStringContainsString('--ash: #1a1a1e;', $css);
+        $this->assertStringContainsString('--ash-hover: #232328;', $css);
+        $this->assertStringContainsString(
+            '.dark\\:hover\\:bg-\\[\\#26416b\\]:hover { background-color: var(--ash-hover);',
+            $css
+        );
+        $this->assertStringContainsString(
+            '.hover\\:bg-blue-50:hover   { background-color: var(--ash-hover);',
+            $css
+        );
+
+        // The unlayered palette rules must explicitly hand control back to
+        // text, border and ring hover variants after repainting their rest state.
+        $this->assertStringContainsString('.dark\\:hover\\:text-blue-400:hover { color: var(--color-blue-400); }', $css);
+        $this->assertStringContainsString('.hover\\:border-zinc-400:hover,', $css);
+        $this->assertStringContainsString('.hover\\:ring-zinc-300:hover { --tw-ring-color: #4a4a4f; }', $css);
+    }
+
+    public function test_responsive_header_logo_turns_white_in_dark_mode(): void
+    {
+        $nav = file_get_contents(resource_path('views/components/nav/main-nav.blade.php'));
+        $css = $this->css();
+
+        // Desktop logo.webp is supplied by <source>; the <img src> remains the
+        // mobile PWA icon, so a src selector alone cannot match the displayed
+        // desktop wordmark.
+        $this->assertStringContainsString('class="site-logo h-9 w-auto', $nav);
+        $this->assertStringContainsString('.dark .site-logo,', $css);
+        $this->assertStringContainsString('filter: brightness(0) invert(1) !important;', $css);
+    }
+
     /**
-     * In dark the home cards and the nav are the PAGE, not surfaces lifted off
-     * it. Both are transparent rather than a matching colour: the page ground
-     * carries a grain layer, so an identical background-color still reads as a
-     * flat patch on a textured page - and re-declaring the grain per element
-     * would seam, since each starts the pattern at its own origin.
+     * In dark the sticky nav and home cards use the card tone above the page.
+     *
+     * The nav used to be transparent while it scrolled with the page. It is
+     * sticky now, so transparency lets page content show through. The ash tone
+     * gives the pinned bar an opaque surface and its controls hover to a lighter
+     * white tint above it.
+     *
+     * The cards did move. They were transparent too, with a ring to stand them
+     * off the page, and the redesign dropped every card border. A borderless card
+     * that is also the page colour is not a card at all: the four category tiles
+     * and the panel below them dissolved into one unbroken black field. They take
+     * var(--ash) now, the single card tone the whole dark palette already uses,
+     * which is what gives an edge back without drawing one. That they name the
+     * token rather than a hex is the point - a retuned palette moves them with it.
      */
-    public function test_dark_cards_and_nav_are_the_page_not_a_surface(): void
+    public function test_dark_nav_and_cards_use_the_card_tone(): void
     {
         $cards = file_get_contents(resource_path('views/components/home/category-cards.blade.php'));
         $home = file_get_contents(resource_path('views/welcome.blade.php'));
         $css = $this->css();
 
-        $this->assertStringContainsString('dark:bg-transparent', $cards);
-        $this->assertStringContainsString('dark:bg-transparent', $home);
+        $this->assertStringContainsString('dark:bg-[var(--ash)]', $cards);
+        $this->assertStringContainsString('dark:bg-[var(--ash)]', $home);
+
+        // Still never black. --ash is the card tone; black would be the ground
+        // again, which is the surface these two are meant to sit above.
         $this->assertStringNotContainsString('dark:bg-black', $cards);
         $this->assertStringNotContainsString('dark:bg-black', $home);
 
-        $this->assertStringContainsString('.dark .nav-surface { background-color: transparent; }', $css);
-        $this->assertStringNotContainsString('.dark .nav-surface { background-color: var(--ground); }', $css);
+        preg_match('/\.dark \.nav-surface\s*\{(.*?)\}/s', $css, $navSurface);
+        $this->assertNotEmpty($navSurface, 'The dark nav surface rule is missing.');
+        $this->assertStringContainsString('background-color: var(--ash);', $navSurface[1]);
+        $this->assertStringContainsString('background-image: var(--grain);', $navSurface[1]);
 
         // Light is untouched: the bar is deliberately white there, not the page
         // tone, so it reads as a bar rather than dissolving into the page.

@@ -32,26 +32,35 @@ class ThemeTogglePanelTest extends TestCase
         $this->assertStringNotContainsString('rounded-[5px] py-1.5 pl-2 pr-4 text-left text-xs', $blade);
     }
 
-    public function test_the_panel_marks_scale_with_the_rows(): void
+    /**
+     * The two variants size independently now. The dropdown panel keeps 20px
+     * marks: it is a menu people read, and it opens over the page with room to
+     * spare. The segmented strip went back to 16px because it does not open -
+     * it stands permanently in the footer beside a "Theme" label, where a
+     * full-size control read as the loudest thing in the row.
+     */
+    public function test_the_panel_marks_stay_full_size(): void
     {
-        // Both variants use 20px marks now: the dropdown rows for legibility,
-        // the segmented strip because 16px on a 28px cell was a small target.
         $blade = $this->toggle();
 
-        $this->assertSame(2, substr_count($blade, '<x-dynamic-component :component="$opt[\'icon\']" class="h-5 w-5" />'));
-        $this->assertStringNotContainsString('class="h-4 w-4" />', $blade);
+        $this->assertSame(1, substr_count($blade, '<x-dynamic-component :component="$opt[\'icon\']" class="h-5 w-5" />'));
+        $this->assertSame(1, substr_count($blade, '<x-dynamic-component :component="$opt[\'icon\']" class="h-4 w-4" />'));
     }
 
-    /** The segmented strip was scaled up too - 28px cells were a small target. */
-    public function test_the_segmented_variant_is_full_size(): void
+    /** The segmented strip is the compact one: 28px cells, 16px marks. */
+    public function test_the_segmented_variant_is_compact(): void
     {
         $blade = $this->toggle();
 
-        $this->assertStringContainsString('flex h-9 w-9 items-center justify-center rounded-[9px]', $blade);
-        $this->assertStringNotContainsString('flex h-7 w-7 items-center justify-center rounded-[7px]', $blade);
+        $this->assertStringContainsString('flex h-7 w-7 items-center justify-center rounded-full', $blade);
+        $this->assertStringNotContainsString('flex h-9 w-9 items-center justify-center rounded-[9px]', $blade);
 
-        // Its shell grows with the cells, or the cells crowd the border.
-        $this->assertStringContainsString('items-center gap-1 rounded-[14px] border border-blue-400 p-1', $blade);
+        // A pill, not a rounded rectangle: at this size the corner radius was
+        // most of the cell anyway, so the shape reads cleaner fully round.
+        // Its outline is the locale chip's hairline ring, not the old blue
+        // border, so the two controls in the footer row read as one family.
+        $this->assertStringContainsString('items-center gap-0.5 rounded-full p-0.5 ring-1 ring-[#dee3e1]', $blade);
+        $this->assertStringNotContainsString('border-blue-400', $blade);
     }
 
     public function test_the_panel_still_renders_all_three_choices(): void
