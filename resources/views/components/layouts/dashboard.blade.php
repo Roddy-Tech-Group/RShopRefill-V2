@@ -868,7 +868,8 @@
                                // Brand blue: a tinted pill with a solid blue edge.
                                'tone' => 'border-[#3d6bff] bg-[#0044ff]/30 group-hover:bg-[#0044ff]/45']
                             : null,
-                        ['label' => 'Become a partner', 'href' => route('shop.affiliates'), 'panel' => false, 'icon' => 'partner',
+                        // Straight to the Partnership program tab of For Partners, not the public affiliates page.
+                        ['label' => 'Become a partner', 'href' => route('dashboard.rewards', ['tab' => 'partners']), 'panel' => false, 'icon' => 'partner',
                          // Green: the same tinted pill in emerald.
                          'tone' => 'border-emerald-500 bg-emerald-600/30 group-hover:bg-emerald-600/45'],
                     ]));

@@ -333,7 +333,9 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('Refer &amp; earn up to $100', $header);
         $this->assertStringContainsString('href="'.route('dashboard.rewards').'"', $header);
         $this->assertStringContainsString('Become a partner', $header);
-        $this->assertStringContainsString('href="'.route('shop.affiliates').'"', $header);
+        // The pill opens the Partnership program tab of For Partners, not the public affiliates page.
+        $this->assertStringContainsString('href="'.route('dashboard.rewards', ['tab' => 'partners']).'"', $header);
+        $this->assertStringNotContainsString('href="'.route('shop.affiliates').'"', $header);
         $this->assertStringContainsString('5000', $header);
 
         // The swap is a slow, smooth swipe up inside the clipped pill: the old
