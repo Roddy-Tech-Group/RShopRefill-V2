@@ -8,7 +8,8 @@
     // never re-renders their content as if it were ours.
     $tp = config('services.trustpilot');
     $google = config('services.google_reviews');
-    $reviews = \App\Models\Review::published()->ownCollected()->with('user:id,kyc_status')->ordered()->get();
+    // withText: a score left without a comment has no card to show.
+    $reviews = \App\Models\Review::published()->ownCollected()->withText()->with('user:id,kyc_status')->ordered()->get();
     $aggregate = [
         'rating' => (float) \App\Models\SiteSetting::get('reviews.aggregate.rating', 0),
         'count' => (int) \App\Models\SiteSetting::get('reviews.aggregate.count', 0),

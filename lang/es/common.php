@@ -7,6 +7,7 @@
  */
 return [
     'menu' => 'Menú',
+    'anonymous_customer' => 'Cliente anónimo',
     'continue' => 'Continuar',
     'cancel' => 'Cancelar',
     'save' => 'Guardar',

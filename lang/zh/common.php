@@ -5,6 +5,7 @@
  */
 return [
     'menu' => '菜单',
+    'anonymous_customer' => '匿名顾客',
     'continue' => '继续',
     'cancel' => '取消',
     'save' => '保存',

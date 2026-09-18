@@ -9,7 +9,9 @@
     // collected (Review::ownCollected). Trustpilot and Google host and display
     // their reviews on their own surfaces - we send customers there to leave one
     // rather than re-render their content here.
-    $reviews = \App\Models\Review::published()->ownCollected()->with('user:id,kyc_status')->ordered()->get();
+    // withText: the experience prompt lets a customer leave a score alone, and a
+    // card with nothing to say has nothing to show here.
+    $reviews = \App\Models\Review::published()->ownCollected()->withText()->with('user:id,kyc_status')->ordered()->get();
     $trustpilotProfileUrl = config('services.trustpilot.profile_url');
 @endphp
 <section

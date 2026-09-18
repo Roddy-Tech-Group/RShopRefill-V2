@@ -5,6 +5,7 @@
  */
 return [
     'menu' => 'Menyu',
+    'anonymous_customer' => 'Mteja asiyejulikana',
     'continue' => 'Endelea',
     'cancel' => 'Ghairi',
     'save' => 'Hifadhi',

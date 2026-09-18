@@ -7,6 +7,7 @@
  */
 return [
     'menu' => 'Menu',
+    'anonymous_customer' => 'Abokin ciniki mara suna',
     'continue' => 'Ci gaba',
     'cancel' => 'Soke',
     'save' => 'Ajiye',

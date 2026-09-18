@@ -7,6 +7,7 @@
  */
 return [
     'menu' => 'القائمة',
+    'anonymous_customer' => 'عميل مجهول',
     'continue' => 'متابعة',
     'cancel' => 'إلغاء',
     'save' => 'حفظ',

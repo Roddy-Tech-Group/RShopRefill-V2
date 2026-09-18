@@ -21,6 +21,10 @@ use Illuminate\Support\Facades\DB;
  * @property string $source
  * @property Carbon $reviewed_at
  * @property bool $is_published
+ * @property bool $is_customer_submitted
+ * @property string|null $category The service line the experience prompt asked about
+ * @property int|null $score The prompt's 1-10 answer; `rating` holds it halved for the stars
+ * @property bool $is_anonymous Printed without the author's name on customer-facing surfaces
  * @property int $sort_order
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -42,6 +46,9 @@ class Review extends Model
         'is_published',
         'is_customer_submitted',
         'sort_order',
+        'category',
+        'score',
+        'is_anonymous',
     ];
 
     protected function casts(): array
@@ -50,8 +57,33 @@ class Review extends Model
             'reviewed_at' => 'date',
             'is_published' => 'boolean',
             'is_customer_submitted' => 'boolean',
+            'is_anonymous' => 'boolean',
             'rating' => 'float',
+            'score' => 'integer',
         ];
+    }
+
+    /**
+     * Reviews that have something to say. The experience prompt makes the
+     * comment optional, so a customer can leave a score alone; that still
+     * counts toward ratings, but a card with no text has nothing to show, so
+     * the carousel and the reviews page take only these.
+     */
+    public function scopeWithText(Builder $query): Builder
+    {
+        return $query->whereNotNull('body')->where('body', '!=', '');
+    }
+
+    /** The name a customer-facing surface may print. */
+    public function displayName(): string
+    {
+        return $this->is_anonymous ? __('common.anonymous_customer') : $this->author_name;
+    }
+
+    /** The initials a customer-facing surface may print: an anonymous review carries none of the author's. */
+    public function displayInitials(): string
+    {
+        return $this->is_anonymous ? mb_strtoupper(mb_substr(__('common.anonymous_customer'), 0, 1)) : $this->initials;
     }
 
     /**

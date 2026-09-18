@@ -473,11 +473,14 @@
             return ['count' => 0];
         }
 
+        // Every rating counts toward the aggregate, including a score left with
+        // no comment. A sample is a quoted review, so it needs text, and it names
+        // the author the way a customer-facing surface may.
         return [
             'rating' => round((float) $published->avg('rating'), 1),
             'count' => $published->count(),
-            'samples' => $published->take(5)->map(fn ($r) => [
-                'author' => $r->author_name,
+            'samples' => $published->filter(fn ($r) => filled($r->body))->take(5)->map(fn ($r) => [
+                'author' => $r->displayName(),
                 'body' => $r->body,
                 'rating' => max(1, min(5, (int) round((float) $r->rating))),
                 'date' => optional($r->reviewed_at)->toDateString(),
@@ -503,8 +506,8 @@
             return [
                 'rating' => round((float) $reviews->avg('rating'), 1),
                 'count' => $reviews->count(),
-                'samples' => $reviews->take(5)->map(fn ($r) => [
-                    'author' => $r->author_name,
+                'samples' => $reviews->filter(fn ($r) => filled($r->body))->take(5)->map(fn ($r) => [
+                    'author' => $r->displayName(),
                     'body' => $r->body,
                     'rating' => max(1, min(5, (int) round((float) $r->rating))),
                     'date' => optional($r->reviewed_at)->toDateString(),

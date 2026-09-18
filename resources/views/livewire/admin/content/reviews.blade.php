@@ -264,9 +264,19 @@ class extends Component {
                                     @endif
                                 </p>
                                 <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">{{ $review->initials }}</p>
+                                @if ($review->is_anonymous)
+                                    {{-- Admin sees who wrote it; customers will not. --}}
+                                    <x-admin.badge tone="zinc">Anonymous</x-admin.badge>
+                                @endif
                             </td>
                             <td>{{ $review->source }}</td>
-                            <td>{{ rtrim(rtrim(number_format($review->rating, 1), '0'), '.') }} / 5</td>
+                            <td>
+                                {{ rtrim(rtrim(number_format($review->rating, 1), '0'), '.') }} / 5
+                                @if ($review->score !== null)
+                                    {{-- From the experience prompt: the answer as given, and what it asked about. --}}
+                                    <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">Scored {{ $review->score }} / 10{{ $review->category ? ' on '.$review->category : '' }}</p>
+                                @endif
+                            </td>
                             <td>{{ $review->reviewed_at->format('M j, Y') }}</td>
                             <td class="max-w-md truncate">{{ $review->body }}</td>
                             <td>

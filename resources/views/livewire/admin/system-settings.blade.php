@@ -77,6 +77,8 @@ class extends Component {
         'Content & Marketing' => [
             'features.newsletter_signup_enabled',
             'features.feedback_widget_enabled',
+            'features.experience_prompt_enabled',
+            'features.experience_prompt_delay_minutes',
         ],
     ];
 

@@ -2134,6 +2134,14 @@
         </div>
 
         {{-- PWA pull-to-refresh (standalone mode only). --}}
+        {{-- Rate-your-experience prompt. Asks a signed-in customer once a day,
+             after the admin-set delay, until they have answered. Gated by
+             features.experience_prompt_enabled so it can be switched off
+             without a deploy; the flag ships off. --}}
+        @feature('experience_prompt')
+            <livewire:experience-prompt />
+        @endfeature
+
         <x-pull-to-refresh />
 
         {{-- Collapsed-rail tooltip: shows a sidebar link's name (its data-tip)

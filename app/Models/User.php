@@ -69,6 +69,8 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         'email',
         'phone',
         'phone_verified_at',
+        'experience_prompted_at',
+        'experience_rated_at',
         'country',
         'profile_completed_at',
         'gender',
@@ -155,6 +157,8 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'experience_prompted_at' => 'datetime',
+            'experience_rated_at' => 'datetime',
             'profile_completed_at' => 'datetime',
             'rcoin_multiplier' => 'decimal:2',
             'banned_at' => 'datetime',
