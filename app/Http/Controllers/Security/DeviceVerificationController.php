@@ -14,6 +14,13 @@ use Illuminate\Support\Facades\Cache;
 
 class DeviceVerificationController extends Controller
 {
+    /**
+     * How long a code stays valid. The page's "expires in" clock, the guess
+     * budget window and the cache lifetime all read this one number, so the
+     * customer is never told a time the server does not enforce.
+     */
+    public const OTP_TTL_MINUTES = 10;
+
     public function __construct(
         private DeviceTrustManager $trustManager,
         private SecurityIncidentManager $incidentManager
@@ -32,8 +39,16 @@ class DeviceVerificationController extends Controller
         // Ensure it's a timestamp; if it was previously stored as a boolean, this handles it gracefully.
         $cooldown = is_numeric($expiresAt) ? max(0, $expiresAt - time()) : 0;
 
+        // The code's real remaining life, stamped when it was issued. Null when
+        // nothing stamped it (a code issued before this key existed): the page
+        // then shows no clock rather than a made-up one.
+        $issuedExpiry = Cache::get('device_otp_expires_'.$user->id);
+        $expiresIn = is_numeric($issuedExpiry) ? max(0, (int) $issuedExpiry - time()) : null;
+
+        $maskedEmail = $this->maskedEmail((string) $user->email);
+
         return response()
-            ->view('auth.verify-device', compact('cooldown'))
+            ->view('auth.verify-device', compact('cooldown', 'expiresIn', 'maskedEmail'))
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
             ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
@@ -86,7 +101,10 @@ class DeviceVerificationController extends Controller
         // could never produce.
         $otp = sprintf('%06d', random_int(0, 999999));
 
-        Cache::put('device_otp_'.$user->id, $otp, now()->addMinutes(10));
+        $expiresAt = now()->addMinutes(self::OTP_TTL_MINUTES);
+        Cache::put('device_otp_'.$user->id, $otp, $expiresAt);
+        // Stamped beside the code so the page can show the real time left.
+        Cache::put('device_otp_expires_'.$user->id, $expiresAt->timestamp, $expiresAt);
         Cache::put($throttleKey, now()->addSeconds($delay)->timestamp, now()->addSeconds($delay));
         Cache::put($attemptsKey, $attempts, now()->addHours(24));
 
@@ -121,18 +139,20 @@ class DeviceVerificationController extends Controller
 
             if ($fails >= 5) {
                 Cache::forget('device_otp_'.$user->id);
+                Cache::forget('device_otp_expires_'.$user->id);
                 Cache::forget($failsKey);
 
                 return back()->withErrors(['otp' => 'Too many incorrect attempts. Please request a new code.']);
             }
 
-            Cache::put($failsKey, $fails, now()->addMinutes(10));
+            Cache::put($failsKey, $fails, now()->addMinutes(self::OTP_TTL_MINUTES));
 
             return back()->withErrors(['otp' => 'Invalid or expired code.']);
         }
 
         // OTP verified successfully
         Cache::forget('device_otp_'.$user->id);
+        Cache::forget('device_otp_expires_'.$user->id);
         Cache::forget('otp_throttle_'.$user->id);
         Cache::forget('otp_attempts_'.$user->id);
         Cache::forget($failsKey);
@@ -171,5 +191,18 @@ class DeviceVerificationController extends Controller
 
         // Simple acknowledgement view
         return view('auth.compromise-acknowledged', ['incidentId' => $incidentId]);
+    }
+
+    /**
+     * The address the code went to, with the local part hidden past its first
+     * two characters. The page is reachable from a device that is not yet
+     * trusted, so it confirms where to look without printing the address.
+     */
+    private function maskedEmail(string $email): string
+    {
+        [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+        $keep = min(2, strlen($local));
+
+        return substr($local, 0, $keep).str_repeat('*', max(1, strlen($local) - $keep)).'@'.$domain;
     }
 }
