@@ -2,8 +2,9 @@
     // Terms of Service — customer-facing legal page. Dark-mode safe: backgrounds use
     // remapped classes (bg-white/bg-zinc-50/bg-blue-50 -> navy in dark) while
     // coloured accents (text-red-600 / text-blue-700) read in both themes.
-    // Terms / legal contact is a formal channel - kept on the info@ inbox.
-    $supportEmail = 'info@rshoprefill.com';
+    // support@ is the one mailbox that receives mail; info@ has no inbox, so
+    // anything sent there bounced. MailDomain::replyTo() is that address.
+    $supportEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
     $lastUpdated = 'August 23, 2026';
 @endphp
 

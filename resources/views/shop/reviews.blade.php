@@ -28,26 +28,9 @@
             <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Customer reviews</span>
             <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">What our customers say</h1>
             <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
-                Real feedback from real customers across {{ $aggregate['source'] }} and our own community. We've been serving customers since {{ $aggregate['since'] }}.
+                Real feedback from real customers across {{ $aggregate['source'] }} and our own community. Read the full, unedited records on the platforms that host them.
             </p>
 
-            @if ($aggregate['count'] > 0)
-                <div class="mx-auto mt-6 inline-flex items-center gap-3 rounded-[12px] bg-white px-4 py-2.5 ring-1 ring-zinc-100">
-                    <div class="flex items-center gap-0.5">
-                        @for ($i = 1; $i <= 5; $i++)
-                            @php $fillPct = max(0, min(100, ($aggregate['rating'] - ($i - 1)) * 100)); @endphp
-                            <span class="relative flex h-5 w-5 items-center justify-center overflow-hidden bg-zinc-200">
-                                <span class="absolute inset-y-0 left-0 bg-emerald-500" style="width: {{ $fillPct }}%"></span>
-                                <svg class="relative h-3 w-3 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
-                                </svg>
-                            </span>
-                        @endfor
-                    </div>
-                    <span class="text-sm font-bold text-zinc-900">{{ number_format($aggregate['rating'], 1) }} / 5</span>
-                    <span class="text-sm text-zinc-600">from {{ number_format($aggregate['count']) }}+ reviews</span>
-                </div>
-            @endif
         </div>
     </section>
 

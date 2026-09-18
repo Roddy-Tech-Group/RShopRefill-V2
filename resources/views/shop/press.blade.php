@@ -2,7 +2,8 @@
     // Press & Media newsroom. Articles come from the press_articles table (CMS-managed).
     // Dark-mode safe: bg-white/bg-zinc-50/bg-blue-50 remap to navy in dark.
     $img = fn (string $file) => asset('assets/'.rawurlencode($file));
-    $pressEmail = 'info@rshoprefill.com';
+    // support@, the one mailbox that receives mail (info@ has no inbox).
+    $pressEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
 @endphp
 
 <x-layouts.app.header :title="'Press and Media | '.$siteName">
@@ -54,7 +55,7 @@
                 <div class="rounded-[12px] bg-white p-6 ring-1 ring-zinc-100">
                     <h3 class="text-base font-bold text-zinc-900">Brand assets</h3>
                     <p class="mt-2 text-sm leading-relaxed text-zinc-600">Use our official logo without altering or recolouring it.</p>
-                    <a href="{{ $img('Rshoprefillslogo.webp') }}" download class="mt-3 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    <a href="{{ $img('logo.webp') }}" download class="mt-3 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                         Download logo
                     </a>

@@ -70,6 +70,17 @@ class CategorySidebarTest extends TestCase
         );
     }
 
+    /** The dashboard sub-navigation panel carries no "Subcategories" heading. */
+    public function test_the_dashboard_panel_has_no_subcategories_heading(): void
+    {
+        $sidebar = $this->sidebar();
+        $heading = strpos($sidebar, "__('products.subcategories') }}</p>");
+
+        $this->assertNotFalse($heading);
+        $this->assertLessThan($heading, strpos($sidebar, '@unless ($inDashboard)'));
+        $this->assertGreaterThan($heading, strpos($sidebar, '@endunless'));
+    }
+
     /** Whatever else changes, the filters people came for stay. */
     public function test_the_subcategory_list_is_never_conditional_on_that_flag(): void
     {

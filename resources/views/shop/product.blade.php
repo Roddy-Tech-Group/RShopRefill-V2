@@ -19,11 +19,22 @@
     $isBill       = $categorySlug === 'bill-payments';
     $isGiftCard   = $categorySlug === 'gift-cards';
 
-    [$kindNoun, $kindTitle, $listingRoute, $detailRoute] = match ($categorySlug) {
-        'mobile-airtime' => ['top-up', 'Mobile Top-up', 'shop.topups', 'shop.topup'],
-        'bill-payments'  => ['bill payment', 'Bill Payment', 'shop.bills', 'shop.bill'],
-        default          => ['gift card', 'Gift Card', 'shop.gift-cards', 'shop.brand'],
+    [$kindTitle, $listingRoute, $detailRoute] = match ($categorySlug) {
+        'mobile-airtime' => [__('products.detail_kind_topup'), 'shop.topups', 'shop.topup'],
+        'bill-payments'  => [__('products.detail_kind_bill'), 'shop.bills', 'shop.bill'],
+        default          => [__('products.detail_kind_gift_card'), 'shop.gift-cards', 'shop.brand'],
     };
+
+    // Copy that names the product is written as three whole sentences (gift
+    // card, top-up, bill payment) rather than one sentence with a noun spliced
+    // in: word order and gender change between languages ("Acme gift card",
+    // "Carte cadeau Acme"). This picks the version for this page's category.
+    $kindText = fn (string $giftCard, string $topup, string $bill, array $replace = []) => __(
+        $isTopup ? $topup : ($isBill ? $bill : $giftCard),
+        $replace
+    );
+    $productLabel = $kindText('products.detail_name_gift_card', 'products.detail_name_topup', 'products.detail_name_bill', ['brand' => $brandName]);
+    $pageTitle    = $kindText('products.detail_title_gift_card', 'products.detail_title_topup', 'products.detail_title_bill', ['brand' => $brandName]);
 
     // Inside the dashboard chrome, swap to the dashboard.shop.* equivalents so
     // the "see more" + similar-brand links keep the user in the dashboard.
@@ -334,7 +345,11 @@
 
     // Switcher tabs: Credit / Data / Bundle (only those the network offers). Credit's
     // panel is the amount selector; Data/Bundle panels are benefit cards.
-    $topupTabMeta = ['credit' => 'Credit', 'data' => 'Data', 'bundle' => 'Bundles'];
+    $topupTabMeta = [
+        'credit' => __('products.detail_tab_credit'),
+        'data' => __('products.detail_tab_data'),
+        'bundle' => __('products.detail_tab_bundles'),
+    ];
     $topupTabs = collect($topupTabMeta)
         ->filter(fn ($label, $key) => ! empty($topupGroups[$key]) || ($key === 'credit' && $variable))
         ->all();
@@ -505,11 +520,18 @@
     // The on-page review carousel is the shared x-shop.brand-reviews
     // component (it fetches its own reviews and self-guards when empty).
 
+    // One "Buy X in Y on Z." sentence opens both the schema description and
+    // the meta description; only the delivery sentence after it differs.
+    $seoReplace = ['brand' => $brandName, 'country' => $countryName, 'range' => (string) $rangeText, 'site' => $siteName];
+    $seoBuyLine = $rangeText
+        ? $kindText('products.detail_seo_buy_ranged_gift_card', 'products.detail_seo_buy_ranged_topup', 'products.detail_seo_buy_ranged_bill', $seoReplace)
+        : $kindText('products.detail_seo_buy_gift_card', 'products.detail_seo_buy_topup', 'products.detail_seo_buy_bill', $seoReplace);
+
     $productJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'Product',
-        'name' => $brandName.' '.$kindTitle,
-        'description' => 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName.($rangeText ? ' from '.$rangeText : '').' on '.$siteName.'. Instant digital delivery, pay with card, mobile money or crypto.',
+        'name' => $pageTitle,
+        'description' => $seoBuyLine.' '.__('products.detail_seo_digital_delivery'),
         'brand' => ['@type' => 'Brand', 'name' => $brandName],
         'category' => $kindTitle,
         'url' => url()->current(),
@@ -555,9 +577,9 @@
     }
 
     $crumbLabel = match ($categorySlug) {
-        'mobile-airtime' => 'Mobile Top-ups',
-        'bill-payments' => 'Bill Payments',
-        default => 'Gift Cards',
+        'mobile-airtime' => __('products.detail_crumb_topups'),
+        'bill-payments' => __('navigation.bill_payments'),
+        default => __('navigation.gift_cards'),
     };
     $crumbListing = match ($categorySlug) {
         'mobile-airtime' => 'shop.topups',
@@ -569,23 +591,22 @@
         '@context' => 'https://schema.org',
         '@type' => 'BreadcrumbList',
         'itemListElement' => [
-            ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => url('/')],
+            ['@type' => 'ListItem', 'position' => 1, 'name' => __('products.detail_crumb_home'), 'item' => url('/')],
             ['@type' => 'ListItem', 'position' => 2, 'name' => $crumbLabel, 'item' => route($crumbListing)],
-            ['@type' => 'ListItem', 'position' => 3, 'name' => $brandName.' '.$kindTitle, 'item' => url()->current()],
+            ['@type' => 'ListItem', 'position' => 3, 'name' => $pageTitle, 'item' => url()->current()],
         ],
     ];
 
     $pageJsonLd = [$productJsonLd, $breadcrumbJsonLd];
 
-    $metaDescription = 'Buy '.$brandName.' '.strtolower($kindTitle).' in '.$countryName
-        .($rangeText ? ' from '.$rangeText : '')
-        .' on '.$siteName.'. Instant email delivery, pay with card, mobile money or crypto.';
+    $metaDescription = $seoBuyLine.' '.__('products.detail_seo_email_delivery');
+    $metaKeywords = $kindText('products.detail_keywords_gift_card', 'products.detail_keywords_topup', 'products.detail_keywords_bill', ['brand' => $brandName, 'site' => $siteName]);
 @endphp
 
 <x-shop.layout
-    :title="$brandName . ' ' . $kindTitle . ' | '.$siteName"
+    :title="$pageTitle . ' | '.$siteName"
     :description="$metaDescription"
-    :keywords="$brandName . ', ' . $brandName . ' ' . strtolower($kindTitle) . ', buy ' . $brandName . ' ' . strtolower($kindTitle) . ' online, '.$siteName"
+    :keywords="$metaKeywords"
     :og-image="$logoSrc ?: asset('assets/og-image.png')"
     og-type="product"
     :json-ld="$pageJsonLd"
@@ -630,9 +651,13 @@
                      so the card parks below it instead of sliding up behind the nav. --}}
                 <div class="lg:sticky lg:top-[156px]">
                     <div class="pure-card mx-auto lg:mr-0 flex w-full max-w-lg items-center justify-center rounded-[24px] bg-[#e8e8f7] p-10 sm:p-14 dark:border dark:border-[#24364f] dark:bg-[#0c1a36]">
-                        <div class="relative flex aspect-[8/5] w-4/5 items-center justify-center overflow-hidden rounded-[20px] bg-[#ffffff] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.25)]">
+                        {{-- The brand plate. keep-light holds it white in dark mode: bg-[#ffffff]
+                             became the dashboard card class in the light redesign, and the dashboard
+                             mirror of this page renders the same file, so without the opt-out the
+                             plate repaints to the card grey and a dark-linework logo vanishes. --}}
+                        <div class="relative flex aspect-[8/5] w-4/5 items-center justify-center overflow-hidden rounded-[20px] keep-light bg-[#ffffff] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.25)]">
                             @if ($logoSrc)
-                                <img src="{{ $logoSrc }}" alt="{{ $brandName }} {{ $kindNoun }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high">
+                                <img src="{{ $logoSrc }}" alt="{{ $productLabel }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high">
                             @else
                                 {{-- No logo (e.g. mobile-airtime operators) — a branded name tile. --}}
                                 <div class="flex h-full w-full items-center justify-center" style="background-color: {{ Product::tileColor($brandKey) }}">
@@ -649,13 +674,13 @@
 
                 {{-- Heading --}}
                 <div>
-                    <h1 class="text-[24px] font-bold leading-tight text-zinc-900">{{ $brandName }} {{ $kindNoun }}</h1>
+                    <h1 class="text-[24px] font-bold leading-tight text-zinc-900">{{ $productLabel }}</h1>
 
                     {{-- Per-brand customer rating, from reviews left on delivered
                          orders for this gift card. Only shown for gift cards that
                          have at least one approved review. --}}
                     @if ($isGiftCard && ($brandReviewAgg['count'] ?? 0) > 0)
-                        <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ number_format($brandReviewAgg['rating'], 1) }} out of 5 from {{ $brandReviewAgg['count'] }} {{ str('review')->plural($brandReviewAgg['count']) }}">
+                        <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ trans_choice('products.detail_rating_aria', $brandReviewAgg['count'], ['rating' => number_format($brandReviewAgg['rating'], 1), 'count' => $brandReviewAgg['count']]) }}">
                             <span class="flex items-center gap-0.5">
                                 @for ($i = 1; $i <= 5; $i++)
                                     <svg class="h-4 w-4 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -664,7 +689,7 @@
                                 @endfor
                             </span>
                             <span class="text-sm font-bold text-zinc-900">{{ number_format($brandReviewAgg['rating'], 1) }}</span>
-                            <span class="text-sm text-zinc-500 hover:text-blue-700">({{ $brandReviewAgg['count'] }} {{ str('review')->plural($brandReviewAgg['count']) }})</span>
+                            <span class="text-sm text-zinc-500 hover:text-blue-700">({{ trans_choice('products.detail_review_count', $brandReviewAgg['count'], ['count' => $brandReviewAgg['count']]) }})</span>
                         </a>
                     @endif
 
@@ -672,15 +697,15 @@
                         <div class="mt-3 text-base leading-relaxed text-zinc-600 [&>p]:mb-2 [&_a]:text-blue-600 [&_a]:underline">{!! $product->description !!}</div>
                     @elseif ($isTopup)
                         <p class="mt-3 text-base leading-relaxed text-zinc-600">
-                            Send airtime to any {{ $brandName }} number. Instant delivery and a fair refund policy.
+                            {{ __('products.detail_intro_topup', ['brand' => $brandName]) }}
                         </p>
                     @elseif ($isBill)
                         <p class="mt-3 text-base leading-relaxed text-zinc-600">
-                            Pay your {{ $brandName }} bill instantly. Fast delivery and a fair refund policy.
+                            {{ __('products.detail_intro_bill', ['brand' => $brandName]) }}
                         </p>
                     @else
                         <p class="mt-3 text-base leading-relaxed text-zinc-600">
-                            Buy {{ $brandName }} gift cards with Bitcoin, USDT, USDC and other Crypto. Instant delivery and a fair refund policy.
+                            {{ __('products.detail_intro_gift_card', ['brand' => $brandName]) }}
                         </p>
                     @endif
                 </div>
@@ -690,13 +715,13 @@
                      sm+ wraps naturally. --}}
                 @php
                     $redeemLabel = $isTopup
-                        ? 'Credited straight to the number'
-                        : ($isBill ? 'Paid straight to the account' : 'Online redeemable');
+                        ? __('products.detail_badge_credited_to_number')
+                        : ($isBill ? __('products.detail_badge_paid_to_account') : __('products.detail_badge_online_redeemable'));
 
                     $badges = [
-                        ['label' => 'Instant delivery', 'd' => 'M13 10V3L4 14h7v7l9-11h-7z'],
+                        ['label' => __('products.detail_badge_instant_delivery'), 'd' => 'M13 10V3L4 14h7v7l9-11h-7z'],
                         ['label' => $redeemLabel,       'd' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                        ['label' => 'Fair refund policy', 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                        ['label' => __('products.detail_badge_fair_refund'), 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ];
                 @endphp
                 {{-- py-1 stops the overflow-x container clipping the badge
@@ -719,7 +744,7 @@
                      buyer instantly knows what kind of product this is (matches the
                      "Credits" tag in the reference). --}}
                 @php
-                    $kindPillLabel = $isTopup ? 'Credits' : ($isBill ? 'Bill Payment' : 'Gift Card');
+                    $kindPillLabel = $isTopup ? __('products.detail_pill_credits') : ($isBill ? __('products.detail_kind_bill') : __('products.detail_kind_gift_card'));
                 @endphp
                 <div>
                     <span class="inline-flex items-center rounded-[5px] bg-blue-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">{{ $kindPillLabel }}</span>
@@ -733,9 +758,9 @@
 
                     @if ($isTopup && $topupHasPlans)
                         <div class="mb-5">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-white">Choose how to top up</label>
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-white">{{ __('products.detail_choose_topup') }}</label>
 
-                            <div class="inline-flex items-center rounded-[12px] bg-zinc-100 p-1 dark:bg-[#0c1a36]" role="tablist" aria-label="Plan type">
+                            <div class="inline-flex items-center rounded-[12px] bg-zinc-100 p-1 dark:bg-[#0c1a36]" role="tablist" aria-label="{{ __('products.detail_plan_type') }}">
                                 @foreach ($topupTabs as $key => $label)
                                     <button
                                         type="button"
@@ -761,13 +786,13 @@
                                             $clockIcon = 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z';
 
                                             $features = [];
-                                            if ($plan['dataUnlimited']) { $features[] = [$dataIcon, 'Unlimited data']; }
-                                            elseif (! empty($plan['dataGB'])) { $features[] = [$dataIcon, rtrim(rtrim(number_format((float) $plan['dataGB'], 2, '.', ''), '0'), '.').'GB data']; }
-                                            if ($plan['voiceUnlimited']) { $features[] = [$voiceIcon, 'Unlimited minutes']; }
-                                            elseif (! empty($plan['voice'])) { $features[] = [$voiceIcon, $plan['voice'].' minutes']; }
-                                            if ($plan['smsUnlimited']) { $features[] = [$smsIcon, 'Unlimited SMS']; }
-                                            elseif (! empty($plan['sms'])) { $features[] = [$smsIcon, $plan['sms'].' SMS']; }
-                                            if (! empty($plan['days'])) { $features[] = [$clockIcon, $plan['days'].'-day validity']; }
+                                            if ($plan['dataUnlimited']) { $features[] = [$dataIcon, __('products.detail_unlimited_data')]; }
+                                            elseif (! empty($plan['dataGB'])) { $features[] = [$dataIcon, __('products.detail_data_size', ['size' => rtrim(rtrim(number_format((float) $plan['dataGB'], 2, '.', ''), '0'), '.').'GB'])]; }
+                                            if ($plan['voiceUnlimited']) { $features[] = [$voiceIcon, __('products.detail_unlimited_minutes')]; }
+                                            elseif (! empty($plan['voice'])) { $features[] = [$voiceIcon, __('products.detail_minutes', ['count' => (string) $plan['voice']])]; }
+                                            if ($plan['smsUnlimited']) { $features[] = [$smsIcon, __('products.detail_unlimited_sms')]; }
+                                            elseif (! empty($plan['sms'])) { $features[] = [$smsIcon, __('products.detail_sms', ['count' => (string) $plan['sms']])]; }
+                                            if (! empty($plan['days'])) { $features[] = [$clockIcon, __('products.detail_validity_days', ['count' => (string) $plan['days']])]; }
                                         @endphp
                                         <button
                                             type="button"
@@ -775,7 +800,7 @@
                                             :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-[#24364f] dark:hover:border-blue-400/50'"
                                             class="esim-tile flex h-full flex-col rounded-[14px] border bg-[#eff6ff] px-4 py-4 text-left transition-colors"
                                         >
-                                            <span class="inline-flex w-fit items-center rounded-[8px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">{{ $key === 'data' ? 'Data' : 'Bundle' }}</span>
+                                            <span class="inline-flex w-fit items-center rounded-[8px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">{{ $key === 'data' ? __('products.detail_tab_data') : __('products.detail_plan_bundle') }}</span>
                                                 @if (! empty($plan['name']))
                                                     <span class="mt-2 block text-sm font-bold leading-snug text-zinc-900 dark:text-white">{{ $plan['name'] }}</span>
                                                 @endif
@@ -808,7 +833,7 @@
                         {{-- Amount field — plain typeable input with $ prefix. Suggested denominations
                              render as small clickable chips below so users can one-tap a common value. --}}
                         <div class="col-span-2 sm:col-span-1" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? 'Credit amount' : 'Amount' }}</label>
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? __('products.detail_credit_amount') : __('products.detail_amount') }}</label>
                             <div
                                 x-data="{ open: false, locked: false }"
                                 @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
@@ -828,8 +853,8 @@
                                         x-effect="selectedVariantId; customMode; flash()"
                                         class="flex-1 truncate text-left tabular-nums"
                                         :class="amount ? 'text-zinc-900' : 'font-medium text-zinc-500'"
-                                        x-text="amount ? amount : 'Select amount'"
-                                    >Select amount</span>
+                                        x-text="amount ? amount : @js(__('products.detail_select_amount'))"
+                                    >{{ __('products.detail_select_amount') }}</span>
                                     {{-- Clear the selected denomination. @click.stop so it doesn't toggle the dropdown. --}}
                                     <span
                                         x-show="selectedVariantId || amount"
@@ -837,7 +862,7 @@
                                         @keydown.enter.stop="amount = ''; selectedVariantId = null; customMode = false; open = false"
                                         role="button"
                                         tabindex="0"
-                                        aria-label="Clear selected amount"
+                                        aria-label="{{ __('products.detail_clear_amount') }}"
                                         class="flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] bg-zinc-200 transition-colors hover:bg-zinc-300"
                                     >
                                         <img src="{{ asset('assets/' . rawurlencode('x button.webp')) }}" alt="" class="h-3.5 w-3.5 object-contain" loading="lazy">
@@ -920,7 +945,7 @@
                                                 :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
                                                 class="flex w-full items-center justify-between rounded-[12px] {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                                             >
-                                                <span class="font-bold">Custom amount</span>
+                                                <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
                                                 <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
                                             </button>
                                         @endif
@@ -938,7 +963,7 @@
                                         >
                                             <span class="font-bold">{{ $conv($val) }}</span>
                                             @if ($i === $fixedDenoms->count() - 1 && $fixedDenoms->count() > 1)
-                                                <span class="inline-flex items-center rounded-[12px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">Popular</span>
+                                                <span class="inline-flex items-center rounded-[12px] bg-white/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-300/50 shadow-[0_0_10px_rgba(37,99,235,0.45)] backdrop-blur-md dark:bg-blue-950 dark:ring-blue-400/50">{{ __('products.detail_popular') }}</span>
                                             @endif
                                         </button>
                                     @endforeach
@@ -949,7 +974,7 @@
                                             :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
                                             class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                                         >
-                                            <span class="font-bold">Custom amount</span>
+                                            <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
                                             <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
                                         </button>
                                     @endif
@@ -982,21 +1007,21 @@
                                         x-cloak
                                         class="mt-1.5 text-xs font-medium text-red-600"
                                     >
-                                        Enter an amount between {{ $customMoney($customDisplayMin) }} and {{ $customMoney($customDisplayMax) }}.
+                                        {{ __('products.detail_amount_out_of_range', ['min' => $customMoney($customDisplayMin), 'max' => $customMoney($customDisplayMax)]) }}
                                     </p>
                                 </div>
                             @endif
 
                             @if ($rangeMin !== null && $rangeMax !== null)
                                 <p class="mt-1.5 text-xs text-zinc-600">
-                                    Between {{ $variable ? $customMoney($rangeMin) : $conv($rangeMin) }} and {{ $variable ? $customMoney($rangeMax) : $conv($rangeMax) }}
+                                    {{ __('products.detail_range_hint', ['min' => $variable ? $customMoney($rangeMin) : $conv($rangeMin), 'max' => $variable ? $customMoney($rangeMax) : $conv($rangeMax)]) }}
                                 </p>
                             @endif
                         </div>
 
                         {{-- Quantity — custom dropdown so it visually matches the Amount + Estimated price fields. --}}
                         <div class="sm:min-w-[6rem]">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">Quantity</label>
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_quantity') }}</label>
                             <div
                                 x-data="{ open: false, locked: false }"
                                 @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
@@ -1042,7 +1067,7 @@
                         {{-- Estimated price — crypto currency selector. Each option shows the equivalent
                              in that crypto using a placeholder rate (rate table lives in Alpine state). --}}
                         <div class="sm:min-w-[9rem]">
-                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">Estimated price</label>
+                            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_estimated_price') }}</label>
                             <div
                                 x-data="{ open: false, locked: false }"
                                 @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
@@ -1115,7 +1140,7 @@
                     @if ($isBill)
                         <div>
                             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                                {{ $brandName }} account / meter number
+                                {{ __('products.detail_account_label', ['brand' => $brandName]) }}
                             </label>
                             <div
                                 :class="accountIdValid()
@@ -1128,7 +1153,7 @@
                                     inputmode="numeric"
                                     autocomplete="off"
                                     x-model="accountId"
-                                    placeholder="e.g. 04220098765"
+                                    placeholder="{{ __('products.detail_account_placeholder') }}"
                                     class="min-w-0 flex-1 bg-transparent text-base font-medium tracking-wider text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
                                 >
                                 <svg
@@ -1145,7 +1170,7 @@
                                 x-show="accountId.length > 0 && ! accountIdValid()"
                                 x-cloak
                                 class="mt-1 text-[11px] font-medium text-red-600"
-                            >Enter a valid account or meter number.</p>
+                            >{{ __('products.detail_account_invalid') }}</p>
                         </div>
                     @endif
 
@@ -1159,7 +1184,7 @@
                                 @if (Product::flagUrl($product->country_code))
                                     <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-3.5 w-5 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
                                 @endif
-                                {{ $countryName }} phone number to refill
+                                {{ __('products.detail_phone_label', ['country' => $countryName]) }}
                             </label>
                             <div
                                 :class="recipientPhoneValid()
@@ -1190,14 +1215,14 @@
                                 x-show="recipientPhone.length > 0 && ! recipientPhoneValid()"
                                 x-cloak
                                 class="mt-1 text-[11px] font-medium text-red-600"
-                            >Enter a valid {{ $countryName }} mobile number.</p>
+                            >{{ __('products.detail_phone_invalid', ['country' => $countryName]) }}</p>
                         </div>
                     @endif
 
                     {{-- Points you earn - calculated via backend rates (USD spent x cashback % / Rcoin USD rate). Coin icon is the site favicon. Hidden when the Rcoin engine is off. --}}
                     <p x-show="rcoinConfig.enabled" class="my-3 flex items-center gap-1.5 text-sm font-semibold text-zinc-700">
-                        Points you earn
-                        <img src="{{ asset('assets/favicon.ico') }}" alt="coins" class="h-6 w-6 object-contain" loading="lazy">
+                        {{ __('products.detail_points_you_earn') }}
+                        <img src="{{ asset('assets/favicon.ico') }}" alt="{{ __('products.detail_points_icon_alt') }}" class="h-6 w-6 object-contain" loading="lazy">
                         <span x-data="valueFlip()" x-effect="selectedVariantId; quantity; flash()" class="inline-block text-zinc-900" x-text="pointsEarned()">0</span>
                     </p>
 
@@ -1210,8 +1235,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                             </svg>
                             <div>
-                                <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? 'Out of stock' : 'Temporarily unavailable' }}</p>
-                                <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">{{ $product->is_out_of_stock ? 'This product is out of stock right now. Please check back later.' : 'Purchases are paused right now. Please check back soon.' }}</p>
+                                <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? __('products.out_of_stock') : __('products.temporarily_unavailable') }}</p>
+                                <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">{{ $product->is_out_of_stock ? __('products.detail_out_of_stock_notice') : __('products.detail_paused_notice') }}</p>
                             </div>
                         </div>
                     @endunless
@@ -1238,7 +1263,7 @@
                                 x-transition:leave="transition ease-in duration-100"
                                 x-transition:leave-end="opacity-0"
                                 class="absolute inset-0 flex items-center justify-center"
-                            >Add to cart</span>
+                            >{{ __('products.add_to_cart') }}</span>
 
                             <span
                                 x-show="cartState === 'loading'"
@@ -1266,7 +1291,7 @@
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M5 13l4 4L19 7"/>
                                 </svg>
-                                Added
+                                {{ __('products.detail_added') }}
                             </span>
                         </button>
                         <button
@@ -1275,7 +1300,7 @@
                             :disabled="! canAddToCart() || $store.cart.loading"
                             class="flex h-[52px] items-center justify-center rounded-[12px] bg-blue-600 px-4 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
                         >
-                            Buy now
+                            {{ __('products.buy_now') }}
                         </button>
                     </div>
 
@@ -1286,20 +1311,20 @@
                             @if (Product::flagUrl($product->country_code))
                                 <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-4 w-6 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
                             @endif
-                            <span>{{ $isTopup ? 'Works for ' . $countryName . ' mobile numbers' : ($isBill ? 'Available for billers in ' . $countryName : 'May only be redeemable in ' . $countryName) }}</span>
+                            <span>{{ $isTopup ? __('products.detail_works_for_numbers', ['country' => $countryName]) : ($isBill ? __('products.detail_billers_in', ['country' => $countryName]) : __('products.detail_redeemable_in', ['country' => $countryName])) }}</span>
                         </p>
                         <p class="mt-0.5 text-sm text-zinc-600">
-                            Not in {{ $countryName }}?
+                            {{ __('products.detail_not_in_country', ['country' => $countryName]) }}
                             <button type="button" @click="$dispatch('open-locale-modal'); localeModalOpen = true" class="font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700">
-                                Find your country
+                                {{ __('products.detail_find_your_country') }}
                             </button>
                         </p>
                     </div>
                     </div>{{-- /top-up switcher ttab scope --}}
                 @else
                     <div class="dash-shimmer pure-card rounded-[12px] bg-[#eff6ff] px-4 py-8 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
-                        <p class="text-base font-semibold text-zinc-900">Out of stock</p>
-                        <p class="mt-1 text-sm text-zinc-600">{{ $isTopup ? 'This network has no top-up amounts available right now.' : ($isBill ? 'This biller has no payment amounts available right now.' : 'This card has no denominations available right now.') }} Check back later.</p>
+                        <p class="text-base font-semibold text-zinc-900">{{ __('products.out_of_stock') }}</p>
+                        <p class="mt-1 text-sm text-zinc-600">{{ $kindText('products.detail_no_amounts_gift_card', 'products.detail_no_amounts_topup', 'products.detail_no_amounts_bill') }}</p>
                     </div>
                 @endif
 
@@ -1314,7 +1339,7 @@
                     rel="noopener noreferrer"
                     class="mb-2 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
-                    Redeem at {{ $brandName }}
+                    {{ __('products.detail_redeem_at', ['brand' => $brandName]) }}
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
                     </svg>
@@ -1324,7 +1349,7 @@
             @if ($product->redeem_instructions)
                 <details class="group" open>
                     <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        {{ $categorySlug === 'gift-cards' ? 'How to redeem' : 'How it works' }}
+                        {{ $categorySlug === 'gift-cards' ? __('products.detail_how_to_redeem') : __('products.detail_how_it_works') }}
                         <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                         </svg>
@@ -1338,7 +1363,7 @@
             @if ($product->terms_and_conditions)
                 <details class="group">
                     <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        Terms and conditions
+                        {{ __('products.detail_terms') }}
                         <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                         </svg>
@@ -1352,7 +1377,7 @@
             @if ($redemptionVideo)
                 <details class="group">
                     <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                        Watch a walkthrough
+                        {{ __('products.detail_walkthrough') }}
                         <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                         </svg>
@@ -1361,7 +1386,7 @@
                         <div class="overflow-hidden rounded-[12px] bg-zinc-900 ring-1 ring-zinc-100">
                             <video controls class="aspect-video w-full">
                                 <source src="{{ $redemptionVideo }}">
-                                Your browser doesn't support embedded video.
+                                {{ __('products.detail_video_unsupported') }}
                             </video>
                         </div>
                     </div>
@@ -1370,24 +1395,24 @@
 
             <details class="group">
                 <summary class="flex cursor-pointer items-center justify-between py-5 text-lg font-bold text-zinc-900 marker:content-['']">
-                    Frequently asked questions
+                    {{ __('products.detail_faq_heading') }}
                     <svg class="h-5 w-5 text-zinc-600 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
                     </svg>
                 </summary>
                 <div class="pb-5 text-base leading-relaxed text-zinc-700">
                     @if ($isTopup)
-                        <p class="mb-3"><strong class="text-zinc-900">How fast will the top-up arrive?</strong><br>Delivery is instant — the airtime is credited to the phone number within seconds of confirmed payment.</p>
-                        <p class="mb-3"><strong class="text-zinc-900">Which numbers can I top up on {{ $brandName }}?</strong><br>This top-up works for {{ $brandName }} mobile numbers in {{ $countryName }}. To top up a different network or country, switch country in the locale picker at the top of the page.</p>
-                        <p><strong class="text-zinc-900">What happens if the top-up fails?</strong><br>Our fair-refund policy covers any top-up that fails to deliver due to an issue on our end. Contact support with your order ID.</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_topup_speed_q') }}</strong><br>{{ __('products.detail_faq_topup_speed_a') }}</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_topup_numbers_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_topup_numbers_a', ['brand' => $brandName, 'country' => $countryName]) }}</p>
+                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_topup_failed_q') }}</strong><br>{{ __('products.detail_faq_topup_failed_a') }}</p>
                     @elseif ($isBill)
-                        <p class="mb-3"><strong class="text-zinc-900">How fast is the bill paid?</strong><br>Payment is instant — the amount is applied to the account within seconds of confirmed payment.</p>
-                        <p class="mb-3"><strong class="text-zinc-900">What do I need to pay a {{ $brandName }} bill?</strong><br>You need the account or meter number the bill is registered to. Enter it at checkout so the payment reaches the right account.</p>
-                        <p><strong class="text-zinc-900">What happens if the payment fails?</strong><br>Our fair-refund policy covers any bill payment that fails to apply due to an issue on our end. Contact support with your order ID.</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_bill_speed_q') }}</strong><br>{{ __('products.detail_faq_bill_speed_a') }}</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_bill_need_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_bill_need_a') }}</p>
+                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_bill_failed_q') }}</strong><br>{{ __('products.detail_faq_bill_failed_a') }}</p>
                     @else
-                        <p class="mb-3"><strong class="text-zinc-900">How fast will I receive my gift card?</strong><br>Delivery is instant — the redemption code lands in your delivery email within seconds of confirmed payment.</p>
-                        <p class="mb-3"><strong class="text-zinc-900">Can I redeem this {{ $brandName }} gift card in my country?</strong><br>This card is only redeemable in {{ $countryName }}. To shop a different country's catalog, switch country in the locale picker at the top of the page.</p>
-                        <p><strong class="text-zinc-900">What happens if the code doesn't work?</strong><br>Our fair-refund policy covers any code that fails to redeem due to a delivery issue on our end. Contact support with your order ID.</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_speed_q') }}</strong><br>{{ __('products.detail_faq_gift_card_speed_a') }}</p>
+                        <p class="mb-3"><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_country_q', ['brand' => $brandName]) }}</strong><br>{{ __('products.detail_faq_gift_card_country_a', ['country' => $countryName]) }}</p>
+                        <p><strong class="text-zinc-900">{{ __('products.detail_faq_gift_card_failed_q') }}</strong><br>{{ __('products.detail_faq_gift_card_failed_a') }}</p>
                     @endif
                 </div>
             </details>
@@ -1399,19 +1424,26 @@
         @if ($similar->isNotEmpty())
             <section class="mt-12">
                 <div class="mb-4 flex items-baseline justify-between">
-                    <h2 class="text-lg font-bold text-zinc-900">Similar in {{ $countryName }}</h2>
+                    <h2 class="text-lg font-bold text-zinc-900">{{ __('products.detail_similar_in', ['country' => $countryName]) }}</h2>
                     <a href="{{ route($listingRoute, array_filter(['country' => $product->country_code, 'subcategory' => $product->subcategory?->slug])) }}" wire:navigate class="text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700">
-                        View all →
+                        {{ __('products.view_all') }} →
                     </a>
                 </div>
 
                 {{-- Horizontal carousel on mobile (scrollbar hidden); a static grid from sm up. --}}
                 <div class="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-4 sm:overflow-visible sm:pb-0 lg:grid-cols-6">
                     @foreach ($similar as $s)
-                        @php($sLogo = Product::brandLogoUrl($s->brand_key, $s->logo_url))
+                        {{-- Block form, not the inline parenthesised one: that compiled
+                             here to an open tag with no space after it, which PHP does
+                             not read as an open tag at all, so everything below stopped
+                             being compiled and every product page 500'd. --}}
+                        @php
+                            $sLogo = Product::brandLogoUrl($s->brand_key, $s->logo_url);
+                        @endphp
                         <a href="{{ route($detailRoute, ['brandSlug' => Product::brandSlug($s->brand_key), 'country' => $product->country_code]) }}" wire:navigate class="card-3d-scene group block w-36 shrink-0 sm:w-auto">
+                            {{-- keep-light: same white plate, same reason as the hero above. --}}
                             <div
-                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] bg-[#ffffff] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300"
+                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] keep-light bg-[#ffffff] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300"
                                 x-data="cardTilt()"
                                 @mousemove="tilt($event)"
                                 @mouseleave="reset()"
@@ -1446,25 +1478,32 @@
              Console "Crawled - currently not indexed" thin/near-duplicate pages. --}}
         <section class="mt-14 border-t border-zinc-100 pt-10 dark:border-white/10">
             <div class="max-w-3xl">
+                @php
+                    $aboutReplace = ['brand' => $brandName, 'country' => $countryName, 'site' => $siteName, 'range' => (string) $rangeText];
+                @endphp
                 <h2 class="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
-                    Buy {{ $brandName }} {{ $kindTitle }} in {{ $countryName }}
+                    {{ $kindText('products.detail_about_heading_gift_card', 'products.detail_about_heading_topup', 'products.detail_about_heading_bill', $aboutReplace) }}
                 </h2>
 
                 <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
-                    {{ $brandName }} {{ $kindNoun }}s on {{ $siteName }} are delivered instantly{{ $rangeText ? ', with amounts from '.$rangeText : '' }}. Pay with a debit or credit card, mobile money, or crypto, and your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} lands in your email within seconds of a confirmed payment. Every order is backed by our fair refund policy.
+                    {{ $rangeText ? $kindText('products.detail_about_delivery_ranged_gift_card', 'products.detail_about_delivery_ranged_topup', 'products.detail_about_delivery_ranged_bill', $aboutReplace) : $kindText('products.detail_about_delivery_gift_card', 'products.detail_about_delivery_topup', 'products.detail_about_delivery_bill', $aboutReplace) }} {{ $kindText('products.detail_about_payment_gift_card', 'products.detail_about_payment_topup', 'products.detail_about_payment_bill') }} {{ __('products.detail_about_refund') }}
                 </p>
 
                 @if ($brandCountries->count() > 1)
+                    @php
+                        $aboutReplace['countries'] = $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' '.__('products.detail_list_and').' ');
+                    @endphp
                     <p class="mt-4 text-base leading-relaxed text-zinc-600 dark:text-zinc-300">
-                        This {{ $brandName }} {{ $kindNoun }} is for {{ $countryName }}. {{ $brandName }} {{ $kindNoun }}s are also available in {{ $brandCountries->map(fn ($c) => $countryNames[strtoupper((string) $c)] ?? $c)->reject(fn ($n) => $n === $countryName)->take(8)->join(', ', ' and ') }}. Switch country at the top of the page to shop them.
+                        {{ $kindText('products.detail_about_countries_gift_card', 'products.detail_about_countries_topup', 'products.detail_about_countries_bill', $aboutReplace) }} {{ __('products.detail_about_switch_country') }}
                     </p>
                 @endif
 
-                <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">How to {{ $isTopup ? 'top up' : ($isBill ? 'pay' : 'buy') }} {{ $brandName }} {{ $kindNoun }}</h3>
+                <h3 class="mt-8 text-lg font-bold text-zinc-900 dark:text-white">{{ $kindText('products.detail_how_to_gift_card', 'products.detail_how_to_topup', 'products.detail_how_to_bill', $aboutReplace) }}</h3>
                 <ol class="mt-3 list-decimal space-y-2 pl-5 text-base leading-relaxed text-zinc-600 marker:font-semibold marker:text-zinc-400 dark:text-zinc-300">
-                    <li>Choose your amount{{ $isTopup ? ' and enter the '.$brandName.' phone number' : ($isBill ? ' and enter your '.$brandName.' account number' : '') }}.</li>
-                    <li>Pay securely with card, mobile money or crypto.</li>
-                    <li>Receive your {{ $isTopup ? 'airtime' : ($isBill ? 'payment confirmation' : 'redemption code') }} by email instantly{{ $isGiftCard ? ', then redeem it at '.$brandName : '' }}.</li>
+                    <li>{{ $kindText('products.detail_step_amount_gift_card', 'products.detail_step_amount_topup', 'products.detail_step_amount_bill', $aboutReplace) }}</li>
+                    <li>{{ __('products.detail_step_pay') }}</li>
+                    {{-- The "then redeem it at" tail is gift cards only; any other category that lands here gets the plain line. --}}
+                    <li>{{ $isGiftCard ? __('products.detail_step_receive_gift_card', $aboutReplace) : $kindText('products.detail_step_receive_code', 'products.detail_step_receive_topup', 'products.detail_step_receive_bill') }}</li>
                 </ol>
             </div>
         </section>

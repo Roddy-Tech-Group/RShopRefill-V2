@@ -59,7 +59,19 @@ class CategoryCardsTest extends TestCase
         // Four cards, four blooms, one wash. Counted inside the card list
         // only: the payment panel further down the page borrows the same bloom
         // layer, so a page-wide count would drift every time that changes.
-        $list = substr($html, (int) strpos($html, 'grid grid-cols-1 gap-4 sm:grid-cols-2'));
+        //
+        // The slice used to open at the list's own class string, which no
+        // longer exists: below sm the row became a snapping carousel, so the
+        // class list now starts with the carousel utilities and every grid one
+        // moved behind an sm: prefix. Anchoring on how the row happens to be
+        // laid out this month is what broke it, so the slice starts at the
+        // section's aria-label instead - what the row IS, which survives the
+        // next layout change. The anchor is asserted before it is used: a
+        // strpos miss returns false, which substr reads as 0, and the count
+        // would then silently run over the whole document.
+        $this->assertStringContainsString('aria-label="Browse categories"', $html);
+
+        $list = substr($html, (int) strpos($html, 'aria-label="Browse categories"'));
         $list = substr($list, 0, (int) strpos($list, '</ul>'));
 
         $this->assertSame(4, substr_count($list, 'cat-card-glow'));
@@ -123,10 +135,10 @@ class CategoryCardsTest extends TestCase
 
     public function test_the_blue_stays_on_the_edge_and_out_of_the_card(): void
     {
-        // The card face keeps its own fill; the wash colour arrives from the
-        // ring, never as a flat tint over the whole card. The light-mode glow
-        // previously carried a #f4f8ff tint down from the card's top, which is
-        // exactly the fill this forbids.
+        // The card face keeps its own fill; the blue only ever arrives off the
+        // card's edge, never as a flat tint over the whole card. The light-mode
+        // glow previously carried a #f4f8ff tint down from the card's top,
+        // which is exactly the fill this forbids.
         preg_match('/
 \.cat-card-glow \{(.*?)
 \}/s', $this->css(), $m);
@@ -144,8 +156,18 @@ class CategoryCardsTest extends TestCase
         // a face this close to the page it washed out entirely.
         $this->assertStringContainsString('box-shadow: inset 0 0 70px 4px rgba(191, 235, 255', $decls);
 
+        // This used to end by pinning the card's #dee3e1 hairline, on the
+        // grounds that the blue arrived off THAT edge rather than out of the
+        // face. The hairline is gone by design - the redesign took the borders
+        // off the tiles so they read as surfaces rather than as boxes - so what
+        // is left to hold is the other half of the same rule: the face is a
+        // flat opaque fill of its own, and nothing blue rides on the card
+        // element itself. The inset shadow asserted above is the only blue the
+        // tile gets, and it is a wash off the edge, not a fill.
         $blade = File::get(resource_path('views/components/home/category-cards.blade.php'));
-        $this->assertStringContainsString('ring-1 ring-[#dee3e1]', $blade);
+        $this->assertStringContainsString('rounded-[20px] bg-[#ffffff]', $blade);
+        $this->assertStringNotContainsString('ring-[#bfebff]', $blade);
+        $this->assertStringNotContainsString('bg-[#bfebff]', $blade);
     }
 
     public function test_the_wash_top_fades_instead_of_drawing_a_line(): void
@@ -175,7 +197,7 @@ class CategoryCardsTest extends TestCase
         $this->assertNotEmpty($m, '.card-text face rule missing.');
 
         foreach ([
-            'font-weight: 500;',
+            'font-weight: 399;',
             'font-size: 16px;',
             'line-height: 24px;',
             'font-style: normal;',
@@ -183,9 +205,18 @@ class CategoryCardsTest extends TestCase
             $this->assertStringContainsString($decl, $m[1]);
         }
 
-        // Roobert leads the stack so the design resolves the moment the licensed
-        // files land; the platform fallbacks carry it until then.
-        $this->assertStringContainsString('font-family: Roobert, -apple-system', $m[1]);
+        // The supplied spec asked for Roobert 500 and this pinned exactly that.
+        // Both halves moved. Roobert is a licensed face that was never brought
+        // into the repo - no woff2, no @font-face - so leading the stack with it
+        // resolved to a platform fallback on every machine and the spec was
+        // decorative. DM Sans is the site face now, imported at the top of
+        // app.css as a variable font, which is the only reason the weight can be
+        // 399: that is the off-axis cut the design calls for, and no static cut
+        // can render it. Asserting the exact weight rather than "some weight" is
+        // the point - a build that silently drops back to a static face lands on
+        // 400 and this notices.
+        $this->assertStringContainsString("font-family: 'DM Sans', sans-serif;", $m[1]);
+        $this->assertStringNotContainsString('Roobert', $m[1]);
 
         // "bitrefill" is the source site's own icon font. We do not have it, and
         // a dead family in the middle of a stack only slows matching.
@@ -224,19 +255,38 @@ class CategoryCardsTest extends TestCase
     }
 
     /**
-     * The CTA is a span, never a nested <a>: the card itself is the link, and
-     * an anchor inside an anchor is invalid markup that browsers repair by
-     * splitting the outer link.
+     * Each card names its own destination, and the CTA is a span, never a
+     * nested <a>: the card itself is the link, and an anchor inside an anchor
+     * is invalid markup that browsers repair by splitting the outer link.
+     *
+     * All four used to read "Check it out", which is one sentence repeated four
+     * times and says nothing about where any of them goes. The labels are
+     * asserted distinct rather than just present, because a single shared
+     * string is exactly the thing this replaced.
      */
-    public function test_every_card_carries_a_check_it_out_cta(): void
+    public function test_every_card_names_its_own_destination(): void
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $this->assertSame(4, substr_count($html, 'Check it out'));
+        // Scoped to the row, not the page. The hero's own button also reads
+        // "Shop Gift Cards", so a page-wide count of that label is 2 and says
+        // nothing about whether each CARD carries its own.
+        $this->assertStringContainsString('aria-label="Browse categories"', $html);
+        $row = substr($html, (int) strpos($html, 'aria-label="Browse categories"'));
+        $row = substr($row, 0, (int) strpos($row, '</ul>'));
+
+        $ctas = ['Shop Gift Cards', 'Explore eSIMs', 'Buy Airtime &amp; Data', 'Pay Bills'];
+
+        foreach ($ctas as $cta) {
+            $this->assertSame(1, substr_count($row, $cta), $cta.' should appear once, on its own card.');
+        }
+
+        $this->assertStringNotContainsString('Check it out', $html);
 
         $blade = File::get(resource_path('views/components/home/category-cards.blade.php'));
         $this->assertStringContainsString('aria-hidden="true"', $blade);
-        $this->assertStringNotContainsString('<a href="{{ $card[\'url\'] }}">Check it out', $blade);
+        $this->assertStringContainsString("{{ \$card['cta'] }}", $blade);
+        $this->assertStringNotContainsString("__('products.check_it_out')", $blade);
     }
 
     public function test_the_cta_reveals_on_hover_without_resizing_the_card(): void
@@ -312,6 +362,14 @@ class CategoryCardsTest extends TestCase
      * mid-grey zinc-400, so three surfaces sitting within one screen of each
      * other had three different edges.
      *
+     * Two of those three no longer draw an edge at all. The redesign took the
+     * borders off the category tiles and off the panel below them, so they are
+     * told apart from the page by their fill and their bloom instead. That is
+     * not a licence for the old colours to creep back one surface at a time, so
+     * this now asserts both halves: the hero chips, the surface that still
+     * draws an edge, wear the shared colour, and the two that dropped theirs
+     * carry no static hairline at all.
+     *
      * The bloom stays blue deliberately - a neutral edge with a #bfebff wash off
      * it, rather than one colour doing both jobs.
      */
@@ -321,11 +379,18 @@ class CategoryCardsTest extends TestCase
         $home = File::get(resource_path('views/welcome.blade.php'));
         $hero = File::get(resource_path('views/components/home/hero.blade.php'));
 
-        foreach (['cards' => $cards, 'panel' => $home, 'hero chips' => $hero] as $what => $blade) {
-            $this->assertStringContainsString('ring-[#dee3e1]', $blade, $what.' should wear the shared outline.');
-        }
+        $this->assertStringContainsString('ring-1 ring-[#dee3e1]', $hero, 'hero chips should wear the shared outline.');
 
-        // The colours it replaced must not linger on any of them.
+        // `ring-1 ring-[` is the exact shape every one of these hairlines wore,
+        // so it is what has to stay absent. It cannot catch the cards' focus
+        // ring by accident: that one is focus-visible:ring-2, and it must keep
+        // working - a keyboard user still needs to see where they are.
+        foreach (['cards' => $cards, 'panel' => $home] as $what => $blade) {
+            $this->assertStringNotContainsString('ring-1 ring-[', $blade, $what.' should carry no hairline.');
+        }
+        $this->assertStringContainsString('focus-visible:ring-2', $cards);
+
+        // The colours the shared outline replaced must not linger on any of them.
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $cards.$home.$hero);
         $this->assertStringNotContainsString('ring-[#bfebff]', $markup);
         $this->assertStringNotContainsString('ring-zinc-400', $markup);

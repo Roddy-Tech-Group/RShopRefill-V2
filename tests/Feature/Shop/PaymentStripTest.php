@@ -210,13 +210,42 @@ class PaymentStripTest extends TestCase
      * Mobile-money networks per the gateway account (owner-confirmed,
      * 2026-07-30). The per-market charge endpoints are queued work - see
      * PaymentStripBadges' docblock.
+     *
+     * Coverage is unchanged and still backed by the catalogue: MobileMoneyRail
+     * carries MTN for GHS, UGX, RWF, XAF and XOF, Orange for XAF and XOF, M-PESA
+     * for KES and Airtel for UGX and RWF, and SupportedPaymentMethods lets every
+     * one of those currencies pay by mobile_money. What moved is the MTN badge.
+     * It used to be a generic MOMO.svg file labelled "MTN Mobile Money"; the
+     * redesign dropped that asset for an inline MTN MoMo mark, because the global
+     * dark-mode rule inverts SVG images and would have turned MTN's yellow
+     * purple. The mark draws the wordmark as MoMo, so the badge is labelled to
+     * match what a customer actually sees on it.
+     *
+     * The rail is therefore asserted by its MARK as well as its label. A label is
+     * a string somebody can retitle; the mark is what proves the badge on the
+     * strip is still MTN's and not a second generic mobile-money tile.
      */
     public function test_mobile_money_networks_cover_the_accepted_markets(): void
     {
-        $labels = array_column(PaymentStripBadges::all(), 'label');
+        $badges = PaymentStripBadges::all();
+        $labels = array_column($badges, 'label');
 
-        foreach (['MTN Mobile Money', 'Orange Money', 'M-PESA', 'Airtel Money'] as $network) {
+        foreach (['MoMo', 'Orange Money', 'M-PESA', 'Airtel Money'] as $network) {
             $this->assertContains($network, $labels);
+        }
+
+        $byLabel = array_column($badges, null, 'label');
+
+        $this->assertSame(
+            'mtn_momo',
+            $byLabel['MoMo']['svg'] ?? null,
+            'The MoMo badge must carry the MTN mark, or the strip advertises a rail it cannot name.'
+        );
+
+        // All four are the one method key checkout gates on, so a badge that
+        // drifted onto another rail's key fails here rather than at payment.
+        foreach (['MoMo', 'Orange Money', 'M-PESA', 'Airtel Money'] as $network) {
+            $this->assertSame('mobile_money', $byLabel[$network]['method']);
         }
     }
 

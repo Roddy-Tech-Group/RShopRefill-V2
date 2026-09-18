@@ -144,10 +144,12 @@ class MobileNavSheetTest extends TestCase
         $this->assertNotFalse($end);
         $foot = substr($html, $start, $end - $start);
 
-        // The footer arrangement: the THEME label beside the segmented chip
-        // (the blue-bordered pill), not the dropdown trigger it replaced.
+        // The footer arrangement: the Theme label beside the segmented chip
+        // (the pill with the locale chip's ring), not the dropdown trigger it
+        // replaced. The label reads "Theme" as written, not shouted in caps.
         $this->assertStringContainsString(__('footer.theme'), $foot);
-        $this->assertStringContainsString('border-blue-400', $foot);
+        $this->assertStringContainsString('rounded-full p-0.5 ring-1 ring-[#dee3e1]', $foot);
+        $this->assertStringNotContainsString('uppercase tracking-wider text-zinc-500', $foot);
     }
 
     /**

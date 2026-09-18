@@ -130,9 +130,6 @@
     // So the listing is one flat "All networks" list.
     $subcategories = collect();
 
-    // Green tint for the trust-badge icons (instant delivery / refund policy).
-    $greenTint = 'filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(394%) hue-rotate(105deg) brightness(92%) contrast(87%);';
-
     // Distinct countries actually available in the synced mobile-airtime catalog.
     $availableCountries = Product::query()
         ->where('category_id', $topupCategory?->id ?? 0)
@@ -211,16 +208,6 @@
                     <div class="mb-6 flex flex-col gap-3 sm:grid sm:grid-cols-3 sm:items-center sm:gap-4">
                         <div class="hidden sm:block">
                             <h1 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Mobile Top-up</h1>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-zinc-700">
-                                <span class="flex items-center gap-1.5">
-                                    <img src="{{ asset('assets/' . rawurlencode('instant delivery.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Instant Delivery
-                                </span>
-                                <a href="{{ route('shop.refund-policy') }}" wire:navigate class="flex items-center gap-1.5 underline-offset-2 transition-colors hover:text-blue-600 hover:underline">
-                                    <img src="{{ asset('assets/' . rawurlencode('Fair Redund Policy.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Clear Refund Policy
-                                </a>
-                            </div>
                         </div>
 
                         {{-- Modern segmented sort selector. URL-driven so the choice survives reloads. --}}
@@ -297,9 +284,13 @@
                                             aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
                                             @if ($notBuyable) aria-disabled="true" @endif
                                         >
-                                            {{-- White tile, logo fills the card edge-to-edge. Caption sits OUTSIDE on the page background. --}}
+                                            {{-- White tile, logo fills the card edge-to-edge. Caption sits OUTSIDE on
+                                                 the page background. keep-light holds the tile white in dark mode:
+                                                 bg-[#ffffff] became the dashboard card class in the light redesign, so
+                                                 without the opt-out the tile repaints to the card grey and an operator
+                                                 logo drawn in dark linework disappears into it. --}}
                                             <div
-                                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300 {{ $logoSrc ? 'bg-[#ffffff]' : '' }}"
+                                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300 {{ $logoSrc ? 'keep-light bg-[#ffffff]' : '' }}"
                                                 @if (! $logoSrc) style="background-color: {{ $tileColor }}" @endif
                                                 x-data="cardTilt()"
                                                 @mousemove="tilt($event)"
@@ -364,7 +355,7 @@
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
-                                <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
+                                <img src="{{ asset('assets/empty-state-blue.webp') }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
                                 @if ($search !== '' || $countryFiltered || $sub !== '')
                                     <p class="mt-4 text-base font-semibold text-zinc-900">No networks match these filters</p>
                                     <p class="mt-1 text-sm text-zinc-600">Try clearing the search or pick a different country.</p>

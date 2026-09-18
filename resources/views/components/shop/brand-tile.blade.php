@@ -57,11 +57,14 @@
         aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
         @if ($notBuyable) aria-disabled="true" @endif
     >
-        {{-- Logo tile. bg uses a literal hex so the dark-mode
-             remap keeps it white — brand logos are drawn for a
-             light tile and vanish on a dark one. --}}
+        {{-- Logo tile. The plate stays white in BOTH themes: brand logos are
+             drawn for a light tile and vanish on a dark one. The literal hex
+             alone no longer guarantees that: bg-[#ffffff] became the dashboard
+             card marker when the light palette moved to white cards on #f4f6f5,
+             and dark mode repaints that class. keep-light opts this plate back
+             out, which is what keeps the logo readable in dark. --}}
         <div
-            class="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] bg-[#ffffff] shadow-sm ring-1 ring-zinc-200"
+            class="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] keep-light bg-[#ffffff] shadow-sm ring-1 ring-zinc-200"
         >
             @if ($logoSrc)
 

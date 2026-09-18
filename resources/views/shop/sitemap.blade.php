@@ -22,6 +22,7 @@
         'Help & company' => [
             ['Help Center', route('shop.help')],
             ['How it works', route('shop.how-it-works')],
+            ['eSIM Installation Guide', route('shop.esim-guide')],
             ['Contact us', route('shop.contact')],
             ['About us', route('shop.about')],
         ],
@@ -31,6 +32,7 @@
             ['Cookie Policy', route('shop.cookie-policy')],
             ['Refund Policy', route('shop.refund-policy')],
             ['Compliance', route('shop.compliance')],
+            ['Security', route('shop.security')],
             ['Accessibility', route('shop.accessibility')],
         ],
     ];

@@ -13,7 +13,7 @@
 --}}
 @php
     $sourceKey = strtolower(trim((string) $review->source));
-    // Our own "system" reviews (source set by ReviewController, e.g. "RshopRefills")
+    // Our own "system" reviews (source set by ReviewController, e.g. "RshopRefill")
     // use the brand mark + blue stars, distinct from Trustpilot's emerald.
     //
     // is_customer_submitted wins over the label for the same reason the model
@@ -24,7 +24,7 @@
     $isSystem = (bool) $review->is_customer_submitted || str_contains($sourceKey, 'rshop');
     $isGoogle = ! $isSystem && $sourceKey === 'google';
     $sourceLabel = $isSystem && in_array($sourceKey, \App\Models\Review::EXTERNAL_SOURCES, true)
-        ? ($siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefills'))
+        ? ($siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefill'))
         : $review->source;
 
     // Half-star bucketing: 3.5 renders as 3 full + 1 half + 1 empty.
@@ -78,6 +78,13 @@
                 <span class="text-[10px] font-bold text-zinc-900 dark:text-white">{{ $sourceLabel }}</span>
             </div>
 
+            {{-- Stars render for OUR OWN reviews only. A Trustpilot or Google
+                 score is that platform's number, measured by them under their
+                 own rules; restating it here presents it as ours and it cannot
+                 be verified from this side. The source logo above still says
+                 where the review came from, and the card links out to the
+                 platform that holds the score. --}}
+            @if ($isSystem)
             <div class="flex gap-0.5" aria-label="{{ number_format($r, 1) }} out of 5 stars">
                 @for ($i = 0; $i < $full; $i++)
                     @if ($isGoogle)
@@ -140,6 +147,7 @@
                     @endif
                 @endfor
             </div>
+            @endif
         </div>
     </div>
 

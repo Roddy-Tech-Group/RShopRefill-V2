@@ -3,7 +3,8 @@
     // Dark-mode safe: backgrounds use remapped classes (bg-white/bg-zinc-50/bg-blue-50
     // -> navy in dark) while coloured accents (text-red-600 / text-blue-700) read in
     // both themes.
-    $complianceEmail = 'info@rshoprefill.com';
+    // support@, the one mailbox that receives mail (info@ has no inbox).
+    $complianceEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
     $lastUpdated = 'August 23, 2026';
 @endphp
 

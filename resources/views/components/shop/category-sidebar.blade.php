@@ -57,14 +57,46 @@
      this component's own dark: variants and painted hover, selection and panel
      the same colour. #ffffff and #dbeafe are not in that remap, which lets
      dark:hover:bg-white/10 and dark:bg-blue-500/25 through. Renaming either to
-     a Tailwind blue would silently kill both states again. --}}
+     a Tailwind blue would silently kill both states again.
+
+     Inside the dashboard the panel does not sit in the page: it teleports into
+     the layout's [data-dash-subnav] slot beside the icon rail (the rail folds
+     while it is there), and wears the dashboard sidebar's own row styling, so
+     the two read as one sidebar rather than two boxes. The template stays in
+     the page, so Alpine keeps the page scope (the client filter's
+     activeCategory) and the page grid drops its sidebar column (CSS keys on
+     template[data-subnav-teleport]). --}}
+@php
+    // Row styling per surface. The dashboard rows copy the dashboard sidebar's
+    // own rows (8px corners, 14px, white active tile). Its white is
+    // bg-[#ffffff], which dark mode turns into the sidebar grey, so the dark
+    // active tile forces its black.
+    $rowBase = $inDashboard
+        ? 'rounded-[8px] px-2.5 py-1.5 text-sm transition-colors'
+        : 'rounded-[12px] px-3 py-2 transition-colors';
+    $catSelected = $inDashboard
+        ? 'cat-selected bg-[#ffffff] font-medium text-black dark:bg-black! dark:text-white'
+        : 'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-white';
+    $subSelected = $inDashboard
+        ? 'cat-selected bg-[#ffffff] font-medium text-black dark:bg-black! dark:text-white'
+        : 'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-blue-300';
+    $catHover = $inDashboard
+        ? 'cat-hover font-medium text-zinc-800 hover:bg-white/70 hover:text-black dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-white'
+        : 'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300';
+@endphp
+@if ($inDashboard)
+<template x-teleport="[data-dash-subnav]" data-subnav-teleport>
+<aside class="dash-subnav-panel flex h-full min-h-0 flex-col" aria-label="{{ __('products.subcategories') }}">
+    <div class="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+@else
 <aside class="hidden self-start lg:sticky lg:top-[156px] lg:block">
     <div class="max-h-[calc(100vh-180px)] overflow-y-auto rounded-[14px] bg-[#eff6ff] p-3 border border-zinc-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-[#0c1a36] dark:border-[#24364f]">
+@endif
 
         {{-- Categories — switches the storefront entirely. --}}
         @if ($showCategories)
-        <p class="px-3 pb-2 pt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300">{{ __('navigation.categories') }}</p>
-        <nav class="space-y-0.5 text-[16px]" aria-label="{{ __('navigation.categories') }}">
+        <p class="{{ $inDashboard ? 'px-2.5 pb-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400' : 'px-3 pb-2 pt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300' }}">{{ __('navigation.categories') }}</p>
+        <nav class="{{ $inDashboard ? 'space-y-0.5' : 'space-y-0.5 text-[16px]' }}" aria-label="{{ __('navigation.categories') }}">
             @foreach ($categories as $cat)
                 @php $catEnabled = \App\Support\FeatureFlag::categoryEnabled($cat['slug']); @endphp
                 @if ($cat['url'] && $catEnabled)
@@ -72,9 +104,9 @@
                         href="{{ $cat['url'] }}"
                         wire:navigate
                         @class([
-                            'flex items-center justify-between rounded-[12px] px-3 py-2 transition-colors',
-                            'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-white' => $active === $cat['slug'],
-                            'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300' => $active !== $cat['slug'],
+                            'flex items-center justify-between '.$rowBase,
+                            $catSelected => $active === $cat['slug'],
+                            $catHover => $active !== $cat['slug'],
                         ])
                         @if ($active === $cat['slug']) aria-current="page" @endif
                     >
@@ -82,12 +114,12 @@
                     </a>
                 @elseif ($cat['url'] && ! $catEnabled)
                     {{-- Feature off: stays visible but greyed and non-clickable. --}}
-                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-2 font-bold text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="{{ __('products.temporarily_unavailable') }}">
+                    <span class="flex cursor-not-allowed items-center justify-between {{ $rowBase }} font-bold text-zinc-400 opacity-70 dark:text-zinc-500" aria-disabled="true" title="{{ __('products.temporarily_unavailable') }}">
                         <span>{{ $cat['label'] }}</span>
                         <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">{{ __('products.flag_off') }}</span>
                     </span>
                 @else
-                    <span class="flex cursor-not-allowed items-center justify-between rounded-[12px] px-3 py-2 font-bold text-zinc-400 dark:text-zinc-500">
+                    <span class="flex cursor-not-allowed items-center justify-between {{ $rowBase }} font-bold text-zinc-400 dark:text-zinc-500">
                         <span>{{ $cat['label'] }}</span>
                         <span class="text-[9px] font-bold uppercase tracking-wide text-zinc-300 dark:text-zinc-600">{{ __('products.coming_soon') }}</span>
                     </span>
@@ -99,8 +131,12 @@
         {{-- Subcategories — of the active category only. Heads the panel when
              the category list above is off, so it carries no top margin then. --}}
         @if (! empty($subItems))
+            {{-- No "Subcategories" heading in the dashboard panel: the rows speak
+                 for themselves there (the panel is labelled for screen readers). --}}
+            @unless ($inDashboard)
             <p class="{{ $showCategories ? 'mt-4 ' : '' }}px-3 pb-2 pt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300">{{ __('products.subcategories') }}</p>
-            <nav class="space-y-0.5 text-[16px]" aria-label="{{ __('products.subcategories') }}">
+            @endunless
+            <nav class="{{ $inDashboard ? ($showCategories ? 'mt-4 space-y-0.5' : 'space-y-0.5') : 'space-y-0.5 text-[16px]' }}" aria-label="{{ __('products.subcategories') }}">
                 @foreach ($subItems as $item)
                     @php $slug = $item['slug'] ?? ''; @endphp
                     <a
@@ -112,16 +148,14 @@
                             @click.prevent="$dispatch('category-filtered', { slug: @js($slug) })"
                         @endif
                         @if ($clientFilter)
-                            :class="activeCategory === @js($slug)
-                                ? 'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-blue-300'
-                                : 'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300'"
+                            :class="activeCategory === @js($slug) ? @js($subSelected) : @js($catHover)"
                             :aria-current="activeCategory === @js($slug) ? 'true' : null"
-                            class="block rounded-[12px] px-3 py-2 transition-colors"
+                            class="block {{ $rowBase }}"
                         @else
                             @class([
-                                'block rounded-[12px] px-3 py-2 transition-colors',
-                                'cat-selected bg-[#ffffff] font-bold text-[#0c1a36] shadow-sm dark:text-blue-300' => $item['active'] ?? false,
-                                'cat-hover font-bold text-zinc-800 hover:bg-[#ffffff] hover:text-zinc-900 dark:text-zinc-300' => ! ($item['active'] ?? false),
+                                'block '.$rowBase,
+                                $subSelected => $item['active'] ?? false,
+                                $catHover => ! ($item['active'] ?? false),
                             ])
                         @endif
                     >
@@ -133,3 +167,6 @@
 
     </div>
 </aside>
+@if ($inDashboard)
+</template>
+@endif

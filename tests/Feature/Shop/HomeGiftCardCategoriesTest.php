@@ -10,11 +10,23 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Gift-card categories on the home page.
+ * The gift-card category row.
  *
- * The four tiles above them say what we sell; these say what KIND of gift
- * card, which is the question most visitors arrive with. Each one deep-links
- * into the listing with that category already selected.
+ * It says what KIND of gift card we carry, which is the question most visitors
+ * arrive with, and each item deep-links into the listing with that category
+ * already selected.
+ *
+ * IT IS NOT ON THE HOME PAGE, and that is deliberate. The trust panel it used
+ * to sit in was given over to the live customer counts, and this row is what
+ * those counts replaced. HomeTrustPanelTest owns that fact and asserts the row
+ * stays out.
+ *
+ * So these render the component DIRECTLY rather than through `/`. The component
+ * is kept and kept working because the behaviour below is worth keeping: which
+ * categories earn a place, which are withheld, the marks, the carousel. Going
+ * through the home page instead would make this file fail for a reason that has
+ * nothing to do with any of that, which is exactly what happened when the row
+ * was first taken out.
  */
 class HomeGiftCardCategoriesTest extends TestCase
 {
@@ -28,6 +40,19 @@ class HomeGiftCardCategoriesTest extends TestCase
 
         $this->withoutVite();
         $this->category = Category::factory()->create(['slug' => 'gift-cards', 'name' => 'Gift Cards']);
+    }
+
+    /**
+     * The component on its own, as HTML.
+     *
+     * Blade rather than a route, because the row is mounted nowhere: rendering
+     * it in isolation is the only way to exercise it, and it is also the more
+     * honest test of a component, since nothing on a surrounding page can make
+     * an assertion pass by accident.
+     */
+    private function render(): string
+    {
+        return (string) $this->blade('<x-home.gift-card-categories />');
     }
 
     private function subcategory(string $name, string $slug): Subcategory
@@ -87,7 +112,7 @@ class HomeGiftCardCategoriesTest extends TestCase
         // Steam is one of Gaming's brands in config/gift_card_categories.php.
         $this->stock($this->subcategory('Gaming', 'gaming'), brand: 'Steam');
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->render();
 
         $this->assertStringContainsString('aria-label="Gift card categories"', $html);
 
@@ -108,7 +133,7 @@ class HomeGiftCardCategoriesTest extends TestCase
     {
         $this->stock($this->subcategory('Gaming', 'gaming'), brand: 'BrandNobodyCurated');
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->render();
 
         $this->assertStringNotContainsString('aria-label="Gift card categories"', $html);
     }
@@ -120,7 +145,7 @@ class HomeGiftCardCategoriesTest extends TestCase
         $this->stock($this->subcategory('Pets', 'pets'), available: false, brand: 'Chewy');
         $this->subcategory('Ghosts', 'ghosts');
 
-        $row = $this->row($this->get('/')->assertOk()->getContent());
+        $row = $this->row($this->render());
 
         $this->assertStringContainsString('subcategory=gaming"', $row);
         $this->assertStringNotContainsString('subcategory=pets', $row);
@@ -136,7 +161,7 @@ class HomeGiftCardCategoriesTest extends TestCase
     {
         $this->stock($this->subcategory('Pets', 'pets'), available: false, brand: 'Chewy');
 
-        $row = $this->row($this->get('/')->assertOk()->getContent());
+        $row = $this->row($this->render());
 
         $this->assertStringNotContainsString('subcategory=pets', $row);
     }
@@ -144,37 +169,60 @@ class HomeGiftCardCategoriesTest extends TestCase
     /** With no gift cards at all, the block does not render an empty heading. */
     public function test_nothing_renders_when_there_are_no_categories(): void
     {
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->render();
 
         $this->assertStringNotContainsString('aria-label="Gift card categories"', $html);
     }
 
-    /** Each category carries its own mark, and an unknown slug still renders. */
+    /**
+     * Each category carries its own mark, and an unknown slug still renders.
+     *
+     * Every mark is inline path data now. Most of them used to be files in
+     * public/assets, picked so a category read the same here as it did in the
+     * nav and the mobile sheet. That sameness cost one HTTP request per
+     * category on a row that draws eleven of them, and the artwork was flat
+     * black rather than currentColor, so each one also needed a
+     * `dark:brightness-0 dark:invert` correction to survive dark mode. Drawn
+     * inline they cost no extra request, no decode and no layout shift while a
+     * lazy image arrives, and they inherit the label's colour, so dark mode
+     * needs no correction at all.
+     *
+     * So what this guards is the whole set being inline rather than any one
+     * category still pointing at any one file: a single entry sliding back to
+     * an 'asset' would quietly bring both problems back with it.
+     */
     public function test_every_category_card_draws_an_icon(): void
     {
-        // Gaming's icon is a file; Pets has none of its own and falls back.
+        // Gaming names a mark of its own; Pets has none and falls back.
         $this->stock($this->subcategory('Gaming', 'gaming'), brand: 'Steam');
         $this->stock($this->subcategory('Pets', 'pets'), brand: 'Chewy');
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $row = $this->row($this->render());
 
         $icons = config('gift_card_category_icons');
         $categories = config('gift_card_categories');
 
         $this->assertArrayHasKey('default', $icons, 'an unknown slug must have somewhere to fall back to');
 
-        // Gaming points at a file already in public/assets, so a category
-        // reads the same here as it does in the nav and the mobile sheet.
+        foreach ($icons as $slug => $icon) {
+            $this->assertArrayHasKey('path', $icon, "The {$slug} mark must be inline path data.");
+            $this->assertArrayNotHasKey('asset', $icon, "The {$slug} mark must not be a file.");
+        }
+
+        // Gaming names its own mark, and it is drawn against Gaming's own deep
+        // link rather than simply existing somewhere on the page.
         $gamingIcon = $icons[$categories['gaming']['icon']];
-        $this->assertArrayHasKey('asset', $gamingIcon);
-        $this->assertStringContainsString(rawurlencode($gamingIcon['asset']), $html);
+        $this->assertMatchesRegularExpression(
+            '/subcategory=gaming".*?<path d="'.preg_quote($gamingIcon['path'], '/').'"/s',
+            $row
+        );
 
         // Pets names no icon of its own, so it draws the fallback path rather
         // than leaving a hole where a mark should be.
         $this->assertSame('default', $categories['pets']['icon'] ?? 'default');
         $this->assertMatchesRegularExpression(
             '/subcategory=pets".*?<path d="'.preg_quote($icons['default']['path'], '/').'"/s',
-            $html
+            $row
         );
     }
 
@@ -183,7 +231,7 @@ class HomeGiftCardCategoriesTest extends TestCase
     {
         $this->stock($this->subcategory('Gaming', 'gaming'), brand: 'Steam');
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->render();
 
         $this->assertStringContainsString('x-ref="track"', $html);
         $this->assertStringContainsString('overflow-x-auto', $html);
@@ -202,12 +250,26 @@ class HomeGiftCardCategoriesTest extends TestCase
 
         // Every name on ONE line, and no fixed item width - at a fixed one the
         // long names wrapped and the row sat at the height of the longest.
-        $this->assertStringContainsString('whitespace-nowrap text-[14px] font-bold', $html);
+        //
+        // The size is a pair now, not a single 14px. A phone shows two or three
+        // categories of a row that has eleven, which reads as a stalled row
+        // rather than a scrollable one, so the label steps down to 11px (and the
+        // mark and the gaps with it) to fit more of the row on screen, then
+        // returns to 14px from sm where the space is there anyway.
+        $this->assertStringContainsString('whitespace-nowrap text-[11px] font-bold', $html);
+        $this->assertStringContainsString('sm:text-[14px]', $html);
         $this->assertStringNotContainsString('w-[132px]', $html);
 
-        // One item per press, measured off the first item - a fixed pixel step
-        // would overshoot a row of short labels and undershoot a row of long ones.
-        $this->assertStringContainsString('getBoundingClientRect().width + gap', $html);
+        // A screenful per press, settling on the nearest item edge so nothing
+        // sits half-cut. This used to step to the very next edge, which is one
+        // chip per press: eleven presses to cross eleven categories, and the row
+        // read as barely moving. The reach is measured off the track and the
+        // landing off the items, so neither part is a fixed pixel step - that
+        // would overshoot a row of short labels and undershoot a row of long
+        // ones. Asserted against the row, because the brand carousels further
+        // down the page carry stepping code of their own.
+        $this->assertStringContainsString('track.clientWidth * 0.8', $this->row($html));
+        $this->assertStringContainsString('item.getBoundingClientRect().left - edge', $this->row($html));
 
         // No "All gift cards" item in the ROW: the four tiles above already
         // lead there. The mega menu offers one, which is its job, not this
@@ -215,18 +277,27 @@ class HomeGiftCardCategoriesTest extends TestCase
         $this->assertStringNotContainsString('All gift cards', $this->row($html));
     }
 
-    /** It sits after the four category tiles, inside the panel below them. */
-    public function test_it_renders_after_the_four_category_cards(): void
+    /**
+     * It is not on the home page, and it has to be asserted here as well as in
+     * HomeTrustPanelTest.
+     *
+     * This test used to say the opposite: that the row sat after the four
+     * category tiles, inside the panel below them. That was true until the
+     * panel was handed to the live counts. Anyone arriving at this file will
+     * assume a component with a full test suite belongs on the page it is named
+     * after, which is how it got put back once already. The assertion lives
+     * where that assumption gets made.
+     */
+    public function test_the_row_is_deliberately_not_on_the_home_page(): void
     {
         $this->stock($this->subcategory('Gaming', 'gaming'), brand: 'Steam');
 
-        $html = $this->get('/')->assertOk()->getContent();
+        // It renders perfectly well on its own, so this is not a broken row.
+        $this->assertStringContainsString('aria-label="Gift card categories"', $this->render());
 
-        $tiles = strpos($html, 'aria-label="Browse categories"');
-        $block = strpos($html, 'aria-label="Gift card categories"');
-
-        $this->assertNotFalse($tiles);
-        $this->assertNotFalse($block);
-        $this->assertLessThan($block, $tiles);
+        // The home page simply does not carry it.
+        $home = $this->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('aria-label="Browse categories"', $home, 'The four tiles DO belong there.');
+        $this->assertStringNotContainsString('aria-label="Gift card categories"', $home);
     }
 }

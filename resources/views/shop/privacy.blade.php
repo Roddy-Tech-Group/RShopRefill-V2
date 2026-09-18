@@ -2,9 +2,9 @@
     // Privacy Policy — customer-facing legal page. Dark-mode safe: backgrounds use
     // remapped classes (bg-white/bg-zinc-50/bg-blue-50 -> navy in dark) while
     // coloured accents (text-red-600 / text-blue-700) read in both themes.
-    // Privacy / DPO contact is a formal legal channel - kept on the info@
-    // inbox for the record, not the support@ help queue.
-    $supportEmail = 'info@rshoprefill.com';
+    // Privacy / DPO contact. support@ is the one mailbox that receives mail;
+    // info@ has no inbox, so privacy requests sent there bounced.
+    $supportEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
     $lastUpdated = 'August 23, 2026';
 @endphp
 

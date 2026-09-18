@@ -158,7 +158,31 @@
             track.scrollBy({ left: direction * track.clientWidth, behavior: 'smooth' });
         },
     }"
-    x-init="$nextTick(() => { measure(); refresh(); settle(); })"
+    {{-- measure() divides this section's own width, so it has to re-run when
+         that width changes, not only when the window does. In the dashboard the
+         pane narrows every time the sidebar opens, with no window resize to
+         hear, which left the columns at their old width and cut the last card
+         off at the panel edge until the sidebar was folded again or the page
+         hard-reloaded. The observer catches that and anything else that resizes
+         the pane. The width guard stops measure()'s own writes from
+         re-triggering it. --}}
+    x-init="
+        $nextTick(() => { measure(); refresh(); settle(); });
+        if (window.ResizeObserver) {
+            let seen = 0, queued = false;
+            $el._sectionObserver = new ResizeObserver(() => {
+                const w = Math.round($el.getBoundingClientRect().width);
+                if (! w || w === seen || queued) { return; }
+                seen = w;
+                // One measure per frame: the sidebar folds over a transition,
+                // so the observer fires on every frame of it.
+                queued = true;
+                requestAnimationFrame(() => { queued = false; measure(); refresh(); });
+            });
+            $el._sectionObserver.observe($el);
+        }
+    "
+    x-on:livewire:navigating.window="$el._sectionObserver?.disconnect()"
     x-effect="activeCategory; setTimeout(() => { measure(); refresh(); }, 80)"
     x-on:livewire:navigated.window="$nextTick(() => { measure(); refresh(); })"
     @resize.window.debounce.200ms="measure(); refresh()"
@@ -176,9 +200,9 @@
                 @click="page(-1)"
                 :disabled="! canPrev"
                 aria-label="{{ __('products.previous_page', ['category' => $title]) }}"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ffffff] text-zinc-700 ring-1 ring-[#dee3e1] shadow-sm transition-colors duration-150 hover:bg-[#f4f6f5] hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ffffff] text-zinc-700 ring-1 ring-[#dee3e1] shadow-sm transition-colors duration-150 hover:bg-[#f4f6f5] hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white"
             >
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M15 6l-6 6 6 6" />
                 </svg>
             </button>
@@ -188,9 +212,9 @@
                 @click="page(1)"
                 :disabled="! canNext"
                 aria-label="{{ __('products.next_page', ['category' => $title]) }}"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#ffffff] text-zinc-700 ring-1 ring-[#dee3e1] shadow-sm transition-colors duration-150 hover:bg-[#f4f6f5] hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ffffff] text-zinc-700 ring-1 ring-[#dee3e1] shadow-sm transition-colors duration-150 hover:bg-[#f4f6f5] hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white"
             >
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M9 6l6 6-6 6" />
                 </svg>
             </button>

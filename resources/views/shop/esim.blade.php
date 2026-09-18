@@ -230,7 +230,7 @@
 
     // Region picker — one entry per country (deduped across suppliers); regional and
     // global eSIMs stay per-product. Selecting one opens that country's merged page.
-    $esimRegions = Cache::remember('esim-regions-dropdown-v2', now()->addMinutes(10), function () {
+    $esimRegions = Cache::remember('esim-regions-dropdown-v3', now()->addMinutes(10), function () {
         $cat = Category::where('slug', 'esims')->first();
 
         return Product::query()
@@ -292,12 +292,44 @@
         ? $countryCurrency
         : ($cryptoRatesForJs->firstWhere('code', 'USD') ? 'USD' : ($cryptoRatesForJs->first()['code'] ?? 'USDT'));
 
-    $compat = config('esim_compatibility', ['ios' => [], 'android' => []]);
+    // One list of MANUFACTURERS, not an iOS/Android split. A buyer knows the make
+    // of their phone, not which of our two lists we filed it under, so the modal
+    // asks for the make. Apple carries what the config keeps as the flat iOS
+    // list; the Android brands come through as they already are. Counts are read
+    // off this same structure, so the figures can never disagree with the list.
+    $compatRaw = config('esim_compatibility', ['ios' => [], 'android' => []]);
+
+    $compatBrands = collect($compatRaw['android'] ?? [])
+        ->when(! empty($compatRaw['ios']), fn ($b) => $b->put('Apple', $compatRaw['ios']))
+        ->map(fn ($models) => collect($models)->unique()->values()->all())
+        ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+
+    $compatModelCount = $compatBrands->sum(fn ($models) => count($models));
 
     // Regional + global eSIMs for the "Need broader coverage?" section under the
     // plan selector — sourced from the shared catalog summary (deduped, cached).
+    // Figures on the "why travelers choose us" card, read from the catalogue and
+    // the language picker rather than typed. A typed number cannot be wrong
+    // loudly, only quietly: that card claimed "80+ languages" while the picker
+    // has only ever offered English and French, and "200+ destinations" was
+    // right by luck rather than by construction.
+    $whyDestinations = \App\Http\Controllers\EsimStoreController::catalogSummary()->count();
+    $whyLanguages = array_values(\App\Support\Languages::names());
+    $whyLanguageLine = count($whyLanguages) > 1
+        ? 'Pay in your currency or crypto, with the store in '.\Illuminate\Support\Arr::join($whyLanguages, ', ', ' and ')
+        : 'Pay in your currency or crypto';
+
+    // Never the destination being viewed. "Need broader coverage?" offers a way
+    // OUT of this plan, so listing this plan in it is a link back to the page
+    // you are already on.
+    //
+    // Matched on the SLUG alone. Matching the country code as well looked safer
+    // and was not: regional and global rows share one non-country code, so on
+    // the worldwide plan's own page that test rejected every row and emptied the
+    // section instead of dropping the single card meant to go.
     $broaderCoverage = \App\Http\Controllers\EsimStoreController::catalogSummary()
         ->whereIn('scope', ['regional', 'global'])
+        ->reject(fn ($b) => $b['slug'] === $product->slug)
         ->sortBy('from')
         ->take(6)
         ->values();
@@ -324,11 +356,11 @@
         })"
         x-init="init()"
         translate="no"
-        class="notranslate mx-auto w-full max-w-[1140px] px-4 pb-32 pt-6 sm:px-6 lg:pt-10"
+        class="notranslate mx-auto w-full max-w-[1150px] px-4 pb-32 pt-6 sm:px-6 lg:pt-10"
     >
 
-        {{-- ── Breadcrumb (aligned with the 800px cards) ────────────────────── --}}
-        <nav class="mx-auto flex w-full max-w-[800px] flex-wrap items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400" aria-label="Breadcrumb">
+        {{-- ── Breadcrumb (aligned with the 1100px cards) ────────────────────── --}}
+        <nav class="mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400" aria-label="Breadcrumb">
             <a href="{{ $shopRoute('esims') }}" wire:navigate class="font-medium transition-colors hover:text-zinc-900 dark:hover:text-white">eSIM Store</a>
             <span aria-hidden="true">&rsaquo;</span>
             <a href="{{ $shopRoute('esims', ['scope' => strtolower($curScope)]) }}" wire:navigate class="transition-colors hover:text-zinc-900 dark:hover:text-white">{{ $curScope }} eSIMs</a>
@@ -340,14 +372,14 @@
         {{-- z-20: backdrop-blur creates a stacking context - without lifting it
              above the plan selector (also a blur context, later in DOM), the
              region picker dropdown gets clipped behind the plans card. --}}
-        <div class="esim-tile relative z-20 mx-auto mt-4 w-full max-w-[800px] rounded-[12px] bg-transparent p-6 ring-1 ring-zinc-200 sm:p-8 dark:ring-zinc-700/60">
+        <div class="esim-tile relative z-20 mx-auto mt-4 w-full max-w-[1100px] rounded-[12px] bg-[#ffffff] p-6 ring-1 ring-zinc-200 sm:p-8 dark:ring-zinc-700/60">
             <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex items-center gap-3">
                         @if ($flag)
                             <img src="{{ $flag }}" alt="" class="h-9 w-12 shrink-0 rounded-[4px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700">
                         @else
-                            <span class="flex h-9 w-12 shrink-0 items-center justify-center rounded-[4px] bg-blue-50 ring-1 ring-zinc-200 dark:bg-blue-950/40 dark:ring-zinc-700">
+                            <span class="flex h-9 w-12 shrink-0 items-center justify-center rounded-[4px] bg-[#f4f6f5] ring-1 ring-zinc-200 dark:bg-blue-950/40 dark:ring-zinc-700">
                                 <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8"/>
                                 </svg>
@@ -356,7 +388,7 @@
                         <h1 class="truncate text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">{{ $regionLabel }} eSIMs</h1>
                     </div>
 
-                    <div class="my-5 h-px bg-zinc-100 dark:bg-zinc-700/60"></div>
+                    <div class="my-5 h-px bg-[#f4f6f5] dark:bg-zinc-700/60"></div>
 
                     {{-- Supported networks (real provider data) --}}
                     <div class="flex flex-wrap items-center gap-3">
@@ -391,7 +423,16 @@
                         @if ($anyTopUp)
                             <li class="flex items-center gap-2">
                                 <svg class="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                If you're running low, you can always&nbsp;<a href="{{ $shopRoute('topups') }}" wire:navigate class="font-semibold text-blue-600 underline-offset-2 transition-colors hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300">top up</a>
+                                {{-- Stated, not linked. It pointed at the airtime
+                                     top-ups page, which is a different product;
+                                     an eSIM is topped up from the order itself.
+
+                                     The whole sentence is ONE span on purpose. Left
+                                     as a bare text node beside a second span, the
+                                     two became separate flex items, so "top up" was
+                                     laid out as its own column and stranded on the
+                                     right once the line wrapped. --}}
+                                <span>If you're running low, you can always <span class="font-semibold text-zinc-900 dark:text-white">top up</span></span>
                             </li>
                         @endif
                         <li class="flex items-center gap-2">
@@ -417,9 +458,6 @@
                         </div>
                     @endunless
 
-                    {{-- Sales-final policy. Applies to every eSIM (including the
-                         Discover Global page), so it sits outside the guard above. --}}
-                    <p class="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">All purchases are final unless you don't receive your order.</p>
                 </div>
 
                 {{-- Region switcher --}}
@@ -429,7 +467,10 @@
                         <button
                             type="button"
                             @click="open = ! open; if (open) $nextTick(() => $refs.regionSearch?.focus())"
-                            :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600'"
+                            {{-- White edge in dark mode, not zinc-700: on the dark
+                                 panel that border was near invisible, so the
+                                 control did not read as a control. --}}
+                            :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-white dark:hover:border-white'"
                             class="flex h-[46px] w-full items-center gap-2 rounded-[12px] border bg-transparent px-3 text-sm font-medium text-zinc-900 outline-none transition-colors dark:text-white"
                             aria-haspopup="listbox"
                             :aria-expanded="open.toString()"
@@ -472,14 +513,14 @@
                                         x-show="search === '' || $el.dataset.name.includes(search.toLowerCase())"
                                         @class([
                                             'flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors',
-                                            'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $r['key'] === $currentKey,
-                                            'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]' => $r['key'] !== $currentKey,
+                                            'bg-[#f4f6f5] text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $r['key'] === $currentKey,
+                                            'text-zinc-700 hover:bg-[#f4f6f5] dark:text-zinc-300 dark:hover:bg-[#26416b]' => $r['key'] !== $currentKey,
                                         ])
                                     >
                                         @if ($r['flag'])
                                             <img src="{{ $r['flag'] }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" loading="lazy">
                                         @else
-                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-white/10"></span>
+                                            <span class="h-3.5 w-5 shrink-0 rounded-[2px] bg-[#f4f6f5] ring-1 ring-zinc-200 dark:bg-[#26416b] dark:ring-white/10"></span>
                                         @endif
                                         <span class="flex-1 truncate">{{ $r['name'] }}</span>
                                     </a>
@@ -490,11 +531,31 @@
 
                     {{-- Quick reassurance badges under the region picker. --}}
                     <div class="mt-5 space-y-3">
-                        @foreach ([
-                            ['t' => 'Instant activation', 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
-                            ['t' => 'No ID required', 'icon' => 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z'],
-                            ['t' => '180+ countries and territories', 'icon' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8'],
-                        ] as $feat)
+                        @php
+                            // Built here, not inside the @foreach, because the third
+                            // line is conditional and Blade's @if cannot live inside a
+                            // PHP array literal: it compiles to an if statement dropped
+                            // into the middle of the array and takes the whole page down
+                            // with a parse error.
+                            //
+                            // That line used to read "180+ countries and territories" on
+                            // every page. It contradicted the live count in this same
+                            // panel (173 on the worldwide plan) and on a single-country
+                            // eSIM it was simply false, so it now states the plan's real
+                            // reach and is dropped where the plan covers one country.
+                            $headerFeatures = [
+                                ['t' => 'Instant activation', 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
+                                ['t' => 'No ID required', 'icon' => 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z'],
+                            ];
+
+                            if ($coverageCount > 1) {
+                                $headerFeatures[] = [
+                                    't' => 'Covers '.number_format($coverageCount).' countries and territories',
+                                    'icon' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8',
+                                ];
+                            }
+                        @endphp
+                        @foreach ($headerFeatures as $feat)
                             <div class="flex items-center gap-2.5 text-sm font-semibold text-zinc-900 dark:text-white">
                                 <svg class="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $feat['icon'] }}"/></svg>
                                 {{ $feat['t'] }}
@@ -506,7 +567,7 @@
         </div>
 
         @unless ($productBuyable)
-            <div class="mx-auto mt-6 flex w-full max-w-[800px] items-start gap-3 rounded-[12px] border px-4 py-3 {{ $product->is_out_of_stock ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-white/5' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
+            <div class="mx-auto mt-6 flex w-full max-w-[1100px] items-start gap-3 rounded-[12px] border px-4 py-3 {{ $product->is_out_of_stock ? 'border-zinc-200 bg-[#ffffff] dark:border-zinc-700 dark:bg-white/5' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 {{ $product->is_out_of_stock ? 'text-zinc-400' : 'text-amber-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                 </svg>
@@ -518,14 +579,14 @@
         @endunless
 
         @if ($hasPlans)
-            {{-- ── Selector card (glass): holds the Data/Voice + Standard/Unlimited
+            {{-- ── Selector card (glass): holds the data/voice + fixed/unlimited
                  segmented controls only. The plan cards live outside it, below. ── --}}
-            <div id="esim-packages" class="mx-auto mt-6 w-full max-w-[800px] scroll-mt-24 overflow-hidden rounded-[14px] bg-[#eff6ff] border border-zinc-200 dark:bg-[#0c1a36] dark:border-zinc-700">
+            <div id="esim-packages" class="mx-auto mt-6 w-full max-w-[1100px] scroll-mt-24 overflow-hidden rounded-[14px] bg-[#ffffff] border border-zinc-200 dark:bg-[#0c1a36] dark:border-zinc-700">
                 <div class="p-5 sm:p-6">
-                    {{-- Category selector (Data Only / Voice) - segmented control with
+                    {{-- Category selector (Data Only / Data + Calls + Texts) - segmented control with
                          a smooth sliding bubble. The bubble width adapts to however
                          many categories this region actually carries. --}}
-                    <div class="relative flex rounded-[12px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
+                    <div class="relative flex rounded-[12px] bg-[#f4f6f5] p-1 dark:bg-[#26416b]" role="tablist">
                         <div
                             class="pointer-events-none absolute inset-y-1 left-1 rounded-[8px] bg-white shadow-sm transition-transform duration-300 ease-out dark:border dark:border-white dark:bg-[#1d3252]"
                             :style="`width: calc((100% - 0.5rem) / ${tabList().length}); transform: translateX(${tabIndex() * 100}%)`"
@@ -535,20 +596,23 @@
                                 type="button"
                                 @click="setTab(t)"
                                 :class="activeTab === t ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'"
-                                class="relative z-10 flex-1 rounded-[8px] px-4 py-2.5 text-sm font-bold transition-colors"
-                                x-text="t === 'voice' ? 'Voice Plans' : 'Data Only'"
+                                {{-- Tighter padding and leading on small screens: the
+                                     voice label is three words now and would wrap
+                                     mid-phrase inside a half-width tab on a phone. --}}
+                                class="relative z-10 flex-1 rounded-[8px] px-2 py-2.5 text-sm font-bold leading-tight transition-colors sm:px-4"
+                                x-text="t === 'voice' ? 'Data / Calls / Texts' : 'Data Only'"
                             ></button>
                         </template>
                     </div>
 
-                    {{-- Standard / Unlimited selector - same sliding-bubble control,
+                    {{-- Fixed data / Unlimited selector - same sliding-bubble control,
                          only shown when the category carries both tiers. --}}
-                    <div x-show="showModeToggle()" class="relative mt-3 flex rounded-[12px] bg-zinc-100 p-1 dark:bg-[#26416b]" role="tablist">
+                    <div x-show="showModeToggle()" class="relative mt-3 flex rounded-[12px] bg-[#f4f6f5] p-1 dark:bg-[#26416b]" role="tablist">
                         <div
                             class="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%_-_0.5rem)/2)] rounded-[8px] bg-blue-600 shadow-sm transition-transform duration-300 ease-out"
                             :style="`transform: translateX(${dataMode === 'unlimited' ? 100 : 0}%)`"
                         ></div>
-                        <button type="button" @click="setMode('standard')" :class="dataMode === 'standard' ? 'text-white' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'" class="relative z-10 flex-1 rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors">Standard</button>
+                        <button type="button" @click="setMode('standard')" :class="dataMode === 'standard' ? 'text-white' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'" class="relative z-10 flex-1 rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors">Fixed data</button>
                         <button type="button" @click="setMode('unlimited')" :class="dataMode === 'unlimited' ? 'text-white' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'" class="relative z-10 flex-1 rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors">Unlimited</button>
                     </div>
                 </div>
@@ -569,112 +633,121 @@
                             <button
                                 type="button"
                                 @click="selectedId = p.id"
-                                :class="selectedId === p.id ? 'border-2 border-blue-600 dark:border-blue-500' : 'border border-zinc-200 hover:border-zinc-300 dark:border-[#24364f] dark:hover:border-white'"
-                                class="esim-tile relative isolate flex h-full w-[70vw]! min-w-[70vw]! flex-col overflow-hidden rounded-[14px] bg-transparent px-5 pb-5 pt-[22px] text-left transition-colors focus:outline-none sm:w-[274px]! sm:min-w-[274px]!"
+                                {{-- Same shape as a gift card tile: a white plate,
+                                     rounded-[14px], a hairline RING and a soft
+                                     shadow, never a border. Selection thickens
+                                     that ring to blue rather than swapping in a
+                                     border, so the card's size never changes as
+                                     you click along the row. Dark mode is not set
+                                     here: `.esim-tile` already carries the ash +
+                                     grain card tone for both dark themes. --}}
+                                :class="selectedId === p.id ? 'ring-2 ring-blue-600 dark:ring-blue-500' : 'ring-1 ring-zinc-200 hover:ring-zinc-300 dark:ring-[#24364f] dark:hover:ring-white/40'"
+                                class="esim-tile relative isolate flex h-full w-[70vw]! min-w-[70vw]! flex-col overflow-hidden rounded-[14px] bg-[#ffffff] p-4 text-left shadow-sm transition-shadow focus:outline-none sm:w-[274px]! sm:min-w-[274px]!"
                             >
-                                {{-- Accent hairline on the top edge. An absolute bar rather than
-                                     a border-top: the border utilities here are already driven by
-                                     :class for the selected state, and a colour utility on top of
-                                     that would fight it. Blue reads as voice, green as data-only -
-                                     the same pairing the badges use. --}}
-                                <span aria-hidden="true" class="absolute inset-x-0 top-0 z-10 h-px" :class="p.is_voice ? 'bg-[#7dc4ff]/60' : 'bg-[#8fe3a8]/60'"></span>
+                {{-- Same shape as a destination card on the eSIM store: round
+                                     glyph, a title, a row of chips saying what the package holds,
+                                     the price, then one full-width action. The decorated version
+                                     this replaces (SIM watermark, tilted country plate, glowing
+                                     badges, a 58px allowance figure) said the same things in five
+                                     different type sizes and did not match anything else on the
+                                     site. The chips read off the plan's own fields, so a card can
+                                     never advertise something the package does not carry. --}}
+                                @php
+                                    // Stated once here rather than repeated on eight spans.
+                                    $planChip = 'rounded-full bg-[#f4f6f5] px-2.5 py-1 text-[12px] text-[#0c1337] dark:bg-white/10 dark:text-zinc-200';
+                                @endphp
 
-                                {{-- SIM watermark. `isolate` on the card makes it the stacking
-                                     context, so -z-10 keeps this behind the copy but still above
-                                     the card's own background - it can never veil the content. --}}
-                                <svg viewBox="0 0 120 100" class="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[167px] w-[200px] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.05] dark:text-white/[0.05]" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                                    <path d="M22 6h58l18 18v70a6 6 0 0 1-6 6H22a6 6 0 0 1-6-6V12a6 6 0 0 1 6-6Z"/>
-                                    <path d="M78 6v14a4 4 0 0 0 4 4h15"/>
-                                    <rect x="34" y="34" width="44" height="34" rx="5"/>
-                                    <path d="M34 45h44M34 57h44M48 34v34M64 34v34"/>
-                                </svg>
-
-                                {{-- Country plate, tilted off the top-right corner. --}}
-                                <span aria-hidden="true" class="esim-plate pointer-events-none absolute -right-6 -top-4 -z-10 flex h-[88px] w-[132px] -rotate-[14deg] items-end justify-center rounded-[9px] border border-zinc-200 pb-2 dark:border-white/15">
-                                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-white/55">{{ $cc }}</span>
-                                </span>
-
-                                {{-- What the plan actually carries. Voice plans get a real phone
-                                     number, data plans do not - that is the one difference buyers
-                                     ask about, so it leads. --}}
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <span class="om-glow">
-                                        <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-emerald-600 dark:text-[#8fe3a8]">Data</span>
+                                <span class="flex items-start justify-between gap-3">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f6f5] ring-1 ring-zinc-200 dark:bg-white/10 dark:ring-white/10">
+                                        {{-- A real SIM: the cut corner and the CONTACT GRID are
+                                             what make it read as one. The previous glyph was a
+                                             card outline with a plain rectangle inside, which
+                                             looked like a document icon. Same artwork the card's
+                                             old watermark used, normalised to a 24px box. --}}
+                                        <svg class="h-5 w-5 text-zinc-500 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7.2L18 6.8V20a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V4.5A1.5 1.5 0 0 1 7 3Z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.2 3v2.8a1 1 0 0 0 1 1H18"/>
+                                            <rect x="8.5" y="11" width="7" height="6.5" rx="1"/>
+                                            <path stroke-linecap="round" d="M8.5 13.2h7M8.5 15.3h7M10.8 11v6.5M13.2 11v6.5"/>
+                                        </svg>
                                     </span>
+
+                                    {{-- The badge slot the store card gives "Popular". Every card
+                                         carries one, naming which of the two families this plan
+                                         belongs to: a package with a phone number is Calls, one
+                                         without is Data. The two are mutually exclusive, so a card
+                                         never shows both. --}}
                                     <template x-if="p.is_voice">
-                                        <span class="om-glow">
-                                            <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-blue-600 dark:text-[#bcd6ff]">Phone number</span>
-                                        </span>
+                                        <span class="shrink-0 rounded-full bg-[#0c1337] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">Calls</span>
                                     </template>
                                     <template x-if="! p.is_voice">
-                                        <span class="om-glow">
-                                            <span class="bg-white px-2.5 py-[7px] text-[11px] font-bold uppercase leading-none tracking-[0.13em] text-zinc-500 dark:text-white/60">Data only</span>
-                                        </span>
+                                        <span class="shrink-0 rounded-full bg-[#0c1337] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">Data</span>
                                     </template>
-                                </div>
+                                </span>
 
-                                {{-- The allowance as one large figure. Unlimited plans carry a word
-                                     rather than a number in data_num, so they step down a size or
-                                     they run off the card. --}}
-                                <div class="mt-11 flex items-baseline gap-[7px]">
-                                    <span
-                                        class="font-bold leading-[0.85] tracking-[-0.05em] text-zinc-900 dark:text-white"
-                                        :class="p.is_unlimited ? 'text-[30px]' : 'text-[58px]'"
-                                        x-text="p.data_num"
-                                    ></span>
-                                    <span x-show="p.data_unit" class="text-[17px] font-medium text-zinc-500 dark:text-white/50" x-text="p.data_unit"></span>
-                                </div>
-                                <p class="mt-2.5 text-[13.5px] uppercase tracking-[0.12em] text-zinc-500 dark:text-white/50" x-text="p.days + ' Days'"></p>
+                                <span class="mt-3 block truncate text-[17px] text-[#0c1337] dark:text-white" x-text="p.is_unlimited ? 'Unlimited data' : p.data"></span>
 
-                                <div class="my-[18px] h-px bg-zinc-200 dark:bg-white/10"></div>
+                                <span class="mt-2 flex flex-wrap items-center gap-1.5">
+                                    <span class="{{ $planChip }} tabular-nums" x-text="p.days + (p.days === 1 ? ' day' : ' days')"></span>
 
-                                {{-- Voice plans have six lines and pair up two to a row; data plans
-                                     have two and stay in a single column. --}}
-                                <div
-                                    class="grid flex-1 content-start gap-x-3.5 gap-y-3 text-[15px] leading-[1.35] text-zinc-700 dark:text-white/70"
-                                    :class="p.is_voice ? 'grid-cols-2' : 'grid-cols-1'"
-                                >
-                                    <div x-text="p.data + ' of data'"></div>
-                                    <div x-text="p.days + ' day validity'"></div>
-                                    <template x-if="p.is_voice && p.voice"><div x-text="p.voice"></div></template>
-                                    <template x-if="p.is_voice && p.sms"><div x-text="p.sms"></div></template>
-                                    <template x-if="p.is_voice"><div>Unlimited iMessage</div></template>
-                                    <template x-if="p.is_voice"><div>FaceTime</div></template>
-                                    <template x-if="p.note">
-                                        <div class="col-span-full text-[13px] text-zinc-500 dark:text-white/50" x-text="p.note"></div>
+                                    <template x-if="p.is_unlimited">
+                                        <span class="rounded-full bg-[#0c1337] px-2.5 py-1 text-[12px] text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">Unlimited</span>
                                     </template>
-                                </div>
 
-                                <div class="mt-[22px] h-px bg-zinc-200 dark:bg-white/10"></div>
+                                    {{-- One chip per thing the package carries. Where there is no
+                                         number, the single chip says so: "Data only" is the fact a
+                                         traveller needs, where a bare "Data" leaves them wondering
+                                         about calls. Same wording as the store cards. --}}
+                                    <template x-if="p.is_voice">
+                                        <span class="{{ $planChip }}">Data</span>
+                                    </template>
+                                    <template x-if="p.is_voice">
+                                        <span class="{{ $planChip }}">Phone number</span>
+                                    </template>
+                                    <template x-if="! p.is_voice">
+                                        <span class="{{ $planChip }}">Data only</span>
+                                    </template>
 
-                                <div class="mb-4 mt-[14px] flex items-baseline justify-between gap-2">
-                                    <span class="text-[11px] uppercase tracking-[0.16em] text-zinc-500 dark:text-white/45">Total</span>
-                                    <span class="text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums text-zinc-900 dark:text-white" x-text="rowPrice(p)"></span>
-                                </div>
+                                    <template x-if="p.is_voice && p.voice">
+                                        <span class="{{ $planChip }}" x-text="p.voice"></span>
+                                    </template>
+                                    <template x-if="p.is_voice && p.sms">
+                                        <span class="{{ $planChip }}" x-text="p.sms"></span>
+                                    </template>
+                                </span>
+
+                                <template x-if="p.note">
+                                    <span class="mt-2 block text-[12px] leading-relaxed text-zinc-500 dark:text-white/50" x-text="p.note"></span>
+                                </template>
+
+                                {{-- Pushes the price and action to the bottom, so cards of
+                                     different chip counts still line their footers up. --}}
+                                <span class="mt-3 flex flex-1 items-end">
+                                    <span class="text-[17px] tabular-nums text-[#0c1337] dark:text-white" x-text="rowPrice(p)"></span>
+                                </span>
 
                                 {{-- role=button, not <button>: the card itself is a <button> and
-                                     nesting them is invalid HTML. `dark:bg-white` rather than
-                                     `bg-white` on purpose - the plain class is remapped to the
-                                     card surface in dark, which would erase the CTA. --}}
+                                     nesting them is invalid HTML. The store's action pill shape,
+                                     in brand navy because this one actually buys. --}}
                                 <span
                                     @click.stop="selectedId = p.id; buyNow()"
                                     @keydown.enter.stop="selectedId = p.id; buyNow()"
                                     role="button" tabindex="0"
-                                    class="inline-flex w-full cursor-pointer items-center justify-center rounded-[9px] bg-zinc-900 px-4 py-[15px] text-[15.5px] font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-blue-600 dark:hover:text-white"
+                                    class="mt-4 block w-full cursor-pointer rounded-full bg-[#0c1337] px-3 py-2 text-center text-[14px] text-white transition-colors hover:bg-[#1a2560] dark:bg-[#fdfdfd] dark:text-[#0c1337] dark:hover:bg-[#e4e5f3]"
                                 >Get eSIM</span>
 
                                 <span
                                     @click.stop="detailsId = p.id; showDetails = true"
                                     @keydown.enter.stop="detailsId = p.id; showDetails = true"
                                     role="button" tabindex="0"
-                                    class="mt-3 inline-flex w-full cursor-pointer items-center justify-center text-[13px] font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                                    class="mt-2 block w-full cursor-pointer text-center text-[13px] text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
                                 >See more</span>
                             </button>
                         </template>
                         </x-home.brand-row>
                     </div>
                 </template>
-                    <p x-show="sortedPlans().length === 0" class="mt-4 rounded-[12px] bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-400 dark:ring-zinc-700">No packages in this category right now.</p>
+                    <p x-show="sortedPlans().length === 0" class="mt-4 rounded-[12px] bg-[#ffffff] px-4 py-8 text-center text-sm text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-400 dark:ring-zinc-700">No packages in this category right now.</p>
 
                     {{-- Voice-plan inclusions - only on the Voice tab.
                          Each inclusion is its own card. --}}
@@ -686,7 +759,7 @@
                                 ['title' => 'Unlimited iMessage', 'desc' => 'Unlimited iMessage for the full validity period your plan carries.', 'icon' => 'M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z'],
                                 ['title' => 'Renewable & top-up', 'desc' => 'Top up for local calls any time, with iMessage unlimited.', 'icon' => 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99'],
                             ] as $voiceCard)
-                                <div class="rounded-[12px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                                <div class="rounded-[12px] bg-[#ffffff] p-4 ring-1 ring-zinc-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
                                     <span class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
                                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $voiceCard['icon'] }}"/></svg>
                                     </span>
@@ -708,19 +781,25 @@
                                 :bleed="! $inDash"
                                 view-all-variant="none"
                             >
+                                {{-- The same card the eSIM store grid uses, not a
+                                     second one shaped like it. These rows come from
+                                     catalogSummary(), which is exactly what that
+                                     component takes, so a destination shows the same
+                                     chips and price here as it does on the store.
+
+                                     filter off: the card normally hides itself against
+                                     the parent scope's locTab/locSearch, and this page
+                                     has no tabs. ask off: it normally raises the
+                                     purchase-check modal by writing `pick`, which only
+                                     the store page's scope holds; with it off the card
+                                     is a plain link and keeps wire:navigate. --}}
                                 @foreach ($broaderCoverage as $b)
-                                    <a href="{{ $shopRoute('esim', $b['slug']) }}" wire:navigate class="esim-tile group flex flex-col rounded-[14px] border border-white bg-transparent px-4 py-4 transition-colors hover:border-blue-600 dark:border-[#24364f] dark:hover:border-white">
-                                        <span class="flex h-10 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-blue-50 ring-1 ring-zinc-200 dark:bg-blue-950/40 dark:ring-zinc-700">
-                                            @if ($b['flag'])
-                                                <img src="{{ $b['flag'] }}" alt="" class="h-full w-full object-cover" loading="lazy">
-                                            @else
-                                                <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8"/></svg>
-                                            @endif
-                                        </span>
-                                        <p class="mt-3 line-clamp-2 text-base font-bold text-zinc-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">{{ $b['name'] }}</p>
-                                        <p class="mt-auto pt-3 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">From</p>
-                                        <p class="text-lg font-bold tabular-nums text-zinc-900 dark:text-white">${{ number_format($b['from'], 2) }}</p>
-                                    </a>
+                                    <x-esim.location-card
+                                        :item="$b"
+                                        :filter="false"
+                                        :ask="false"
+                                        class="w-[70vw]! min-w-[70vw]! sm:w-[274px]! sm:min-w-[274px]!"
+                                    />
                                 @endforeach
                             </x-home.brand-row>
                         </div>
@@ -728,13 +807,13 @@
                 </div>
 
             {{-- ── Why choose us (1000px centered) ───────────────────────────── --}}
-            <section class="mx-auto mt-8 w-full max-w-[1000px] rounded-[40px] bg-blue-100 p-6 sm:p-10 dark:bg-[#1d3252]">
+            <section class="mx-auto mt-8 w-full max-w-[1100px] rounded-[20px] bg-[#ffffff] p-6 sm:p-10 dark:bg-[#1d3252]">
                 <h2 class="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Why travelers choose {{ $siteName }} eSIMs</h2>
                 <div class="mt-8 grid grid-cols-2 gap-6 lg:grid-cols-4">
                     @foreach ([
-                        ['t' => 'Local, regional & global coverage for 200+ destinations', 'd' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8'],
+                        ['t' => 'Local, regional and global coverage for '.number_format($whyDestinations).' destinations', 'd' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8'],
                         ['t' => 'Flexible packages, including unlimited data options', 'd' => 'M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5'],
-                        ['t' => 'Pay in your currency or crypto, translated into 80+ languages', 'image' => 'total transactions.svg'],
+                        ['t' => $whyLanguageLine, 'image' => 'total transactions.svg'],
                         ['t' => 'Easy install and set up to get connected in minutes', 'd' => 'M3.75 4.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm12 0a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm-12 12a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zM15 15.75h.008v.008H15v-.008zm0 3h.008v.008H15v-.008zm3-3h.008v.008H18v-.008zm0 3h.008v.008H18v-.008zm3-3h.008v.008H21v-.008zm0 3h.008v.008H21v-.008z'],
                     ] as $feature)
                         <div class="flex flex-col items-center text-center">
@@ -751,36 +830,20 @@
                 </div>
             </section>
 
-            {{-- ── FAQ (glass card, 800px centered) ─────────────────────────── --}}
-            <section class="mx-auto mt-8 w-full max-w-[800px] rounded-[12px] bg-white/60 p-6 ring-1 ring-white/60 shadow-xl shadow-zinc-900/5 backdrop-blur-xl sm:p-8 dark:bg-[#1d3252] dark:ring-zinc-800/60 dark:shadow-black/40">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Frequently asked questions</h2>
-                    <a href="{{ route('shop.help') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Go to help center</a>
-                </div>
-                <div class="mt-5 space-y-2.5">
-                    @foreach ([
-                        ['q' => 'When should I install my eSIM?', 'a' => 'You can install your eSIM as soon as you receive the QR code by email. Most plans only start counting down once you arrive and connect to a supported network, so installing early is safe.'],
-                        ['q' => 'How do I use my eSIM?', 'a' => 'Open your phone settings, add a cellular/mobile plan, and scan the QR code we email you. Turn on data roaming for the eSIM line and you are connected.'],
-                        ['q' => 'Can I reuse my eSIM?', 'a' => 'If your plan supports top-ups you can add more data to the same eSIM. Otherwise, buy a fresh package whenever you travel again.'],
-                        ['q' => 'What are renewals?', 'a' => 'Some packages can be renewed or topped up before they expire so you stay connected without installing a new eSIM.'],
-                    ] as $faq)
-                        <details class="group rounded-[12px] bg-zinc-50 px-4 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
-                            <summary class="flex cursor-pointer items-center justify-between py-4 text-sm font-semibold text-zinc-900 marker:content-[''] dark:text-white">
-                                {{ $faq['q'] }}
-                                <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform group-open:rotate-180 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </summary>
-                            <p class="pb-4 text-sm leading-relaxed text-zinc-600 dark:text-white">{{ $faq['a'] }}</p>
-                        </details>
-                    @endforeach
-                </div>
-                <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-700/60">
-                    <div>
-                        <p class="text-sm font-bold text-zinc-900 dark:text-white">Support</p>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Need help? We offer 24/7, multi-language support.</p>
-                    </div>
-                    <a href="{{ route('shop.contact') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50 dark:text-white dark:ring-white dark:hover:bg-[#26416b]">Contact support</a>
-                </div>
-            </section>
+            {{-- FAQ. The questions come from the faqs table through <x-home.faq>,
+                 the same component and the same admin editor as the homepage and
+                 the gift card store, scoped to the eSIM topic. Nothing is written
+                 here, so the copy cannot drift from /faq.
+
+                 It replaced four questions hardcoded in an @foreach on this page,
+                 which nobody could edit without a deploy and which said nothing
+                 about coverage, compatibility, roaming or refunds. --}}
+            <x-home.faq
+                :topics="['eSIMs']"
+                :limit="17"
+                heading-id="esim-faq-heading"
+                :grow-from="1100"
+            />
 
             {{-- ── How to add your eSIM (three-step walkthrough) ─────────────── --}}
             @php
@@ -807,7 +870,7 @@
                  is offset by the sidebar, so calc(50%-50vw) breaks out under the rail
                  and overflows - there we keep it contained as a rounded band instead. --}}
             <section @class([
-                'esim-tile mt-8 bg-gradient-to-r from-[#dfe5f1] via-[#dfe5f1] to-white py-10 sm:py-14 dark:from-[#1d3252] dark:via-[#1d3252] dark:to-[#34507a]',
+                'esim-tile mt-8 bg-[#f4f6f5] py-10 sm:py-14 dark:bg-[#1d3252]',
                 '[margin-left:calc(50%-50vw)] [margin-right:calc(50%-50vw)]' => ! $inDash,
                 'overflow-hidden rounded-[15px]' => $inDash,
             ])>
@@ -853,7 +916,7 @@
             {{-- ── Anonymous eSIM with crypto (no KYC) ──────────────────────── --}}
             <section class="mx-auto mt-12 grid w-full max-w-[1450px] grid-cols-1 items-start gap-10 lg:grid-cols-2 lg:gap-16">
                 <div>
-                    <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-blue-50 ring-1 ring-blue-100 dark:bg-blue-950/40 dark:ring-blue-900/40">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[#ffffff] ring-1 ring-zinc-200 dark:bg-blue-950/40 dark:ring-blue-900/40">
                         <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                     </span>
                     <h2 class="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Anonymous eSIM with MOMO, Cards, Crypto and more. No KYC required.</h2>
@@ -877,42 +940,62 @@
                 </ul>
             </section>
 
-            {{-- ── Payment methods we accept ──────────────────────────────── --}}
+            {{-- Payment methods we accept, as a continuous marquee.
+
+                 The list is PaymentStripBadges::all(), the same source the
+                 homepage strip uses, so this row carries MoMo, Orange Money and
+                 every other rail with the real brand marks rather than a second
+                 hand-kept list. That class also holds the rule that a badge may
+                 only claim a rail checkout actually accepts, which a local array
+                 here could quietly break.
+
+                 It replaced ten entries of my own, four of which were 210 to 790
+                 byte .webp bitmaps blown up to 40px and then flattened by
+                 `brightness-0 dark:invert` into featureless silhouettes. --}}
             @php
-                // 'mono' => true → icon flattens to black in light mode, white in dark
-                // mode (brightness-0 dark:invert). Used for the blue line-art icons.
-                $payMethods = [
-                    ['name' => 'Mobile Money', 'icon' => 'MOMO.svg',                'kind' => 'fiat',   'mono' => true],
-                    ['name' => 'Card',         'icon' => 'credit card payment.webp', 'kind' => 'fiat',   'mono' => true],
-                    ['name' => 'Apple Pay',    'icon' => 'apply pay.webp',           'kind' => 'fiat',   'mono' => true],
-                    ['name' => 'Bank',         'icon' => 'Bank transfer.webp',       'kind' => 'fiat',   'mono' => true],
-                    ['name' => 'Bitcoin',      'icon' => 'BTC.svg',                 'kind' => 'crypto'],
-                    ['name' => 'Ethereum',     'icon' => 'ETH.svg',                 'kind' => 'crypto'],
-                    ['name' => 'Tether',       'icon' => 'USDT.svg',                'kind' => 'crypto'],
-                    ['name' => 'Solana',       'icon' => 'SOLANA.svg',              'kind' => 'crypto'],
-                    ['name' => 'BNB',          'icon' => 'BNB.svg',                  'kind' => 'crypto'],
-                    ['name' => 'Litecoin',     'icon' => 'LTC.svg',                  'kind' => 'crypto'],
-                ];
+                $payBadges = \App\Domain\Payment\Support\PaymentStripBadges::all();
             @endphp
             <section class="mx-auto mt-12 w-full max-w-[1450px]">
                 <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">Payment methods we accept</h2>
-                <p class="mt-2 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-300">Pay with crypto or your local card. Settle in seconds, anywhere in the world.</p>
+                <p class="mt-2 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-300">Pay with crypto or your local card. Settle in the currency you already hold.</p>
 
-                <div class="mt-6 grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-5 lg:grid-cols-10">
-                    @foreach ($payMethods as $m)
-                        <div class="flex flex-col items-center gap-2 text-center">
-                            <img
-                                src="{{ asset('assets/'.rawurlencode($m['icon'])) }}"
-                                alt=""
-                                @class([
-                                    'h-10 w-10 shrink-0 rounded-[12px] object-contain',
-                                    'brightness-0 dark:invert' => ! empty($m['mono']),
-                                ])
-                                loading="lazy"
-                            >
-                            <span class="text-xs font-semibold text-zinc-900 dark:text-white">{{ $m['name'] }}</span>
-                        </div>
-                    @endforeach
+                {{-- The track holds TWO copies of the list and travels exactly
+                     -50%, so the second copy sits where the first began at the
+                     moment the animation restarts and the loop has no seam. That
+                     holds for any item width, since both copies are identical:
+                     half the track is always exactly one copy. The clone is
+                     aria-hidden, so a screen reader hears each method once.
+                     Hover pauses it; prefers-reduced-motion stops it. --}}
+                <div class="pay-marquee mt-6 overflow-hidden" role="group" aria-label="Accepted payment methods">
+                    <div class="pay-marquee-track flex w-max items-center">
+                        @foreach ([false, true] as $isClone)
+                            <div class="flex w-max items-center" @if ($isClone) aria-hidden="true" @endif>
+                                @foreach ($payBadges as $badge)
+                                    <div class="flex h-[52px] w-[128px] shrink-0 items-center justify-center px-2">
+                                        @isset($badge['img'])
+                                            <img
+                                                src="{{ asset('assets/'.rawurlencode($badge['img'])) }}"
+                                                alt="{{ $isClone ? '' : $badge['label'] }}"
+                                                @class([
+                                                    'h-8 w-auto max-w-full object-contain',
+                                                    // Monochrome glyphs want the global dark invert;
+                                                    // colour brand marks must opt out or they flatten.
+                                                    'brightness-0 dark:invert' => $badge['mono'] ?? false,
+                                                    'no-dark-invert' => ! ($badge['mono'] ?? false),
+                                                ])
+                                                loading="lazy"
+                                            >
+                                        @else
+                                            <x-home.payment-mark
+                                                :mark="$badge['svg']"
+                                                :label="$isClone ? null : $badge['label']"
+                                            />
+                                        @endisset
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             </section>
 
@@ -931,8 +1014,11 @@
                 {{-- A plain 12px from the top. It used to track the live
                      header height to sit below the pinned nav; the header is
                      not sticky any more, so there is nothing to clear. --}}
-                style="top: 12px"
-                style="display:none;"
+                {{-- One style attribute, not two. A duplicate is discarded by the
+                     parser, which kept `top` and threw the `display:none` away,
+                     so the toast flashed at the top of every page load until
+                     Alpine booted and x-show hid it. --}}
+                style="top: 12px; display: none;"
                 class="fixed inset-x-0 z-[100] px-3 sm:px-5"
             >
                 <div class="relative mx-auto w-full max-w-[860px] rounded-[20px] border border-white/40 bg-white/70 shadow-[0_14px_44px_-12px_rgba(15,23,42,0.4),inset_0_1px_0_rgba(255,255,255,0.4)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1d3252]/80">
@@ -941,7 +1027,7 @@
                         type="button"
                         @click="selectedId = null"
                         aria-label="Deselect plan"
-                        class="absolute bottom-0 left-1/2 z-10 flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-md transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:bg-[#26416b] dark:text-white dark:ring-zinc-700/60 dark:hover:bg-[#34507a]"
+                        class="absolute bottom-0 left-1/2 z-10 flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-md transition-colors hover:bg-[#f4f6f5] hover:text-zinc-900 dark:bg-[#26416b] dark:text-white dark:ring-zinc-700/60 dark:hover:bg-[#34507a]"
                     >
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
@@ -960,9 +1046,9 @@
                             <span x-text="selectedCrypto"></span>
                             <svg class="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        <div x-show="open" x-transition style="display:none;" class="absolute top-full left-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-zinc-700 dark:bg-[#1d3252] dark:shadow-black/40" role="listbox">
+                        <div x-show="open" x-transition style="display:none;" class="absolute top-full left-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#ffffff] p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-zinc-700 dark:bg-[#1d3252] dark:shadow-black/40" role="listbox">
                             <template x-for="(meta, code) in cryptos" :key="code">
-                                <button type="button" @click="selectedCrypto = code; open = false" :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'" class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors">
+                                <button type="button" @click="selectedCrypto = code; open = false" :class="selectedCrypto === code ? 'bg-[#f4f6f5] text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-[#f4f6f5] dark:text-zinc-200 dark:hover:bg-[#26416b]'" class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors">
                                     <template x-if="meta.icon"><img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px]"></template>
                                     <template x-if="!meta.icon && meta.flag"><img :src="meta.flag" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px] object-cover ring-1 ring-zinc-200"></template>
                                     <template x-if="!meta.icon && !meta.flag"><span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[12px] text-[10px] font-black text-white" :class="meta.type === 'crypto' ? 'bg-amber-500' : 'bg-emerald-500'" x-text="code.charAt(0)"></span></template>
@@ -1005,7 +1091,7 @@
                 </div>
             </div>
         @else
-            <div class="mt-8 rounded-[12px] bg-zinc-50 px-4 py-10 text-center ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+            <div class="mt-8 rounded-[12px] bg-[#ffffff] px-4 py-10 text-center ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
                 <p class="text-base font-semibold text-zinc-900 dark:text-white">No data plans available</p>
                 <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">This region has no plans in stock right now. Check back later.</p>
                 <a href="{{ $shopRoute('esims') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Browse other regions</a>
@@ -1016,11 +1102,11 @@
 
         {{-- Networks modal --}}
         <div x-show="showNetworks" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="networks-title">
-            <div x-show="showNetworks" @click="showNetworks = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showNetworks" x-transition class="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white/65 p-6 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+            <div x-show="showNetworks" @click="showNetworks = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
+            <div x-show="showNetworks" x-transition class="relative max-h-[85vh] w-full max-w-[760px] overflow-y-auto p-6 rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
                 <div class="flex items-start justify-between gap-4">
                     <h2 id="networks-title" class="text-lg font-bold text-zinc-900 dark:text-white">{{ $coverageCount > 1 ? 'Countries & Networks' : 'Networks' }}</h2>
-                    <button type="button" @click="showNetworks = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showNetworks = false" aria-label="Close" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 @if ($coverageCount > 1)
                     <p class="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-white">This eSIM works across {{ $coverageCount }} countries and connects to a local network automatically in each.</p>
@@ -1082,7 +1168,7 @@
                                     <img src="{{ asset('assets/'.rawurlencode('Network Svg.svg')) }}" alt="" class="h-4 w-4 dark:invert" aria-hidden="true">
                                     {{ $net['name'] }}
                                     @if (! empty($net['speed']))
-                                        <span class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-600 dark:bg-[#26416b] dark:text-zinc-200">{{ $net['speed'] }}</span>
+                                        <span class="rounded-[5px] bg-[#f4f6f5] px-1.5 py-0.5 text-[10px] font-bold text-zinc-600 dark:bg-[#26416b] dark:text-zinc-200">{{ $net['speed'] }}</span>
                                     @endif
                                 </li>
                             @empty
@@ -1094,73 +1180,126 @@
             </div>
         </div>
 
-        {{-- Check compatibility modal --}}
-        <div x-show="showCompat" style="display:none;" class="fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="compat-title">
-            <div x-show="showCompat" @click="showCompat = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showCompat" x-transition class="esim-tile relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[14px] bg-white/65 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
-                <div class="flex items-start justify-between gap-4 p-5 pb-3">
+        {{-- Check compatibility modal.
+
+             Reference shape: one searchable list of manufacturers, each a
+             collapsible row carrying its own model count, rather than the iOS /
+             Android tabs this used to be. Someone checking a device knows its
+             make, not which platform list we keep it under, and with 60-odd
+             makes a tab holding 300 loose model names is not readable. The
+             search waits for three characters because one or two match most of
+             the list and the result reads as noise. --}}
+        <div x-show="showCompat" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="compat-title">
+            <div x-show="showCompat" @click="showCompat = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
+            <div x-show="showCompat" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
+
+                {{-- Header, held above the body so the title stays put while the
+                     manufacturer list scrolls under it. --}}
+                <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-700/60">
                     <h2 id="compat-title" class="text-lg font-bold text-zinc-900 dark:text-white">Check compatibility</h2>
-                    <button type="button" @click="showCompat = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showCompat = false" aria-label="Close" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
-                <div class="px-6 text-sm leading-relaxed text-zinc-600 dark:text-white">
-                    <p>To use an eSIM, a device must meet the following conditions:</p>
+
+                <div class="px-6 pt-5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                    <p>To use an eSIM, a device must meet all three of these conditions:</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5">
                         <li>The device supports eSIMs.</li>
                         <li>The device is not carrier or network-locked.</li>
                         <li>The device is not jailbroken (iOS) or rooted (Android).</li>
                     </ul>
-                    <p class="mt-2">Use the list to check if your device is eSIM-compatible. Some regional models may differ, so confirm with your manufacturer if unsure.</p>
+                    <p class="mt-3">
+                        <span class="font-semibold text-zinc-900 dark:text-white">Don't see your device?</span>
+                        The list is kept up to date but is not complete, and some regional models of a listed device do not carry eSIM. Check with the manufacturer if yours is missing.
+                    </p>
                 </div>
 
-                <div class="mt-4 grid grid-cols-2 border-b border-zinc-200 px-6 dark:border-zinc-700/60">
-                    <button type="button" @click="compatTab = 'ios'; compatSearch = ''" :class="compatTab === 'ios' ? 'border-blue-600 text-zinc-900 dark:text-white' : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'" class="border-b-2 py-3 text-sm font-bold transition-colors">iOS</button>
-                    <button type="button" @click="compatTab = 'android'; compatSearch = ''" :class="compatTab === 'android' ? 'border-blue-600 text-zinc-900 dark:text-white' : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'" class="border-b-2 py-3 text-sm font-bold transition-colors">Android</button>
+                {{-- Find your device. Both figures are counted off the list below,
+                     so they cannot drift away from what is actually shown. --}}
+                <div class="mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-zinc-200 px-6 pt-4 dark:border-zinc-700/60">
+                    <p class="text-sm font-bold text-zinc-900 dark:text-white">Find your device</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ number_format($compatModelCount) }} models across {{ number_format($compatBrands->count()) }} manufacturers</p>
                 </div>
 
-                <div class="p-4">
+                <div class="px-6 pb-0 pt-3">
                     <div class="relative">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input x-model="compatSearch" type="text" placeholder="Search your device" aria-label="Search your device" class="w-full rounded-[15px] border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">
+                        <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                        <input
+                            x-model="compatSearch"
+                            type="text"
+                            placeholder="Search by manufacturer or model"
+                            aria-label="Search by manufacturer or model"
+                            class="w-full rounded-full border border-zinc-200 bg-white py-3 pl-11 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700/60 dark:bg-white/5 dark:text-white dark:placeholder:text-zinc-500"
+                        >
+                        <button
+                            type="button"
+                            x-show="compatSearch !== ''"
+                            x-cloak
+                            @click="compatSearch = ''"
+                            aria-label="Clear search"
+                            class="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#f4f6f5] hover:text-zinc-900 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
                     </div>
+                    {{-- Shown only while the query is too short to act on, so it
+                         reads as a hint rather than an error. --}}
+                    <p x-show="compatSearch.trim().length > 0 && compatSearch.trim().length < 3" x-cloak class="mt-2 pl-4 text-xs text-zinc-500 dark:text-zinc-400">Keep typing, three characters or more.</p>
                 </div>
 
-                {{-- The ring lives on this wrapper, not on the scroller: the fade
-                     mask dissolves everything it covers, so a ring on the scrolling
-                     element got faded away at its own top and bottom edges. --}}
-                <div class="mx-4 mb-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] ring-1 ring-zinc-200 dark:ring-zinc-700/60">
-                <div class="modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch]">
-                    {{-- iOS --}}
-                    <div x-show="compatTab === 'ios'" class="space-y-0.5">
-                        @foreach ($compat['ios'] as $device)
-                            <p data-name="{{ Str::lower($device) }}" x-show="compatSearch === '' || $el.dataset.name.includes(compatSearch.toLowerCase())" class="border-b border-zinc-100 py-2 text-sm text-zinc-800 dark:border-zinc-700/40 dark:text-zinc-200">{{ $device }}</p>
-                        @endforeach
-                    </div>
-                    {{-- Android (grouped by brand) --}}
-                    <div x-show="compatTab === 'android'" style="display:none;" class="space-y-4">
-                        @foreach ($compat['android'] as $brand => $models)
-                            <div
-                                data-brand="{{ Str::lower($brand) }}"
-                                data-models="{{ Str::lower(implode('|', $models)) }}"
-                                x-show="compatSearch === '' || $el.dataset.brand.includes(compatSearch.toLowerCase()) || $el.dataset.models.includes(compatSearch.toLowerCase())"
+                <div class="modal-scroll-fade min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-6 pb-6 pt-6 [-webkit-overflow-scrolling:touch]">
+                    @foreach ($compatBrands as $brand => $models)
+                        @php $brandKey = \Illuminate\Support\Str::slug($brand) ?: \Illuminate\Support\Str::lower($brand); @endphp
+                        <div
+                            data-brand="{{ \Illuminate\Support\Str::lower($brand) }}"
+                            data-models="{{ \Illuminate\Support\Str::lower(implode('|', $models)) }}"
+                            x-show="compatTerm() === '' || $el.dataset.brand.includes(compatTerm()) || $el.dataset.models.includes(compatTerm())"
+                            class="overflow-hidden rounded-[12px] ring-1 ring-zinc-200 dark:ring-zinc-700/60"
+                        >
+                            <button
+                                type="button"
+                                @click="compatOpen = (compatOpen === @js($brandKey) ? '' : @js($brandKey))"
+                                :aria-expanded="compatIsOpen($el, @js($brandKey)) ? 'true' : 'false'"
+                                class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
                             >
-                                <p class="sticky top-0 bg-white py-1.5 text-sm font-bold text-zinc-900 dark:bg-[#1d3252] dark:text-white">{{ $brand }}</p>
-                                <div class="space-y-0.5">
-                                    @foreach ($models as $model)
-                                        <p data-name="{{ Str::lower($model) }}" data-brand="{{ Str::lower($brand) }}" x-show="compatSearch === '' || $el.dataset.brand.includes(compatSearch.toLowerCase()) || $el.dataset.name.includes(compatSearch.toLowerCase())" class="border-b border-zinc-100 py-2 text-sm text-zinc-800 dark:border-zinc-700/40 dark:text-zinc-200">{{ $model }}</p>
-                                    @endforeach
-                                </div>
+                                <span class="flex min-w-0 items-baseline gap-2">
+                                    <span class="truncate text-sm font-bold text-zinc-900 dark:text-white">{{ $brand }}</span>
+                                    <span class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{{ count($models) }} {{ \Illuminate\Support\Str::plural('model', count($models)) }}</span>
+                                </span>
+                                <svg
+                                    class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200 dark:text-zinc-400"
+                                    :class="compatIsOpen($el, @js($brandKey)) ? 'rotate-180' : ''"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"
+                                ><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+
+                            <div x-show="compatIsOpen($el, @js($brandKey))" x-cloak class="border-t border-zinc-200 px-4 py-2 dark:border-zinc-700/60">
+                                @foreach ($models as $model)
+                                    <p
+                                        data-name="{{ \Illuminate\Support\Str::lower($model) }}"
+                                        x-show="compatTerm() === '' || $el.closest('[data-brand]').dataset.brand.includes(compatTerm()) || $el.dataset.name.includes(compatTerm())"
+                                        class="py-1.5 text-sm text-zinc-600 dark:text-zinc-300"
+                                    >{{ $model }}</p>
+                                @endforeach
                             </div>
-                        @endforeach
-                    </div>
-                </div>
+                        </div>
+                    @endforeach
+
+                    {{-- Worth saying when nothing matches, or the list just empties. --}}
+                    <p
+                        x-show="compatTerm() !== '' && compatMatches() === 0"
+                        x-cloak
+                        class="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400"
+                    >No manufacturer or model matches that search.</p>
                 </div>
             </div>
         </div>
 
         {{-- Package details modal --}}
         <div x-show="showDetails" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="details-title">
-            <div x-show="showDetails" @click="showDetails = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-black/60"></div>
-            <div x-show="showDetails" x-transition class="esim-tile relative max-h-[85vh] w-full max-w-lg flex flex-col overflow-hidden rounded-3xl bg-white/65 shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:rounded-[14px] dark:bg-[#0c1a36]/70 dark:ring-1 dark:ring-white/10">
+            <div x-show="showDetails" @click="showDetails = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
+            <div x-show="showDetails" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
                 {{-- Inner scroller: the sheet itself must NOT scroll, or the mask would
                      fade its glass background and rounded corners too, not just the text. --}}
                 <div class="modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 [-webkit-overflow-scrolling:touch]">
@@ -1171,28 +1310,28 @@
                         @endif
                         {{ $regionLabel }}
                     </h2>
-                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <div class="mt-5">
                     <p class="text-sm font-bold text-zinc-900 dark:text-white">Package</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-[#f4f6f5] px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Coverage</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $regionLabel }}</span>
                         </span>
-                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-[#f4f6f5] px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Data</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.data || '-'"></span>
                         </span>
-                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-[#f4f6f5] px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Calls</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.voice || '-'"></span>
                         </span>
-                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span x-show="detailsPlan()?.is_voice" x-cloak class="inline-flex flex-col rounded-[12px] bg-[#f4f6f5] px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Texts</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="detailsPlan()?.sms || '-'"></span>
                         </span>
-                        <span class="inline-flex flex-col rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                        <span class="inline-flex flex-col rounded-[12px] bg-[#f4f6f5] px-3 py-2 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                             <span class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Validity</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white" x-text="(detailsPlan()?.days > 0 ? detailsPlan().days + ' days' : 'Flexible')"></span>
                         </span>
@@ -1208,7 +1347,7 @@
                                 ['t' => 'iMessage text', 'd' => 'Send and receive texts over iMessage.', 'icon' => 'M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z'],
                                 ['t' => 'FaceTime', 'd' => 'Video and audio FaceTime over data.', 'icon' => 'M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z'],
                             ] as $svc)
-                                <div class="flex items-start gap-2.5 rounded-[12px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                                <div class="flex items-start gap-2.5 rounded-[12px] bg-[#f4f6f5] p-3 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $svc['icon'] }}"/></svg>
                                     </span>
@@ -1222,7 +1361,7 @@
                     </div>
 
                     {{-- Top-up + free iMessage note (voice plans). --}}
-                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-blue-50 p-4 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-[#f4f6f5] p-4 ring-1 ring-zinc-200 dark:bg-blue-500/10 dark:ring-blue-500/20">
                         <p class="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                             <svg class="h-4 w-4 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                             Top-ups &amp; iMessage
@@ -1231,7 +1370,7 @@
                     </div>
 
                     {{-- Data-only note: pure connectivity, no calls/texts/number. --}}
-                    <div x-show="detailsPlan() && ! detailsPlan().is_voice" x-cloak class="mt-4 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
+                    <div x-show="detailsPlan() && ! detailsPlan().is_voice" x-cloak class="mt-4 rounded-[12px] bg-[#f4f6f5] p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-zinc-700/60">
                         <p class="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                             <svg class="h-4 w-4 text-zinc-500 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
                             Data only
@@ -1293,7 +1432,7 @@
                     {{-- What happens when the allowance runs out + how to manage the
                          eSIM. Shown for voice plans only; data-only plans intentionally
                          show no message here. --}}
-                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-[#24364f]">
+                    <div x-show="detailsPlan()?.is_voice" x-cloak class="mt-4 rounded-[12px] bg-[#f4f6f5] p-4 ring-1 ring-zinc-100 dark:bg-[#26416b] dark:ring-[#24364f]">
                         <p class="text-sm leading-relaxed text-zinc-700 dark:text-white">After your data, SMS and calls finish, you can still call, text and FaceTime over iMessage, WhatsApp and your WiFi. To keep using normal texts, calls and data, top up before you let your eSIM expire. If you plan to keep using it, a top-up auto-renews your eSIM to the top-up plan you choose. On your Web App orders page you can manage your eSIM, see remaining data, credit and SMS, top up your eSIM (only from there) and install your eSIM from there too. Have fun 😊</p>
                     </div>
 
@@ -1333,8 +1472,41 @@
                 showNetworks: false,
                 showCompat: false,
                 showDetails: false,
-                compatTab: 'ios',
                 compatSearch: '',
+                compatOpen: '',
+
+                // The live query, lowercased, but only once it is long enough to
+                // narrow anything. One or two characters match most of a list of
+                // 368 model names, so below three this returns '' and every
+                // caller falls back to showing the full list.
+                compatTerm() {
+                    const q = this.compatSearch.trim().toLowerCase();
+                    return q.length >= 3 ? q : '';
+                },
+
+                // A manufacturer is open either because it was tapped, or because
+                // the current search matched inside it. Reading the make and its
+                // models off the row's own dataset keeps those strings in the one
+                // place they already exist, rather than repeating all 368 of them
+                // in a second attribute.
+                compatIsOpen(el, key) {
+                    const q = this.compatTerm();
+                    if (q === '') return this.compatOpen === key;
+
+                    const row = el.closest('[data-brand]');
+                    return !! row && (row.dataset.brand.includes(q) || row.dataset.models.includes(q));
+                },
+
+                // How many manufacturers the current search leaves on screen, for
+                // the empty state. Counted off the DOM for the same reason.
+                compatMatches() {
+                    const q = this.compatTerm();
+                    if (q === '') return 1;
+
+                    return Array.from(this.$el.querySelectorAll('[data-brand][data-models]'))
+                        .filter((row) => row.dataset.brand.includes(q) || row.dataset.models.includes(q))
+                        .length;
+                },
 
                 locTab: 'popular',
                 locSearch: '',

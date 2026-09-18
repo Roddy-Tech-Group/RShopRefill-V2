@@ -10,12 +10,23 @@ use Tests\TestCase;
  * .full-bleed breaks a carousel track out of the content column so it spans the
  * viewport - which is what lets those rows scroll edge to edge.
  *
- * It must stay a plain 100vw. An attempt to also correct for the vertical
- * scrollbar via `body { --sbw: calc(100vw - 100%) }` broke it: a custom property
- * is substituted as tokens, so its `100%` resolved against the element USING it
- * rather than against body. Inside the rule that became 100vw minus the
- * carousel's own container width, `width` collapsed to roughly the content
- * column, and the tracks stopped bleeding - and stopped scrolling edge to edge.
+ * It used to be a plain 100vw and this file used to insist on that. 100vw is
+ * the wrong measure: it counts the vertical scrollbar, so on every page long
+ * enough to scroll the tracks ran a scrollbar's width past the page's usable
+ * area. The rule is now written against --page-w, a real pixel width app.js
+ * publishes from a fixed-position probe (whose containing block is the viewport
+ * itself, so it measures the usable area and cannot be widened by the very
+ * overflow it is there to prevent). 100vw survives only as the var() fallback,
+ * which is the old behaviour for the moment before the bundle runs - a track a
+ * scrollbar too wide, rather than a broken one.
+ *
+ * What has NOT changed is why the pure-CSS shortcut is banned. An attempt to
+ * correct for the scrollbar via `body { --sbw: calc(100vw - 100%) }` broke the
+ * rule outright: a custom property is substituted as tokens, so its `100%`
+ * resolved against the element USING it rather than against body. Inside the
+ * rule that became 100vw minus the carousel's own container width, `width`
+ * collapsed to roughly the content column, and the tracks stopped bleeding -
+ * and stopped scrolling edge to edge. The second test below still guards it.
  */
 class FullBleedTest extends TestCase
 {
@@ -35,8 +46,18 @@ class FullBleedTest extends TestCase
 \}/s', $css, $m);
         $this->assertNotEmpty($m, 'The .full-bleed rule is missing.');
 
-        $this->assertStringContainsString('margin-inline: calc(50% - 50vw);', $m[1]);
-        $this->assertStringContainsString('width: 100vw;', $m[1]);
+        // Both declarations measure the page with --page-w now, and both keep
+        // 100vw as the fallback only. The margin is half the measured width
+        // taken off half the container: the container is itself centred in
+        // body, so the two halves cancel and the track lands flush with the
+        // usable area on both sides, wherever the browser chose to put the
+        // scrollbar gutter.
+        $this->assertStringContainsString('width: var(--page-w, 100vw);', $m[1]);
+        $this->assertStringContainsString('margin-inline: calc(50% - (var(--page-w, 100vw) / 2));', $m[1]);
+
+        // 100vw may only ever appear as that fallback. A bare `width: 100vw`
+        // coming back is the exact regression this rule was rewritten to end.
+        $this->assertStringNotContainsString('width: 100vw;', $m[1]);
     }
 
     /**

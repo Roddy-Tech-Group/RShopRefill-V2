@@ -14,29 +14,76 @@ class HomeTrustPanelTest extends TestCase
         return file_get_contents(resource_path('views/welcome.blade.php'));
     }
 
+    /**
+     * What the panel carries, in the order it carries it.
+     *
+     * Two things have been through here. The payment pyramid went first. The
+     * four-signal trust strip went with the rework that followed it: three of
+     * its signals were unverifiable marketing lines sitting next to figures the
+     * database can actually stand behind, so it was replaced by the live counts
+     * rather than kept beside them.
+     *
+     * The gift-card category row went out in that same rework, and this is the
+     * assertion that keeps it out. The box was given over to the counts, and
+     * the category row is the thing the counts replaced. It reads like an
+     * accident from the code alone, because the component is still in the repo
+     * and still maintained while nothing mounts it, so a reader who only has
+     * the diff concludes it was dropped by mistake and puts it back. That has
+     * already happened once.
+     *
+     * The order is the argument the panel makes, which is why it is asserted
+     * and not just the membership: the heading makes the claim, the counts back
+     * it with real figures, and the assurance strip closes with the promises
+     * and the payment rails - the rails being the one part of the old pyramid
+     * worth keeping, now a single line rather than a block of its own.
+     */
     public function test_the_panel_holds_the_trust_signals(): void
     {
-        // The payment pyramid used to sit above these; it was removed and the
-        // trust strip is what the panel carries now.
         $home = $this->home();
 
         $this->assertStringContainsString('class="trust-panel isolate mt-8', $home);
-        $this->assertStringContainsString('<x-home.trust-strip />', $home);
+        $this->assertStringContainsString('<x-home.customer-counts />', $home);
+        $this->assertStringContainsString('<x-home.assurance-strip />', $home);
+
         $this->assertStringNotContainsString('<x-home.payment-methods />', $home);
+        $this->assertStringNotContainsString('<x-home.trust-strip />', $home);
+        $this->assertStringNotContainsString('<x-home.gift-card-categories />', $home);
+
+        $counts = strpos($home, '<x-home.customer-counts />');
+        $assurance = strpos($home, '<x-home.assurance-strip />');
+
+        $this->assertLessThan($assurance, $counts);
     }
 
     /**
      * The panel wears the category card's surface, not a navy island fill, so
      * the two blocks read as one family down the page.
+     *
+     * Both are fill-only now. The #dee3e1 hairline they used to share is gone
+     * from both, and the dark half is the shared --ash card tone rather than a
+     * transparent face held together by a ring - with the ring gone, a
+     * transparent block simply disappeared into the page in dark mode. What
+     * gives either of them an edge is the bloom bleeding in from it, which is
+     * the layer the two tests below cover.
+     *
+     * So the tokens come in two lists. The fills must match, and the ring pair
+     * must be absent from BOTH: leaving it on one of them is exactly how the
+     * panel and the tiles stop reading as one family, which is the only thing
+     * this test exists to prevent.
      */
     public function test_the_panel_wears_the_category_card_surface(): void
     {
         $home = $this->home();
         $cards = file_get_contents(resource_path('views/components/home/category-cards.blade.php'));
 
-        foreach (['bg-[#f4f6f5]', 'ring-1 ring-[#dee3e1]', 'dark:bg-transparent', 'dark:ring-zinc-700/60'] as $token) {
+        foreach (['bg-[#ffffff]', 'dark:bg-[var(--ash)]'] as $token) {
             $this->assertStringContainsString($token, $home, "Panel is missing {$token}.");
             $this->assertStringContainsString($token, $cards, "Card is missing {$token}.");
+        }
+
+        foreach (['ring-1 ring-[#dee3e1]', 'dark:ring-zinc-700/60', 'dark:bg-transparent'] as $token) {
+            $this->assertStringNotContainsString($token, $home, "Panel still carries {$token}.");
+            $this->assertStringNotContainsString($token, $cards, "Card still carries {$token}.");
         }
     }
 
@@ -91,29 +138,33 @@ class HomeTrustPanelTest extends TestCase
      * 26px edge bleed reads as a hairline on it. Only the spread is scoped up -
      * the face gradient stays shared, or the two become different effects
      * rather than one treatment at two sizes.
+     *
+     * Dark now has no scoped rule at all, which is the change here. The panel
+     * used to opt back into the bloom in dark mode with an accent wash across
+     * its whole face; at four times a tile's size that stopped reading as light
+     * coming off an edge and became a fill, so the panel came out navy while
+     * the four tiles above it stayed near-black and the page looked like two
+     * themes meeting. It now inherits the blanket kill the tiles get, which is
+     * why both halves of the old dark override are asserted ABSENT.
+     *
+     * The stylesheet is read off disk, so its line endings are whatever the
+     * checkout produced. They are normalised before the multi-line needle is
+     * matched: this is an assertion about the shape of a CSS rule, and a Windows
+     * working copy must not be able to fail it.
      */
     public function test_the_panel_bloom_is_scaled_to_the_panel(): void
     {
-        $css = file_get_contents(resource_path('css/app.css'));
+        $css = str_replace("\r\n", "\n", file_get_contents(resource_path('css/app.css')));
 
         $this->assertStringContainsString(
-            '.trust-panel .cat-card-glow {'.'
-'.'  box-shadow: inset 0 0 200px 10px rgba(191, 235, 255, 0.85);',
+            ".trust-panel .cat-card-glow {\n".'  box-shadow: inset 0 0 200px 10px rgba(191, 235, 255, 0.85);',
             $css
         );
 
-        // Dark kills the bloom on the tiles outright, so the panel has to opt
-        // back in - and on the accent: #bfebff at this spread is a haze on
-        // near-black rather than light coming off an edge.
-        $this->assertStringContainsString(
-            '.dark .trust-panel .cat-card-glow {'.'
-'.'  display: block;',
-            $css
-        );
-        $this->assertStringContainsString(
-            'box-shadow: inset 0 0 200px 10px rgba(122, 162, 255, 0.22);',
-            $css
-        );
+        // No dark override of any kind: the panel takes the same outright kill
+        // the tiles take, rather than a second colour for the same layer.
+        $this->assertStringNotContainsString('.dark .trust-panel .cat-card-glow', $css);
+        $this->assertStringNotContainsString('rgba(122, 162, 255, 0.22)', $css);
 
         // The scoped rules must not touch `background` - that is what keeps the
         // panel and the cards the same effect.
@@ -159,25 +210,39 @@ class HomeTrustPanelTest extends TestCase
         // its absence is what proves those are still gone too.
         $this->assertStringNotContainsString('min-h-[110px]', $html);
 
-        // The trust strip below it survives the removal.
-        $this->assertStringContainsString('Trusted by Thousands', $html);
+        // The trust strip that replaced those tiles has since gone the same way,
+        // and for the same reason the pyramid did: three of its four signals
+        // were claims nothing could check ("Trusted by Thousands") sitting
+        // beside a figure read live from the catalogue.
+        $this->assertStringNotContainsString('Trusted by Thousands', $html);
+
+        // What closes the panel instead. Asserting these is what keeps this test
+        // honest: a home page that had simply stopped rendering the panel would
+        // otherwise satisfy every absence above it.
+        $this->assertStringContainsString(__('home.assurance_instant_title'), $html);
+        $this->assertStringContainsString(__('home.assurance_pay_with'), $html);
     }
 
     /**
-     * Home runs its own light-mode surface. Everywhere else the page is
-     * #f4f6f5 with #ffffff cards lifted off it; here it is the other way round -
-     * a #ffffff page with #f4f6f5 cards sitting on it, ringed in #dee3e1.
+     * Home follows the storefront light-mode surface: a #f4f6f5 page with
+     * #ffffff cards lifted off it.
+     *
+     * The #dee3e1 ring is no longer part of that story. Surface and fill are now
+     * the only two values: the card is told apart from the page by its own tone
+     * plus the bloom bleeding in from its edge, and a hairline drawn on top of
+     * that bloom read as a second outline competing with it. So the ring is
+     * asserted absent here, and the bloom - which is now doing the edge's whole
+     * job - is asserted at the spread that makes it visible.
      */
     public function test_home_runs_its_own_light_mode_surface(): void
     {
         $home = $this->home();
         $cards = file_get_contents(resource_path('views/components/home/category-cards.blade.php'));
 
-        // Both home surfaces are white. The wrapper needs it as well as the
-        // section: the hero sits above the section and would otherwise show
-        // <main>'s #f4f6f5 as a band across the top of the page.
-        $this->assertStringContainsString('<section class="relative bg-[#ffffff] dark:bg-[#0c1a36]">', $home);
-        $this->assertStringContainsString('<section class="relative z-10 bg-[#ffffff] dark:bg-[#0c1a36]">', $home);
+        // Both home surfaces carry the page tone. The wrapper needs it as well
+        // as the content section so the hero and the content share one ground.
+        $this->assertStringContainsString('<section class="relative bg-[#f4f6f5] dark:bg-[#0c1a36]">', $home);
+        $this->assertStringContainsString('<section class="relative z-10 bg-[#f4f6f5] dark:bg-[#0c1a36]">', $home);
 
         // Literal hex, never bg-white: that is this codebase's idiom for opting
         // out of the dark-mode flip, and dark is pinned beside it. Comments
@@ -189,12 +254,16 @@ class HomeTrustPanelTest extends TestCase
             );
         }
 
-        // Surface, fill and border are three distinct values: a #ffffff page,
-        // #f4f6f5 cards, a #dee3e1 ring. The bloom inside stays blue - a
-        // neutral edge with a #bfebff wash off it.
-        $this->assertStringContainsString('rounded-[20px] bg-[#f4f6f5] px-5 pb-6 pt-5', $cards);
-        $this->assertStringContainsString('ring-1 ring-[#dee3e1]', $cards);
+        // Surface and fill are two distinct values: a #f4f6f5 page with #ffffff
+        // cards on it, and no third value for a border. The bloom stays blue on
+        // a neutral card, which is the same pairing the hero chips use.
+        $this->assertStringContainsString('rounded-[20px] bg-[#ffffff] px-5 pb-6 pt-5', $cards);
+        $this->assertStringNotContainsString('ring-1 ring-[#dee3e1]', $cards);
 
+        // 70px, not the 26px this started at: with the ring gone the wash has to
+        // travel well into the face to give the card an edge at all, and at a
+        // hairline's worth of spread it left the card indistinguishable from the
+        // page behind it.
         $css = file_get_contents(resource_path('css/app.css'));
         $this->assertStringContainsString('box-shadow: inset 0 0 70px 4px rgba(191, 235, 255, 0.85);', $css);
 

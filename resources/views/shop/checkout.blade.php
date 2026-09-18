@@ -86,7 +86,7 @@
     // figure the customer sees.
 @endphp
 
-<x-shop.layout :title="'Checkout | '.$siteName">
+<x-shop.layout :title="__('checkout.checkout').' | '.$siteName">
 
     <script src="https://checkout.flutterwave.com/v3.js"></script>
 
@@ -104,8 +104,8 @@
              upfront instead of bouncing off a 503 on submit. --}}
         <x-paused-banner
             flag="checkout"
-            title="Checkout is temporarily paused"
-            message="New orders are currently unavailable. Your cart is saved and you can try again shortly."
+            :title="__('checkout.paused_title')"
+            :message="__('checkout.paused_message')"
             class="mt-4"
         />
 
@@ -123,10 +123,10 @@
                  page and the nav/dashboard cart popups. --}}
             <div x-show="$store.cart.hydrated && $store.cart.count === 0" x-cloak class="pure-card rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 px-6 py-20 text-center ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10">
                 <x-illo name="emptyCart" class="mx-auto w-full max-w-[280px]" />
-                <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">Your cart is empty</p>
-                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Add a Product before heading to checkout.</p>
+                <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">{{ __('checkout.cart_empty') }}</p>
+                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ __('checkout.checkout_empty_hint') }}</p>
                 <a href="{{ request()->routeIs('dashboard.*') ? route('dashboard.shop.gift-cards') : route('shop.gift-cards') }}" wire:navigate class="mt-5 inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
-                    Visit Shop
+                    {{ __('checkout.visit_shop') }}
                 </a>
             </div>
 
@@ -135,7 +135,7 @@
 
                 {{-- ─── LEFT: Order details ─── --}}
                 <section class="pure-card self-start rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6">
-                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Order details</h2>
+                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('checkout.order_details') }}</h2>
 
                     <ul class="mt-4 divide-y divide-zinc-100">
                         <template x-for="item in $store.cart.items" :key="item.id">
@@ -179,7 +179,7 @@
                                     <p x-show="rcoinConfig.enabled" class="mt-1 inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
                                         <span x-text="item.quantity"></span> x
                                         <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-3.5 w-3.5 object-contain">
-                                        <span class="font-semibold text-zinc-900 dark:text-white" x-text="Math.floor(((item.line_total_usd || 0) * (rcoinConfig.cashback_percentage / 100)) / rcoinConfig.usd_rate)"></span> Points
+                                        <span class="font-semibold text-zinc-900 dark:text-white" x-text="Math.floor(((item.line_total_usd || 0) * (rcoinConfig.cashback_percentage / 100)) / rcoinConfig.usd_rate)"></span> {{ __('checkout.points') }}
                                     </p>
                                 </div>
 
@@ -200,7 +200,7 @@
                                         </div>
                                     </div>
                                     <button type="button" @click="$store.cart.remove(item.id)" class="text-xs font-semibold text-red-600 transition-colors hover:text-red-700">
-                                        Remove
+                                        {{ __('checkout.remove') }}
                                     </button>
                                 </div>
                             </li>
@@ -219,14 +219,14 @@
                         <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a9.004 9.004 0 018.716 6.747M12 3a9.004 9.004 0 00-8.716 6.747M21.75 12H2.25"/>
                         </svg>
-                        <p class="text-sm text-blue-800 dark:text-blue-200">eSIMs are region-based and only work inside their coverage area. Pick the plan for the country or region you are traveling to, or choose a Global plan for worldwide connectivity. You can install it from anywhere; it connects once you arrive.</p>
+                        <p class="text-sm text-blue-800 dark:text-blue-200">{{ __('checkout.esim_coverage_notice') }}</p>
                     </div>
 
                     {{-- Points + total --}}
                     <div class="mt-4 space-y-2 border-t border-zinc-100 dark:border-white/10 pt-4 text-sm">
                         <div x-show="rcoinConfig.enabled" class="flex items-center justify-between">
                             <span class="inline-flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
-                                Points you earn
+                                {{ __('checkout.points_you_earn') }}
                                 <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-4 w-4 object-contain">
                             </span>
                             <span x-data="valueFlip()" x-effect="points(); flash()" class="inline-block font-bold text-zinc-900 dark:text-white" x-text="points()">0</span>
@@ -255,16 +255,17 @@
                                 >
                                 <span class="min-w-0 flex-1">
                                     <span class="flex flex-wrap items-baseline justify-between gap-x-3">
-                                        <span class="text-sm font-bold text-zinc-900 dark:text-white">Use my Rcoin</span>
+                                        <span class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.use_my_rcoin') }}</span>
                                         <span class="text-[11px] text-zinc-600 dark:text-zinc-400">
-                                            Balance: <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="Number(walletBalances.RCOIN || 0).toLocaleString()"></span>
+                                            {{ __('checkout.balance_label') }} <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="Number(walletBalances.RCOIN || 0).toLocaleString()"></span>
                                         </span>
                                     </span>
+                                    {{-- The live figures are passed in as markup placeholders so a
+                                         translator can move them within the sentence without ever
+                                         carrying the Alpine bindings themselves. --}}
                                     <span class="mt-0.5 block text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
-                                        Apply up to <span class="font-semibold" x-text="rcoinConfig.redemption_max_pct + '%'"></span> of your order
-                                        — save up to
-                                        <span class="font-bold text-blue-700 dark:text-blue-300" x-text="'$' + (Math.min((walletBalances.RCOIN || 0) * rcoinConfig.usd_rate, ($store.cart.subtotalUsd || 0) * (rcoinConfig.redemption_max_pct / 100))).toFixed(2)"></span>
-                                        on this purchase.
+                                        {!! __('checkout.rcoin_apply_up_to_order', ['percent' => '<span class="font-semibold" x-text="rcoinConfig.redemption_max_pct + \'%\'"></span>']) !!}
+                                        — {!! __('checkout.rcoin_save_up_to', ['amount' => '<span class="font-bold text-blue-700 dark:text-blue-300" x-text="\'$\' + (Math.min((walletBalances.RCOIN || 0) * rcoinConfig.usd_rate, ($store.cart.subtotalUsd || 0) * (rcoinConfig.redemption_max_pct / 100))).toFixed(2)"></span>']) !!}
                                     </span>
                                 </span>
                             </label>
@@ -277,16 +278,16 @@
                                 class="mt-3 flex items-center gap-1 rounded-[12px] bg-white/70 p-1 dark:bg-white/5"
                             >
                                 <button type="button" @click="applyRcoin = '1'" :class="applyRcoin === '1' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors">
-                                    Apply up to <span x-text="rcoinConfig.redemption_max_pct + '%'"></span>
+                                    {!! __('checkout.rcoin_apply_up_to', ['percent' => '<span x-text="rcoinConfig.redemption_max_pct + \'%\'"></span>']) !!}
                                 </button>
                                 <button type="button" @click="applyRcoin = 'full'" :class="applyRcoin === 'full' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors">
-                                    Pay full bill
+                                    {{ __('checkout.rcoin_pay_full_bill') }}
                                 </button>
                             </div>
                         </div>
 
                         <div class="flex items-start justify-between border-t border-zinc-100 dark:border-white/10 pt-2 text-base font-bold text-zinc-900 dark:text-white">
-                            <span>Total estimate</span>
+                            <span>{{ __('checkout.total_estimate') }}</span>
                             <span class="text-right">
                                 <span x-data="valueFlip()" x-effect="$store.cart.subtotal; flash()" class="block tabular-nums" x-text="$store.cart.pay($store.cart.subtotal)"></span>
                                 <span x-show="$store.cart.showUsd" class="block text-xs font-medium tabular-nums text-zinc-500" x-text="'(' + $store.cart.usd($store.cart.subtotalUsd) + ' USD)'"></span>
@@ -305,12 +306,12 @@
                     <input type="hidden" name="crypto_coin" :value="crypto">
                     <input type="hidden" name="currency" :value="$store.cart.currency">
 
-                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">Select payment method</h2>
+                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('checkout.select_payment_method') }}</h2>
 
                     {{-- Checkout Currency Selector --}}
                     <div class="mt-4" x-data="{ ccyOpen: false }">
-                        <label class="text-sm font-semibold text-zinc-900 dark:text-white">Checkout currency</label>
-                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Select the currency you wish to pay with.</p>
+                        <label class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.checkout_currency') }}</label>
+                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.checkout_currency_hint') }}</p>
                         <div class="relative mt-1.5" @click.outside="ccyOpen = false">
                             <button
                                 type="button"
@@ -320,7 +321,7 @@
                                 <span class="flex items-center gap-2">
                                     <span class="font-bold" x-text="$store.cart.currency"></span>
                                     <span class="text-zinc-600 dark:text-zinc-400">&middot;</span>
-                                    <span x-text="$store.cart.currency === 'USD' ? 'United States Dollar' : ($store.cart.currency === 'EUR' ? 'Euro' : ($store.cart.currency === 'GBP' ? 'British Pound' : ($store.cart.currency === 'NGN' ? 'Nigerian Naira' : ($store.cart.currency === 'XAF' ? 'Central African CFA Franc' : ''))))"></span>
+                                    <span x-text="$store.cart.currency === 'USD' ? @js(__('checkout.currency_usd_long')) : ($store.cart.currency === 'EUR' ? @js(__('checkout.currency_eur')) : ($store.cart.currency === 'GBP' ? @js(__('checkout.currency_gbp')) : ($store.cart.currency === 'NGN' ? @js(__('checkout.currency_ngn')) : ($store.cart.currency === 'XAF' ? @js(__('checkout.currency_xaf')) : ''))))"></span>
                                 </span>
                                 <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="ccyOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
@@ -340,6 +341,11 @@
                                 role="listbox"
                             >
                                 @foreach (array_filter(\App\Domain\Shared\Enums\Currency::cases(), fn ($c) => $c->value !== 'RCOIN') as $c)
+                                    @php
+                                        // The enum's label() is English; a currency added
+                                        // without a translation keeps showing that label.
+                                        $currencyKey = 'checkout.currency_'.strtolower($c->value);
+                                    @endphp
                                     <button
                                         type="button"
                                         @click="
@@ -350,7 +356,7 @@
                                         class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
                                         :class="$store.cart.currency === '{{ $c->value }}' ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
                                     >
-                                        <span>{{ $c->value }} &middot; {{ $c->label() }}</span>
+                                        <span>{{ $c->value }} &middot; {{ \Illuminate\Support\Facades\Lang::has($currencyKey) ? __($currencyKey) : $c->label() }}</span>
                                         <template x-if="$store.cart.currency === '{{ $c->value }}'">
                                             <svg class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
@@ -366,11 +372,11 @@
                          friend's email here to send the redemption codes
                          straight to them instead of yourself. --}}
                     <div class="mt-4">
-                        <label for="delivery_email" class="text-sm font-semibold text-zinc-900 dark:text-white">Delivery email or send as a gift</label>
-                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Codes are emailed to this address right after payment. Use a friend's email to send it as a gift.</p>
+                        <label for="delivery_email" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.delivery_email_label') }}</label>
+                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.delivery_email_hint') }}</p>
                         <input id="delivery_email" name="delivery_email" type="email" required
                             value="{{ old('delivery_email', auth()->user()?->email) }}"
-                            placeholder="you@example.com or friend@example.com" class="{{ $fieldClass }}">
+                            placeholder="{{ __('checkout.delivery_email_placeholder') }}" class="{{ $fieldClass }}">
                         @error('delivery_email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
@@ -385,13 +391,13 @@
                         // off, which is the whole point of the failover.
                         $downRails = [];
                         if (! \App\Domain\Payment\Support\FiatGatewayRouter::anyFiatGatewayEnabled()) {
-                            $downRails[] = 'Card and bank payments';
+                            $downRails[] = __('checkout.outage_rail_card_bank');
                         }
                         if (! \App\Support\FeatureFlag::gatewayEnabled('nowpayments')) {
-                            $downRails[] = 'Crypto payments';
+                            $downRails[] = __('checkout.outage_rail_crypto');
                         }
                         if (! \App\Support\FeatureFlag::gatewayEnabled('wallet')) {
-                            $downRails[] = 'Wallet payments';
+                            $downRails[] = __('checkout.outage_rail_wallet');
                         }
                         $allGatewaysDown = count($downRails) === 3;
                     @endphp
@@ -402,9 +408,12 @@
                             </svg>
                             <p class="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
                                 @if ($allGatewaysDown)
-                                    Checkout is temporarily paused for maintenance. Your cart is saved, please check back shortly.
+                                    {{ __('checkout.outage_all_paused') }}
                                 @else
-                                    {{ implode(' and ', $downRails) }} {{ count($downRails) > 1 ? 'are' : 'is' }} temporarily unavailable. We are working on it, please use another payment method or check back shortly.
+                                    {{-- Two whole sentences rather than a swapped verb, so
+                                         languages that agree differently are not forced
+                                         into English grammar. --}}
+                                    {{ __(count($downRails) > 1 ? 'checkout.outage_many_unavailable' : 'checkout.outage_one_unavailable', ['rails' => implode(__('checkout.outage_rails_joiner'), $downRails)]) }}
                                 @endif
                             </p>
                         </div>
@@ -442,11 +451,11 @@
                     <div x-show="method === 'card'" x-collapse class="mt-5 space-y-3">
                         @if(config('services.flutterwave.direct_charge_enabled', false))
                             <div>
-                                <label for="card_name" class="text-sm font-semibold text-zinc-900 dark:text-white">Name on card</label>
-                                <input id="card_name" name="card_name" type="text" autocomplete="cc-name" placeholder="Full name" x-model="cardDetails.card_holder" class="{{ $fieldClass }}">
+                                <label for="card_name" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.card_name_label') }}</label>
+                                <input id="card_name" name="card_name" type="text" autocomplete="cc-name" placeholder="{{ __('checkout.card_name_placeholder') }}" x-model="cardDetails.card_holder" class="{{ $fieldClass }}">
                             </div>
                             <div>
-                                <label for="card_number" class="text-sm font-semibold text-zinc-900 dark:text-white">Card number</label>
+                                <label for="card_number" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.card_number_label') }}</label>
                                 <div class="relative">
                                     <input 
                                         id="card_number" 
@@ -461,7 +470,7 @@
                                     >
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none mt-1.5">
                                         <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-[12px] tracking-wider uppercase bg-zinc-100 text-zinc-500 border border-zinc-200" 
-                                              x-text="cardBrand === 'unknown' ? 'Card' : cardBrand"
+                                              x-text="cardBrand === 'unknown' ? @js(__('checkout.method_card')) : cardBrand"
                                               :class="{
                                                   'bg-blue-50 text-blue-600 border-blue-200': cardBrand === 'visa',
                                                   'bg-amber-50 text-amber-700 border-amber-200': cardBrand === 'mastercard',
@@ -476,21 +485,21 @@
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label for="card_expiry" class="text-sm font-semibold text-zinc-900 dark:text-white">Expiry</label>
-                                    <input 
-                                        id="card_expiry" 
-                                        name="card_expiry" 
-                                        type="text" 
-                                        inputmode="numeric" 
-                                        autocomplete="cc-exp" 
-                                        placeholder="MM / YY" 
+                                    <label for="card_expiry" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.card_expiry_label') }}</label>
+                                    <input
+                                        id="card_expiry"
+                                        name="card_expiry"
+                                        type="text"
+                                        inputmode="numeric"
+                                        autocomplete="cc-exp"
+                                        placeholder="{{ __('checkout.card_expiry_placeholder') }}"
                                         x-model="cardExpiryRaw"
                                         @input="formatExpiry"
                                         class="{{ $fieldClass }} tabular-nums"
                                     >
                                 </div>
                                 <div>
-                                    <label for="card_cvc" class="text-sm font-semibold text-zinc-900 dark:text-white">CVC</label>
+                                    <label for="card_cvc" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.card_cvc_label') }}</label>
                                     <input 
                                         id="card_cvc" 
                                         name="card_cvc" 
@@ -519,7 +528,7 @@
                                     </span>
                                 </div>
                                 <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                    Secure and encrypted payment with bank-level security.
+                                    {{ __('checkout.card_secure_note') }}
                                 </p>
                             </div>
                         @endif
@@ -536,7 +545,7 @@
                         {{-- Network — custom glass dropdown (replaces the native <select>).
                              Hidden for rails that take the phone number alone (M-Pesa, Rwanda). --}}
                         <div x-show="momoNetworks.length > 0">
-                            <label class="text-sm font-semibold text-zinc-900 dark:text-white">Network</label>
+                            <label class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_network_label') }}</label>
                             <div
                                 x-data="{ open: false, value: '' }"
                                 x-init="value = momoNetworks[0] ?? ''; $watch('momoNetworks', list => value = list[0] ?? '')"
@@ -584,14 +593,14 @@
                             </div>
                         </div>
                         <div>
-                            <label for="momo_phone" class="text-sm font-semibold text-zinc-900 dark:text-white">Mobile money number</label>
-                            <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" placeholder="Phone number" class="{{ $fieldClass }}">
+                            <label for="momo_phone" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_number_label') }}</label>
+                            <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ $fieldClass }}">
                         </div>
                     </div>
 
                     {{-- Crypto --}}
                     <div x-show="method === 'crypto'" x-collapse x-cloak class="mt-5">
-                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">Pay with</p>
+                        <p class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.crypto_pay_with') }}</p>
                         {{-- Ticker plus network. Six of the ten coins are stablecoin
                              variants that differ only by chain, so showing the ticker
                              alone would make USDT on BNB Chain and USDT on Tron look
@@ -629,16 +638,16 @@
                                     </template>
                                 </button>
                             @empty
-                                <p class="col-span-full text-sm text-zinc-600 dark:text-zinc-400">No crypto currencies are enabled.</p>
+                                <p class="col-span-full text-sm text-zinc-600 dark:text-zinc-400">{{ __('checkout.crypto_none_enabled') }}</p>
                             @endforelse
                         </div>
                         <template x-if="unusableCoinCount() > 0">
                             <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                                Some coins are unavailable for this order size — each blockchain sets its own minimum.
+                                {{ __('checkout.crypto_some_unavailable') }} — {{ __('checkout.crypto_chain_minimum') }}
                             </p>
                         </template>
                         <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-                            Pick a coin and continue, the next step shows the exact wallet address and amount to send.
+                            {{ __('checkout.crypto_pick_hint') }}
                         </p>
                     </div>
 
@@ -646,11 +655,11 @@
                     <div x-show="method === 'wallet'" x-collapse x-cloak class="mt-5 space-y-3">
                         <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-zinc-600 dark:text-zinc-400">Available Balance</span>
+                                <span class="text-sm font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.wallet_available_balance') }}</span>
                                 <span class="text-base font-bold text-zinc-900 dark:text-white" x-text="$store.cart.pay(walletBalances[$store.cart.currency] || 0)"></span>
                             </div>
                             <div x-show="!hasSufficientWalletBalance()" class="mt-3 text-xs text-red-600 font-medium">
-                                Insufficient balance to pay for this order. Please fund your wallet or select a different payment method.
+                                {{ __('checkout.wallet_insufficient') }}
                             </div>
                         </div>
                     </div>
@@ -660,7 +669,7 @@
                          code submits with the form so the server re-applies it. --}}
                     <div class="mt-5" x-data="{ open: false }">
                         <button type="button" @click="open = !open" class="text-sm font-semibold text-zinc-900 dark:text-white underline underline-offset-2 transition-colors hover:text-blue-700">
-                            I have a coupon
+                            {{ __('checkout.coupon_toggle') }}
                         </button>
                         <div x-show="open" x-collapse x-cloak class="mt-2">
                             <div class="flex items-stretch gap-2">
@@ -670,7 +679,7 @@
                                     x-model="couponCode"
                                     @input="couponApplied && removeCoupon()"
                                     @keydown.enter.prevent="applyCoupon()"
-                                    placeholder="Coupon code"
+                                    placeholder="{{ __('checkout.coupon_placeholder') }}"
                                     class="{{ $fieldClass }} !mt-0 flex-1 uppercase"
                                 >
                                 <button
@@ -680,14 +689,14 @@
                                     class="shrink-0 rounded-[12px] px-4 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                     :class="couponApplied ? 'bg-zinc-600 hover:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'"
                                 >
-                                    <span x-show="! couponLoading" x-text="couponApplied ? 'Remove' : 'Apply'"></span>
+                                    <span x-show="! couponLoading" x-text="couponApplied ? @js(__('checkout.remove')) : @js(__('checkout.coupon_apply'))"></span>
                                     <span x-show="couponLoading">…</span>
                                 </button>
                             </div>
                             <p x-show="couponError" x-cloak class="mt-1.5 text-xs font-medium text-red-600" x-text="couponError"></p>
                             <p x-show="couponApplied" x-cloak class="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                <span x-text="'Coupon ' + couponApplied + ' applied'"></span>
+                                <span x-text="@js(__('checkout.coupon_applied')).replace(':code', () => couponApplied)"></span>
                             </p>
                         </div>
                     </div>
@@ -698,18 +707,19 @@
                          hint so the customer knows what to expect (dial code,
                          bank login, QR scan, e-wallet pin). --}}
                     @php
+                        // USSD and NQR are scheme names, the same in every language.
                         $hostedMethods = [
-                            'ussd'           => ['title' => 'USSD',           'hint' => 'You will dial a short code on your phone to authorise the payment.'],
-                            'pay_with_bank'  => ['title' => 'Pay With Bank',  'hint' => 'You will sign in to your internet or mobile banking to complete the payment.'],
-                            'bank_qr'        => ['title' => 'Bank QR (NQR)',  'hint' => 'You will scan a QR code with your bank app to confirm the payment.'],
-                            'mobile_wallet'  => ['title' => 'Mobile Wallet',  'hint' => 'You will authorise the payment inside your mobile wallet app.'],
+                            'ussd'           => ['title' => 'USSD',                                     'hint' => __('checkout.hosted_ussd_hint')],
+                            'pay_with_bank'  => ['title' => __('checkout.method_pay_with_bank'),        'hint' => __('checkout.hosted_pay_with_bank_hint')],
+                            'bank_qr'        => ['title' => __('checkout.method_bank_qr').' (NQR)',     'hint' => __('checkout.hosted_bank_qr_hint')],
+                            'mobile_wallet'  => ['title' => __('checkout.method_mobile_wallet'),        'hint' => __('checkout.hosted_mobile_wallet_hint')],
                         ];
                     @endphp
                     @foreach ($hostedMethods as $key => $meta)
                         <div x-show="method === '{{ $key }}'" x-collapse x-cloak class="mt-5 rounded-[12px] bg-blue-50 px-4 py-4 ring-1 ring-blue-100">
                             <p class="text-sm font-bold text-blue-900">{{ $meta['title'] }}</p>
                             <p class="mt-1 text-xs leading-relaxed text-blue-800/90">{{ $meta['hint'] }}</p>
-                            <p class="mt-2 text-[11px] text-blue-700/80">After you tap Continue we will redirect you to our payment partner to finish the payment safely.</p>
+                            <p class="mt-2 text-[11px] text-blue-700/80">{{ __('checkout.hosted_redirect_note') }}</p>
                         </div>
                     @endforeach
 
@@ -720,22 +730,22 @@
                          (wallet) keep the simple single-line total. --}}
                     <div x-show="processingFee() > 0 && method !== 'crypto'" x-cloak class="mt-5 border-t border-zinc-100 dark:border-white/10 pt-5">
                         <div class="flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">Subtotal</span>
+                            <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.subtotal') }}</span>
                             <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="$store.cart.pay($store.cart.subtotal)"></span>
                         </div>
                         <div class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">Processing fee</span>
+                            <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.processing_fee') }}</span>
                             <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="$store.cart.pay(processingFee())"></span>
                         </div>
                         <div x-show="couponApplied" x-cloak class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-emerald-600" x-text="'Discount (' + couponApplied + ')'"></span>
+                            <span class="font-medium text-emerald-600" x-text="@js(__('checkout.discount_with_code')).replace(':code', () => couponApplied)"></span>
                             <span class="font-semibold tabular-nums text-emerald-600" x-text="'-' + $store.cart.pay(couponDiscountDisplay)"></span>
                         </div>
                     </div>
 
                     {{-- Discount line when there is no processing fee (wallet / crypto) --}}
                     <div x-show="couponApplied && processingFee() <= 0" x-cloak class="mt-4 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-4 text-sm">
-                        <span class="font-medium text-emerald-600" x-text="'Discount (' + couponApplied + ')'"></span>
+                        <span class="font-medium text-emerald-600" x-text="@js(__('checkout.discount_with_code')).replace(':code', () => couponApplied)"></span>
                         <span class="font-semibold tabular-nums text-emerald-600" x-text="'-' + $store.cart.pay(couponDiscountDisplay)"></span>
                     </div>
 
@@ -754,7 +764,7 @@
                              figure actually payable is quoted on the next screen, straight
                              from the gateway, and promising this is the amount to pay would
                              recreate the two-numbers problem in words. --}}
-                        <span class="text-base font-bold text-zinc-900 dark:text-white">Total amount</span>
+                        <span class="text-base font-bold text-zinc-900 dark:text-white">{{ __('checkout.total_amount') }}</span>
                         <span x-data="valueFlip()" x-effect="totalLabel(); flash()" class="inline-block text-lg font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="totalLabel()">0.00</span>
                     </div>
 
@@ -769,10 +779,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                         </svg>
                         <p class="text-xs text-red-700 dark:text-red-300">
-                            Send the exact amount shown to the address provided on the next step. Sending a
-                            <span class="font-bold">different coin</span> or on a
-                            <span class="font-bold">different network</span> will result in
-                            <span class="font-bold">loss of your funds</span>.
+                            {!! __('checkout.crypto_warning', [
+                                'coin' => '<span class="font-bold">'.e(__('checkout.crypto_warning_coin')).'</span>',
+                                'network' => '<span class="font-bold">'.e(__('checkout.crypto_warning_network')).'</span>',
+                                'loss' => '<span class="font-bold">'.e(__('checkout.crypto_warning_loss')).'</span>',
+                            ]) !!}
                         </p>
                     </div>
 
@@ -785,11 +796,11 @@
                         <button type="submit" :disabled="!canContinue() || submitting || backoffRemaining > 0"
                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
                             <template x-if="backoffRemaining > 0">
-                                <span class="flex items-center gap-2" x-text="'Please wait ' + backoffRemaining + ' seconds before trying again'"></span>
+                                <span class="flex items-center gap-2" x-text="@js(__('checkout.backoff_wait')).replace(':seconds', backoffRemaining)"></span>
                             </template>
                             <template x-if="!submitting && backoffRemaining === 0">
                                 <span class="flex items-center gap-2">
-                                    Continue to payment
+                                    {{ __('checkout.continue_to_payment') }}
                                 </span>
                             </template>
                             <template x-if="submitting && backoffRemaining === 0">
@@ -798,22 +809,22 @@
                                         <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
                                         <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
                                     </svg>
-                                    Processing
+                                    {{ __('checkout.processing_short') }}
                                 </span>
                             </template>
                         </button>
                     @else
                         <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login', returnTo: window.location.pathname + window.location.search })" class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700">
-                            Sign in to pay
+                            {{ __('checkout.sign_in_to_pay') }}
                         </button>
-                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">You need an account to complete a purchase. Your cart is saved and comes with you.</p>
+                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.sign_in_required_note') }}</p>
                     @endauth
 
                     <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
                         <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        Secure checkout. Codes delivered instantly.
+                        {{ __('checkout.secure_checkout_note') }}
                     </p>
                 </form>
 
@@ -858,7 +869,7 @@
                     aria-modal="true"
                 >
                     <!-- Close button -->
-                    <x-close-button @click="closeModal()" class="absolute right-4 top-4" />
+                    <x-close-button @click="closeModal()" class="absolute right-4 top-4" :aria-label="__('common.close')" />
 
                     <!-- Active Payment Session Details & Wizard -->
                     <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice'" class="mt-2">
@@ -869,27 +880,27 @@
                                 <svg class="h-4 w-4 animate-pulse text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                Complete payment within:
+                                {{ __('checkout.wizard_timer_label') }}
                             </span>
                             <span class="font-extrabold text-sm tabular-nums text-amber-700" x-text="timerText"></span>
                         </div>
 
                         <!-- Card Auth: PIN Challenge -->
                         <div x-show="paymentState === 'action_pin'">
-                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">Card PIN Required</h3>
-                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">Enter your card 4-digit security PIN to authorize payment.</p>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.card_pin_title') }}</h3>
+                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{{ __('checkout.card_pin_hint') }}</p>
                             <div class="space-y-4">
                                 <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                                    Confirm PIN
+                                    {{ __('checkout.card_pin_confirm') }}
                                 </button>
                             </div>
                         </div>
 
                         <!-- Wallet Auth: Transaction PIN Challenge -->
                         <div x-show="paymentState === 'wallet_pin'">
-                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">Transaction PIN Required</h3>
-                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">Enter your 4-digit transaction PIN to authorize this payment from your wallet balance.</p>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.wallet_pin_title') }}</h3>
+                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{{ __('checkout.wallet_pin_hint') }}</p>
                             <div class="space-y-4">
                                 <input type="password" inputmode="numeric" x-ref="walletPinInput" x-model="walletPin" maxlength="4" placeholder="••••"
                                     @keydown.enter.prevent="authorizeWalletPayment()"
@@ -901,28 +912,28 @@
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                     </svg>
-                                    <span x-text="authorizingWallet ? 'Authorizing...' : 'Authorize payment'"></span>
+                                    <span x-text="authorizingWallet ? @js(__('checkout.wallet_authorizing')) : @js(__('checkout.wallet_authorize'))"></span>
                                 </button>
-                                <a href="{{ route('dashboard.security') }}" class="block text-center text-[11px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">Manage your transaction PIN</a>
+                                <a href="{{ route('dashboard.security') }}" class="block text-center text-[11px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">{{ __('checkout.wallet_manage_pin') }}</a>
                             </div>
                         </div>
 
                         <!-- Card Auth: OTP Challenge -->
                         <div x-show="paymentState === 'action_otp'">
-                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">OTP Verification</h3>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.otp_title') }}</h3>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4" x-text="actionMessage"></p>
                             <div class="space-y-4">
                                 <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
                                 <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                                    Verify OTP
+                                    {{ __('checkout.otp_verify') }}
                                 </button>
                             </div>
                         </div>
 
                         <!-- Card Auth: 3D Secure Redirect -->
                         <div x-show="paymentState === 'action_3ds'">
-                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">Secure Verification</h3>
-                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">Please complete the secure authentication inside the window below.</p>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.threeds_title') }}</h3>
+                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{{ __('checkout.threeds_hint') }}</p>
 
                             <div class="w-full overflow-hidden rounded-[12px] border border-zinc-200 bg-zinc-50 h-[55vh] min-h-[400px] max-h-[520px]">
                                 <iframe :src="session?.payment_payload?.redirect_url" class="h-full w-full border-0" allow="payment"></iframe>
@@ -933,7 +944,7 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                 </svg>
-                                <span x-text="verifying ? 'Verifying...' : 'I Have Completed Payment'"></span>
+                                <span x-text="verifying ? @js(__('checkout.threeds_verifying')) : @js(__('checkout.threeds_completed'))"></span>
                             </button>
                             <p x-show="errorMessage" x-cloak class="mt-2 text-center text-xs text-amber-600" x-text="errorMessage"></p>
                         </div>
@@ -943,30 +954,30 @@
                             <!-- If Bank Transfer details -->
                             <template x-if="session?.payment_payload?.bank_details || session?.payment_payload?.account_number">
                                 <div>
-                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">Virtual Bank Transfer</h3>
-                                    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">Please make a transfer to the temporary virtual account below:</p>
+                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.bank_transfer_title') }}</h3>
+                                    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{{ __('checkout.bank_transfer_hint') }}</p>
 
                                     <div class="bg-zinc-50 border border-zinc-200 rounded-[12px] p-4 space-y-3 shadow-inner">
                                         <div class="flex justify-between items-center text-xs">
-                                            <span class="text-zinc-500 font-medium">Bank Name</span>
+                                            <span class="text-zinc-500 font-medium">{{ __('checkout.bank_name') }}</span>
                                             <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.bank_name"></span>
                                         </div>
                                         <div class="flex justify-between items-center text-xs">
-                                            <span class="text-zinc-500 font-medium">Account Number</span>
+                                            <span class="text-zinc-500 font-medium">{{ __('checkout.account_number') }}</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="font-extrabold text-zinc-900 dark:text-white text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[12px] border border-zinc-150" x-text="bankDetails?.account_number"></span>
                                                 <button type="button" @click="copyToClipboard(bankDetails?.account_number, 'account')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[12px] transition-all">
-                                                    <span x-show="!copiedStates['account']">Copy</span>
-                                                    <span x-show="copiedStates['account']" class="text-emerald-600 font-bold">Copied!</span>
+                                                    <span x-show="!copiedStates['account']">{{ __('common.copy') }}</span>
+                                                    <span x-show="copiedStates['account']" class="text-emerald-600 font-bold">{{ __('checkout.copied') }}</span>
                                                 </button>
                                             </div>
                                         </div>
                                         <div class="flex justify-between items-center text-xs">
-                                            <span class="text-zinc-500 font-medium">Account Name</span>
+                                            <span class="text-zinc-500 font-medium">{{ __('checkout.account_name') }}</span>
                                             <span class="font-bold text-zinc-900 dark:text-white" x-text="bankDetails?.account_name || 'Roddy Technologies LTD'"></span>
                                         </div>
                                         <div class="flex justify-between items-center text-xs border-t border-zinc-200 pt-3">
-                                            <span class="text-zinc-500 font-medium">Amount</span>
+                                            <span class="text-zinc-500 font-medium">{{ __('checkout.amount') }}</span>
                                             <span class="font-extrabold text-blue-700 text-base tabular-nums" x-text="session?.currency + ' ' + Number(bankDetails?.amount || session?.amount).toFixed(2)"></span>
                                         </div>
                                     </div>
@@ -976,23 +987,23 @@
                             <!-- If Crypto details -->
                             <template x-if="session?.payment_payload?.qr_payload || session?.payment_payload?.pay_address">
                                 <div>
-                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white text-center mb-1">Crypto Payment Details</h3>
+                                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white text-center mb-1">{{ __('checkout.crypto_details_title') }}</h3>
 
                                     {{-- The amount leads, because it is the one figure that
                                          must be exact. It comes straight from the gateway and
                                          is the same number quoted for the rest of this
                                          payment — it is never recalculated locally. --}}
                                     <div class="mt-3 rounded-[12px] border border-blue-200 bg-blue-50 px-4 py-3 text-center dark:border-blue-500/30 dark:bg-blue-900/20">
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-blue-700/70 dark:text-blue-300/70">Send exactly</span>
+                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-blue-700/70 dark:text-blue-300/70">{{ __('checkout.crypto_send_exactly') }}</span>
                                         <div class="mt-1 flex items-center justify-center gap-2">
                                             <span class="text-xl font-extrabold tabular-nums tracking-tight text-blue-900 dark:text-blue-100" x-text="session?.payment_payload?.pay_amount"></span>
                                             <span class="text-sm font-bold uppercase text-blue-700 dark:text-blue-300" x-text="session?.payment_payload?.pay_currency"></span>
                                             <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="rounded-[12px] bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 transition-all hover:bg-white">
-                                                <span x-show="!copiedStates['amount_crypto']">Copy</span>
-                                                <span x-show="copiedStates['amount_crypto']" class="font-bold text-emerald-600">Copied!</span>
+                                                <span x-show="!copiedStates['amount_crypto']">{{ __('common.copy') }}</span>
+                                                <span x-show="copiedStates['amount_crypto']" class="font-bold text-emerald-600">{{ __('checkout.copied') }}</span>
                                             </button>
                                         </div>
-                                        <p class="mt-1 text-[10px] text-blue-700/80 dark:text-blue-300/80">All fees included. Your wallet must send this exact amount.</p>
+                                        <p class="mt-1 text-[10px] text-blue-700/80 dark:text-blue-300/80">{{ __('checkout.crypto_fees_included') }}</p>
                                     </div>
 
                                     <div class="mt-4 flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
@@ -1000,28 +1011,28 @@
                                         <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-3 border border-zinc-150 shadow-sm">
                                             <img
                                                 :src="session?.id ? ('/api/payment-sessions/' + session.id + '/crypto-qr') : ''"
-                                                alt="Payment QR code"
+                                                alt="{{ __('checkout.crypto_qr_alt') }}"
                                                 class="h-32 w-32 object-contain"
                                             />
-                                            <span class="mt-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">Scan to pay</span>
+                                            <span class="mt-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">{{ __('checkout.crypto_scan_to_pay') }}</span>
                                         </div>
 
                                         <!-- Details -->
                                         <div class="w-full space-y-3.5 text-xs">
                                             <div>
-                                                <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Cryptocurrency / Network</span>
+                                                <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">{{ __('checkout.crypto_currency_network') }}</span>
                                                 <div class="flex items-center gap-1.5">
                                                     <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
-                                                    <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || '')"></span>
+                                                    <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="@js(__('checkout.crypto_network_value')).replace(':network', () => session?.payment_payload?.network || '')"></span>
                                                 </div>
                                             </div>
                                             <div>
-                                                <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Deposit Address</span>
+                                                <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">{{ __('checkout.crypto_deposit_address') }}</span>
                                                 <div class="mt-1 flex items-center gap-1.5">
                                                     <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-white px-2.5 py-1.5 rounded-[12px] border border-zinc-200 text-[10px] text-zinc-800 font-mono select-all outline-none">
                                                     <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address, 'address')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold shrink-0 bg-blue-50 px-2.5 py-1.5 rounded-[12px] transition-all border border-blue-100">
-                                                        <span x-show="!copiedStates['address']">Copy</span>
-                                                        <span x-show="copiedStates['address']" class="text-emerald-600 font-bold">Copied!</span>
+                                                        <span x-show="!copiedStates['address']">{{ __('common.copy') }}</span>
+                                                        <span x-show="copiedStates['address']" class="text-emerald-600 font-bold">{{ __('checkout.copied') }}</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -1031,15 +1042,15 @@
                                                  returns a tag it is shown as loudly as the address. --}}
                                             <template x-if="session?.payment_payload?.payin_extra_id">
                                                 <div class="rounded-[12px] border border-amber-300 bg-amber-50 p-2.5 dark:border-amber-500/30 dark:bg-amber-900/20">
-                                                    <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">Memo / Destination tag — required</span>
+                                                    <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">{{ __('checkout.crypto_memo_label') }} — {{ __('checkout.crypto_memo_required') }}</span>
                                                     <div class="mt-1 flex items-center gap-1.5">
                                                         <input type="text" readonly :value="session?.payment_payload?.payin_extra_id" class="w-full rounded-[12px] border border-amber-200 bg-white px-2.5 py-1.5 font-mono text-[10px] text-zinc-800 outline-none select-all">
                                                         <button type="button" @click="copyToClipboard(session?.payment_payload?.payin_extra_id, 'memo')" class="shrink-0 rounded-[12px] border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-[10px] font-bold text-amber-800 transition-all">
-                                                            <span x-show="!copiedStates['memo']">Copy</span>
-                                                            <span x-show="copiedStates['memo']" class="font-bold text-emerald-600">Copied!</span>
+                                                            <span x-show="!copiedStates['memo']">{{ __('common.copy') }}</span>
+                                                            <span x-show="copiedStates['memo']" class="font-bold text-emerald-600">{{ __('checkout.copied') }}</span>
                                                         </button>
                                                     </div>
-                                                    <p class="mt-1.5 text-[10px] text-amber-800/90 dark:text-amber-300/90">Without this tag your payment cannot be matched to your order automatically.</p>
+                                                    <p class="mt-1.5 text-[10px] text-amber-800/90 dark:text-amber-300/90">{{ __('checkout.crypto_memo_hint') }}</p>
                                                 </div>
                                             </template>
                                         </div>
@@ -1054,35 +1065,35 @@
                                  waiting for a confirmation that is never coming. --}}
                             <template x-if="session?.underpayment">
                                 <div class="mt-5 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-4 dark:border-amber-500/30 dark:bg-amber-900/20">
-                                    <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Your payment was short</p>
+                                    <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('checkout.underpaid_title') }}</p>
                                     <div class="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-300">
                                         <div class="flex justify-between gap-3">
-                                            <span>Expected</span>
+                                            <span>{{ __('checkout.underpaid_expected') }}</span>
                                             <span class="font-semibold tabular-nums" x-text="session.underpayment.expected + ' ' + session.underpayment.currency"></span>
                                         </div>
                                         <div class="flex justify-between gap-3">
-                                            <span>Received</span>
+                                            <span>{{ __('checkout.underpaid_received') }}</span>
                                             <span class="font-semibold tabular-nums" x-text="session.underpayment.received + ' ' + session.underpayment.currency"></span>
                                         </div>
                                         <div class="flex justify-between gap-3 border-t border-amber-300/60 pt-1 font-bold">
-                                            <span>Still owing</span>
+                                            <span>{{ __('checkout.underpaid_owing') }}</span>
                                             <span class="tabular-nums" x-text="session.underpayment.shortfall + ' ' + session.underpayment.currency"></span>
                                         </div>
                                     </div>
                                     <p class="mt-2 text-[11px] text-amber-800/90 dark:text-amber-300/90">
-                                        This usually happens when an exchange deducts its withdrawal fee from the amount sent.
+                                        {{ __('checkout.underpaid_reason') }}
                                     </p>
 
                                     <template x-if="session.underpayment.can_top_up">
                                         <button type="button" @click="requestTopUp()" :disabled="topUpLoading"
                                             class="mt-3 w-full rounded-[12px] bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60">
-                                            <span x-show="!topUpLoading">Pay the balance</span>
-                                            <span x-show="topUpLoading">Creating payment…</span>
+                                            <span x-show="!topUpLoading">{{ __('checkout.underpaid_pay_balance') }}</span>
+                                            <span x-show="topUpLoading">{{ __('checkout.underpaid_creating') }}</span>
                                         </button>
                                     </template>
                                     <template x-if="!session.underpayment.can_top_up">
                                         <p class="mt-3 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
-                                            Please contact support with your order number to complete this payment.
+                                            {{ __('checkout.underpaid_contact_support') }}
                                         </p>
                                     </template>
                                     <p x-show="topUpError" x-cloak class="mt-2 text-[11px] font-semibold text-red-700 dark:text-red-400" x-text="topUpError"></p>
@@ -1093,10 +1104,10 @@
                                  credit once they confirm. Saying otherwise would panic customers
                                  whose transaction is simply still on-chain. --}}
                             <div x-show="quoteExpired && !session?.underpayment" x-cloak class="mt-5 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-center dark:border-amber-500/30 dark:bg-amber-900/20">
-                                <p class="text-xs font-bold text-amber-900 dark:text-amber-200">This quote has expired</p>
+                                <p class="text-xs font-bold text-amber-900 dark:text-amber-200">{{ __('checkout.quote_expired_title') }}</p>
                                 <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-                                    If you already sent the payment, keep this page open — it will still be credited once the network confirms it.
-                                    If you have not paid yet, start a new checkout to get a fresh amount.
+                                    {{ __('checkout.quote_expired_sent') }} — {{ __('checkout.quote_expired_credited') }}
+                                    {{ __('checkout.quote_expired_not_paid') }}
                                 </p>
                             </div>
 
@@ -1105,14 +1116,14 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                 </svg>
-                                <p class="text-xs font-semibold text-zinc-800 mt-2">Waiting for transfer...</p>
-                                <p class="text-[10px] text-zinc-500 mt-1">Status updates automatically as soon as payment is detected.</p>
+                                <p class="text-xs font-semibold text-zinc-800 mt-2">{{ __('checkout.awaiting_transfer') }}</p>
+                                <p class="text-[10px] text-zinc-500 mt-1">{{ __('checkout.awaiting_transfer_hint') }}</p>
                             </div>
                         </div>
 
                         <!-- Mobile money push prompt -->
                         <div x-show="paymentState === 'awaiting_confirmation'">
-                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">Authorize on Phone</h3>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.momo_authorize_title') }}</h3>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4" x-text="actionMessage"></p>
 
                             <div class="flex flex-col items-center py-6 text-center">
@@ -1125,7 +1136,7 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                 </svg>
-                                <p class="text-xs font-semibold text-zinc-800 mt-3">Verifying payment authorization...</p>
+                                <p class="text-xs font-semibold text-zinc-800 mt-3">{{ __('checkout.momo_verifying') }}</p>
                             </div>
                         </div>
 
@@ -1135,26 +1146,26 @@
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
-                            <p class="mt-4 text-sm font-bold text-zinc-900 dark:text-white" x-text="method === 'apple_pay' ? 'Authorizing with Apple Pay...' : 'Processing transaction...'"></p>
-                            <p class="mt-1 text-xs text-zinc-500">Please do not close this window.</p>
+                            <p class="mt-4 text-sm font-bold text-zinc-900 dark:text-white" x-text="method === 'apple_pay' ? @js(__('checkout.processing_apple_pay')) : @js(__('checkout.processing_transaction'))"></p>
+                            <p class="mt-1 text-xs text-zinc-500">{{ __('checkout.do_not_close') }}</p>
                         </div>
 
                         <!-- Success state: same animated tick as the order-complete
                              page so every payment method celebrates identically. -->
                         <div x-show="paymentState === 'success'" class="flex flex-col items-center py-8 text-center">
                             <x-success-tick />
-                            <h3 class="mt-4 text-base font-bold text-zinc-950">Payment Complete!</h3>
-                            <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium">Your order is confirmed. Redirecting now...</p>
+                            <h3 class="mt-4 text-base font-bold text-zinc-950">{{ __('checkout.payment_complete') }}</h3>
+                            <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium">{{ __('checkout.payment_complete_hint') }}</p>
                         </div>
 
                         <!-- Error state: animated red cross, the tick's counterpart. -->
                         <div x-show="paymentState === 'error'" class="flex flex-col items-center py-6 text-center">
                             <x-error-cross />
-                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Payment Failed</h3>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.payment_failed_title') }}</h3>
                             <p class="mt-1.5 text-xs text-red-600 px-4" x-html="errorMessage"></p>
 
                             <button type="button" @click="closeModal()" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
-                                Close &amp; Modify Details
+                                {{ __('checkout.close_modify_details') }}
                             </button>
                         </div>
 
@@ -1167,7 +1178,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
                                 </svg>
                             </div>
-                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Verify your email to continue</h3>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.email_notice_title') }}</h3>
                             <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="errorMessage"></p>
 
                             <p x-show="resendFlash" x-cloak class="mt-3 rounded-[10px] bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" x-text="resendFlash"></p>
@@ -1178,10 +1189,10 @@
                                     @click="resendVerification()"
                                     :disabled="resendRemaining > 0 || resendBusy"
                                     class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5"
-                                    x-text="resendBusy ? 'Sending...' : (resendRemaining > 0 ? 'Resend ' + resendLabel(resendRemaining) : 'Resend email')"
+                                    x-text="resendBusy ? @js(__('checkout.resend_sending')) : (resendRemaining > 0 ? @js(__('checkout.resend_in')).replace(':time', () => resendLabel(resendRemaining)) : @js(__('checkout.resend_email')))"
                                 ></button>
                                 <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
-                                    Got it
+                                    {{ __('checkout.got_it') }}
                                 </button>
                             </div>
                         </div>
@@ -1196,14 +1207,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
                                 </svg>
                             </div>
-                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Quick verification needed</h3>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.kyc_title') }}</h3>
                             <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="kycMessage"></p>
 
                             <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
-                                Verify
+                                {{ __('checkout.kyc_verify') }}
                             </button>
                             <button type="button" @click="closeModal()" class="mt-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
-                                Not now
+                                {{ __('checkout.kyc_not_now') }}
                             </button>
                         </div>
                     </div>
@@ -1268,11 +1279,11 @@
                             this.couponError = '';
                         } else {
                             this.removeCoupon();
-                            this.couponError = json.message || 'This coupon could not be applied.';
+                            this.couponError = json.message || @js(__('checkout.coupon_not_applied'));
                         }
                     } catch (e) {
                         this.removeCoupon();
-                        this.couponError = 'Could not check that coupon. Please try again.';
+                        this.couponError = @js(__('checkout.coupon_check_failed'));
                     } finally {
                         this.couponLoading = false;
                     }
@@ -1335,25 +1346,28 @@
                     return this.disabledGateways.includes(this.methodGateways[key] ?? '');
                 },
 
+                // Labels and descriptions are copy; keys and icons are not. Card
+                // network and brand names (Visa, MTN, Apple Pay) and the USSD
+                // scheme name read the same in every language, so they stay literal.
                 allMethods: [
-                    { key: 'card',          label: 'Card',          desc: 'Visa, Mastercard',           icon: '/assets/credit%20card%20payment.webp' },
-                    { key: 'mobile_money',  label: 'Mobile Money',  desc: 'MTN, Orange, Vodafone, M-Pesa', icon: '/assets/MOMO.svg' },
-                    { key: 'bank_transfer', label: 'Bank Transfer', desc: 'Pay via virtual account',    icon: '/assets/Bank%20transfer.webp' },
+                    { key: 'card',          label: @js(__('checkout.method_card')),          desc: 'Visa, Mastercard',           icon: '/assets/credit%20card%20payment.webp' },
+                    { key: 'mobile_money',  label: @js(__('checkout.method_mobile_money')),  desc: 'MTN, Orange, Vodafone, M-Pesa', icon: '/assets/MOMO.svg' },
+                    { key: 'bank_transfer', label: @js(__('checkout.method_bank_transfer')), desc: @js(__('checkout.method_bank_transfer_desc')), icon: '/assets/Bank%20transfer.webp' },
                     // New: covers Flutterwave's "Pay With Bank" (internet banking
                     // redirect) for NGN / GBP / EUR.
-                    { key: 'pay_with_bank', label: 'Pay With Bank', desc: 'Internet & mobile banking',  icon: '/assets/Bank%20transfer.webp' },
+                    { key: 'pay_with_bank', label: @js(__('checkout.method_pay_with_bank')), desc: @js(__('checkout.method_pay_with_bank_desc')), icon: '/assets/Bank%20transfer.webp' },
                     // New: USSD dial codes (Nigeria). Customer dials a code on
                     // their phone to authorise the payment.
-                    { key: 'ussd',          label: 'USSD',          desc: 'Dial a code on your phone',  icon: '/assets/credit%20card%20payment.webp' },
+                    { key: 'ussd',          label: 'USSD',                                   desc: @js(__('checkout.method_ussd_desc')), icon: '/assets/credit%20card%20payment.webp' },
                     // New: scan-to-pay QR (Nigerian banks).
-                    { key: 'bank_qr',       label: 'Bank QR',       desc: 'Scan to pay in your bank app', icon: '/assets/credit%20card%20payment.webp' },
+                    { key: 'bank_qr',       label: @js(__('checkout.method_bank_qr')),       desc: @js(__('checkout.method_bank_qr_desc')), icon: '/assets/credit%20card%20payment.webp' },
                     // New: NGN digital wallets (OPay / eNaira). Provider name
                     // hidden per project convention; admin reconciliation still
                     // sees the specific provider on the order.
-                    { key: 'mobile_wallet', label: 'Mobile Wallet', desc: 'Pay with a Nigerian e-wallet', icon: '/assets/Wallet.svg' },
-                    { key: 'apple_pay',     label: 'Apple Pay',     desc: 'Pay via Apple Wallet',       icon: '/assets/apply%20pay.webp' },
-                    { key: 'crypto',        label: 'Crypto',        desc: 'USDT, BTC, ETH and more',    icon: '/assets/USDT.svg' },
-                    { key: 'wallet',        label: 'Wallet',        desc: 'Pay with wallet balance',    icon: '/assets/Wallet.svg' }
+                    { key: 'mobile_wallet', label: @js(__('checkout.method_mobile_wallet')), desc: @js(__('checkout.method_mobile_wallet_desc')), icon: '/assets/Wallet.svg' },
+                    { key: 'apple_pay',     label: 'Apple Pay',                              desc: @js(__('checkout.method_apple_pay_desc')), icon: '/assets/apply%20pay.webp' },
+                    { key: 'crypto',        label: @js(__('checkout.method_crypto')),        desc: @js(__('checkout.method_crypto_desc')), icon: '/assets/USDT.svg' },
+                    { key: 'wallet',        label: @js(__('checkout.method_wallet')),        desc: @js(__('checkout.method_wallet_desc')), icon: '/assets/Wallet.svg' }
                 ],
 
                 getFilteredMethods() {
@@ -1650,7 +1664,7 @@
                         const body = await res.json();
 
                         if (! res.ok) {
-                            this.topUpError = body.message || 'Could not create a top-up payment.';
+                            this.topUpError = body.message || @js(__('checkout.topup_failed'));
                             return;
                         }
 
@@ -1658,7 +1672,7 @@
                         this.quoteExpired = false;
                         this.startCountdown();
                     } catch (e) {
-                        this.topUpError = 'Network error. Please try again.';
+                        this.topUpError = @js(__('checkout.network_error_retry'));
                     } finally {
                         this.topUpLoading = false;
                     }
@@ -1695,7 +1709,9 @@
                         return '';
                     }
 
-                    return 'Min $' + Number(coin.minUsd).toFixed(2);
+                    // A function replacement, so the "$" in the amount is never read
+                    // as a String.replace substitution pattern.
+                    return @js(__('checkout.crypto_min')).replace(':amount', () => '$' + Number(coin.minUsd).toFixed(2));
                 },
 
                 unusableCoinCount() {
@@ -1795,7 +1811,7 @@
                     if (this.method === 'wallet' && !this.hasTransactionPin) {
                         this.submitting = false;
                         this.paymentState = 'error';
-                        this.errorMessage = 'You must set up a Wallet Transaction PIN before you can pay with your wallet. <a href="/dashboard/password" class="underline font-bold text-blue-600 hover:text-blue-700">Click here to set it up</a>.';
+                        this.errorMessage = @js(__('checkout.wallet_pin_missing', ['link' => '<a href="/dashboard/password" class="underline font-bold text-blue-600 hover:text-blue-700">'.e(__('checkout.wallet_pin_missing_link')).'</a>']));
                         this.open = true;
                         return;
                     }
@@ -1822,8 +1838,8 @@
                         if (! contentType.includes('application/json')) {
                             this.submitting = false;
                             this.errorMessage = response.ok
-                                ? 'Checkout returned an unexpected response. Refresh the page and try again.'
-                                : 'Checkout failed (HTTP ' + response.status + '). Refresh the page and try again.';
+                                ? @js(__('checkout.checkout_unexpected_response'))
+                                : @js(__('checkout.checkout_http_failed')).replace(':status', response.status);
                             alert(this.errorMessage);
                             return;
                         }
@@ -1838,7 +1854,7 @@
                         // opening unprompted.)
                         if (response.status === 422 && resData.kyc_required) {
                             this.submitting = false;
-                            this.kycMessage = resData.message || 'To continue with this purchase, please complete a quick identity verification.';
+                            this.kycMessage = resData.message || @js(__('checkout.kyc_default_message'));
                             if (window.rshopKyc) {
                                 this.kycSmile = resData.smile;
                                 this.pendingForm = e.target;
@@ -1857,7 +1873,7 @@
                         // "Payment Failed" state.
                         if (response.status === 403 && resData.email_unverified) {
                             this.submitting = false;
-                            this.errorMessage = resData.message || 'Please verify your email to continue.';
+                            this.errorMessage = resData.message || @js(__('checkout.email_verify_default'));
                             this.resendFlash = '';
                             // The server just auto-sent; its schedule says when a
                             // resend becomes available.
@@ -1871,9 +1887,9 @@
                             this.submitting = false;
                             if (response.status === 429 && resData.is_rate_limited) {
                                 this.startBackoff(resData.wait_seconds);
-                                this.errorMessage = resData.error || 'Too many failed payment attempts.';
+                                this.errorMessage = resData.error || @js(__('checkout.too_many_attempts'));
                             } else {
-                                this.errorMessage = resData.message || 'Checkout failed. Please try again.';
+                                this.errorMessage = resData.message || @js(__('checkout.checkout_failed_retry'));
                             }
                             // Show error modal instead of alert
                             this.paymentState = 'error';
@@ -1981,8 +1997,8 @@
                         // the customer's internet.
                         console.error('Checkout submit failed:', err);
                         const msg = (err && err.name === 'TypeError')
-                            ? 'Network connection failed. Please check your internet.'
-                            : 'Could not complete checkout: ' + (err && err.message ? err.message : 'unexpected error') + '. Refresh the page and try again.';
+                            ? @js(__('checkout.network_failed'))
+                            : @js(__('checkout.checkout_could_not_complete')).replace(':error', () => (err && err.message ? err.message : @js(__('checkout.unexpected_error'))));
                         alert(msg);
                     }
                 },
@@ -2017,19 +2033,19 @@
                         try {
                             resData = await response.json();
                         } catch (jsonErr) {
-                            resData = { message: 'Server error (' + response.status + '): ' + response.statusText };
+                            resData = { message: @js(__('checkout.server_error')).replace(':status', response.status).replace(':text', () => response.statusText) };
                         }
 
                         if (!response.ok) {
                             this.paymentState = 'error';
-                            this.errorMessage = resData.message || 'Payment initiation failed.';
+                            this.errorMessage = resData.message || @js(__('checkout.payment_initiation_failed'));
                             return;
                         }
 
                         this.handlePayResponse(resData.data || resData);
                     } catch (err) {
                         this.paymentState = 'error';
-                        this.errorMessage = 'Network connection failed. Please check your internet.';
+                        this.errorMessage = @js(__('checkout.network_failed'));
                     }
                 },
 
@@ -2041,7 +2057,7 @@
                 async authorizeWalletPayment() {
                     const pin = (this.$refs.walletPinInput?.value || this.walletPin || '').trim();
                     if (!/^\d{4}$/.test(pin)) {
-                        this.errorMessage = 'Enter your 4-digit transaction PIN.';
+                        this.errorMessage = @js(__('checkout.wallet_pin_enter'));
                         return;
                     }
                     this.authorizingWallet = true;
@@ -2060,7 +2076,7 @@
                         if (!res.ok) {
                             this.authorizingWallet = false;
                             // 422 returns { message, errors: { pin: [...] } }; 429 is a lockout/throttle.
-                            this.errorMessage = (data.errors?.pin?.[0]) || data.message || 'Could not verify your PIN.';
+                            this.errorMessage = (data.errors?.pin?.[0]) || data.message || @js(__('checkout.wallet_pin_verify_failed'));
                             this.walletPin = '';
                             if (this.$refs.walletPinInput) this.$refs.walletPinInput.value = '';
                             return;
@@ -2072,7 +2088,7 @@
                         await this.paySession('wallet', { auth_token: data.auth_token });
                     } catch (e) {
                         this.authorizingWallet = false;
-                        this.errorMessage = 'Network error verifying your PIN. Please try again.';
+                        this.errorMessage = @js(__('checkout.wallet_pin_network_error'));
                     }
                 },
 
@@ -2094,17 +2110,17 @@
                             return;
                         }
                         this.paymentState = 'error';
-                        this.errorMessage = 'Could not start the payment. Please try a different method.';
+                        this.errorMessage = @js(__('checkout.payment_start_failed'));
                     } else if (status === 'failed') {
                         this.paymentState = 'error';
-                        this.errorMessage = sessionData.payment_payload?.failure_reason || 'Transaction could not be completed.';
+                        this.errorMessage = sessionData.payment_payload?.failure_reason || @js(__('checkout.transaction_not_completed'));
                     } else if (status === 'awaiting_payment') {
                         const inlineData = sessionData.payment_payload?.inline;
                         if (inlineData) {
                             this.openFlutterwaveInline(inlineData);
                         } else {
                             this.paymentState = 'error';
-                            this.errorMessage = 'Could not initialize card payment.';
+                            this.errorMessage = @js(__('checkout.card_init_failed'));
                         }
                     } else if (status === 'awaiting_customer_action') {
                         const action = sessionData.payment_payload?.action;
@@ -2115,7 +2131,7 @@
                         } else if (action === 'otp') {
                             this.paymentState = 'action_otp';
                             this.otpValue = '';
-                            this.actionMessage = sessionData.payment_payload?.message || 'Verification code sent';
+                            this.actionMessage = sessionData.payment_payload?.message || @js(__('checkout.otp_code_sent'));
                             this.startCountdown();
                         } else if (action === 'redirect') {
                             this.paymentState = 'action_3ds';
@@ -2129,7 +2145,7 @@
                         this.startCountdown();
                     } else if (status === 'awaiting_confirmation') {
                         this.paymentState = 'awaiting_confirmation';
-                        this.actionMessage = sessionData.payment_payload?.message || 'Please accept the billing prompt on your device.';
+                        this.actionMessage = sessionData.payment_payload?.message || @js(__('checkout.momo_accept_prompt'));
                         this.startStatusPolling();
                         this.startCountdown();
                     }
@@ -2146,7 +2162,7 @@
                             window.PaymentTelemetry.recordFailure(self.session.id, 'sdk_load_failed', { provider: 'flutterwave' });
                         }
                         this.paymentState = 'error';
-                        this.errorMessage = 'The payment window could not load. Please disable any ad blocker and try again.';
+                        this.errorMessage = @js(__('checkout.payment_window_failed'));
                         this.open = true;
                         this.submitting = false;
                         return;
@@ -2193,7 +2209,7 @@
                                     setTimeout(() => { window.location.href = self.redirectUrl; }, 2000);
                                 } else {
                                     self.paymentState = 'error';
-                                    self.errorMessage = verifyData.message || 'Payment could not be verified.';
+                                    self.errorMessage = verifyData.message || @js(__('checkout.payment_not_verified'));
                                     self.open = true; // Re-open modal to show error
                                 }
                             } catch (e) {
@@ -2203,7 +2219,7 @@
                                     window.PaymentTelemetry.recordSignal(self.session.id, 'network_timeout', { provider: 'flutterwave', step: 'verify' });
                                 }
                                 self.paymentState = 'error';
-                                self.errorMessage = 'Could not verify payment. Please check your connection.';
+                                self.errorMessage = @js(__('checkout.payment_verify_connection'));
                                 self.open = true; // Re-open modal to show error
                             }
                         },
@@ -2246,7 +2262,7 @@
                             } else if (data.status === 'failed') {
                                 clearInterval(this.pollInterval);
                                 this.paymentState = 'error';
-                                this.errorMessage = data.payment_payload?.failure_reason || 'Transaction failed.';
+                                this.errorMessage = data.payment_payload?.failure_reason || @js(__('checkout.transaction_failed'));
                             }
                         } catch (e) {}
                     }, 4500);
@@ -2284,10 +2300,10 @@
                             return;
                         }
                         this.verifying = false;
-                        this.errorMessage = data.message || 'We could not confirm your payment yet. If you just completed it, wait a few seconds and try again.';
+                        this.errorMessage = data.message || @js(__('checkout.payment_not_confirmed_yet'));
                     } catch (e) {
                         this.verifying = false;
-                        this.errorMessage = 'Could not reach the server to verify. Please check your connection and try again.';
+                        this.errorMessage = @js(__('checkout.verify_unreachable'));
                     }
                 },
 
@@ -2298,7 +2314,7 @@
                             this.copiedStates[key] = false;
                         }, 2000);
                     }).catch(() => {
-                        alert('Failed to copy to clipboard.');
+                        alert(@js(__('checkout.copy_failed')));
                     });
                 },
 
@@ -2319,7 +2335,7 @@
                         'processing',
                     ];
                     if (this.session && inFlight.includes(this.paymentState)) {
-                        const ok = window.confirm('A payment is in progress. Closing this window will cancel the attempt. Continue?');
+                        const ok = window.confirm(@js(__('checkout.close_in_flight_confirm')));
                         if (! ok) {
                             return;
                         }
@@ -2382,11 +2398,11 @@
                             return;
                         }
                         this.resendFlash = res.ok
-                            ? (data.message || 'Verification link sent.')
-                            : (data.message || 'Please wait before requesting another link.');
+                            ? (data.message || @js(__('checkout.verification_link_sent')))
+                            : (data.message || @js(__('checkout.verification_wait')));
                         this.startResendCountdown(data.retry_after || 30);
                     } catch (e) {
-                        this.resendFlash = 'Network error. Please try again.';
+                        this.resendFlash = @js(__('checkout.network_error_retry'));
                     } finally {
                         this.resendBusy = false;
                     }

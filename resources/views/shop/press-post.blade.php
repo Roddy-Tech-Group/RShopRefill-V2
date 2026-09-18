@@ -1,7 +1,8 @@
 @php
     // Single press post. Dark-mode safe (bg-white/bg-zinc-50/bg-blue-50 -> navy).
     $img = fn (string $file) => asset('assets/'.rawurlencode($file));
-    $pressEmail = 'info@rshoprefill.com';
+    // support@, the one mailbox that receives mail (info@ has no inbox).
+    $pressEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
 @endphp
 
 <x-layouts.app.header

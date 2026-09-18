@@ -130,18 +130,17 @@
     // two consecutive pages while another never appears at all.
     $productsQuery->orderBy('id');
 
-    // Unpaginated: one card per brand_key, so the whole catalogue - ~688 brands -
-    // renders in a single scroll.
+    // Unpaginated query: one Product per brand_key, so every matching brand is
+    // available to the category sections and the total shown below the flat grid.
     //
     // It stays a fixed number of queries rather than N+1: the variants come back
     // in one eager-load and the ratings in one rollup, both keyed by the full
-    // result set. The cost is payload and render time, not round trips. Tile
-    // images past the first ten load lazily, so the browser fetches them as the
-    // visitor scrolls rather than all at once.
+    // result set. Tile images past the first ten load lazily, so the browser
+    // fetches them as the visitor scrolls rather than all at once.
     //
-    // This IS the heaviest request in the app, and it is anonymous-accessible and
-    // uncached. If it starts hurting, the fix is a cache on this query or a
-    // progressive "load more" - not a page size, which is what was here before.
+    // This is still one of the heaviest anonymous requests in the app. The flat
+    // "All gift cards" grid below limits its duplicate tile markup by default;
+    // ?brands=all opts into rendering its complete copy of the catalogue.
     $products = $productsQuery->get();
 
     // Categories that actually have something to sell under the current
@@ -631,20 +630,42 @@
                                      component-free grid below: this is the
                                      "just show me all of them" view, so it
                                      carries no category headings at all. --}}
+                                @php
+                                    // How many of the flat grid's tiles are RENDERED, as
+                                    // opposed to revealed.
+                                    //
+                                    // This grid used to render the whole catalogue, every
+                                    // tile wrapped in `<template x-if="index < limit">` with
+                                    // limit starting at 30. The reveal was instant, but the
+                                    // other ~650 tiles were still built by Blade, sent down
+                                    // the wire and parsed by the browser on every single
+                                    // visit, for content almost nobody scrolls to. Measured
+                                    // on this page: 722 tiles at ~1,614 bytes each, and the
+                                    // page came to 1.73 MB with a 4.7s render.
+                                    //
+                                    // Four reveals' worth are rendered now. Anyone who wants
+                                    // the whole list follows the link at the end, which comes
+                                    // back with ?brands=all and renders the lot, so nothing
+                                    // is unreachable and the default visit pays for a
+                                    // fraction of it.
+                                    $flatShowAll = request()->query('brands') === 'all';
+                                    $flatProducts = $flatShowAll ? $products : $products->take(120);
+                                @endphp
                                 <section
-                                    class="mt-20 mb-16"
+                                    class="mt-20"
                                     aria-labelledby="all-gift-cards"
                                     x-show="activeCategory === ''"
                                     x-data="{
-                                        /* Reveal in pages. Every card is already
-                                           rendered, so this is a reveal rather
-                                           than a fetch - instant, and nothing to
-                                           re-decode. */
+                                        /* `rendered` is the ceiling the reveal can reach,
+                                           `total` is the whole catalogue. They differ unless
+                                           the page was asked for every brand, and the copy
+                                           below reports both honestly. */
                                         limit: 30,
+                                        rendered: {{ $flatProducts->count() }},
                                         total: {{ $products->count() }},
 
                                         more() {
-                                            this.limit = Math.min(this.total, this.limit + 30);
+                                            this.limit = Math.min(this.rendered, this.limit + 30);
                                         },
                                     }"
                                 >
@@ -656,7 +677,7 @@
                                     </h2>
 
                                     <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                                        @foreach ($products as $product)
+                                        @foreach ($flatProducts as $product)
                                             @php $tile = $tileFor($product); @endphp
                                             <template x-if="{{ $loop->index }} < limit">
                                                 <x-shop.brand-tile
@@ -705,7 +726,8 @@
                                             >{{ __('products.request_a_product') }}</a>
                                         </p>
 
-                                        <div class="mt-2" x-show="limit < total">
+                                        {{-- Reveal while tiles are still rendered and waiting. --}}
+                                        <div class="mt-2" x-show="limit < rendered">
                                             <button
                                                 type="button"
                                                 @click="more()"
@@ -714,6 +736,26 @@
                                                 {{ __('products.see_more') }}
                                             </button>
                                         </div>
+
+                                        {{-- The rendered set is exhausted but the catalogue
+                                             is not. A link rather than another reveal,
+                                             because the remaining tiles were never sent:
+                                             this comes back with every brand rendered.
+                                             wire:navigate keeps it an in-place swap.
+                                             Hidden entirely once ?brands=all has been
+                                             followed, since there is nothing left to ask
+                                             for. --}}
+                                        @unless ($flatShowAll)
+                                            <div class="mt-2" x-show="limit >= rendered && rendered < total" x-cloak>
+                                                <a
+                                                    href="{{ request()->fullUrlWithQuery(['brands' => 'all']) }}#all-gift-cards"
+                                                    wire:navigate
+                                                    class="inline-flex items-center rounded-full bg-zinc-900 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                                >
+                                                    {{ __('products.see_more') }}
+                                                </a>
+                                            </div>
+                                        @endunless
                                     </div>
                                 </section>
 
@@ -740,7 +782,7 @@
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
-                                <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
+                                <img src="{{ asset('assets/empty-state-blue.webp') }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
                                 @if ($countryHasNoCatalogue)
                                     {{-- The country is bare, so nothing the visitor did
                                          caused this. Naming it is the whole message, and
@@ -754,7 +796,7 @@
                                         {{ __('products.no_gift_cards_in_country_hint') }}
                                     </p>
 
-                                    <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+                                    <div class="mt-5 flex items-center justify-center">
                                         {{-- Opens the same locale sheet the nav pill does.
                                              `.stop` for the reason the footer chip needs it:
                                              without it the click bubbles, the backdrop
@@ -768,14 +810,6 @@
                                         >
                                             {{ __('products.switch_country') }}
                                         </button>
-
-                                        <a
-                                            href="{{ $shopRoute('gift-cards') }}"
-                                            wire:navigate
-                                            class="inline-flex items-center gap-2 rounded-full bg-[#f4f6f5] px-5 py-2.5 text-sm font-bold text-zinc-900 transition-colors hover:bg-[#e8ecea] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-                                        >
-                                            {{ __('products.browse_all_countries') }}
-                                        </a>
                                     </div>
                                 @else
                                     <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">{{ __('products.no_products') }}</p>
@@ -794,5 +828,32 @@
 
         </div>
     </section>
+
+    {{-- FAQ. The storefront only: this is the page a first-time visitor lands on
+         from search, and the questions it answers (region locking, how fast a
+         code arrives, where to find it afterwards) are exactly what stops them
+         buying. A signed-in customer in the dashboard has already crossed that
+         bridge, and the page there is a shopping surface, not a landing page.
+
+         Questions come from the faqs table through <x-home.faq>, the same
+         component and the same admin editor as the homepage, scoped to the two
+         topics that answer a gift card shopper. Nothing is written here, so the
+         copy can never drift from /faq. --}}
+    @if (! $inDash)
+        {{-- This page's FAQ needs a visible strip of page ground before the
+             footer. Other FAQ callers keep their own existing boundary. --}}
+        <div class="bg-[#eff6ff] pb-3 sm:pb-4 lg:pb-5">
+            {{-- top-margin="" and the row above dropping its mb-16: together
+                 those two were a measured 160px of empty page between the last
+                 "See more" and the first question. --}}
+            <x-home.faq
+                :topics="['Gift Cards']"
+                :limit="12"
+                heading-id="gift-cards-faq-heading"
+                :grow-from="1100"
+                top-margin=""
+            />
+        </div>
+    @endif
 
 </x-shop.layout>
