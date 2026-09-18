@@ -230,6 +230,31 @@ class DarkThemeTest extends TestCase
         $this->assertStringNotContainsString('background-image: none', $decls);
     }
 
+    public function test_no_dark_hover_paints_the_resting_card_colour(): void
+    {
+        // var(--ash) is what cards REST at. A :hover that paints var(--ash) on
+        // a surface already sitting at var(--ash) leaves the row the exact
+        // colour it was, so the hover reads as broken although the rule fired.
+        // That is the bug the whole --ash-hover split exists to prevent, and it
+        // survived on .admin-table long after the rest were converted. Hovers
+        // lift to var(--ash-hover); nothing hovers to the resting colour.
+        $rules = preg_replace('#/\*.*?\*/#s', '', $this->css());
+
+        preg_match_all('/([^{}]+)\{([^{}]*)\}/s', $rules, $m, PREG_SET_ORDER);
+        $offenders = [];
+        foreach ($m as [$whole, $selector, $body]) {
+            if (! str_contains($selector, ':hover') || ! str_contains($selector, '.dark')) {
+                continue;
+            }
+            // var(--ash-hover) does not match: the closing paren is required.
+            if (preg_match('/background-color:\s*var\(--ash\)/', $body)) {
+                $offenders[] = trim($selector);
+            }
+        }
+
+        $this->assertSame([], $offenders, 'Dark hover rules painting the resting card colour.');
+    }
+
     public function test_no_dark_rule_paints_pure_black(): void
     {
         // The old Extra Dark ramp painted #000 and rode on `.dark.pure-dark`,
