@@ -413,7 +413,7 @@ class AdminCustomerController extends Controller
 
         $admin = auth('admin')->user();
         $isWarning = $validated['type'] === 'warning';
-        $title = $isWarning ? 'Warning regarding your account' : 'New message from RShopRefills Support';
+        $title = $isWarning ? 'Warning regarding your account' : 'New message from RshopRefill Support';
 
         app(CommunicationManager::class)->send(
             recipient: $user,
