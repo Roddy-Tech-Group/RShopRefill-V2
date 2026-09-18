@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
 use App\Models\Subcategory;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -169,6 +170,29 @@ class ProductReviewsSectionTest extends TestCase
         // Four filled stars and one empty for a four-star review.
         $this->assertSame(4, substr_count($section, 'h-4 w-4 text-blue-600 dark:text-blue-400'));
         $this->assertSame(1, substr_count($section, 'h-4 w-4 text-blue-600/20 dark:text-blue-400/20'));
+    }
+
+    /**
+     * A reviewer is shown by their profile photo when they set one, and by the
+     * same plain user glyph the account button falls back to when they did not.
+     * Initials are not drawn here.
+     */
+    public function test_a_reviewer_shows_their_photo_or_the_plain_user_glyph(): void
+    {
+        $withPhoto = User::factory()->create(['avatar_url' => 'https://cdn.example.test/me.jpg']);
+
+        $this->review(['author_name' => 'Has Photo', 'user_id' => $withPhoto->id]);
+        $this->review(['author_name' => 'No Photo', 'user_id' => null]);
+
+        $section = $this->section($this->page());
+
+        $this->assertStringContainsString('src="https://cdn.example.test/me.jpg"', $section);
+        $this->assertSame(1, substr_count($section, '<img src="https://cdn.example.test/me.jpg"'));
+
+        // The other one falls back to the glyph, inside the same round frame.
+        $this->assertStringContainsString('h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full', $section);
+        $this->assertStringNotContainsString('>HP</span>', $section);
+        $this->assertStringNotContainsString('>NP</span>', $section);
     }
 
     /**

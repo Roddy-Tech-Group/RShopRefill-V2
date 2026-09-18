@@ -15,7 +15,7 @@
 
 @php
     $productReviews = $brandKey
-        ? \App\Models\Review::published()->ownCollected()->withText()->forBrand($brandKey)->with('user:id,kyc_status')->ordered()->get()
+        ? \App\Models\Review::published()->ownCollected()->withText()->forBrand($brandKey)->with('user:id,kyc_status,avatar_url')->ordered()->get()
         : collect();
 
     $reviewTotal = $productReviews->count();
@@ -72,7 +72,7 @@
                     <div class="flex items-center gap-3 py-0.5">
                         <span class="w-3 shrink-0 text-sm tabular-nums text-zinc-600 dark:text-zinc-400">{{ $star }}</span>
                         <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-200 sm:max-w-[240px] dark:bg-white/10">
-                            <span class="block h-full rounded-full bg-zinc-900 dark:bg-white" style="width: {{ $row['share'] }}%"></span>
+                            <span class="block h-full rounded-full bg-blue-600 dark:bg-blue-500" style="width: {{ $row['share'] }}%"></span>
                         </span>
                         <span class="sr-only">{{ trans_choice('products.reviews_count', $row['count'], ['count' => number_format($row['count'])]) }}</span>
                     </div>
@@ -132,7 +132,16 @@
                     :style="{ order: place({{ $index }}) }"
                     class="flex min-w-0 gap-3"
                 >
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-bold text-zinc-600 dark:bg-white/10 dark:text-zinc-200">{{ $review->displayInitials() }}</span>
+                    {{-- Their profile photo if they set one, otherwise the same plain user
+                         glyph the account button falls back to. An anonymous review shows
+                         the glyph either way: the photo would say whose account it is. --}}
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-100 text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
+                        @if (! $review->is_anonymous && $review->user?->avatar_url)
+                            <img src="{{ $review->user->avatar_url }}" alt="" class="h-full w-full object-cover" loading="lazy">
+                        @else
+                            <flux:icon.user class="h-5 w-5" />
+                        @endif
+                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="flex items-center gap-1 text-sm font-semibold text-zinc-900 dark:text-white">
                             <span class="truncate">{{ $review->displayName() }}</span>
@@ -181,7 +190,7 @@
                 {{ __('products.reviews_showing', ['shown' => min(10, $reviewTotal), 'total' => number_format($reviewTotal)]) }}
             </p>
             <span class="h-1 w-56 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
-                <span class="block h-full rounded-full bg-zinc-900 transition-[width] duration-300 dark:bg-white" :style="{ width: progress() }"></span>
+                <span class="block h-full rounded-full bg-blue-600 transition-[width] duration-300 dark:bg-blue-500" :style="{ width: progress() }"></span>
             </span>
             <button
                 type="button"
