@@ -127,7 +127,7 @@
     x-transition:leave-end="opacity-0"
     @click="localeModalOpen = false"
     style="display:none;"
-    class="fixed inset-0 z-40 bg-zinc-900/40"
+    class="fixed inset-0 z-40 bg-zinc-900/50 dark:bg-zinc-950/70"
 ></div>
 
 {{-- Preferences sheet.
@@ -298,6 +298,32 @@
          * assigning through to the shared storefrontLocale() scope, whose
          * watchers would persist and navigate immediately.
          */
+        /*
+         * A country suggested from outside (the header's region-suggestion
+         * popup). It is STAGED like any other pick, never applied: the sheet
+         * opens with it selected and Save is still what commits it, so the
+         * modal remains the only thing that writes country, language and
+         * currency. Anything else would be a second way to set the region.
+         *
+         * Looks the country up by ISO in the same list the picker renders, so
+         * an unknown code stages nothing rather than a blank row.
+         */
+        suggestCountry(iso) {
+            const target = String(iso || '').toUpperCase();
+            const codes = @js($countryCodes);
+            const name = Object.keys(codes).find((n) => String(codes[n]).toUpperCase() === target);
+
+            if (! name) { return; }
+
+            this.pickCountry(
+                name,
+                @js($countries)[name] ?? '',
+                codes,
+                @js($countryCurrencyMap ?? []),
+                @js($currencySymbols ?? [])
+            );
+        },
+
         pickCountry(name, flag, codes, currencyByCode, symbolByCurrency) {
             const code = (codes[name] || '').toUpperCase();
 
@@ -311,6 +337,23 @@
     }"
     {{-- Closing discards the draft: reopening always starts from what is
          actually in force, never from a half-finished edit. --}}
+    {{-- The one way in. The dashboard layout listens for this event too, and
+         the storefront previously did not, so callers there had to assign
+         localeModalOpen directly and the event was dead on half the site.
+         Listening HERE covers both surfaces with one handler.
+
+         Staged on the next tick: opening runs the x-effect below, which
+         re-syncs the drafts from what is in force. Suggesting first would be
+         overwritten by it. --}}
+    @open-locale-modal.window="
+        localeModalOpen = true;
+        $nextTick(() => {
+            if ($event.detail && $event.detail.country) { suggestCountry($event.detail.country); }
+            {{-- A caller can open straight on one chooser (the dashboard
+                 account menu's Language row asks for 'language'). --}}
+            if ($event.detail && ['country', 'language', 'currency'].includes($event.detail.pane)) { pane = $event.detail.pane; }
+        });
+    "
     x-effect="if (! localeModalOpen) { pane = 'root'; syncDrafts(); }"
     x-show="localeModalOpen"
     x-transition:enter="transition-opacity ease-out duration-300"
@@ -337,7 +380,7 @@
         x-transition:leave="transition duration-200 ease-in"
         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
         x-transition:leave-end="opacity-0 translate-y-8 scale-[0.98]"
-        class="pointer-events-auto relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[20px] bg-[#f4f6f5] p-6 shadow-2xl shadow-zinc-900/20 dark:bg-[#0c1a36] dark:ring-1 dark:ring-white/10"
+        class="pointer-events-auto relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden p-6 rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]"
     >
         {{-- Header. The back arrow appears only in a chooser, and the title
              names whatever is being chosen. --}}
@@ -359,10 +402,10 @@
             <button
                 type="button"
                 @click="localeModalOpen = false"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-900 transition-colors hover:bg-[#dee3e1] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-white dark:hover:bg-white/10"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"
                 aria-label="{{ __('common.close') }}"
             >
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -470,7 +513,7 @@
                 </span>
                 {{-- Enter would otherwise submit the form this pane sits in, saving a
                      half-made choice from the search box. --}}
-                <input x-model="search" @keydown.enter.prevent type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.country') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.country') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
             </div>
 
             <div class="min-h-0 max-h-[18.5rem] overflow-y-auto rounded-[12px] bg-[#ffffff] p-1 ring-1 ring-[#dee3e1] dark:bg-white/5 dark:ring-white/10">
@@ -542,7 +585,7 @@
                 </span>
                 {{-- Enter would otherwise submit the form this pane sits in, saving a
                      half-made choice from the search box. --}}
-                <input x-model="search" @keydown.enter.prevent type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.payment_currency') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.payment_currency') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
             </div>
 
             <div class="min-h-0 max-h-[18.5rem] overflow-y-auto rounded-[12px] bg-[#ffffff] p-1 ring-1 ring-[#dee3e1] dark:bg-white/5 dark:ring-white/10">

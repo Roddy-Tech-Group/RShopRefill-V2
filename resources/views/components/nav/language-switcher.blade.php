@@ -38,7 +38,7 @@
              half-made choice from the search box. --}}
         <input
             x-model="search"
-            @keydown.enter.prevent
+            @keydown.enter.prevent="null"
             type="text"
             placeholder="{{ __('common.search') }}"
             aria-label="{{ __('common.language') }}"

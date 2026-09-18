@@ -34,16 +34,19 @@ class NavTypeScaleTest extends TestCase
         $rule = substr($css, (int) strpos($css, '.nav-text {'));
         $rule = substr($rule, 0, (int) strpos($rule, '}'));
 
-        // 500, not the spec's 750: with no variable Roobert in the repo the
-        // fallbacks snap 750 to full bold, which is too heavy at this size.
-        // See the note on the rule.
-        $this->assertStringContainsString('font-weight: 500;', $rule);
+        // 399, the site's base weight: DM Sans is variable, so it holds the
+        // exact cut rather than snapping to the nearest static one. The nav
+        // takes the same weight as body copy - it is chrome, and anything
+        // heavier made the bar the loudest thing on the page.
+        $this->assertStringContainsString('font-weight: 399;', $rule);
         $this->assertStringContainsString('font-size: 16px;', $rule);
         $this->assertStringContainsString('line-height: 16px;', $rule);
 
-        // Same stack as the card face, Roobert first, so both land together
-        // once the licensed woff2 files are added.
-        $this->assertStringContainsString('font-family: Roobert,', $rule);
+        // The site face, not a nav-only one: Roobert was never licensed, and
+        // the whole storefront moved to DM Sans rather than keep a stack whose
+        // first family does not exist.
+        $this->assertStringContainsString("font-family: 'DM Sans', sans-serif;", $rule);
+        $this->assertStringNotContainsString('Roobert', $rule);
 
         // Colour must stay out of it: the rule is unlayered, so a colour here
         // would beat every dark: variant and the active pill's inverted ink.

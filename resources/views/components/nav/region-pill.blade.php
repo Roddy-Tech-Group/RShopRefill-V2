@@ -12,7 +12,12 @@
      retired translate widget and then never again, so a browser that
      once picked Portuguese showed "PO / USD" forever. The server value
      cannot go stale: it IS the language the page rendered in. --}}
-@props(['compact' => false])
+@props(['compact' => false, 'suggestion' => false])
+
+{{-- Relative wrapper so the region-suggestion popup can hang off THIS control
+     rather than off the header, keeping the pointer aligned with the pill at
+     every breakpoint. It adds no box of its own. --}}
+<div class="relative flex shrink-0 items-center">
 
 <button
     type="button"
@@ -29,3 +34,8 @@
          spare and the flag alone still says which country is selected. --}}
     <span class="{{ $compact ? 'hidden md:inline' : '' }}"><span x-text="(language || 'English').slice(0, 2).toUpperCase()">{{ config('localization.supported.'.app()->getLocale().'.short') }}</span> / <span x-text="currency || 'USD'">USD</span></span>
 </button>
+
+    @if ($suggestion)
+        <x-nav.region-suggestion :region="$region ?? 'US'" />
+    @endif
+</div>

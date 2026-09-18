@@ -1,3 +1,9 @@
+@props(['suggestion' => false])
+
+{{-- $suggestion is passed by ONE caller only. This component is mounted twice
+     (the mobile menu sheet and the desktop utility bar), so the region popup
+     must not live inside it unconditionally or it renders in both, including
+     the copy that is hidden at the current breakpoint. --}}
 {{--
     Utility links - Help and the region/currency pill.
 
@@ -37,4 +43,4 @@
     <span>{{ __('navigation.help_center') }}</span>
 </a>
 
-<x-nav.region-pill />
+<x-nav.region-pill :suggestion="$suggestion" />

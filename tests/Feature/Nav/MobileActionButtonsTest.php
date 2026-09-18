@@ -115,6 +115,12 @@ class MobileActionButtonsTest extends TestCase
         $this->assertStringNotContainsString('viewBox="0 0 48 48"', $ac);
 
         // Two stroked marks, same weight, both inheriting the button colour.
-        $this->assertSame(2, substr_count($ac, 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"'));
+        // Sign in is drawn here; Cart comes from x-icons.cart, which the
+        // dashboard shares so the two carts cannot drift apart.
+        $stroke = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"';
+
+        $this->assertSame(1, substr_count($ac, $stroke));
+        $this->assertStringContainsString('<x-icons.cart class="h-5 w-5" />', $ac);
+        $this->assertStringContainsString($stroke, file_get_contents(resource_path('views/components/icons/cart.blade.php')));
     }
 }

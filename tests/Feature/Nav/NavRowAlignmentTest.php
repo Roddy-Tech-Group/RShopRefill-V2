@@ -98,14 +98,18 @@ class NavRowAlignmentTest extends TestCase
         $this->assertStringContainsString('<x-nav.account-cart />', $nav);
 
         // Two copies of the links: the menu sheet below md, the logo line at
-        // md and up.
-        $this->assertSame(2, substr_count($nav, '<x-nav.utility-links />'));
+        // md and up. They are not identical mounts - only the desktop one
+        // carries the region suggestion popup, which is anchored to the region
+        // pill and would otherwise render twice and have to be dismissed
+        // twice. So this counts the tag, not the tag plus its props.
+        $this->assertSame(2, substr_count($nav, '<x-nav.utility-links'));
+        $this->assertSame(1, substr_count($nav, '<x-nav.utility-links :suggestion="true" />'));
         $this->assertStringContainsString('x-data="{ menuOpen: false, sub: null }"', $nav);
         $this->assertStringContainsString('hidden items-center gap-1 md:flex', $nav);
 
         // Neither partial wraps itself, or it would fight the parent flex row.
         foreach ([$this->links(), $this->accountCart()] as $partial) {
-            $this->assertStringNotContainsString('max-w-[1350px]', $partial);
+            $this->assertStringNotContainsString('max-w-[1550px]', $partial);
             $this->assertStringNotContainsString('justify-end', $partial);
         }
     }
@@ -187,35 +191,41 @@ class NavRowAlignmentTest extends TestCase
     {
         $nav = $this->nav();
 
-        // One on the category line, one at the foot of the sheet.
-        $this->assertSame(2, substr_count($nav, '<x-nav.invite-link />'));
+        // One on the category line, one at the foot of the sheet. Matched
+        // without the closing slash: the category-line copy takes props now
+        // (it opens the referral panel) so it is no longer self-closing on one
+        // line, and counting '<x-nav.invite-link />' counted only the sheet's.
+        $this->assertSame(2, substr_count($nav, '<x-nav.invite-link'));
 
         // md+: on the category line, pinned right and OUTSIDE the scroll track,
-        // or it scrolls away with the pills on a narrow screen.
-        $this->assertStringContainsString('<span class="hidden shrink-0 md:flex">', $nav);
+        // or it scrolls away with the pills on a narrow screen. The span became
+        // a relative wrapper when the pill grew a dropdown - the panel anchors
+        // to it - but the display and shrink behaviour it is asserting here are
+        // unchanged.
+        $this->assertStringContainsString('class="relative hidden shrink-0 md:flex"', $nav);
 
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $nav);
         $this->assertGreaterThan(
             strpos($markup, 'overflow-x-auto justify-start'),
-            strrpos($markup, '<x-nav.invite-link />')
+            strrpos($markup, '<x-nav.invite-link')
         );
 
         // The category-line copy comes after the logo row; the sheet's copy
         // is declared before it, above the collapsing wrapper.
         $this->assertGreaterThan(
             strpos($markup, 'grid grid-cols-[auto_auto_1fr]'),
-            strrpos($markup, '<x-nav.invite-link />')
+            strrpos($markup, '<x-nav.invite-link')
         );
         $this->assertLessThan(
             strpos($markup, 'grid grid-cols-[auto_auto_1fr]'),
-            strpos($markup, '<x-nav.invite-link />')
+            strpos($markup, '<x-nav.invite-link')
         );
 
         // The partial carries the link and no wrapper of its own.
         $link = File::get(resource_path('views/components/nav/invite-link.blade.php'));
         $this->assertStringContainsString('Invite a Friend', $link);
         $this->assertStringContainsString("route('shop.earn-points')", $link);
-        $this->assertStringNotContainsString('max-w-[1350px]', $link);
+        $this->assertStringNotContainsString('max-w-[1550px]', $link);
 
         // Twice on the page: the category line and the sheet, each hidden at
         // the other's breakpoint.
@@ -234,7 +244,7 @@ class NavRowAlignmentTest extends TestCase
      */
     public function test_both_nav_strips_share_one_container(): void
     {
-        $container = 'max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8';
+        $container = 'max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8';
 
         // Two: the logo row (which now also holds the phone search row) and
         // the category rail. The mobile utility row that made a third is gone.
@@ -300,7 +310,7 @@ class NavRowAlignmentTest extends TestCase
         // Sheet: last of the three controls at its foot - invite, then the
         // utility links behind a rule, then the picker.
         $sheetTheme = strpos($markup, '<x-theme-toggle');
-        $this->assertGreaterThan(strpos($markup, '<x-nav.invite-link />'), $sheetTheme);
+        $this->assertGreaterThan(strpos($markup, '<x-nav.invite-link'), $sheetTheme);
         $this->assertGreaterThan(strpos($markup, '<x-nav.utility-links />'), $sheetTheme);
 
         // Logo row: after account-cart, which is itself after the utility links.

@@ -32,7 +32,7 @@
         'regionName' => $regionName,
     ] = GiftCardCategories::navMenu($region ?? null);
 
-    $columnClass = 'text-[15px] font-semibold text-zinc-900 transition-colors hover:underline hover:decoration-1 hover:underline-offset-4 dark:text-zinc-100 dark:hover:text-white';
+    $columnClass = 'text-[15px] font-semibold text-zinc-900 transition-colors dark:text-zinc-100 dark:hover:text-white';
     $headingClass = 'text-[13px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300';
 @endphp
 
@@ -83,11 +83,11 @@
             x-transition:leave-end="opacity-0 -translate-y-2"
             :style="'top: ' + top + 'px'"
             @resize.window="place()"
-            class="fixed inset-x-0 z-[60] bg-[#ffffff] py-8 shadow-xl shadow-zinc-900/10 dark:bg-[#0c1a36]"
+            class="nav-flyout fixed inset-x-0 z-[60] bg-[#ffffff] py-8 shadow-xl shadow-zinc-900/10"
             role="menu"
             aria-label="{{ __('navigation.gift_cards') }}"
         >
-            <div class="mx-auto grid w-full max-w-[1350px] grid-cols-[220px_1fr_240px] gap-10 px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto grid w-full max-w-[1550px] grid-cols-[220px_1fr_240px] gap-10 px-4 sm:px-6 lg:px-8">
 
                 {{-- Ways in, before any category: most visitors want everything
                      or the popular ones, not a taxonomy. --}}
@@ -95,17 +95,17 @@
                     <p class="{{ $headingClass }}">{{ __('navigation.featured') }}</p>
                     <ul class="mt-4 space-y-3">
                         <li>
-                            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors hover:text-blue-600 hover:underline hover:decoration-1 hover:underline-offset-4 dark:text-white dark:hover:text-blue-400">
+                            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors dark:text-white dark:">
                                 {{ __('products.all_gift_cards') }}
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('shop.gift-cards', ['subcategory' => 'popular']) }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors hover:text-blue-600 hover:underline hover:decoration-1 hover:underline-offset-4 dark:text-white dark:hover:text-blue-400">
+                            <a href="{{ route('shop.gift-cards', ['subcategory' => 'popular']) }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors dark:text-white dark:">
                                 {{ __('products.popular_brands') }}
                             </a>
                         </li>
                         <li>
-                            <a href="{{ route('shop.gift-cards', ['sort' => 'recent']) }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors hover:text-blue-600 hover:underline hover:decoration-1 hover:underline-offset-4 dark:text-white dark:hover:text-blue-400">
+                            <a href="{{ route('shop.gift-cards', ['sort' => 'recent']) }}" wire:navigate class="text-[25.6px] font-bold leading-[31.5px] tracking-tight text-zinc-900 transition-colors dark:text-white dark:">
                                 {{ __('products.recently_added') }}
                             </a>
                         </li>

@@ -14,30 +14,51 @@
         hidden: false,
         ticking: false,
         init() {
-            // Desktop (lg+) keeps the full nav at all times - no collapse on
-            // scroll. Only mobile / tablet collapses the primary row to free
-            // vertical space. Position-based hysteresis (50-140px) prevents
-            // the bar from flickering near the threshold on touch scrolls.
-            const SHOW_AT = 50;
-            const HIDE_AT = 140;
-            const LG = 1024;
+            // Every width collapses now, desktop included: the logo row is
+            // what stays pinned, and the search row and category strip give
+            // their space back once the page is scrolled.
+            //
+            // The two thresholds are far apart on purpose, and further apart
+            // than the height the collapse removes. Collapsing shortens the
+            // header, which pulls the page up under the cursor; if that lands
+            // back under SHOW_AT the bar expands, which pushes it down again,
+            // and the nav sits there flickering. The gap here (8px to 130px)
+            // cannot be crossed by the ~100px the two rows give back, so the
+            // loop has nowhere to close.
+            //
+            // HIDE_AT was 220, which meant most of a phone screen went by
+            // before the bar gave its space back. 130 is the lowest this can
+            // go while the gap still clears that ~100px with room to spare.
+            const SHOW_AT = 8;
+            const HIDE_AT = 130;
             const onScroll = () => {
-                if (window.innerWidth >= LG) {
-                    if (this.hidden) { this.hidden = false; }
-                    return;
-                }
                 if (this.ticking) { return; }
                 this.ticking = true;
                 requestAnimationFrame(() => {
                     const y = window.scrollY;
                     if (y <= SHOW_AT)      { this.hidden = false; }
                     else if (y >= HIDE_AT) { this.hidden = true; }
+                    this.publishHeight();
                     this.ticking = false;
                 });
             };
             window.addEventListener('scroll', onScroll, { passive: true });
             window.addEventListener('resize', onScroll, { passive: true });
             onScroll();
+            // The collapse animates, so the height keeps changing for ~350ms
+            // after the class flips. Re-publish while it settles.
+            this.$el.addEventListener('transitionend', () => this.publishHeight());
+        },
+
+        // Publishes the pinned header's real height as --nav-h. Anything that
+        // has to sit under the bar reads that instead of hardcoding a number:
+        // the bar is 56px or 64px depending on width, and taller again while
+        // the search row and category strip are expanded, so every fixed offset
+        // written against it was wrong the moment any of those changed.
+        publishHeight() {
+            const header = this.$el.closest('header');
+            if (! header) { return; }
+            document.documentElement.style.setProperty('--nav-h', Math.round(header.getBoundingClientRect().height) + 'px');
         },
     }"
     {{-- Transparent: the header behind it carries the page tone, and this is
@@ -69,7 +90,11 @@
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
             @click="menuOpen = false"
-            class="fixed inset-0 z-[70] bg-zinc-900/45"
+            {{-- Frosted, not a flat scrim: the close button sits ON this layer
+                 rather than in the panel, so the page behind has to fall back far
+                 enough for a white glyph to read against it. Same treatment as the
+                 cart and search panels. --}}
+            class="fixed inset-0 z-[70] bg-zinc-900/45 backdrop-blur-md backdrop-saturate-150"
             aria-hidden="true"
         ></div>
 
@@ -82,9 +107,9 @@
             x-transition.opacity
             @click="menuOpen = false"
             aria-label="{{ __('common.close') }}"
-            class="fixed right-4 top-4 z-[72] flex h-10 w-10 items-center justify-center rounded-full text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            class="fixed right-4 top-4 z-[72] flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"
         >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
@@ -193,12 +218,12 @@
                         <x-nav.utility-links />
                     </div>
 
-                    {{-- Same arrangement as the footer: the THEME label
+                    {{-- Same arrangement as the footer: the Theme label
                          beside the segmented chip. The dropdown this replaced
                          popped a panel, which is one tap more than a control
                          that is already three buttons wide. --}}
                     <div class="mt-2 flex items-center gap-3">
-                        <span class="text-sm font-semibold uppercase tracking-wider text-zinc-500" aria-hidden="true">{{ __('footer.theme') }}</span>
+                        <span class="text-sm font-semibold text-zinc-500" aria-hidden="true">{{ __('footer.theme') }}</span>
                         <x-theme-toggle variant="segmented" />
                     </div>
                 </div>
@@ -313,16 +338,24 @@
         ></span>
     </div>
 
-    {{-- Primary nav row - collapses on scroll. Uses a wide hysteresis zone so
-         a half-scroll never lands in a position where the bar flickers between
-         collapsed and expanded. Transforms + max-height on a will-change layer
-         so the GPU handles the animation cleanly. --}}
-    <div
-        :class="hidden ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[150px] md:max-h-[140px] opacity-100 overflow-visible'"
-        class="[transition:max-height_350ms_cubic-bezier(0.4,0,0.2,1),opacity_200ms_ease-out] will-change-[max-height]"
-    >
-    <div class="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-[auto_auto_1fr] items-center h-[64px] gap-4 relative z-10">
+    {{-- Primary nav row. This one STAYS: the logo, the hamburger and the
+         account and cart controls are what a shopper reaches for at any point
+         on the page, so they ride the sticky header. The search row and the
+         category strip below are the parts that collapse on scroll. --}}
+    <div>
+    <div class="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8">
+        {{-- gap-2 on a phone, gap-4 from md.
+
+             On a phone this gap sits between the menu button and the logo, and
+             16px there measured much wider than it was: the button's icon is
+             24px inside a 44px tap target, so ten of those pixels are already
+             empty before the gap starts. From md the button is gone and the
+             same gap separates the logo from the search bar, where 16px is
+             right, so the two cases are set separately rather than compromised
+             on one number. --}}
+        {{-- 56px on a phone, where the bar is pinned and every pixel of it is
+             pixels the page does not get; back to 64 from md. --}}
+        <div class="grid grid-cols-[auto_auto_1fr] items-center h-[56px] gap-2 md:h-[64px] md:gap-4 relative z-10">
 
             {{-- Menu, phone only. Opens the sheet above; the logo keeps its own
                  grid column, so adding this cannot shift it. --}}
@@ -340,28 +373,45 @@
 
             {{-- Logo. -ml-1 cancels the wordmark's own transparent left margin
                  so the mark lands ON the gutter, level with the category pill
-                 below it and with the cart chip on the far side.
+                 below it and with the cart chip on the far side. The footer's
+                 logo carries the same pull for the same reason.
 
-                 The measurement, so nobody has to re-derive it: the source is
-                 701x165 with 20px of transparency down its left edge, which
-                 scales to 3.9px at h-8 and 4.4px at h-9. This used to be -ml-3
-                 (12px), which overshot by ~8px - that is the whole reason the
-                 left and right gutters did not look equal. --}}
+                 The measurement, so nobody has to re-derive it: the artwork
+                 carries 12px of transparency down the left of a 419px canvas,
+                 which is about 4px in this band. -ml-3 (12px) overshot it by
+                 ~8px, which is the whole reason the left and right gutters did
+                 not look equal.
+
+                 On a phone it is doing a second job: the gap to the menu button
+                 is measured from the ink, not from the file's empty edge, so
+                 without this the logo reads further from the button than the
+                 gap actually is. --}}
             <a
                 href="{{ route('home') }}"
                 wire:navigate
-                class="col-start-2 md:col-start-1 justify-self-start relative flex items-center rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="col-start-2 md:col-start-1 justify-self-start -ml-1 relative flex items-center rounded-[12px] group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 aria-label="{{ $siteName }} - Home"
             >
-                <span class="flex items-center h-8 md:h-9">
-                    <img
-                        src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                        alt="{{ $siteName }}"
-                        fetchpriority="high"
-                        class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
-                    />
+                {{-- The wordmark from md up, the R on its own below it. A phone
+                     gives this the same row as the menu button and the cart, and
+                     the full wordmark spent that width on type nobody reads at
+                     that size.
+
+                     <picture> rather than two <img> tags with hidden/md:block:
+                     both tags would download, and this is a fetchpriority=high
+                     image in the header. The source's media query means only the
+                     matching file is fetched. --}}
+                <span class="flex items-center h-11 md:h-12">
+                    <picture class="flex h-full items-center">
+                        <source media="(min-width: 768px)" srcset="{{ asset('assets/logo.webp').'?v=4' }}">
+                        <img
+                            src="{{ asset('assets/PWAicon.webp') }}"
+                            alt="{{ $siteName }}"
+                            fetchpriority="high"
+                            class="site-logo h-9 w-auto object-contain transition-opacity duration-200 group-hover:opacity-90 md:h-full"
+                        />
+                    </picture>
                 </span>
-                <span class="absolute left-1 top-full -mt-0.5 text-[10px] font-medium italic leading-none text-zinc-600" aria-hidden="true">Est. 2024</span>
             </a>
 
             {{-- Live search (desktop). Hits /api/search/brands?q=… on every keystroke (debounced)
@@ -419,7 +469,7 @@
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
                     style="display:none;"
-                    class="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[12px] border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/15"
+                    class="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[10px] border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/15"
                 >
                     <x-nav.search-panel />
                 </div>
@@ -433,7 +483,7 @@
 
                 {{-- md and up: the full utility cluster on the logo line. --}}
                 <div class="hidden items-center gap-1 md:flex">
-                    <x-nav.utility-links />
+                    <x-nav.utility-links :suggestion="true" />
                 </div>
 
                 {{-- Phones get the region pill only. Help and the theme picker
@@ -467,15 +517,27 @@
             @click.outside="open = false"
             x-effect="open ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
             @keydown.escape="open = false"
-            class="relative pb-3 md:hidden"
+            {{-- Collapses on scroll with the category strip: searching is an
+                 arrival action, so it gives its space back once the shopper is
+                 reading the page. Desktop never collapses (see init). --}}
+            {{-- The bottom padding is bound, not static: max-height collapses the
+                 CONTENT, but padding on the collapsing element itself keeps
+                 rendering, so a static pb-3 left 12px of black hanging under
+                 the pinned bar with nothing in it. --}}
+            :class="hidden ? 'max-h-0 pb-0 opacity-0 overflow-hidden' : 'max-h-[120px] pb-3 opacity-100 overflow-visible'"
+            class="relative [transition:max-height_200ms_cubic-bezier(0.4,0,0.2,1),opacity_120ms_ease-out,padding_200ms_cubic-bezier(0.4,0,0.2,1)] will-change-[max-height] md:hidden"
         >
             <form
                 role="search"
                 method="GET"
                 action="{{ route('shop.gift-cards') }}"
                 @click="$refs.mobileSearch.focus()"
-                :class="open ? 'border-blue-500 bg-[#ffffff] ring-2 ring-blue-500/15 dark:bg-[#0c1a36]' : 'border-transparent bg-[#f4f6f5] dark:bg-white/8'"
-                class="flex cursor-text items-center gap-3 rounded-[12px] border-2 px-4 py-2.5 transition-all duration-200"
+                {{-- Reference shape: a full pill on a hairline, with the action as
+                     a filled round button inside its right edge. The focus state
+                     brightens the same hairline rather than swapping in a second,
+                     thicker border, so the pill never changes size when tapped. --}}
+                :class="open ? 'border-zinc-300 bg-[#ffffff] dark:border-white/25 dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white/10 dark:bg-white/8'"
+                class="flex cursor-text items-center gap-2 rounded-full border py-1 pl-4 pr-1 transition-colors duration-200"
             >
                 <input
                     x-ref="mobileSearch"
@@ -488,7 +550,7 @@
                     aria-label="{{ __('navigation.search_placeholder') }}"
                     autocomplete="off"
                     spellcheck="false"
-                    class="min-w-0 flex-1 bg-transparent text-base text-zinc-900 outline-none placeholder:text-zinc-600 dark:text-white dark:placeholder:text-zinc-400"
+                    class="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-900 outline-none placeholder:text-zinc-600 dark:text-white dark:placeholder:text-zinc-400"
                 />
 
                 {{-- Clear takes the magnifier's place once there is something to
@@ -498,7 +560,7 @@
                     x-show="query.length > 0"
                     x-cloak
                     @click.stop="clear(); $refs.mobileSearch.focus()"
-                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 transition-colors hover:bg-zinc-300 focus:outline-none dark:bg-white/15"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-200 transition-colors hover:bg-zinc-300 focus:outline-none dark:bg-white/15"
                     aria-label="{{ __('common.clear') }}"
                 >
                     <svg class="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -509,10 +571,10 @@
                 <button
                     type="submit"
                     x-show="query.length === 0"
-                    class="shrink-0 text-zinc-900 transition-colors hover:text-blue-600 focus:outline-none dark:text-zinc-200 dark:hover:text-blue-400"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0c1337] text-white transition-colors hover:bg-[#1a2560] focus:outline-none dark:bg-[#fdfdfd] dark:text-[#0c1337] dark:hover:bg-[#e4e5f3]"
                     aria-label="{{ __('navigation.search_placeholder') }}"
                 >
-                    <svg class="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </button>
@@ -524,7 +586,7 @@
                 x-transition:enter="transition ease-out duration-150"
                 x-transition:enter-start="opacity-0 -translate-y-1"
                 x-transition:enter-end="opacity-100 translate-y-0"
-                class="absolute inset-x-0 top-full z-[60] max-h-[70vh] overflow-y-auto rounded-[12px] border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/20 dark:border-white/10 dark:bg-[#0c1a36]"
+                class="absolute inset-x-0 top-full z-[60] max-h-[70vh] overflow-y-auto rounded-[10px] border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/20 dark:border-white/10 dark:bg-[#0c1a36]"
             >
                 <x-nav.search-panel list-class="" />
             </div>
@@ -546,8 +608,12 @@
          invite pill on the right, the inner one is the scroll track. The pill
          has to sit OUTSIDE that track, or it scrolls away with the categories
          on a narrow screen. --}}
-    <div>
-        <nav aria-label="Product categories" class="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div
+        {{-- Same collapse as the search row above. --}}
+        :class="hidden ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[120px] opacity-100 overflow-visible'"
+        class="[transition:max-height_200ms_cubic-bezier(0.4,0,0.2,1),opacity_120ms_ease-out] will-change-[max-height]"
+    >
+        <nav aria-label="Product categories" class="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center gap-3 py-2.5">
             <div class="flex min-w-0 flex-1 gap-5 md:gap-2 overflow-x-auto justify-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 @php
@@ -558,7 +624,10 @@
                     // px-0 below md is what keeps the phone rail the width it is;
                     // the hover wash therefore only has room to read as a pill
                     // from md up, which is also the only place a pointer exists.
-                    $catLinkClass = "inline-flex shrink-0 items-center rounded-full px-0 py-2 nav-text transition-colors duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 md:px-4";
+                    // Sized to x-nav.invite-link, the pill at the other end of this same row:
+                    // px-3.5 py-1.5 on a 13px label. Two pills on one line reading at two
+                    // different heights is what made the row look unfinished.
+                    $catLinkClass = "inline-flex shrink-0 items-center rounded-full px-0 py-1.5 text-[13px] leading-none transition-colors duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 md:px-4 md:py-2 md:text-[16px] md:leading-4";
 
                     // The active category is the OPEN page, resolved from the route —
                     // so the highlight is never statically stuck on Gift Cards.
@@ -580,8 +649,13 @@
                     // sits on the same line, so anything else would read as two
                     // kinds of control. Active still underlines - it names the open
                     // page, and a hover state cannot carry that too.
+                    // Active reads as a filled pill, not an underline: the row is
+                    // already a row of pills on hover, so the open page should wear
+                    // the same shape rather than a different kind of marker.
+                    // px-4 unconditionally, since the base class only pads from md
+                    // and a fill with no padding hugs the text.
                     $catLinkState = fn (string $c) => $currentCat === $c
-                        ? 'font-bold text-zinc-900 underline decoration-2 underline-offset-[6px] dark:text-white'
+                        ? 'bg-[#f4f6f5] px-3.5 font-bold text-zinc-900 md:px-4 dark:bg-white/12 dark:text-white'
                         : 'text-zinc-900 hover:bg-[#f4f6f5] dark:text-zinc-200 dark:hover:bg-white/8 dark:hover:text-white';
 
                     // When a category feature is OFF we keep the tab VISIBLE but greyed
@@ -669,10 +743,43 @@
 
             {{-- Invite a Friend, on the category line from md up. Below md it
                  does not render at all - the phone nav is already three rows
-                 deep before the page starts. --}}
-            <span class="hidden shrink-0 md:flex">
-                <x-nav.invite-link />
-            </span>
+                 deep before the page starts.
+
+                 From md the pill drops the referral panel instead of navigating,
+                 the same panel the dashboard top bar uses. The pill sits at the
+                 right end of this row, so the panel is right-anchored or it
+                 would hang off the viewport. --}}
+            <div
+                class="relative hidden shrink-0 md:flex"
+                x-data="{ referOpen: false }"
+                @click.outside="referOpen = false"
+                @keydown.escape.window="referOpen = false"
+            >
+                <x-nav.invite-link
+                    :navigate="false"
+                    x-on:click.prevent="referOpen = ! referOpen"
+                    ::aria-expanded="referOpen ? 'true' : 'false'"
+                    aria-haspopup="dialog"
+                />
+
+                <div
+                    x-show="referOpen"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-y-1"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-y-0"
+                    x-transition:leave-end="opacity-0 -translate-y-1"
+                    class="absolute right-0 top-full z-50 mt-3"
+                >
+                    <x-nav.referral-panel
+                        role="dialog"
+                        aria-label="Refer friends, earn Rcoin"
+                        close="referOpen = false"
+                    />
+                </div>
+            </div>
             </div>
         </nav>
     </div>

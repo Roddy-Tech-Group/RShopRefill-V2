@@ -16,8 +16,14 @@ use Tests\TestCase;
  * Two things then changed again: the per-category marks were dropped, so the
  * rail is words alone, and the hover underline became Invite a Friend's wash.
  * That pill shares the line, so a second kind of hover on it read as two
- * kinds of control. The open page still underlines - it is the one thing a
- * hover state cannot also say.
+ * kinds of control.
+ *
+ * The open page marks itself with that same wash held down, not an underline.
+ * The row already becomes a row of washed shapes under the cursor, so the
+ * page you are on should wear the shape the others take rather than a
+ * different kind of marker altogether. Hover still cannot say it: the wash is
+ * standing on the open tab and momentary on every other, and aria-current is
+ * what carries it where colour cannot.
  *
  * The class name is the history, kept so the file keeps its place in the
  * suite: this is where the pill rules lived and where their replacement is
@@ -36,20 +42,25 @@ class CategoryPillsTest extends TestCase
     {
         $nav = $this->nav();
 
-        // The open page: bold and underlined.
+        // The open page: the hover wash, held down, plus bold. px-4 rides with
+        // it because the base class only pads from md, and a fill with no
+        // padding hugs the text.
         $this->assertStringContainsString(
-            "'font-bold text-zinc-900 underline decoration-2 underline-offset-[6px] dark:text-white'",
+            "'bg-[#f4f6f5] px-4 font-bold text-zinc-900 dark:bg-white/12 dark:text-white'",
             $nav
         );
 
-        // Every other tab: Invite a Friend's wash, in both themes.
+        // Every other tab: the same wash, but only under the cursor.
         $this->assertStringContainsString('hover:bg-[#f4f6f5]', $nav);
         $this->assertStringContainsString('dark:hover:bg-white/8', $nav);
 
-        // The underline is the open page's alone - hover no longer draws one.
+        // No underline anywhere on the rail now - not on hover, not on the
+        // open page.
         $this->assertStringNotContainsString('hover:underline hover:decoration-2', $nav);
+        $this->assertStringNotContainsString('underline-offset-[6px]', $nav);
 
-        // No fill on any of them, resting or active.
+        // No standing fill on a tab that is not the open page, and none of the
+        // old inverted chip either.
         $this->assertStringNotContainsString('bg-zinc-900 text-white dark:bg-white', $nav);
         $this->assertStringNotContainsString('bg-[#f4f6f5] text-zinc-900 hover:bg-[#e8ecea]', $nav);
 
@@ -93,10 +104,10 @@ class CategoryPillsTest extends TestCase
         $this->assertStringNotContainsString('flex h-full shrink-0 items-center gap-2 px-3', $nav);
     }
 
-    /** The open page is the underlined tab, and it follows the route. */
-    public function test_only_a_category_page_underlines_a_tab(): void
+    /** The open page is the filled tab, and it follows the route. */
+    public function test_only_a_category_page_fills_a_tab(): void
     {
-        $active = 'font-bold text-zinc-900 underline decoration-2 underline-offset-[6px]';
+        $active = 'bg-[#f4f6f5] px-4 font-bold text-zinc-900';
 
         $home = $this->withoutVite()->get('/')->assertOk()->getContent();
         $this->assertSame(0, substr_count($home, $active), 'Home is not a category page.');
@@ -104,7 +115,7 @@ class CategoryPillsTest extends TestCase
 
         foreach (['/gift-cards', '/esims'] as $url) {
             $html = $this->withoutVite()->get($url)->assertOk()->getContent();
-            $this->assertGreaterThanOrEqual(1, substr_count($html, $active), $url.' should underline its tab.');
+            $this->assertGreaterThanOrEqual(1, substr_count($html, $active), $url.' should fill its tab.');
             $this->assertStringContainsString('aria-current="page"', $html);
         }
     }
