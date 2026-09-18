@@ -804,7 +804,7 @@
                         <a href="{{ route('shop.reviews') }}" wire:navigate class="mt-2 inline-flex items-center gap-2" aria-label="{{ trans_choice('products.detail_rating_aria', $brandReviewAgg['count'], ['rating' => number_format($brandReviewAgg['rating'], 1), 'count' => $brandReviewAgg['count']]) }}">
                             <span class="flex items-center gap-0.5">
                                 @for ($i = 1; $i <= 5; $i++)
-                                    <svg class="h-5 w-5 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-blue-600 dark:text-blue-500' : 'text-zinc-300' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <svg class="h-5 w-5 {{ $i <= (int) round($brandReviewAgg['rating']) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                                     </svg>
                                 @endfor
@@ -818,7 +818,7 @@
                         <ul class="mt-4 space-y-2 text-base text-zinc-800 dark:text-zinc-200">
                             @foreach ($badges as $badge)
                                 <li class="flex items-start gap-2.5">
-                                    <svg class="mt-[7px] h-2.5 w-2.5 shrink-0 text-blue-600 dark:text-blue-500" viewBox="0 0 8 10" fill="currentColor" aria-hidden="true">
+                                    <svg class="mt-[7px] h-2.5 w-2.5 shrink-0 text-[#2563eb]" viewBox="0 0 8 10" fill="currentColor" aria-hidden="true">
                                         <path d="M0 0l8 5-8 5z"/>
                                     </svg>
                                     {{ $badge['label'] }}
@@ -960,7 +960,7 @@
                                                     <span class="block space-y-2 text-sm text-zinc-900 dark:text-white">
                                                         @foreach ($features as [$fIcon, $fLabel])
                                                             <span class="flex items-center gap-2">
-                                                                <svg class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
+                                                                <svg class="h-4 w-4 shrink-0 text-[#2563eb]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $fIcon }}"/></svg>
                                                                 <span>{{ $fLabel }}</span>
                                                             </span>
                                                         @endforeach

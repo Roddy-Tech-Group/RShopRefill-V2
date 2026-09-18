@@ -168,8 +168,9 @@ class ProductReviewsSectionTest extends TestCase
         $this->assertStringContainsString('Delivered in under a minute and the code worked first time.', $section);
 
         // Four filled stars and one empty for a four-star review.
-        $this->assertSame(4, substr_count($section, 'h-4 w-4 text-blue-600 dark:text-blue-500'));
-        $this->assertSame(1, substr_count($section, 'h-4 w-4 text-blue-600/20 dark:text-blue-500/20'));
+        // The closing quote matters: the empty star's class starts with the same text.
+        $this->assertSame(4, substr_count($section, 'h-4 w-4 text-[#2563eb]"'));
+        $this->assertSame(1, substr_count($section, 'h-4 w-4 text-[#2563eb]/25"'));
     }
 
     /**

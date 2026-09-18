@@ -60,7 +60,7 @@
                 </div>
                 <div class="mt-2 flex gap-0.5" aria-hidden="true">
                     @for ($star = 1; $star <= 5; $star++)
-                        <svg class="h-6 w-6 {{ $star <= (int) round($reviewAverage) ? 'text-blue-600 dark:text-blue-500' : 'text-blue-600/20 dark:text-blue-500/20' }}" viewBox="0 0 24 24" fill="currentColor">
+                        <svg class="h-6 w-6 {{ $star <= (int) round($reviewAverage) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                         </svg>
                     @endfor
@@ -153,7 +153,7 @@
                         <p class="mt-0.5 flex items-center gap-2">
                             <span class="flex gap-0.5" aria-label="{{ __('products.reviews_stars_aria', ['rating' => number_format((float) $review->rating, 1)]) }}">
                                 @for ($star = 1; $star <= 5; $star++)
-                                    <svg class="h-4 w-4 {{ $star <= (int) round((float) $review->rating) ? 'text-blue-600 dark:text-blue-500' : 'text-blue-600/20 dark:text-blue-500/20' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <svg class="h-4 w-4 {{ $star <= (int) round((float) $review->rating) ? 'text-[#2563eb]' : 'text-[#2563eb]/25' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                                     </svg>
                                 @endfor
