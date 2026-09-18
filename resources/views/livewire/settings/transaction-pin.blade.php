@@ -138,7 +138,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+<div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
     <div class="mb-5">
         <h2 class="text-base font-semibold text-black">Transaction PIN</h2>
         <p class="mt-0.5 text-xs text-zinc-600">A 4-digit PIN that authorizes payments from your wallet balance.</p>

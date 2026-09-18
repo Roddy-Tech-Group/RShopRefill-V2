@@ -192,7 +192,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
     {{-- Password Tab --}}
     <div x-show="tab === 'password'" x-cloak>
-        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-blue-200 dark:bg-[#0c1a36]/50 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:bg-[#0c1a36]/50 dark:shadow-none">
             <div class="mb-5">
                 <h2 class="text-base font-semibold text-black dark:text-white">Change password</h2>
                 <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">You'll stay signed in on this device after updating.</p>
@@ -305,7 +305,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     {{-- Preferences & Devices Tab --}}
     <div x-show="tab === 'preferences'" x-cloak class="flex flex-col gap-6">
         
-        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-blue-200 dark:bg-[#0c1a36]/50 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:bg-[#0c1a36]/50 dark:shadow-none">
             <div class="mb-5">
                 <h2 class="text-base font-semibold text-black dark:text-white">OTP Preferences</h2>
                 <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Choose when you want to receive Email OTPs for logins.</p>
@@ -364,7 +364,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             </div>
         </div>
 
-        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-blue-200 dark:bg-[#0c1a36]/50 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        <div class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:bg-[#0c1a36]/50 dark:shadow-none">
             <div class="mb-5">
                 <h2 class="text-base font-semibold text-black dark:text-white">Connected Devices</h2>
                 <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Active sessions on your account. Revoke any you don't recognize.</p>

@@ -363,7 +363,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
              panel) inside the card. The card stays rounded via rounded-[12px] (which
              clips the background), the hero content is padded, and the avatar clips
              itself - so nothing else needs the card-level clip. --}}
-        <div class="rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        <div class="rounded-[12px] bg-[#eff6ff] dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             {{-- Hero strip: avatar + name/email + edit toggle --}}
             <div class="relative px-5 pt-6 pb-5 sm:px-6">
                 <div class="flex items-center gap-4 sm:gap-5">
@@ -457,7 +457,10 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                 <a href="{{ route('dashboard.kyc') }}" wire:navigate class="inline-flex items-center rounded-[5px] bg-zinc-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white dark:bg-zinc-700 dark:text-zinc-200">Basic</a>
                             @endif
                         </div>
-                        <p class="mt-0.5 truncate text-[13px] text-zinc-600">Member since {{ $authUser?->created_at?->format('F Y') ?? '—' }}</p>
+                        {{-- The full date, not just the month: "Member since 3 June 2026". --}}
+                        @if ($authUser?->created_at)
+                            <p class="mt-0.5 truncate text-[13px] text-zinc-600">Member since {{ $authUser->created_at->format('j F Y') }}</p>
+                        @endif
 
                         {{-- Remove photo (cropper handles upload+save in one shot, so
                              the previous "Save photo / Cancel" pair lives inside the modal). --}}
@@ -471,15 +474,18 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 @error('avatar') <p class="mt-3 text-xs text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Detail rows --}}
-            <div class="divide-inset">
+            {{-- Detail rows. This card cannot clip (see above), so the last row's
+                 square hover highlight painted past the card's rounded bottom
+                 corners. It takes the card's radius while it IS the bottom of
+                 the card, i.e. while the edit form below is closed. --}}
+            <div class="divide-inset" :class="! editingProfile && '[&>*:last-child]:rounded-b-[12px]'">
                 {{-- Full name --}}
                 <div class="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-zinc-50/60 dark:hover:bg-white/5 sm:px-6">
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Full name</p>
                         <p class="mt-0.5 truncate text-sm font-medium text-black">{{ $authUser?->name ?? '—' }}</p>
                     </div>
-                    <button type="button" @click="editingProfile = true" class="shrink-0 text-zinc-600 transition-colors hover:text-blue-600" aria-label="Edit full name">
+                    <button type="button" @click="editingProfile = true" class="shrink-0 text-zinc-600 transition-colors hover:text-[#0c1337] dark:text-zinc-400 dark:hover:text-white" aria-label="Edit full name">
                         <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
                         </svg>
@@ -748,9 +754,9 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 
         <div class="flex flex-col gap-3">
             {{-- Password + Google on one card --}}
-            <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+            <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             <a href="{{ route('dashboard.security') }}" wire:navigate class="relative flex items-center gap-4 p-4 transition-colors hover:bg-zinc-50/60 dark:hover:bg-white/5 sm:p-5">
-                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0c1337] text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
                     </svg>
@@ -796,7 +802,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         x-data
                         href="{{ route('auth.google.redirect', ['popup' => 1]) }}"
                         @click.prevent="window.rshopOpenGoogleOAuth ? window.rshopOpenGoogleOAuth($el.href) : (window.location.href = $el.href)"
-                        class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+                        class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
                     >Connect</a>
                 @endif
             </div>
@@ -819,7 +825,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     <section x-data x-init="$watch('$wire.notifyPush', val => { if(val) window.RshopPush?.subscribe(); else window.RshopPush?.unsubscribe(); })">
         <h2 class="mb-2.5 text-base font-bold text-zinc-900">Notifications</h2>
 
-        <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             @php
                 // [key, current value, label, description, heroicon path]
                 $notifyRows = [
@@ -834,7 +840,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             @foreach ($notifyRows as [$key, $on, $label, $desc, $iconPath])
                 <div class="flex items-center justify-between gap-3 px-5 py-4 sm:px-6">
                     <span class="flex items-center gap-3">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#0c1337] text-white">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $iconPath }}"/>
                             </svg>
@@ -882,7 +888,9 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     <section class="mt-2">
         <h2 class="mb-2.5 text-base font-bold text-red-600">Danger zone</h2>
 
-        <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none">
+        {{-- Red edge, unlike the other sections' neutral one: everything in
+             here signs you out or closes the account. --}}
+        <div class="divide-inset overflow-hidden rounded-[12px] bg-[#eff6ff] dash-shimmer border border-red-300 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-red-400 dark:border-red-500/50 dark:hover:border-red-500 dark:shadow-none">
             {{-- Logout --}}
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
@@ -891,7 +899,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                     class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left sm:px-6"
                 >
                     <span class="flex items-center gap-3">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0c1337] text-white">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
                             </svg>
@@ -913,7 +921,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                 class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left sm:px-6"
             >
                     <span class="flex items-center gap-3">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0a1729] text-white">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#0c1337] text-white">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                             </svg>
