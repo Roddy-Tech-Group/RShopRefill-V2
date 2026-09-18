@@ -603,14 +603,34 @@
         default => 'shop.gift-cards',
     };
 
+    // Home, then the category, then the subcategory this brand sits in. The
+    // heading draws this same trail, so what a reader sees and what a search
+    // engine is told can never drift apart.
+    $crumbTrail = [
+        ['name' => __('products.detail_crumb_home'), 'url' => url('/')],
+        ['name' => $crumbLabel, 'url' => route($crumbListing)],
+    ];
+
+    if ($product->subcategory?->name) {
+        $crumbTrail[] = [
+            'name' => $product->subcategory->name,
+            'url' => route($crumbListing, ['subcategory' => $product->subcategory->slug]),
+        ];
+    }
+
     $breadcrumbJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'BreadcrumbList',
-        'itemListElement' => [
-            ['@type' => 'ListItem', 'position' => 1, 'name' => __('products.detail_crumb_home'), 'item' => url('/')],
-            ['@type' => 'ListItem', 'position' => 2, 'name' => $crumbLabel, 'item' => route($crumbListing)],
-            ['@type' => 'ListItem', 'position' => 3, 'name' => $pageTitle, 'item' => url()->current()],
-        ],
+        'itemListElement' => collect($crumbTrail)
+            ->push(['name' => $pageTitle, 'url' => url()->current()])
+            ->values()
+            ->map(fn (array $crumb, int $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $crumb['name'],
+                'item' => $crumb['url'],
+            ])
+            ->all(),
     ];
 
     $pageJsonLd = [$productJsonLd, $breadcrumbJsonLd];
@@ -786,12 +806,15 @@
                     @if ($isGiftCard)
                         {{-- The same trail the page's BreadcrumbList carries, country
                              first: where a card can be used narrows it before its kind. --}}
-                        <nav aria-label="{{ __('products.detail_breadcrumb') }}" class="mb-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                            <a href="{{ route($crumbListing, ['country' => $product->country_code]) }}" wire:navigate class="underline underline-offset-2 transition-colors hover:text-blue-700">{{ $countryName }}</a>
-                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                            </svg>
-                            <a href="{{ route($crumbListing) }}" wire:navigate class="underline underline-offset-2 transition-colors hover:text-blue-700">{{ $crumbLabel }}</a>
+                        <nav aria-label="{{ __('products.detail_breadcrumb') }}" class="mb-2 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            @foreach ($crumbTrail as $crumb)
+                                @if (! $loop->first)
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                @endif
+                                <a href="{{ $crumb['url'] }}" wire:navigate class="underline underline-offset-2 transition-colors hover:text-blue-700">{{ $crumb['name'] }}</a>
+                            @endforeach
                         </nav>
                     @endif
 
@@ -1314,8 +1337,8 @@
             <section class="mt-12">
                 <div class="mb-4 flex items-baseline justify-between">
                     <h2 class="text-lg font-bold text-zinc-900">{{ __('products.detail_similar_in', ['country' => $countryName]) }}</h2>
-                    <a href="{{ route($listingRoute, array_filter(['country' => $product->country_code, 'subcategory' => $product->subcategory?->slug])) }}" wire:navigate class="text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700">
-                        {{ __('products.view_all') }} →
+                    <a href="{{ route($listingRoute, array_filter(['country' => $product->country_code, 'subcategory' => $product->subcategory?->slug])) }}" wire:navigate class="text-sm font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700 dark:text-white dark:hover:text-blue-300">
+                        {{ __('products.view_all') }}
                     </a>
                 </div>
 

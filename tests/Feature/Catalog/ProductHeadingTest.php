@@ -84,18 +84,81 @@ class ProductHeadingTest extends TestCase
         ]);
     }
 
-    public function test_the_trail_names_the_country_then_the_kind(): void
+    /** Home, then the category, then the subcategory this brand sits in. */
+    public function test_the_trail_runs_home_category_subcategory(): void
     {
+        $this->product->update([
+            'subcategory_id' => Subcategory::create([
+                'category_id' => $this->product->category_id,
+                'name' => 'Digital Apps',
+                'slug' => 'digital-apps',
+            ])->id,
+        ]);
+
         $html = $this->page();
 
         $this->assertStringContainsString('aria-label="Breadcrumb"', $html);
+        foreach (['>Home</a>', '>Gift Cards</a>', '>Digital Apps</a>'] as $crumb) {
+            $this->assertStringContainsString($crumb, $html);
+        }
 
-        // The country first, narrowing to the kind, both of them real links.
-        $country = strpos($html, 'href="'.e(route('shop.gift-cards', ['country' => 'US'])).'"');
-        $this->assertNotFalse($country, 'The country crumb is not a link to its listing.');
-        $this->assertStringContainsString('>United States</a>', $html);
-        $this->assertStringContainsString('>Gift Cards</a>', $html);
-        $this->assertLessThan(strpos($html, '<h1'), $country);
+        // Each one is a real link, the last narrowing the listing to this family.
+        $this->assertStringContainsString('href="'.e(route('shop.gift-cards', ['subcategory' => 'digital-apps'])).'"', $html);
+        $this->assertLessThan(strpos($html, '<h1'), strpos($html, '>Home</a>'));
+        $this->assertLessThan(strpos($html, '>Digital Apps</a>'), strpos($html, '>Gift Cards</a>'));
+    }
+
+    /** The trail a reader sees is the trail search engines are told. */
+    public function test_the_drawn_trail_and_the_markup_agree(): void
+    {
+        $this->product->update([
+            'subcategory_id' => Subcategory::create([
+                'category_id' => $this->product->category_id,
+                'name' => 'Digital Apps',
+                'slug' => 'digital-apps',
+            ])->id,
+        ]);
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('"@type":"BreadcrumbList"', $html);
+        foreach (['"position":1', '"position":2', '"position":3', '"position":4'] as $position) {
+            $this->assertStringContainsString($position, $html);
+        }
+        $this->assertStringContainsString('"name":"Digital Apps"', $html);
+        $this->assertStringContainsString('"name":"Acme Gift Card"', $html);
+    }
+
+    /** A brand with no subcategory simply has a shorter trail. */
+    public function test_a_brand_with_no_subcategory_has_a_two_step_trail(): void
+    {
+        $html = $this->page();
+
+        $start = strpos($html, 'aria-label="Breadcrumb"');
+        $this->assertNotFalse($start, 'The breadcrumb did not render.');
+        $nav = substr($html, $start, strpos($html, '</nav>', $start) - $start);
+
+        $this->assertStringContainsString('>Home</a>', $nav);
+        $this->assertStringContainsString('>Gift Cards</a>', $nav);
+        $this->assertSame(2, substr_count($nav, '</a>'));
+    }
+
+    /**
+     * No decorative arrow on the link out to the listing: it reads like the
+     * review list's own "show more", an underlined word and nothing else. This
+     * is a source check because the link only draws when the brand has
+     * neighbours in its subcategory, which a fixture here would be inventing.
+     */
+    public function test_the_view_all_link_carries_no_arrow(): void
+    {
+        $source = file_get_contents(resource_path('views/shop/product.blade.php'));
+
+        $this->assertStringContainsString("{{ __('products.view_all') }}", $source);
+        $this->assertStringNotContainsString("{{ __('products.view_all') }} \u{2192}", $source);
+        $this->assertMatchesRegularExpression(
+            '/underline underline-offset-2[^"]*"[^>]*>\s*\{\{ __\(\'products\.view_all\'\) \}\}\s*<\/a>/',
+            $source
+        );
     }
 
     public function test_the_name_leads_at_heading_size(): void
