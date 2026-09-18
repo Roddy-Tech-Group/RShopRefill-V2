@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Models\PaymentOutcome;
 use App\Models\PaymentSession;
 use App\Models\RecoveryAttempt;
+use App\Models\SiteSetting;
 use App\Models\TransactionRecovery;
 use App\Models\User;
+use App\Support\FeatureFlag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
 
@@ -34,6 +38,26 @@ class ValidatePaymentPlatformTest extends TestCase
         $this->assertSame(0, TransactionRecovery::count());
         $this->assertSame(0, RecoveryAttempt::count());
         $this->assertSame(0, User::where('email', 'like', 'payval%')->count());
+    }
+
+    /**
+     * The probes flip feature flags inside a transaction that is rolled back.
+     * The rollback restores each row, but not the cache: a probe that reads a
+     * flag after flipping it caches the temporary value for an hour. Here
+     * payment_insights is flipped back on and then read again while outcomes
+     * are recorded, so a production run with insights switched off used to
+     * leave them reading on until the cache expired. The same trap would catch
+     * payment_backoff_enforce the moment a probe read it late.
+     */
+    public function test_flags_read_their_real_value_after_the_suite_runs(): void
+    {
+        SiteSetting::put('features.payment_insights_enabled', 'off', 'features');
+        SiteSetting::put('features.payment_backoff_enforce_enabled', 'on', 'features');
+
+        Artisan::call('payments:validate');
+
+        $this->assertFalse(FeatureFlag::on('payment_insights'), 'a probe left payment_insights reading on from a stale cache');
+        $this->assertTrue(app(PaymentBackoffManager::class)->enforcementEnabled(), 'a probe left enforcement reading off from a stale cache');
     }
 
     public function test_static_mode_passes_without_touching_the_database(): void

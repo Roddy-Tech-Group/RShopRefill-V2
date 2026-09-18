@@ -4,11 +4,14 @@ namespace App\Console\Commands;
 
 use App\Domain\Risk\Enums\RiskReviewStatus;
 use App\Domain\Risk\Services\RiskMetricsService;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Models\RiskReview;
 use App\Notifications\CriticalSystemAlert;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 
 /**
  * The daily risk report: logs the headline metrics (review / decline / step-up
@@ -51,6 +54,25 @@ class RiskReportCommand extends Command
 
     private function alertOwners(int $breachedCount): void
     {
+        // Telegram first, like every newly opened review. The email owner list
+        // is optional and empty by default, so an email-only alert here would
+        // let held orders sit past their SLA without anyone hearing about it.
+        try {
+            app(OperationalAlerter::class)->send(
+                severity: AlertSeverity::Sev2,
+                key: 'risk:reviews-past-sla',
+                title: 'Risk reviews past SLA',
+                message: $breachedCount.' risk review(s) have breached the '.config('risk.review.sla_hours').'h SLA. Those customers are still waiting for a decision.',
+                context: array_filter([
+                    'breached_reviews' => $breachedCount,
+                    'queue' => Route::has('admin.risk.reviews') ? route('admin.risk.reviews') : null,
+                ]),
+                runbook: 'docs/runbooks/risk-review.md',
+            );
+        } catch (\Throwable $e) {
+            Log::warning('risk.sla_alert_failed', ['channel' => 'operational', 'error' => $e->getMessage()]);
+        }
+
         $owners = array_filter((array) config('risk.review.owners', []));
 
         if ($owners === []) {

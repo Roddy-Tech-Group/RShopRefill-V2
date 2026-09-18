@@ -16,6 +16,7 @@ use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\PaymentMethodNormaliser;
 use App\Domain\PaymentInsights\Enums\ProductLine;
+use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Rewards\Services\RewardEngine;
 use App\Domain\Risk\DTOs\RiskContext;
 use App\Domain\Risk\Services\RiskGate;
@@ -156,7 +157,14 @@ class CheckoutService
         //     reservation and OrderPlaced had all committed, so a throttled
         //     customer was left with an order stranded at Pending forever that
         //     no sweeper could see.
-        $this->paymentSessionService->assertNotRateLimited($user, ProductLine::Checkout->value);
+        //
+        //     Paying from wallet balance is never held. A pause or a card-testing
+        //     lock stops new money coming in; spending money the customer already
+        //     holds cannot test a card, and freezing funds is a separate, human
+        //     decision (the admin wallet hold).
+        if (! in_array($paymentMethod, PaymentBackoffManager::BALANCE_PROVIDERS, true)) {
+            $this->paymentSessionService->assertNotRateLimited($user, ProductLine::Checkout->value);
+        }
 
         // 1. Recalculate and validate cart items/prices (in raw USD)
         $validatedTotals = $this->orderValidationService->validateForCheckout($cart);

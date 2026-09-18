@@ -19,4 +19,7 @@ enum IneligibilityReason: string
 
     /** The gateway never answered, so the customer may have paid. Never invite a second payment. */
     case OutcomeUncertain = 'outcome_uncertain';
+
+    /** Several different cards refused in a short window. Robots do not invite card testers back. */
+    case SuspectedTesting = 'suspected_testing';
 }

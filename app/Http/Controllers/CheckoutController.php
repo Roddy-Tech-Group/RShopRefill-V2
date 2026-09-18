@@ -171,12 +171,13 @@ class CheckoutController extends Controller
             // Without this the catch-all below swallowed the exception's own
             // 429 render() and the buyer saw a generic checkout failure with
             // no idea they simply had to wait.
+            //
+            // The exception renders its own 429 so every surface gets the same
+            // payload, including `locked`: without it the checkout page cannot
+            // tell a six hour lock from a short pause and never shows the lock
+            // notice or the way to contact support.
             if ($request->expectsJson() || $request->ajax()) {
-                return response()->json([
-                    'message' => $e->customerMessage(),
-                    'is_rate_limited' => true,
-                    'wait_seconds' => $e->waitSeconds,
-                ], 429);
+                return $e->render($request);
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());

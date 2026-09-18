@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminFintechController;
 use App\Http\Controllers\Admin\AdminKycController;
 use App\Http\Controllers\Admin\AdminOrderReportController;
+use App\Http\Controllers\Admin\AdminPaymentBackoffController;
 use App\Http\Controllers\Admin\AdminReportExportController;
 use App\Http\Controllers\Admin\AdminRewardAnalyticsController;
 use App\Http\Controllers\Admin\AdminRewardSettingsController;
@@ -223,6 +224,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('risk/reviews/{review}/approve', [AdminRiskReviewController::class, 'approve'])->name('risk.review.approve');
         Route::post('risk/reviews/{review}/reject', [AdminRiskReviewController::class, 'reject'])->name('risk.review.reject');
         Route::post('risk/reviews/{review}/escalate', [AdminRiskReviewController::class, 'escalate'])->name('risk.review.escalate');
+
+        // Payment rate limiter: release a card-testing lock from the signed
+        // link in its Telegram alert. Signed so the link cannot be guessed;
+        // inside the admin group so it still needs an admin session.
+        Route::get('payments/backoff/{event}/lift', [AdminPaymentBackoffController::class, 'lift'])
+            ->middleware('signed')
+            ->name('backoff.lift');
 
         // Customer admin actions: edit profile, ban/unban, hold/release funds,
         // and send a direct (email + dashboard) message.

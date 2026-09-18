@@ -9,6 +9,7 @@ use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
+use App\Domain\PaymentInsights\Jobs\ReconcileRefusedCardsJob;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -248,6 +249,16 @@ class PaymentSessionService
         if ($confirmedOrder) {
             OrderConfirmed::dispatch($confirmedOrder);
         }
+
+        // A Flutterwave popup may have refused other cards under this same
+        // reference before one went through. The gateway never pushes those
+        // refusals, so they are pulled on a queue once the money is safe.
+        // afterCommit: a caller wrapping this in its own transaction that
+        // then rolls back must not leave a job alerting about a payment that
+        // never happened.
+        if ($session->provider === 'flutterwave') {
+            ReconcileRefusedCardsJob::dispatch($session->id)->afterCommit();
+        }
     }
 
     /**
@@ -403,17 +414,94 @@ class PaymentSessionService
             return;
         }
 
-        /** @var PaymentBackoffManager $backoffManager */
-        $backoffManager = app(PaymentBackoffManager::class);
-        $status = $backoffManager->getBackoffStatus(
-            $user,
-            $productLine,
-            request()->ip(),
-            request()->cookie('device_uuid') ?? request()->header('X-Installation-ID')
-        );
+        // Fail open. This guard sits in front of every checkout and every
+        // top-up, so a fault inside the limiter itself (a query the database
+        // rejects, an unreachable cache) must never become a payment outage.
+        // The fault is reported so it is fixed; the customer pays, and the
+        // gateway's own fraud screen still stands in front of the card.
+        try {
+            /** @var PaymentBackoffManager $backoffManager */
+            $backoffManager = app(PaymentBackoffManager::class);
+            $status = $backoffManager->getBackoffStatus(
+                $user,
+                $productLine,
+                request()->ip(),
+                $this->requestDeviceUuid()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+            Log::error('payment_backoff.guard_failed_open', [
+                'user_id' => $user?->getKey(),
+                'product_line' => $productLine,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
 
         if ($status['is_rate_limited']) {
-            throw new PaymentBackoffException($status['wait_seconds']);
+            throw new PaymentBackoffException($status['wait_seconds'], locked: (bool) ($status['locked'] ?? false));
         }
+    }
+
+    /**
+     * The pause or lock this customer is already serving, for a page that is
+     * about to render a pay button.
+     *
+     * Lets checkout and the wallet top-up start the countdown the moment the
+     * page loads, instead of offering Continue to payment after a refresh and
+     * only then being refused. Read-only: it records nothing, so rendering a
+     * page never counts as an attempt or writes an event.
+     *
+     * Null when nothing is being served, when the limiter is off or only
+     * observing, for guests, and on any fault: a page must always render, and
+     * the pre-flight guard still stands behind the button either way.
+     *
+     * @return array{wait_seconds: int, locked: bool, message: string}|null
+     */
+    public function currentHold(?User $user, string $productLine): ?array
+    {
+        if ($user === null || FeatureFlag::off('progressive_backoff')) {
+            return null;
+        }
+
+        // The dashboard renders the wallet sheet more than once; ask once.
+        $memoKey = 'payment_backoff.current_hold.'.$user->getKey().'.'.$productLine;
+        if (request()->attributes->has($memoKey)) {
+            return request()->attributes->get($memoKey);
+        }
+
+        try {
+            $status = app(PaymentBackoffManager::class)->peek(
+                $user,
+                $productLine,
+                request()->ip(),
+                $this->requestDeviceUuid(),
+            );
+
+            $hold = $status['is_rate_limited']
+                ? [
+                    'wait_seconds' => (int) $status['wait_seconds'],
+                    'locked' => (bool) $status['locked'],
+                    'message' => (new PaymentBackoffException((int) $status['wait_seconds'], locked: (bool) $status['locked']))->customerMessage(),
+                ]
+                : null;
+        } catch (\Throwable $e) {
+            report($e);
+            $hold = null;
+        }
+
+        request()->attributes->set($memoKey, $hold);
+
+        return $hold;
+    }
+
+    /**
+     * The device fingerprint this request carries: the browser's persistent
+     * cookie, or the installation id a native app sends.
+     */
+    private function requestDeviceUuid(): ?string
+    {
+        return request()->cookie('device_uuid') ?? request()->header('X-Installation-ID');
     }
 }

@@ -54,6 +54,11 @@
         }
     }
 
+    // A pause or lock the customer is already serving, so a refreshed page
+    // starts the countdown straight away instead of offering Continue to
+    // payment and only then refusing it. Null when nothing is being served.
+    $paymentHold = app(\App\Domain\Payment\Services\PaymentSessionService::class)->currentHold($user, 'checkout');
+
     $fieldClass = 'mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-base text-zinc-900 dark:text-white outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-zinc-500';
 
     $rcoinConfig = [
@@ -109,7 +114,7 @@
             class="mt-4"
         />
 
-        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees))">
+        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees), @js($paymentHold))">
 
             {{-- Loading — until the cart store's first fetch resolves --}}
             <div x-show="!$store.cart.hydrated" class="pure-card flex items-center justify-center rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 py-24 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10">
@@ -793,17 +798,22 @@
                          merges into the account at sign-in and the modal
                          returns them right here to pay. --}}
                     @auth
-                        <button type="submit" :disabled="!canContinue() || submitting || backoffRemaining > 0"
+                        {{-- A pause disables the button while it counts down. A lock
+                             leaves it tappable: tapping reopens the lock notice, the
+                             only place a locked customer can reach support. Paying
+                             from wallet balance is never held, so choosing wallet
+                             shows the ordinary button whatever is being served. --}}
+                        <button type="submit" :disabled="!canContinue() || submitting || (backoffApplies() && ! backoffLocked)"
                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
-                            <template x-if="backoffRemaining > 0">
-                                <span class="flex items-center gap-2" x-text="@js(__('checkout.backoff_wait')).replace(':seconds', backoffRemaining)"></span>
+                            <template x-if="backoffApplies()">
+                                <span class="flex items-center gap-2" x-text="backoffLabel()"></span>
                             </template>
-                            <template x-if="!submitting && backoffRemaining === 0">
+                            <template x-if="!submitting && ! backoffApplies()">
                                 <span class="flex items-center gap-2">
                                     {{ __('checkout.continue_to_payment') }}
                                 </span>
                             </template>
-                            <template x-if="submitting && backoffRemaining === 0">
+                            <template x-if="submitting && ! backoffApplies()">
                                 <span class="flex items-center gap-2">
                                     <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
@@ -872,7 +882,10 @@
                     <x-close-button @click="closeModal()" class="absolute right-4 top-4" :aria-label="__('common.close')" />
 
                     <!-- Active Payment Session Details & Wizard -->
-                    <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice'" class="mt-2">
+                    {{-- Every panel that can open without a payment session must be
+                         listed here, or the modal opens empty. backoff_notice (the
+                         card-testing lock) never has a session. --}}
+                    <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice' || paymentState === 'backoff_notice'" class="mt-2">
                         <!-- Countdown timer banner -->
                         <div x-show="['awaiting_transfer', 'awaiting_confirmation', 'action_pin', 'action_otp', 'action_3ds'].includes(paymentState)" 
                              class="mb-5 flex items-center justify-between rounded-[12px] bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
@@ -1197,6 +1210,35 @@
                             </div>
                         </div>
 
+                        {{-- Payments paused: the card-testing limiter held this
+                             attempt. Deliberately NOT the red failure state, which
+                             would read as another decline and push a real customer
+                             to try one more card. Amber, a live countdown, and a
+                             way to reach a human, because the only person who ever
+                             sees the six hour hold and deserves help is the
+                             customer it caught by mistake. --}}
+                        <div x-show="paymentState === 'backoff_notice'" x-cloak class="flex flex-col items-center py-6 text-center">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-500/15">
+                                <svg class="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5V12l2.75 1.75"/>
+                                </svg>
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">Suspicious payments detected</h3>
+                            <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="backoffMessage"></p>
+
+                            <p x-show="backoffRemaining > 0" x-cloak class="mt-3 rounded-[10px] bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300" x-text="'Try again in ' + backoffCountdown()"></p>
+
+                            <div class="mt-6 flex items-center justify-center gap-2.5">
+                                <a href="{{ route('shop.contact') }}" class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5">
+                                    Contact support
+                                </a>
+                                <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+
                         {{-- KYC step-up: the risk/KYC gate asked for identity
                              verification. The customer taps Verify to open Smile ID;
                              the checkout resubmits automatically once verified. --}}
@@ -1226,7 +1268,7 @@
     </div>
 
     <script>
-        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees) {
+        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees, initialHold = null) {
             return {
                 method: 'card',
                 crypto: '',
@@ -1431,6 +1473,13 @@
                 paymentState: 'idle',
                 errorMessage: '',
                 actionMessage: '',
+                // Whether the current hold is the six hour device lock rather
+                // than a short pause. Drives the heading only; the sentence
+                // itself comes from the server so the two can never disagree.
+                backoffLocked: false,
+                // The lock notice's sentence, kept apart from errorMessage,
+                // which every new attempt clears.
+                backoffMessage: '',
                 // KYC step-up: the Smile session + the form to resubmit once the
                 // customer taps Verify and finishes identity verification.
                 kycMessage: '',
@@ -1466,6 +1515,15 @@
                     this.rcoinConfig = rcoinConfig;
                     this.resetCardDetails();
                     this.detectApplePay();
+
+                    // A pause or lock already being served when the page loaded:
+                    // start the countdown now, so a refresh never offers Continue
+                    // to payment only to refuse it a moment later.
+                    if (initialHold && initialHold.wait_seconds > 0) {
+                        this.backoffLocked = !! initialHold.locked;
+                        this.backoffMessage = initialHold.message || '';
+                        this.startBackoff(initialHold.wait_seconds);
+                    }
 
                     // If the default method's gateway is switched off, land the
                     // customer on the first live one instead of a grey tile.
@@ -1776,17 +1834,69 @@
                 
                 backoffRemaining: 0,
                 backoffInterval: null,
-                
+                // When the hold ends, as a wall-clock time, and how long it was
+                // when it started. The end time keeps the countdown true after
+                // the tab has been in the background (browsers slow timers
+                // there to once a minute); the starting length decides the
+                // wording, so it never changes halfway through a countdown.
+                backoffEndsAt: 0,
+                backoffTotal: 0,
+
                 startBackoff(seconds) {
-                    this.backoffRemaining = seconds;
+                    const total = Math.max(0, Math.round(Number(seconds) || 0));
+
+                    this.backoffTotal = total;
+                    this.backoffEndsAt = Date.now() + total * 1000;
+                    this.backoffRemaining = total;
+
                     if (this.backoffInterval) clearInterval(this.backoffInterval);
                     this.backoffInterval = setInterval(() => {
-                        if (this.backoffRemaining > 0) {
-                            this.backoffRemaining--;
-                        } else {
+                        this.backoffRemaining = Math.max(0, Math.ceil((this.backoffEndsAt - Date.now()) / 1000));
+
+                        if (this.backoffRemaining === 0) {
                             clearInterval(this.backoffInterval);
                         }
                     }, 1000);
+                },
+
+                /**
+                 * The time left as a running clock: 5:59:59 for the lock, 4:59
+                 * for the pauses. Exact to the second, so it never rounds to an
+                 * odd "about 60 minutes".
+                 */
+                backoffCountdown() {
+                    const left = Math.max(0, this.backoffRemaining);
+                    const hours = Math.floor(left / 3600);
+                    const minutes = Math.floor((left % 3600) / 60);
+                    const seconds = left % 60;
+                    const pad = (value) => String(value).padStart(2, '0');
+
+                    return hours > 0
+                        ? hours + ':' + pad(minutes) + ':' + pad(seconds)
+                        : minutes + ':' + pad(seconds);
+                },
+
+                /**
+                 * Whether a running hold covers the method picked right now.
+                 * Wallet balance is never held, so it never shows a countdown.
+                 */
+                backoffApplies() {
+                    return this.backoffRemaining > 0 && this.method !== 'wallet';
+                },
+
+                /**
+                 * The pay button's label while a hold is running. The five
+                 * minute pause says why; the one minute pause and the lock just
+                 * show the clock, the lock's reason being on its notice. Chosen
+                 * from the hold's starting length, so the wording stays put
+                 * while the clock runs down.
+                 */
+                backoffLabel() {
+                    if (! this.backoffLocked && this.backoffTotal > 60) {
+                        return @js(__('checkout.backoff_too_many')).replace(':time', this.backoffCountdown());
+                    }
+
+                    return @js(__('checkout.backoff_try_again')).replace(':time', this.backoffCountdown());
                 },
 
                 canContinue() {
@@ -1808,6 +1918,14 @@
                 },
 
                 async submitCheckout(e) {
+                    // A lock already known to this page: show its notice again
+                    // without asking the server, which would only refuse.
+                    if (this.backoffLocked && this.backoffApplies()) {
+                        this.paymentState = 'backoff_notice';
+                        this.open = true;
+                        return;
+                    }
+
                     if (this.method === 'wallet' && !this.hasTransactionPin) {
                         this.submitting = false;
                         this.paymentState = 'error';
@@ -1886,11 +2004,28 @@
                         if (!response.ok) {
                             this.submitting = false;
                             if (response.status === 429 && resData.is_rate_limited) {
+                                // Not a failure: nothing was charged and nothing
+                                // was even attempted. The red cross would read as
+                                // another decline and send them to try one more
+                                // card, which is the behaviour being throttled.
                                 this.startBackoff(resData.wait_seconds);
-                                this.errorMessage = resData.error || @js(__('checkout.too_many_attempts'));
-                            } else {
-                                this.errorMessage = resData.message || @js(__('checkout.checkout_failed_retry'));
+                                this.backoffLocked = !! resData.locked;
+
+                                // A short pause interrupts nobody: the pay button
+                                // carries its own countdown and the customer stays
+                                // on their checkout. Only the six hour lock, which
+                                // they cannot wait out, is worth a panel and a way
+                                // to reach a human.
+                                if (this.backoffLocked) {
+                                    this.backoffMessage = resData.message || resData.error || @js(__('checkout.backoff_locked'));
+                                    this.paymentState = 'backoff_notice';
+                                    this.open = true;
+                                }
+
+                                return;
                             }
+
+                            this.errorMessage = resData.message || @js(__('checkout.checkout_failed_retry'));
                             // Show error modal instead of alert
                             this.paymentState = 'error';
                             this.open = true;

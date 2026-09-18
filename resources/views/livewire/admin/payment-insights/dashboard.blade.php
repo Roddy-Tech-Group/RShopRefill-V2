@@ -289,8 +289,13 @@ class extends Component {
                             <td class="{{ $td }} whitespace-nowrap">{{ $failure['provider'] ?: 'unknown' }}{{ $failure['payment_method'] ? ' · '.$failure['payment_method'] : '' }}</td>
                             <td class="{{ $td }} whitespace-nowrap">
                                 <span class="font-semibold text-zinc-900 dark:text-white">{{ $failure['label'] }}</span>
-                                @if ($failure['retryable'])
+                                @if ($failure['suspected_testing'] ?? false)
+                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">suspected testing</span>
+                                @elseif ($failure['retryable'])
                                     <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">retryable</span>
+                                @endif
+                                @if (($failure['refused_cards'] ?? 0) > 1)
+                                    <span class="block text-[11px] text-zinc-400 dark:text-zinc-500">{{ $failure['refused_cards'] }} cards refused</span>
                                 @endif
                             </td>
                             <td class="{{ $td }} pr-5 text-zinc-500 dark:text-zinc-400">

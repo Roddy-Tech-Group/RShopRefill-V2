@@ -171,6 +171,11 @@ class EsimTopupController extends Controller
         // pass the same risk/KYC/spending-limit seam as checkout - otherwise
         // this is the one unguarded exit for draining a funded wallet. Runs
         // before the PIN check and before anything is written.
+        //
+        // The payment rate limiter deliberately does NOT apply here. A top-up
+        // spends a balance the customer already holds, and a pause or a
+        // card-testing lock only stops new money coming in. Freezing funds is
+        // a separate, human decision: the admin wallet hold.
         try {
             $this->riskGate->guard(RiskContext::capture(
                 user: $user,
