@@ -138,7 +138,7 @@
                     <a
                         :href="'{{ $shopRoute('checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')"
                         wire:navigate
-                        class="flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700"
+                        class="flex h-11 w-full items-center justify-center rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                     >
                         {{ __('checkout.proceed_to_checkout') }}
                     </a>
