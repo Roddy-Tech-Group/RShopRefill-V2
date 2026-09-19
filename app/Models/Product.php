@@ -24,7 +24,7 @@ class Product extends Model
      *
      * @var array<int, string>
      */
-    protected array $translatable = ['name', 'description', 'redeem_instructions', 'terms_and_conditions'];
+    protected array $translatable = ['name', 'description', 'redeem_instructions', 'terms_and_conditions', 'protip'];
 
     use HasFactory, SoftDeletes;
 
@@ -312,6 +312,7 @@ class Product extends Model
         'slug',
         'description',
         'redeem_instructions',
+        'protip',
         'terms_and_conditions',
         'logo_url',
         'featured_image',

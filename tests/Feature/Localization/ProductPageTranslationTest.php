@@ -188,8 +188,9 @@ class ProductPageTranslationTest extends TestCase
             'Payment currency',
             'Points you earn',
             'May only be redeemable in United States',
-            'Not in United States?',
-            'Find your country',
+            // "Not in X? Find your country" is a top-up and bill line now: a gift
+            // card sold in one country has nowhere to send you, and one sold in
+            // several offers its own regions instead (BrandRegionPickerTest).
             'Buy Acme Gift Card in United States',
             'How to buy Acme gift card',
             'Receive your redemption code by email instantly, then redeem it at Acme.',

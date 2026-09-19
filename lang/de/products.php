@@ -226,4 +226,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'Mit Krypto, Bankkarte oder Mobile Money. Der Preis in Ihrer gewählten Währung ist der Preis, den Sie zahlen.',
     'detail_faq_gift_card_expiry_q' => 'Läuft der Code ab?',
     'detail_faq_gift_card_expiry_a' => 'Eine Gültigkeitsfrist legt :brand fest, nicht wir, und sie steht in den Bedingungen auf dieser Seite. Ihre Bestellseite bewahrt den Code auf, solange Sie Ihr Konto haben.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'Vor dem Kauf',
+    'detail_protip_region' => 'Eine Geschenkkarte funktioniert unter Umständen nur in dem Land, für das sie ausgestellt wurde. Wo immer Sie sie einlösen, im Laden oder auf einem Konto: prüfen Sie vor der Zahlung, dass dieses Land :country ist. Sobald ein Code erzeugt ist, ist der Kauf endgültig, und eine Karte für das falsche Land lässt sich nicht erstatten.',
+    'detail_protip_policy_link' => 'Rückerstattungsrichtlinie lesen',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Andere Region wählen',
 ];

@@ -228,4 +228,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'Com cripto, cartão bancário ou mobile money. O preço mostrado na sua moeda é o que paga.',
     'detail_faq_gift_card_expiry_q' => 'O código expira?',
     'detail_faq_gift_card_expiry_a' => 'Qualquer validade é definida pela :brand, não por nós, e consta nos termos desta página. A sua página de encomenda guarda o código enquanto tiver a sua conta.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'Antes de comprar',
+    'detail_protip_region' => 'Um cartão presente pode funcionar apenas no país para o qual foi emitido. Onde quer que o resgate, numa loja ou numa conta, confirme que esse país é :country antes de pagar: assim que um código é gerado a compra é definitiva, por isso um cartão comprado para o país errado não pode ser reembolsado.',
+    'detail_protip_policy_link' => 'Ler a política de reembolso',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Escolher outra região',
 ];

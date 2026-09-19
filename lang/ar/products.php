@@ -230,4 +230,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'بالعملات الرقمية أو البطاقة البنكية أو المحفظة عبر الهاتف. السعر الظاهر بعملتك هو ما تدفعه.',
     'detail_faq_gift_card_expiry_q' => 'هل ينتهي صلاحية الرمز؟',
     'detail_faq_gift_card_expiry_a' => 'أي مدة صلاحية تحددها :brand وليس نحن، وهي مذكورة في الشروط في هذه الصفحة. وتحتفظ صفحة طلبك بالرمز ما دام حسابك قائمًا.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'قبل الشراء',
+    'detail_protip_region' => 'قد لا تعمل بطاقة الهدايا إلا في البلد الذي صدرت من أجله. أينما استخدمتها، في متجر أو على حساب، تأكد أن ذلك البلد هو :country قبل الدفع: فبمجرد إنشاء الرمز يصبح الشراء نهائيًا، ولا يمكن استرداد بطاقة اشتُريت لبلد غير صحيح.',
+    'detail_protip_policy_link' => 'اقرأ سياسة الاسترداد',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'اختر منطقة أخرى',
 ];

@@ -227,4 +227,12 @@ return [
     'detail_faq_gift_card_payment_a' => '可用加密货币、银行卡或移动钱包付款。你所选币种下显示的价格即为实付价格。',
     'detail_faq_gift_card_expiry_q' => '兑换码会过期吗？',
     'detail_faq_gift_card_expiry_a' => '有效期由 :brand 设定，不是我们，并写在本页的条款中。只要账号还在，订单页面就会一直保留兑换码。',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => '购买前须知',
+    'detail_protip_region' => '礼品卡可能只能在发行国使用。无论你是在门店还是在账号中兑换，付款前请确认该国家是 :country：兑换码一经生成，订单即为最终交易，为错误国家购买的卡片无法退款。',
+    'detail_protip_policy_link' => '查看退款政策',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => '选择其他地区',
 ];

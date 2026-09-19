@@ -226,4 +226,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'Kwa sarafu ya kidijitali, kadi ya benki au pesa ya simu. Bei unayoona kwa sarafu uliyochagua ndiyo unayolipa.',
     'detail_faq_gift_card_expiry_q' => 'Je, msimbo huisha muda?',
     'detail_faq_gift_card_expiry_a' => 'Muda wowote wa kuisha huwekwa na :brand, si sisi, na umeandikwa katika masharti ya ukurasa huu. Ukurasa wa oda yako huhifadhi msimbo kadri unavyokuwa na akaunti yako.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'Kabla hujanunua',
+    'detail_protip_region' => 'Kadi ya zawadi huenda ikafanya kazi tu katika nchi iliyotolewa kwa ajili yake. Popote unapoitumia, dukani au kwenye akaunti, hakikisha nchi hiyo ni :country kabla ya kulipa: mara msimbo unapotengenezwa ununuzi huwa wa mwisho, hivyo kadi iliyonunuliwa kwa nchi isiyo sahihi hairudishiwi pesa.',
+    'detail_protip_policy_link' => 'Soma sera ya kurejesha pesa',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Chagua eneo lingine',
 ];

@@ -228,4 +228,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'Con cripto, tarjeta bancaria o dinero móvil. El precio que ves en tu moneda es el que pagas.',
     'detail_faq_gift_card_expiry_q' => '¿El código caduca?',
     'detail_faq_gift_card_expiry_a' => 'Cualquier caducidad la fija :brand, no nosotros, y consta en los términos de esta página. Tu página de pedido guarda el código mientras tengas tu cuenta.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'Antes de comprar',
+    'detail_protip_region' => 'Una tarjeta regalo puede funcionar solo en el país para el que se emitió. La canjees donde la canjees, en una tienda o en una cuenta, comprueba que ese país sea :country antes de pagar: en cuanto se genera un código la compra es definitiva, así que una tarjeta comprada para otro país no se puede reembolsar.',
+    'detail_protip_policy_link' => 'Leer la política de reembolso',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Elegir otra región',
 ];

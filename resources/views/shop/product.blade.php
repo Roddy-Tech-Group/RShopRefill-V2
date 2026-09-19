@@ -2,6 +2,7 @@
     use App\Domain\Cart\Services\CartPricingService;
     use App\Models\CurrencyRate;
     use App\Models\Product;
+    use App\Support\TaggedCache;
 
     /**
      * @var \App\Models\Product $product  The country-specific representative Product for this brand.
@@ -86,14 +87,31 @@
 
     // Every country this brand has an active product in — i.e. the full set of
     // regions the card can be redeemed in. Drives the "redeemable in" chips.
-    $brandCountries = Product::query()
-        ->where('brand_key', $brandKey)
-        ->where('is_active', true)
-        ->whereNotNull('country_code')
-        ->distinct()
-        ->orderByRaw("country_code = '" . addslashes($product->country_code) . "' DESC")
-        ->orderBy('country_code')
-        ->pluck('country_code');
+    // Scoped to the category because one brand_key can span two of them (Epic is
+    // both a gift card and an airtime brand today), and an unscoped list would
+    // offer airtime countries on a gift card page. Out-of-stock rows are left
+    // out for the same reason: a region you cannot buy in is not a region to
+    // offer. The visitor's own country is floated to the front afterwards, in
+    // PHP, so the query is identical for every visitor and can be cached per
+    // brand rather than per brand and region.
+    $brandCountries = TaggedCache::for(['catalog'])->remember(
+        "brand_countries_{$categorySlug}_{$brandKey}",
+        3600,
+        fn () => Product::query()
+            ->where('brand_key', $brandKey)
+            ->where('category_id', $product->category_id)
+            ->where('is_active', true)
+            ->where('is_out_of_stock', false)
+            ->whereNotNull('country_code')
+            ->distinct()
+            ->orderBy('country_code')
+            ->pluck('country_code')
+            ->all()
+    );
+
+    $brandCountries = collect($brandCountries)
+        ->sortByDesc(fn (string $code) => $code === $product->country_code)
+        ->values();
 
     // Primary redemption URL — a curated override (config/brand_urls.php), else
     // the first link inside Zendit's redemption instructions — so the customer
@@ -1147,6 +1165,37 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
                     </svg>
                 </a>
+            @endif
+
+            {{-- The one thing worth knowing BEFORE paying. A brand with its own
+                 warning shows that; every other gift card shows the one that is
+                 true of all of them, because a code bought against the wrong
+                 country is the single most common way a customer ends up with
+                 something they cannot use, and by then it cannot be refunded.
+
+                 The blue here is the legal pages' own info box. This app remaps
+                 every pale blue to a neutral grey, so it reads as a quiet card in
+                 daylight and takes the ash surface at night, beside the accordions
+                 rather than competing with the amber out-of-stock notice above.
+
+                 The ring is load-bearing, not decoration: the dashboard renders
+                 this same page on a ground of exactly this fill, so without an
+                 edge the box would vanish into it there. --}}
+            @if ($isGiftCard)
+                <div class="flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-200 dark:ring-white/10">
+                    <svg class="mt-0.5 h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('products.detail_protip_title') }}</p>
+                        <p class="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+                            {{ $product->protip ?: __('products.detail_protip_region', ['country' => $countryName]) }}
+                            @unless ($product->protip)
+                                <a href="{{ route('shop.refund-policy') }}" wire:navigate class="font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700 dark:text-white dark:hover:text-blue-300">{{ __('products.detail_protip_policy_link') }}</a>
+                            @endunless
+                        </p>
+                    </div>
+                </div>
             @endif
 
             {{-- How to redeem. Suppliers send steps for some brands and nothing for

@@ -233,4 +233,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'En crypto, par carte bancaire ou en mobile money. Le prix affiché dans la devise choisie est celui que vous payez.',
     'detail_faq_gift_card_expiry_q' => 'Le code expire-t-il ?',
     'detail_faq_gift_card_expiry_a' => 'Toute date de validité est fixée par :brand, pas par nous, et figure dans les conditions de cette page. Votre page de commande conserve le code tant que vous avez votre compte.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'À savoir avant d\'acheter',
+    'detail_protip_region' => 'Une carte cadeau peut n\'être utilisable que dans le pays pour lequel elle a été émise. Où que vous l\'utilisiez, en magasin ou sur un compte, vérifiez que ce pays est bien :country avant de payer : dès qu\'un code est généré, l\'achat est définitif, et une carte achetée pour le mauvais pays ne peut pas être remboursée.',
+    'detail_protip_policy_link' => 'Lire la politique de remboursement',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Choisir une autre région',
 ];

@@ -228,4 +228,12 @@ return [
     'detail_faq_gift_card_payment_a' => 'Da kuɗin dijital, katin banki ko kuɗin waya. Farashin da ka gani a kuɗin da ka zaɓa shi ne abin da za ka biya.',
     'detail_faq_gift_card_expiry_q' => 'Lambar tana ƙarewa?',
     'detail_faq_gift_card_expiry_a' => 'Duk wani lokacin ƙarewa :brand ce ke sakawa, ba mu ba, kuma an rubuta shi cikin sharuɗɗan wannan shafin. Shafin odarka yana ajiye lambar muddin kana da asusunka.',
+
+    // The warning above "How to redeem", for a brand that has none of its own.
+    'detail_protip_title' => 'Kafin ka saya',
+    'detail_protip_region' => 'Katin kyauta na iya yin aiki ne kawai a ƙasar da aka ba da shi. Duk inda ka yi amfani da shi, a shago ko a asusu, tabbatar cewa ƙasar ita ce :country kafin ka biya: da zarar an ƙirƙiri lamba, sayan ya zama na ƙarshe, don haka katin da aka saya don ƙasar da ba ta dace ba, ba a mayar da kuɗinsa ba.',
+    'detail_protip_policy_link' => 'Karanta manufar mayar da kuɗi',
+
+    // The region picker under the country line, for a brand sold in several.
+    'detail_choose_region' => 'Zaɓi wani yanki',
 ];
