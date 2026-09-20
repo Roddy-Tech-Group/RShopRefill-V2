@@ -42,9 +42,15 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
         $isTopup = $categorySlug === 'mobile-airtime' || $categorySlug === 'topups' || strpos($title, 'top up') !== false;
         $isBill = $categorySlug === 'bill-payments' || strpos($title, 'bill') !== false;
 
-        $email = 'dev@roddytechgroup.com';
-        $firstName = 'Rshop';
-        $lastName = 'Refills';
+        $order = $item->order;
+        $user = $order?->user;
+        $orderMeta = $order?->metadata ?? [];
+
+        $email = $orderMeta['delivery_email'] ?? $user?->email ?? 'dev@roddytechgroup.com';
+
+        $nameParts = explode(' ', $user?->name ?? 'Rshop Refills', 2);
+        $firstName = $nameParts[0] ?: 'Rshop';
+        $lastName = $nameParts[1] ?? 'Refills';
 
         // Zendit treats transactionId as unique forever - a failed transaction
         // burns its ID ("transaction_duplicate_id" on reuse). Manual retries
