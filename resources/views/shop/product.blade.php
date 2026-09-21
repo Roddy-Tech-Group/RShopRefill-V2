@@ -36,6 +36,11 @@
     $fixedDenoms = $variants->where('is_variable', false)->sortBy('retail_price')->values();
     $variable    = $variants->where('is_variable', true)->first();
 
+    // Ask for the account number whenever the supplier needs it: every bill,
+    // and any other offer whose supplier lists it as required (betting
+    // wallets, electricity brands that sync in as gift cards).
+    $needsAccountId = $isBill || $variants->contains(fn ($v) => $v->requiresAccountId());
+
     $currency = $product->currency_code ?: 'USD';
 
     $symbols = [
@@ -592,7 +597,7 @@
             customMax: @js($customDisplayMax),
             requiresRecipientPhone: @js($isTopup),
             defaultDialCode: @js($dialCode),
-            requiresAccountId: @js($isBill),
+            requiresAccountId: @js($needsAccountId),
             rcoinConfig: @js([
                 'enabled' => (bool) \App\Models\Setting::get('rcoin_enabled', true),
                 'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 0.5),
@@ -1093,15 +1098,16 @@
                         </div>
                     </div>
 
-                    {{-- Account ID — bill payments only. Captures the meter
-                         number / customer ID the biller expects. Mirrors the
-                         top-up phone pattern: validated client-side, blocks
-                         Add to cart until non-empty, persisted to cart→order
-                         metadata for the Zendit billing.accountId field. --}}
-                    @if ($isBill)
+                    {{-- Account ID — bills, and any offer whose supplier needs
+                         it. Captures the meter number / account ID the biller
+                         expects. Mirrors the top-up phone pattern: validated
+                         client-side, blocks Add to cart until non-empty,
+                         persisted to cart→order metadata for the Zendit
+                         billing.accountId field. --}}
+                    @if ($needsAccountId)
                         <div>
                             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                                {{ $brandName }} account / meter number
+                                {{ $brandName }} {{ $isBill ? 'account / meter number' : 'account number' }}
                             </label>
                             <div
                                 :class="accountIdValid()

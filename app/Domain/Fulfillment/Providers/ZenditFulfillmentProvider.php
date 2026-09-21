@@ -149,14 +149,45 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             }
             $endpoint = '/vouchers/purchases'; // Zendit routes bills through the same vouchers endpoint
         } else {
+            $fields = [
+                ['key' => 'recipient.email', 'value' => $email],
+                ['key' => 'recipient.firstName', 'value' => $firstName],
+                ['key' => 'recipient.lastName', 'value' => $lastName],
+            ];
+
+            // Some offers outside Bill Payments are paid straight into the
+            // customer's account (betting wallets, electricity brands that
+            // sync in as gift cards). Zendit lists billing.accountId as
+            // required for those and refuses the purchase without it.
+            if ($this->offerRequiresAccountId($item)) {
+                $accountId = trim((string) ($item->metadata['account_id'] ?? ''));
+
+                if ($accountId === '') {
+                    Log::error("Zendit voucher: missing account_id on order item {$item->id}");
+
+                    FulfillmentLog::create([
+                        'order_item_id' => $item->id,
+                        'provider_name' => 'zendit',
+                        'request_payload' => ['offerId' => $offerId, 'transactionId' => $customTransactionId],
+                        'response_payload' => null,
+                        'status' => 'FAILED',
+                        'error_message' => 'No account_id in order item metadata',
+                    ]);
+
+                    return [
+                        'status' => FulfillmentStatus::Failed,
+                        'reference' => null,
+                        'payload' => ['error' => 'No account number on file for this purchase.'],
+                    ];
+                }
+
+                array_unshift($fields, ['key' => 'billing.accountId', 'value' => $accountId]);
+            }
+
             $requestPayload = [
                 'offerId' => $offerId,
                 'transactionId' => $customTransactionId,
-                'fields' => [
-                    ['key' => 'recipient.email', 'value' => $email],
-                    ['key' => 'recipient.firstName', 'value' => $firstName],
-                    ['key' => 'recipient.lastName', 'value' => $lastName],
-                ],
+                'fields' => $fields,
             ];
 
             // For variable price items, Zendit requires value in minor units
@@ -273,6 +304,22 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                 'payload' => [],
             ];
         }
+    }
+
+    /**
+     * Whether Zendit needs the customer's account number for this offer. The
+     * variant snapshot taken at checkout carries the offer's requiredFields;
+     * the live variant is the fallback for items that predate it.
+     */
+    private function offerRequiresAccountId(OrderItem $item): bool
+    {
+        $required = data_get($item->variant_snapshot, 'metadata.requiredFields');
+
+        if (is_array($required)) {
+            return in_array('billing.accountId', $required, true);
+        }
+
+        return (bool) $item->variant?->requiresAccountId();
     }
 
     /**

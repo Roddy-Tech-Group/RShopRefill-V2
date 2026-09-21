@@ -15,6 +15,7 @@ use App\Support\FeatureFlag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Storefront-facing cart endpoints.
@@ -93,6 +94,12 @@ class CartWebController extends Controller
 
         [$cart, $token] = $this->resolve($request);
         $variant = ProductVariant::findOrFail($data['product_variant_id']);
+
+        // An offer paid straight into an account cannot be delivered without
+        // the account number; refuse it here rather than after payment.
+        if ($variant->requiresAccountId() && trim((string) data_get($data, 'metadata.account_id', '')) === '') {
+            throw ValidationException::withMessages(['metadata.account_id' => 'Enter the account number this should be paid into.']);
+        }
 
         $item = $this->cartManager->addItem(
             $cart,

@@ -61,4 +61,16 @@ class ProductVariant extends Model
     {
         return $this->belongsTo(Subcategory::class);
     }
+
+    /**
+     * Whether the supplier needs the customer's account number to deliver this
+     * offer (a meter number, a betting wallet ID). Zendit says so per offer in
+     * requiredFields, which the catalogue sync keeps in metadata; the category
+     * alone is not enough, since betting and utility brands also sync in as
+     * gift cards.
+     */
+    public function requiresAccountId(): bool
+    {
+        return in_array('billing.accountId', (array) data_get($this->metadata, 'requiredFields', []), true);
+    }
 }
