@@ -22,8 +22,12 @@ class SyncEsimStatusCommand extends Command
 
     protected $description = 'Refresh eSIM status and remaining data from the supplier.';
 
-    /** Airalo allows 5 calls a second per company; stay under it. */
-    private const PAUSE_MICROSECONDS = 250_000;
+    /**
+     * Airalo allows 5 calls a second for the whole company, shared with live
+     * purchases. Two a second leaves room for customers buying at the same
+     * moment, so the sync can never push a real purchase into a refusal.
+     */
+    private const PAUSE_MICROSECONDS = 500_000;
 
     public function handle(EsimUsageSync $sync): int
     {

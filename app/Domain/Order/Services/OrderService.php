@@ -174,8 +174,17 @@ class OrderService
 
         // Everything went back, so every eSIM on the order is refunded too:
         // Manage eSIMs shows it and never offers a second refund.
+        //
+        // Fail open, like the refund ledger: this runs after the gateway has
+        // moved the money, so a failure here (the eSIM table not migrated yet
+        // during a deploy, say) must never roll back the refund's own record.
+        // A missed mark is repaired by esims:backfill.
         if ($isFullyRefunded) {
-            EsimRegistry::markOrderEsimsRefunded($order);
+            try {
+                EsimRegistry::markOrderEsimsRefunded($order);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
     }
 
