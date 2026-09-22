@@ -234,6 +234,12 @@
                                     <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $toneFor($item->fulfillment_status?->value) }}">
                                         {{ $item->fulfillment_status?->label() ?? 'Not Started' }}
                                     </span>
+                                    {{-- eSIM refunds made from Manage eSIMs, per eSIM on the line. --}}
+                                    @foreach ($item->esims->filter(fn ($esim) => $esim->isRefunded() || $esim->isRefundPending()) as $esim)
+                                        <a href="{{ route('admin.esims.show', $esim) }}" class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $esim->isRefunded() ? $toneFor('refunded') : $toneFor('pending') }}" title="{{ $esim->iccid }}">
+                                            {{ $esim->isRefunded() ? 'eSIM refunded' : 'eSIM refund pending' }}{{ $item->quantity > 1 ? ' · '.substr($esim->iccid, -4) : '' }}
+                                        </a>
+                                    @endforeach
                                 {{-- Item subtotal — primary USD figure (truth), customer's
                                      display amount underneath as context. --}}
                                 @php

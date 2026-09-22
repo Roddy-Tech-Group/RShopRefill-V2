@@ -46,6 +46,6 @@ class HighValueSignal extends AbstractRiskSignal
             return (float) $configured;
         }
 
-        return $tiers->tier2ThresholdUsd();
+        return $tiers->singleThresholdUsd();
     }
 }

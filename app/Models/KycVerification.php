@@ -57,6 +57,16 @@ class KycVerification extends Model
     }
 
     /**
+     * Still without a verdict: pending, or abandoned because a newer attempt
+     * replaced it. An abandoned attempt may still have been submitted, so a
+     * late verdict from the provider must be able to land on it.
+     */
+    public function isAwaitingVerdict(): bool
+    {
+        return in_array($this->status, ['pending', 'abandoned'], true);
+    }
+
+    /**
      * Human label for the Smile product this attempt ran.
      */
     public function productLabel(): string

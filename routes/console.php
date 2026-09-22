@@ -62,6 +62,16 @@ Schedule::command('airalo:sync-esims')
     ->appendOutputTo(storage_path('logs/airalo-sync.log'))
     ->name('airalo:sync-esims-hourly');
 
+// Manage eSIMs: refresh status and data for the 200 least recently checked
+// eSIMs every half hour (Airalo caches usage for 20 minutes, so faster buys
+// nothing). About a minute per run at Airalo's 5 calls a second.
+Schedule::command('esims:sync-status --limit=200')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping(30)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/esim-status-sync.log'))
+    ->name('esims:sync-status');
+
 // Zendit catalog syncs - keep gift cards, top-ups and bills fresh without
 // any manual intervention. Cadence is every 6h (Zendit catalog changes
 // less often than Airalo eSIM packages). Each command is idempotent

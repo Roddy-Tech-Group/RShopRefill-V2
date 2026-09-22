@@ -16,6 +16,7 @@ use App\Models\PaymentAttempt;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -97,6 +98,28 @@ class AdminOrderRefundTest extends TestCase
             AuditLog::where('action', 'admin.order_refund_failed')->exists(),
             'the failed attempt must still leave an audit trail',
         );
+    }
+
+    /**
+     * During a deploy the new code can run a minute before its migrations.
+     * A full refund in that window has already moved the money at the
+     * gateway, so the eSIM bookkeeping failing (its table not created yet)
+     * must never roll back the refund's own record.
+     */
+    public function test_a_full_refund_is_recorded_even_when_the_esim_table_is_not_migrated_yet(): void
+    {
+        Event::fake([RefundIssued::class]);
+        $this->fakeGatewayRefund(true);
+        Schema::drop('esims');
+
+        $this->refund(100)->assertOk();
+
+        $order = $this->order->fresh();
+        $this->assertSame(100.0, (float) $order->metadata['refunded_total']);
+        $this->assertSame(PaymentStatus::Refunded, $order->payment_status);
+        $this->assertSame(OrderStatus::Refunded, $order->order_status);
+        $this->assertTrue(AuditLog::where('action', 'admin.order_refunded')->exists());
+        Event::assertDispatched(RefundIssued::class);
     }
 
     public function test_a_partial_refund_marks_partially_refunded_and_tracks_the_total(): void

@@ -12,9 +12,10 @@
         $query->whereIn('payment_status', ['paid', 'reserved'])
               ->where('order_status', 'failed');
     } elseif ($tab === 'unpaid') {
-        $query->whereNotIn('payment_status', ['paid', 'reserved', 'refunded']);
+        // A partly refunded order was paid; it belongs with the paid ones.
+        $query->whereNotIn('payment_status', ['paid', 'reserved', 'refunded', 'partially_refunded']);
     } else { // 'all-paid'
-        $query->whereIn('payment_status', ['paid', 'reserved', 'refunded']);
+        $query->whereIn('payment_status', ['paid', 'reserved', 'refunded', 'partially_refunded']);
     }
 
     // `orders` grows on every checkout attempt, and the `unpaid` tab collects the
@@ -31,8 +32,15 @@
 
     // Status pill tone — maps OrderStatus values to the canonical x-admin.badge
     // tone palette so every list page reads the same.
-    $statusPillFor = function (?string $status): array {
+    // A completed order with part of its money returned (one eSIM of several,
+    // a partial admin refund) says so instead of plain Completed.
+    $statusPillFor = function (?string $status, ?string $paymentStatus = null): array {
+        if ($paymentStatus === 'partially_refunded' && in_array($status, ['completed', 'partially_completed'], true)) {
+            return ['label' => 'Partly refunded', 'tone' => 'purple'];
+        }
+
         return match ($status) {
+            'refunded' => ['label' => 'Refunded', 'tone' => 'purple'],
             'completed' => ['label' => 'Completed', 'tone' => 'emerald'],
             'partially_completed' => ['label' => 'Partial', 'tone' => 'blue'],
             'failed', 'cancelled' => ['label' => 'Failed', 'tone' => 'red'],
@@ -130,7 +138,7 @@
         @forelse ($orders as $order)
             @php
                 $statusValue = $order->order_status?->value ?? 'pending';
-                $status = $statusPillFor($statusValue);
+                $status = $statusPillFor($statusValue, $order->payment_status?->value);
                 $orderNumber = '#'.$order->order_number;
             @endphp
             <a

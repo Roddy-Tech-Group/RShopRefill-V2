@@ -20,6 +20,10 @@ final readonly class RiskContext
      * @param  string  $context  'order' | 'funding' | 'pay' | 'login'
      * @param  list<string>  $categories  category slugs the action touches
      * @param  string|null  $subjectType  morph-ish type of the thing assessed (order/funding/session)
+     * @param  bool  $bringsNewMoney  false when the action spends balance the
+     *                                customer already holds (an order paid from
+     *                                wallet); KYC's cumulative money-in count
+     *                                does not add such an action to itself
      */
     public function __construct(
         public ?User $user,
@@ -32,6 +36,7 @@ final readonly class RiskContext
         public ?string $subjectType = null,
         public ?string $subjectId = null,
         public ?string $correlationId = null,
+        public bool $bringsNewMoney = true,
     ) {}
 
     /**
@@ -51,6 +56,7 @@ final readonly class RiskContext
         array $categories = [],
         ?string $subjectType = null,
         ?string $subjectId = null,
+        bool $bringsNewMoney = true,
     ): self {
         $request = app()->bound('request') ? app('request') : null;
         $ip = null;
@@ -73,6 +79,7 @@ final readonly class RiskContext
             subjectType: $subjectType,
             subjectId: $subjectId,
             correlationId: $request instanceof Request ? $request->header('X-Correlation-ID') : null,
+            bringsNewMoney: $bringsNewMoney,
         );
     }
 

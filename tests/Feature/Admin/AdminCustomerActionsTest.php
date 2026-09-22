@@ -3,6 +3,8 @@
 namespace Tests\Feature\Admin;
 
 use App\Domain\Admin\Enums\AdminRole;
+use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Models\Admin;
 use App\Models\AdminNotification;
 use App\Models\User;
@@ -199,21 +201,48 @@ class AdminCustomerActionsTest extends TestCase
 
     public function test_admin_can_set_kyc_status_to_verified(): void
     {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            $mock->shouldReceive('verified')->once();
+        });
+        $user = User::factory()->create(['kyc_status' => 'pending']);
+        $admin = $this->admin();
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.customer.kyc-status', $user), ['status' => 'verified', 'kyc_reason' => 'Passport checked on a video call'])
+            ->assertRedirect();
+
+        $this->assertSame('verified', $user->fresh()->kyc_status);
+
+        // Marking someone verified lets them past every identity check, so who
+        // did it, from what, and why is always on record.
+        $log = AuditLog::query()->where('action', 'admin.kyc_status_changed')->sole();
+        $this->assertSame(['kyc_status' => 'pending'], $log->before_state);
+        $this->assertSame(['kyc_status' => 'verified'], $log->after_state);
+        $this->assertSame('Passport checked on a video call', $log->metadata['reason']);
+    }
+
+    public function test_a_kyc_status_change_without_a_reason_changes_nothing(): void
+    {
         $user = User::factory()->create(['kyc_status' => 'pending']);
 
         $this->actingAs($this->admin(), 'admin')
             ->post(route('admin.customer.kyc-status', $user), ['status' => 'verified'])
-            ->assertRedirect();
+            ->assertSessionHasErrors('kyc_reason');
 
-        $this->assertSame('verified', $user->fresh()->kyc_status);
+        $this->assertSame('pending', $user->fresh()->kyc_status);
+        $this->assertSame(0, AuditLog::query()->where('action', 'admin.kyc_status_changed')->count());
     }
 
     public function test_admin_can_mark_kyc_under_review(): void
     {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            $mock->shouldReceive('verified')->never();
+            $mock->shouldReceive('notVerified')->never();
+        });
         $user = User::factory()->create(['kyc_status' => 'unsubmitted']);
 
         $this->actingAs($this->admin(), 'admin')
-            ->post(route('admin.customer.kyc-status', $user), ['status' => 'pending'])
+            ->post(route('admin.customer.kyc-status', $user), ['status' => 'pending', 'kyc_reason' => 'Waiting on a clearer document'])
             ->assertRedirect();
 
         $this->assertSame('pending', $user->fresh()->kyc_status);
@@ -221,10 +250,14 @@ class AdminCustomerActionsTest extends TestCase
 
     public function test_admin_can_reject_kyc(): void
     {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            // The admin's note is internal: the customer gets the generic email.
+            $mock->shouldReceive('notVerified')->once();
+        });
         $user = User::factory()->create(['kyc_status' => 'verified']);
 
         $this->actingAs($this->admin(), 'admin')
-            ->post(route('admin.customer.kyc-status', $user), ['status' => 'rejected'])
+            ->post(route('admin.customer.kyc-status', $user), ['status' => 'rejected', 'kyc_reason' => 'Document found to be forged'])
             ->assertRedirect();
 
         $this->assertSame('rejected', $user->fresh()->kyc_status);
@@ -235,7 +268,7 @@ class AdminCustomerActionsTest extends TestCase
         $user = User::factory()->create(['kyc_status' => 'pending']);
 
         $this->actingAs($this->admin(), 'admin')
-            ->post(route('admin.customer.kyc-status', $user), ['status' => 'whatever'])
+            ->post(route('admin.customer.kyc-status', $user), ['status' => 'whatever', 'kyc_reason' => 'Testing an invalid value'])
             ->assertSessionHasErrors('status');
 
         $this->assertSame('pending', $user->fresh()->kyc_status);

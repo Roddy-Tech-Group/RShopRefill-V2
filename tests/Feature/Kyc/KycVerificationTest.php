@@ -3,7 +3,10 @@
 namespace Tests\Feature\Kyc;
 
 use App\Domain\Admin\Enums\AdminRole;
+use App\Domain\Communication\Mail\Compliance\IdentityNotVerifiedMail;
+use App\Domain\Communication\Mail\Compliance\IdentityVerifiedMail;
 use App\Domain\Kyc\Providers\SmileKycProvider;
+use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Models\Admin;
 use App\Models\KycVerification;
 use App\Models\User;
@@ -36,7 +39,10 @@ class KycVerificationTest extends TestCase
             'services.smileid.api_key' => $this->apiKey,
             'services.smileid.server' => 0,
             'services.smileid.callback_url' => 'https://example.test/api/webhooks/smileid',
-            'services.smileid.approved_result_codes' => ['1012'],
+            'services.smileid.approved_result_codes' => [
+                'doc_verification' => ['0810'],
+                'biometric_kyc' => ['1020'],
+            ],
             'services.smileid.biometric_countries' => [],
         ]);
     }
@@ -98,6 +104,46 @@ class KycVerificationTest extends TestCase
         ]);
     }
 
+    /**
+     * A capture the customer closed without submitting used to sit pending
+     * forever. The next session retires it.
+     */
+    public function test_a_new_session_abandons_the_earlier_unfinished_attempt(): void
+    {
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        $earlier = KycVerification::factory()->create(['user_id' => $user->id]);
+        $decided = KycVerification::factory()->rejected()->create(['user_id' => $user->id]);
+        $someoneElses = KycVerification::factory()->create();
+
+        $session = $this->offlineProvider()->startVerification($user);
+
+        $this->assertSame('abandoned', $earlier->fresh()->status);
+        $this->assertSame('rejected', $decided->fresh()->status);
+        $this->assertSame('pending', $someoneElses->fresh()->status);
+        $this->assertDatabaseHas('kyc_verifications', ['reference' => $session->reference, 'status' => 'pending']);
+    }
+
+    /**
+     * Abandoned is a guess, not a verdict: if that capture was in fact
+     * submitted, Smile's result for it must still count.
+     */
+    public function test_a_late_verdict_still_lands_on_an_abandoned_attempt(): void
+    {
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        $verification = KycVerification::factory()->create(['user_id' => $user->id, 'status' => 'abandoned']);
+
+        $payload = $this->signedPayload([
+            'ResultCode' => '0810',
+            'ResultText' => 'Document Verified',
+            'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$user->id, 'job_type' => '6'],
+        ]);
+
+        $this->postJson('/api/webhooks/smileid', $payload)->assertOk();
+
+        $this->assertSame('approved', $verification->fresh()->status);
+        $this->assertSame('verified', $user->fresh()->kyc_status);
+    }
+
     // --- Webhook resolution ---------------------------------------------------
 
     public function test_an_approved_webhook_resolves_the_attempt_and_verifies_the_user(): void
@@ -106,7 +152,7 @@ class KycVerificationTest extends TestCase
         $verification = KycVerification::factory()->create(['user_id' => $user->id]);
 
         $payload = $this->signedPayload([
-            'ResultCode' => '1012',
+            'ResultCode' => '0810',
             'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$user->id],
         ]);
 
@@ -114,9 +160,86 @@ class KycVerificationTest extends TestCase
 
         $verification->refresh();
         $this->assertSame('approved', $verification->status);
-        $this->assertSame('1012', $verification->result_code);
+        $this->assertSame('0810', $verification->result_code);
         $this->assertNotNull($verification->decided_at);
         $this->assertSame('verified', $user->fresh()->kyc_status);
+    }
+
+    /**
+     * The customer hears how their verification ended once. Smile can send the
+     * same callback again, and a replay of a decided attempt must not email
+     * them a second time.
+     */
+    public function test_a_verdict_is_announced_to_the_customer_once(): void
+    {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            $mock->shouldReceive('verified')->once();
+        });
+        $user = User::factory()->create(['kyc_status' => 'pending']);
+        $verification = KycVerification::factory()->create(['user_id' => $user->id]);
+
+        $payload = $this->signedPayload([
+            'ResultCode' => '0810',
+            'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$user->id, 'job_type' => '6'],
+        ]);
+
+        $this->postJson('/api/webhooks/smileid', $payload)->assertOk();
+        $this->postJson('/api/webhooks/smileid', $this->signedPayload(array_diff_key($payload, ['timestamp' => 1, 'signature' => 1])))->assertOk();
+
+        $this->assertSame('verified', $user->fresh()->kyc_status);
+    }
+
+    /**
+     * Smile retries callbacks. A retried "approved" for an attempt that was
+     * decided long ago must not overturn a later admin decision to set the
+     * customer back to rejected.
+     */
+    public function test_a_replayed_verdict_for_a_decided_attempt_does_not_overturn_an_admin_decision(): void
+    {
+        $user = User::factory()->create(['kyc_status' => 'rejected']);
+        $verification = KycVerification::factory()->approved()->create(['user_id' => $user->id]);
+
+        $this->postJson('/api/webhooks/smileid', $this->signedPayload([
+            'ResultCode' => '0810',
+            'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$user->id, 'job_type' => '6'],
+        ]))->assertOk();
+
+        $this->assertSame('rejected', $user->fresh()->kyc_status);
+    }
+
+    public function test_a_failed_verification_is_announced_without_the_providers_technical_text(): void
+    {
+        $this->mock(KycOutcomeNotifier::class, function ($mock) {
+            $mock->shouldReceive('notVerified')->once();
+        });
+        $user = User::factory()->create(['kyc_status' => 'pending']);
+        $verification = KycVerification::factory()->create(['user_id' => $user->id]);
+
+        $this->postJson('/api/webhooks/smileid', $this->signedPayload([
+            'ResultCode' => '0811',
+            'ResultText' => 'Unable to Verify Document After Human Review (Not A Document)',
+            'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$user->id, 'job_type' => '6'],
+        ]))->assertOk();
+    }
+
+    /**
+     * The emails themselves: they render, never name the provider, and tell a
+     * failed customer how to try again.
+     */
+    public function test_the_outcome_emails_render_without_naming_the_provider(): void
+    {
+        $verified = (new IdentityVerifiedMail('Ada'))->render();
+        $notVerified = (new IdentityNotVerifiedMail('Ada'))->render();
+
+        $this->assertStringContainsString('Shop now', $verified);
+        $this->assertStringContainsString('congratulations', $verified);
+        $this->assertStringContainsString('We could not verify your identity', $notVerified);
+        $this->assertStringContainsString('Try again', $notVerified);
+
+        foreach ([$verified, $notVerified] as $html) {
+            $this->assertStringNotContainsStringIgnoringCase('smile', $html);
+            $this->assertStringNotContainsString("\u{2014}", $html);
+        }
     }
 
     public function test_a_rejected_webhook_resolves_the_attempt_with_the_reason(): void
@@ -161,8 +284,8 @@ class KycVerificationTest extends TestCase
 
         // A job minted before attempts were persisted: no row, only PartnerParams.
         $payload = $this->signedPayload([
-            'ResultCode' => '1012',
-            'PartnerParams' => ['job_id' => 'kyc_'.$user->id.'_legacy', 'user_id' => 'user_'.$user->id],
+            'ResultCode' => '0810',
+            'PartnerParams' => ['job_id' => 'kyc_'.$user->id.'_legacy', 'user_id' => 'user_'.$user->id, 'job_type' => '6'],
         ]);
 
         $this->postJson('/api/webhooks/smileid', $payload)->assertOk();
@@ -188,8 +311,8 @@ class KycVerificationTest extends TestCase
             'job_complete' => true,
             'job_success' => true,
             'result' => [
-                'ResultCode' => '1012',
-                'PartnerParams' => ['job_id' => 'kyc_9_abc', 'user_id' => 'user_9'],
+                'ResultCode' => '0810',
+                'PartnerParams' => ['job_id' => 'kyc_9_abc', 'user_id' => 'user_9', 'job_type' => '6'],
             ],
         ]);
 
@@ -227,7 +350,7 @@ class KycVerificationTest extends TestCase
                 'job_complete' => true,
                 'job_success' => true,
                 'result' => [
-                    'ResultCode' => '1012',
+                    'ResultCode' => '0810',
                     'PartnerParams' => ['job_id' => $verification->reference, 'user_id' => 'user_'.$verification->user_id],
                 ],
             ]);

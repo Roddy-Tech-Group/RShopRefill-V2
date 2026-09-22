@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Risk\Exceptions\RiskDeniedException;
 use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
@@ -83,6 +84,10 @@ class UserWalletController extends Controller
         } catch (KycStepUpRequiredException $e) {
             // Crossed the identity-verification threshold; hand back the Smile
             // session so the client can launch verification, then retry.
+            return response()->json($e->toResponse(), 422);
+        } catch (SpendingLimitExceededException $e) {
+            // Rolling transaction cap reached. Nothing was written; the message
+            // nudges unverified customers toward KYC, which raises the cap.
             return response()->json($e->toResponse(), 422);
         } catch (RiskReviewRequiredException $e) {
             // Held for manual review; neutral message, nothing written.

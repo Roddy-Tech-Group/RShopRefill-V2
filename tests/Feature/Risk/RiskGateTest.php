@@ -162,6 +162,7 @@ class RiskGateTest extends TestCase
     {
         $this->flags(master: true, enforce: true);
         SiteSetting::put('features.risk_step_up_enforce_enabled', 'on', 'features');
+        SiteSetting::put('features.kyc_verification_enabled', 'on', 'features');
         Cache::flush();
         $this->weight(40); // MEDIUM -> step_up
         GateStubSignal::$fires = true;

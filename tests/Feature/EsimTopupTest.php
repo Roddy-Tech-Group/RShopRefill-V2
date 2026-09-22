@@ -6,6 +6,7 @@ use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Providers\AiraloFulfillmentProvider;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Shared\Enums\FundingStatus;
 use App\Models\Category;
 use App\Models\CurrencyRate;
 use App\Models\Order;
@@ -18,6 +19,7 @@ use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -239,6 +241,52 @@ class EsimTopupTest extends TestCase
             Order::where('user_id', $user->id)->where('order_number', '!=', 'RSR-PARENT-ESIM-1')->first(),
             'no top-up order was written',
         );
+    }
+
+    /**
+     * A top-up is paid from wallet balance: money that was counted when it was
+     * funded. It adds nothing to the transaction caps or the cumulative KYC
+     * dial, so a customer sitting exactly at their daily cap can still spend
+     * what they hold. (Counted as new money, this $5 would read $505 against
+     * the $500 cap and be refused.)
+     */
+    public function test_a_customer_at_their_transaction_cap_can_still_top_up_from_wallet(): void
+    {
+        Queue::fake();
+        SiteSetting::put('features.spending_limits_enforce_enabled', 'on', 'features');
+        SiteSetting::put('features.kyc_enforce_enabled', 'on', 'features');
+        SiteSetting::put('features.kyc_verification_enabled', 'on', 'features');
+        Cache::flush();
+        CurrencyRate::create(['code' => 'USD', 'name' => 'US Dollar', 'type' => 'fiat', 'rate_per_usd' => 1.0, 'is_active' => true]);
+
+        $user = $this->pinnedUser();
+        $wallet = Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 500.0, 'is_active' => true]);
+        $item = $this->fulfilledEsimItem($user);
+
+        // $500 came in today: exactly the standard daily cap.
+        WalletFunding::create([
+            'user_id' => $user->id,
+            'wallet_id' => $wallet->id,
+            'reference' => 'FUND-ATCAP',
+            'currency' => 'USD',
+            'amount' => 500,
+            'settled_amount_usd' => 500,
+            'gateway' => 'flutterwave',
+            'status' => FundingStatus::Completed,
+            'completed_at' => now(),
+        ]);
+
+        $this->mock(AiraloFulfillmentProvider::class)
+            ->shouldReceive('listTopupsForIccid')
+            ->andReturn([['id' => 'topup_1gb', 'net_price' => 5.0]]);
+
+        $response = $this->actingAs($user)->post(
+            route('dashboard.esim.topup.purchase', $item),
+            ['package_id' => 'topup_1gb', 'net_price' => 5.0, 'wallet_pin' => '1234'],
+        );
+
+        $response->assertSessionHasNoErrors();
+        $this->assertLessThan(500.0, (float) $wallet->fresh()->balance, 'a customer at the cap was stopped from spending their own balance');
     }
 
     public function test_shadow_mode_records_an_assessment_and_lets_the_topup_through(): void

@@ -136,13 +136,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('search-suggest', [AdminSearchController::class, 'suggest'])->name('search-suggest');
 
         Route::view('orders', 'admin.orders')->name('orders');
+        // Manage eSIMs: every eSIM sold, its live status and data, and the
+        // refund for one never activated. Shares the orders permission.
+        Volt::route('esims', 'admin.esims')->name('esims');
+        Volt::route('esims/{esim}', 'admin.esim')->whereNumber('esim')->name('esims.show');
         // Order report: preview page first (view + Download/Share), PDF behind
         // it. Viewing and downloading are separately audited.
         Route::get('orders/{order}/report', [AdminOrderReportController::class, 'show'])->name('order.report');
         Route::get('orders/{order}/report/pdf', [AdminOrderReportController::class, 'pdf'])->name('order.report.pdf');
         Route::get('orders/{order}', function (Order $order) {
             return view('admin.order', [
-                'order' => $order->load(['user', 'items', 'paymentAttempts']),
+                'order' => $order->load(['user', 'items.esims', 'paymentAttempts']),
             ]);
         })->name('order');
         Route::view('customers', 'admin.customers')->name('customers');
@@ -171,7 +175,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 'ordersCount' => $user->orders()->count(),
                 'totalSpent' => (float) $totalSpentUsd,
                 'unreadNotifications' => $user->notifications()->whereNull('read_at')->count(),
-                'kyc' => $user->kycSubmissions()->first(),
                 'kycVerifications' => $user->kycVerifications()->limit(5)->get(),
             ]);
         })->name('customer');
@@ -207,13 +210,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
             }, 'audience-insights-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
         })->name('users.insights.export');
 
-        // KYC review - serve documents from the private disk + approve / reject
-        // (legacy manual submissions), plus the provider-era reconciliation:
-        // ask Smile's job-status API about a pending attempt whose webhook has
-        // not arrived.
-        Route::get('kyc/{submission}/document/{type}', [AdminKycController::class, 'document'])->name('kyc.document');
-        Route::post('kyc/{submission}/approve', [AdminKycController::class, 'approve'])->name('kyc.approve');
-        Route::post('kyc/{submission}/reject', [AdminKycController::class, 'reject'])->name('kyc.reject');
+        // KYC reconciliation: ask Smile's job-status API about an attempt whose
+        // webhook has not arrived. Identity is only ever verified by the
+        // provider; there is no manual document review.
         Route::post('kyc/verifications/{verification}/sync', [AdminKycController::class, 'sync'])->name('kyc.sync');
 
         // Risk engine - metrics dashboard, manual-review queue, and feedback labels.

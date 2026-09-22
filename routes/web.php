@@ -18,7 +18,6 @@ use App\Http\Controllers\EsimStoreController;
 use App\Http\Controllers\EsimTopupController;
 use App\Http\Controllers\GoogleMerchantFeedController;
 use App\Http\Controllers\HealthController;
-use App\Http\Controllers\KycController;
 use App\Http\Controllers\PressController;
 use App\Http\Controllers\RcoinConvertController;
 use App\Http\Controllers\RcoinWithdrawalController;
@@ -854,8 +853,6 @@ Route::middleware(['auth'])->group(function () {
     // Persists the customer's light/dark/system preference (theme engine posts here).
     Route::post('preferences/theme', [ThemeController::class, 'update'])->name('preferences.theme');
 
-    // KYC identity-verification submission (documents stored on the private disk).
-    Route::post('dashboard/kyc', [KycController::class, 'store'])->name('kyc.submit');
     // Right of access: a PDF copy of the customer's data, gated by an emailed
     // one-time code rather than the password (see DataExportController).
     Route::get('dashboard/privacy/export', [DataExportController::class, 'show'])->name('privacy.export');

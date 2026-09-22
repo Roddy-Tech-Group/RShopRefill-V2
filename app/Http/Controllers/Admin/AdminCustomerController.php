@@ -12,6 +12,7 @@ use App\Domain\Communication\Mail\Security\AccountSuspendedMail;
 use App\Domain\Communication\Mail\Security\DataExportRequestedByStaffMail;
 use App\Domain\Communication\Mail\System\AdminDirectMessageMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Domain\Security\Services\SessionRevocationService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -339,17 +340,43 @@ class AdminCustomerController extends Controller
 
     /**
      * Set the customer's KYC status - `pending` (under review), `verified`, or
-     * `rejected`. Bypasses the formal KycSubmission review trail; use this for
-     * out-of-band cases (proof held offline, manual fast-track) or to flip a
-     * verified user back to pending while you investigate.
+     * `rejected`. The admin override of the provider's verdict, kept so the
+     * platform stays in our control: for out-of-band cases (proof held offline,
+     * a fast-track) or to flip a verified user back to pending while you
+     * investigate. Always audited with a reason.
      */
-    public function setKycStatus(Request $request, User $user): RedirectResponse
+    public function setKycStatus(Request $request, User $user, AuditLogService $audit, KycOutcomeNotifier $notifier): RedirectResponse
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'verified', 'rejected'])],
+            // Marking someone verified lets them past every identity check, so
+            // the hand that did it and why is always on record.
+            'kyc_reason' => ['required', 'string', 'min:5', 'max:500'],
         ]);
 
+        $previous = $user->kyc_status;
+
         $user->update(['kyc_status' => $validated['status']]);
+
+        $audit->log(
+            action: 'admin.kyc_status_changed',
+            model: $user,
+            beforeState: ['kyc_status' => $previous],
+            afterState: ['kyc_status' => $validated['status']],
+            metadata: ['reason' => $validated['kyc_reason']],
+        );
+
+        // Only a real change is announced. The admin's reason is an internal
+        // note, so it never reaches the customer's inbox.
+        if ($previous !== $validated['status']) {
+            $correlation = 'admin_'.$user->getKey().'_'.now()->timestamp;
+
+            if ($validated['status'] === 'verified') {
+                $notifier->verified($user, $correlation);
+            } elseif ($validated['status'] === 'rejected') {
+                $notifier->notVerified($user, $correlation);
+            }
+        }
 
         $label = match ($validated['status']) {
             'verified' => 'verified',

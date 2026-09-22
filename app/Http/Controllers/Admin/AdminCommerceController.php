@@ -4,12 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
-use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\FulfillmentSucceeded;
-use App\Domain\Order\Events\RefundIssued;
+use App\Domain\Order\Services\OrderRefundProcessor;
 use App\Domain\Order\Services\OrderService;
-use App\Domain\Payment\Enums\PaymentStatus;
-use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Http\Controllers\Controller;
 use App\Jobs\FulfillOrderItemJob;
 use App\Models\FulfillmentLog;
@@ -169,76 +166,15 @@ class AdminCommerceController extends Controller
                 // second one sees the first one's total. Without it, both
                 // read "0 refunded", both pass the cap, both pay out.
                 $order = Order::where('id', $orderId)->lockForUpdate()->firstOrFail();
-                $orderService = app(OrderService::class);
 
-                // Cumulative cap: every refund already issued against this
-                // order counts, including the AUTOMATIC fulfillment-failure
-                // reversals, so no combination of refunds can hand back more
-                // than the customer ever paid.
-                $alreadyRefunded = $orderService->refundedTotalFor($order);
-                $remaining = round((float) $order->total_amount - $alreadyRefunded, 2);
-
-                if ($amount > $remaining) {
-                    return [400, 'Refund amount cannot exceed the amount still refundable ('.number_format($remaining, 2).').'];
-                }
-
-                // Get the attempt that carried the money. Refunded stays in
-                // the list because the providers stamp the attempt Refunded
-                // even on a partial refund; the cumulative cap above is what
-                // prevents over-refunding. Reserved is deliberately EXCLUDED:
-                // a reserved wallet attempt has the funds locked, not
-                // debited, so "refunding" it would credit money that was
-                // never taken. Those are cancelled/released, never refunded.
-                $attempt = $order->paymentAttempts()
-                    ->whereIn('payment_status', [PaymentStatus::Paid, PaymentStatus::Refunded, PaymentStatus::PartiallyRefunded])
-                    ->first();
-
-                if (! $attempt) {
-                    $hasReserved = $order->paymentAttempts()
-                        ->where('payment_status', PaymentStatus::Reserved)
-                        ->exists();
-
-                    return [400, $hasReserved
-                        ? 'This payment was never captured (funds are only reserved). Cancel the order to release the hold instead of refunding.'
-                        : 'No successful payment attempt found for this order.'];
-                }
-
-                $provider = app(PaymentGatewayFactory::class)->getProvider($attempt->gateway);
-
-                // The gateway's answer decides everything downstream.
-                // Stamping Refunded and emailing the customer on a declined
-                // (or, for crypto, nonexistent) refund promises money that
-                // never moves.
                 $tag = 'admin-'.Str::uuid();
-                $refunded = $provider->refundPayment($attempt, $amount, $tag);
+                $result = app(OrderRefundProcessor::class)->refund($order, $amount, $tag, $validated['reason'], [
+                    'refunded_by' => auth('admin')->id(),
+                ]);
 
-                if (! $refunded) {
-                    app(AuditLogService::class)->log(
-                        action: 'admin.order_refund_failed',
-                        model: $order,
-                        metadata: [
-                            'amount' => $amount,
-                            'gateway' => $attempt->gateway,
-                            'reason' => $validated['reason'],
-                        ],
-                    );
-
-                    $hint = $attempt->gateway === 'nowpayments'
-                        ? ' Crypto payments have no refund API; send the funds back manually, then record it here.'
-                        : ' The gateway declined the refund; nothing was recorded and the customer was not notified.';
-
-                    return [400, 'The gateway did not process this refund.'.$hint];
+                if (! $result['ok']) {
+                    return [$result['status'], $result['message']];
                 }
-
-                $orderService->applyRefundRecord($order, $amount, $tag);
-                $refundedTotal = $orderService->refundedTotalFor($order);
-                $isFullyRefunded = $refundedTotal >= round((float) $order->total_amount, 2);
-
-                $order->payment_status = $isFullyRefunded ? PaymentStatus::Refunded : PaymentStatus::PartiallyRefunded;
-                if ($isFullyRefunded) {
-                    $order->order_status = OrderStatus::Refunded;
-                }
-                $order->save();
 
                 // Money returned by an admin's hand is always audited: who,
                 // how much, through which gateway, and the stated reason.
@@ -247,19 +183,13 @@ class AdminCommerceController extends Controller
                     model: $order,
                     metadata: [
                         'amount' => $amount,
-                        'refunded_total' => $refundedTotal,
-                        'gateway' => $attempt->gateway,
+                        'refunded_total' => $result['refunded_total'],
+                        'gateway' => $result['gateway'],
                         'reason' => $validated['reason'],
                     ],
                 );
 
-                // The customer email rides the commit: a rollback after the
-                // gateway said yes must not un-send "your refund is on its
-                // way". The tag keys the email's idempotency, so a second
-                // admin refund of the SAME amount still emails the customer.
-                DB::afterCommit(fn () => RefundIssued::dispatch($order, $amount, $validated['reason'], $tag));
-
-                return [200, 'Refund processed successfully.'];
+                return [200, $result['message']];
             });
 
             return response()->json(['message' => $message], $status);

@@ -48,13 +48,19 @@ class SmileWebhookController extends Controller
         if ($user) {
             // ResultCode + text are logged so a sandbox run can confirm the
             // approved_result_codes set per product (Biometric KYC and Document
-            // Verification report success differently).
+            // Verification report success differently). Actions is Smile's
+            // per-check breakdown (document, selfie-to-ID face match,
+            // liveness, human review), each Passed / Failed / Not Applicable:
+            // it shows what a headline code actually covered, and carries no
+            // personal data (that lives in FullData, never logged).
             Log::info('smile.webhook.processed', [
                 'user_id' => $user->id,
                 'reference' => $verdict->reference,
                 'approved' => $verdict->approved,
+                'job_type' => data_get($payload, 'PartnerParams.job_type'),
                 'result_code' => data_get($payload, 'ResultCode', data_get($payload, 'result_code')),
                 'result_text' => data_get($payload, 'ResultText', data_get($payload, 'result_text')),
+                'actions' => data_get($payload, 'Actions'),
             ]);
         }
 

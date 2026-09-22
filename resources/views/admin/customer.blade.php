@@ -103,7 +103,7 @@
             $kycRaw = strtolower((string) ($user->kyc_status ?? ''));
             $kycVerified = $kycRaw === 'verified';
         @endphp
-        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])) }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])), kycChange: @js($errors->has('kyc_reason') ? old('status') : null) }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
             @php
                 // Shared button shape. Compact + responsive:
                 //   - Mobile: full-width grid cells (two per row) so labels never truncate
@@ -151,47 +151,32 @@
                         </button>
                         <div x-show="open" x-transition style="display:none;" class="absolute right-0 z-30 mt-1.5 w-56 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60" role="menu">
                             @php
-                                // Each row is a single-field POST. The blade renders an
-                                // unstyled <button> inside a <form> with data-confirm so
-                                // the global modal handles approval.
+                                // Each row opens the Set KYC modal below, which asks for the
+                                // reason that goes on the audit log before anything changes.
                                 $kycOptions = [
                                     'pending' => [
                                         'label' => 'Mark under review',
                                         'description' => 'Awaiting documents or follow-up.',
-                                        'confirm' => 'Mark this customer as KYC under review?',
-                                        'tone' => 'primary',
                                         'classes' => 'text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-600/15',
                                     ],
                                     'verified' => [
                                         'label' => 'Mark verified',
                                         'description' => 'Use only when you hold the proof out-of-band.',
-                                        'confirm' => 'Manually mark this customer as KYC-verified? Use only when you hold the proof out-of-band.',
-                                        'tone' => 'success',
                                         'classes' => 'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/15',
                                     ],
                                     'rejected' => [
                                         'label' => 'Mark rejected',
                                         'description' => 'Customer will need to resubmit.',
-                                        'confirm' => 'Reject this customer\'s KYC? They will need to resubmit their documents.',
-                                        'tone' => 'danger',
                                         'classes' => 'text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/15',
                                     ],
                                 ];
                             @endphp
                             @foreach ($kycOptions as $status => $opt)
                                 @continue($kycRaw === $status)
-                                <form method="POST" action="{{ route('admin.customer.kyc-status', $user) }}"
-                                      data-confirm="{{ $opt['confirm'] }}"
-                                      data-confirm-title="{{ $opt['label'] }}"
-                                      data-confirm-text="{{ $opt['label'] }}"
-                                      data-confirm-tone="{{ $opt['tone'] }}">
-                                    @csrf
-                                    <input type="hidden" name="status" value="{{ $status }}">
-                                    <button type="submit" class="flex w-full flex-col items-start rounded-[12px] px-3 py-2 text-left text-xs font-medium transition-colors {{ $opt['classes'] }}">
-                                        <span class="font-semibold">{{ $opt['label'] }}</span>
-                                        <span class="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">{{ $opt['description'] }}</span>
-                                    </button>
-                                </form>
+                                <button type="button" @click="kycChange = @js($status); open = false" class="flex w-full flex-col items-start rounded-[12px] px-3 py-2 text-left text-xs font-medium transition-colors {{ $opt['classes'] }}">
+                                    <span class="font-semibold">{{ $opt['label'] }}</span>
+                                    <span class="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">{{ $opt['description'] }}</span>
+                                </button>
                             @endforeach
                             @if (count(array_filter($kycOptions, fn ($_, $s) => $s !== $kycRaw, ARRAY_FILTER_USE_BOTH)) === 0)
                                 <p class="px-3 py-2 text-[11px] text-zinc-500 dark:text-zinc-400">No other states to set.</p>
@@ -338,6 +323,35 @@
                 </div>
             </div>
 
+            {{-- Set KYC modal - a status change always carries a reason for the audit log. --}}
+            <div x-show="kycChange" x-cloak @keydown.escape.window="kycChange = null" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                <div x-show="kycChange" @click="kycChange = null" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-zinc-950/70"></div>
+                <form x-show="kycChange" x-transition method="POST" action="{{ route('admin.customer.kyc-status', $user) }}" class="relative w-full max-w-lg overflow-hidden rounded-[12px] bg-white shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60">
+                    @csrf
+                    <input type="hidden" name="status" :value="kycChange">
+                    <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-700/60">
+                        <div>
+                            <h3 class="text-sm font-bold text-zinc-900 dark:text-white" x-text="{ pending: 'Mark KYC under review', verified: 'Mark KYC verified', rejected: 'Mark KYC rejected' }[kycChange] || 'Set KYC'"></h3>
+                            <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300" x-text="{ pending: 'The customer is shown as awaiting review.', verified: 'The customer passes every identity check from now on and is emailed that they are verified. Use only when you hold the proof out-of-band.', rejected: 'The customer is emailed that verification did not go through and can try again.' }[kycChange] || ''"></p>
+                        </div>
+                        <button type="button" @click="kycChange = null" aria-label="Close" class="flex h-8 w-8 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#26416b] dark:text-zinc-300 dark:hover:bg-[#34507a]">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-4 px-5 py-4">
+                        <div>
+                            <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-400">Reason (audit log, not shown to the customer)</label>
+                            <textarea name="kyc_reason" rows="3" required minlength="5" maxlength="500" placeholder="e.g. Passport checked on a video call, ticket #1234" class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white dark:placeholder:text-zinc-400">{{ old('kyc_reason') }}</textarea>
+                            @error('kyc_reason') <p class="mt-1 text-[11px] font-medium text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700/60 dark:bg-[#162a4a]">
+                        <button type="button" @click="kycChange = null" class="inline-flex items-center rounded-[12px] px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]">Cancel</button>
+                        <button type="submit" class="inline-flex items-center rounded-[12px] bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-700">Save KYC status</button>
+                    </div>
+                </form>
+            </div>
+
             {{-- Suspend modal - captures an optional reason shown to the customer. --}}
             <div x-show="suspending" x-cloak @keydown.escape.window="suspending = false" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
                 <div x-show="suspending" @click="suspending = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/40 dark:bg-zinc-950/70"></div>
@@ -426,8 +440,6 @@
                 // is computed up top alongside the other status flags. Falls
                 // back to a neutral "Not started" so an unknown value still
                 // renders sensibly rather than leaking the raw enum to the admin.
-                // NOTE: avoid `$kyc` - the controller passes in a KycSubmission
-                // model on that name (used further down for the documents grid).
                 $kycMap = [
                     'verified' => ['label' => 'KYC verified',    'tone' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30'],
                     'pending'  => ['label' => 'KYC under review','tone' => 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
@@ -798,24 +810,25 @@
                  "Check with provider" reconciles a pending attempt whose
                  callback has not landed. --}}
             @if ($kycVerifications->isNotEmpty())
-                <div class="px-5 py-4">
-                    <div class="space-y-3">
+                <div>
+                    <div class="divide-y divide-zinc-100">
                         @foreach ($kycVerifications as $verification)
                             @php
                                 $attemptTone = match ($verification->status) {
                                     'approved' => 'emerald',
                                     'rejected' => 'red',
+                                    'abandoned' => 'zinc',
                                     default    => 'amber',
                                 };
                             @endphp
-                            <div class="rounded-[12px] border border-zinc-100 bg-zinc-50/60 px-4 py-3">
+                            <div class="px-5 py-4">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="text-xs font-semibold text-zinc-900">{{ $verification->productLabel() }}</span>
                                         <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 ring-1 ring-zinc-200">Smile ID</span>
                                         <x-admin.badge :tone="$attemptTone">{{ $verification->status }}</x-admin.badge>
                                     </div>
-                                    @if ($verification->isPending())
+                                    @if ($verification->isAwaitingVerdict())
                                         <form method="POST" action="{{ route('admin.kyc.sync', $verification) }}">
                                             @csrf
                                             <button type="submit" class="inline-flex items-center gap-1.5 rounded-[12px] bg-zinc-900 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-zinc-700">
@@ -852,89 +865,7 @@
                 </div>
             @endif
 
-            @if ($kyc)
-                <div class="{{ $kycVerifications->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-5 py-4">
-                    <p class="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Manual submission (legacy)</p>
-                    <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3">
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Full name</dt>
-                            <dd class="mt-1 font-medium text-zinc-700">{{ $kyc->full_name }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Date of birth</dt>
-                            <dd class="mt-1 font-medium text-zinc-700">{{ optional($kyc->date_of_birth)->format('M j, Y') ?? '-' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Country</dt>
-                            <dd class="mt-1 font-medium text-zinc-700">{{ $kyc->country ?: '-' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Document type</dt>
-                            <dd class="mt-1 font-medium capitalize text-zinc-700">{{ str_replace('_', ' ', $kyc->document_type) }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Document number</dt>
-                            <dd class="mt-1 font-medium text-zinc-700">{{ $kyc->document_number ?: '-' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Submitted</dt>
-                            <dd class="mt-1 font-medium text-zinc-700">{{ $fmtDate($kyc->created_at) }}</dd>
-                        </div>
-                    </dl>
-
-                    {{-- Documents - streamed from the private disk, admin-only. --}}
-                    <p class="mt-5 text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Documents</p>
-                    <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        @foreach (['front' => 'Document front', 'back' => 'Document back', 'selfie' => 'Selfie'] as $docType => $docLabel)
-                            @php
-                                $docPath = match ($docType) {
-                                    'front' => $kyc->document_front_path,
-                                    'back' => $kyc->document_back_path,
-                                    default => $kyc->selfie_path,
-                                };
-                            @endphp
-                            @if ($docPath)
-                                <a href="{{ route('admin.kyc.document', [$kyc, $docType]) }}" target="_blank" rel="noopener" class="group block overflow-hidden rounded-[12px] border border-zinc-200">
-                                    <img src="{{ route('admin.kyc.document', [$kyc, $docType]) }}" alt="{{ $docLabel }}" class="h-32 w-full bg-zinc-50 object-cover transition-transform duration-200 group-hover:scale-105">
-                                    <p class="px-3 py-1.5 text-[11px] font-medium text-zinc-600">{{ $docLabel }}</p>
-                                </a>
-                            @endif
-                        @endforeach
-                    </div>
-
-                    {{-- Review actions / outcome --}}
-                    @if ($kyc->status === 'pending')
-                        <div x-data="{ rejecting: @js($errors->has('reason')) }" class="mt-5 border-t border-zinc-100 pt-4">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <form method="POST" action="{{ route('admin.kyc.approve', $kyc) }}">
-                                    @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-[12px] bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                        Approve
-                                    </button>
-                                </form>
-                                <button type="button" @click="rejecting = ! rejecting" class="inline-flex items-center gap-1.5 rounded-[12px] bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-100">Reject</button>
-                            </div>
-
-                            <form x-show="rejecting" x-cloak method="POST" action="{{ route('admin.kyc.reject', $kyc) }}" class="mt-3">
-                                @csrf
-                                <textarea name="reason" rows="2" required placeholder="Reason for rejection (the customer will see this)" class="w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-500/15">{{ old('reason') }}</textarea>
-                                @error('reason') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
-                                <button type="submit" class="mt-2 inline-flex items-center rounded-[12px] bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700">Confirm rejection</button>
-                            </form>
-                        </div>
-                    @else
-                        <div class="mt-5 border-t border-zinc-100 pt-4 text-xs text-zinc-600">
-                            <p><span class="font-semibold capitalize">{{ $kyc->status }}</span>{{ $kyc->reviewed_at ? ' on '.$fmtDate($kyc->reviewed_at) : '' }}{{ $kyc->reviewer ? ' by '.$kyc->reviewer->name : '' }}.</p>
-                            @if ($kyc->status === 'rejected' && $kyc->rejection_reason)
-                                <p class="mt-1 text-red-600">Reason: {{ $kyc->rejection_reason }}</p>
-                            @endif
-                        </div>
-                    @endif
-                </div>
-            @endif
-
-            @if ($kycVerifications->isEmpty() && ! $kyc)
+            @if ($kycVerifications->isEmpty())
                 <div class="px-5 py-10 text-center text-sm text-zinc-600">No verification attempts yet. The customer starts verification from their dashboard.</div>
             @endif
         </div>

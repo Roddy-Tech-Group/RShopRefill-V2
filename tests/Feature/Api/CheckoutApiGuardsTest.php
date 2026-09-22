@@ -2,6 +2,11 @@
 
 namespace Tests\Feature\Api;
 
+use App\Domain\Kyc\Contracts\KycProvider;
+use App\Domain\Kyc\DTOs\KycSession;
+use App\Domain\Kyc\DTOs\KycVerdict;
+use App\Domain\Kyc\Services\KycProviderFactory;
+use App\Domain\Shared\Enums\FundingStatus;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -13,6 +18,8 @@ use App\Models\RiskLabel;
 use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
@@ -140,19 +147,83 @@ class CheckoutApiGuardsTest extends TestCase
     {
         SiteSetting::put('features.spending_limits_enforce_enabled', 'on', 'features');
         Cache::flush();
-        config(['limits.standard.day' => 2000]);
 
+        // $495 came in by card today: the $11 card order makes $506 and crosses
+        // the seeded $500 standard daily cap.
         $user = User::factory()->create();
         $cart = $this->cartWithItem($user); // 11.00 USD
         Order::factory()->create([
             'user_id' => $user->id,
-            'total_amount' => 1995,
+            'payment_method' => 'flutterwave',
+            'total_amount' => 495,
             'created_at' => now(),
         ]);
 
         $this->postCheckout($user, ['cart_id' => $cart->id])
             ->assertStatus(422)
             ->assertJsonFragment(['limit_exceeded' => true]);
+
+        // The same $11 from wallet balance brings nothing new in, so the cap
+        // does not apply. Whatever the wallet rail says next is not this
+        // test's concern.
+        $this->postCheckout($user, ['cart_id' => $cart->id, 'payment_method' => 'wallet'])
+            ->assertJsonMissingPath('limit_exceeded');
+    }
+
+    /**
+     * KYC's cumulative dial counts money in. A checkout paid by card is new
+     * money and counts toward the line; the same checkout paid from wallet
+     * balance spends money that was counted when it was funded, so it must
+     * not be asked to verify. This pins the wiring from the payment method the
+     * customer chose through to the tier engine.
+     */
+    public function test_a_wallet_paid_checkout_does_not_add_itself_to_the_kyc_money_in_count(): void
+    {
+        SiteSetting::put('features.kyc_enforce_enabled', 'on', 'features');
+        SiteSetting::put('features.kyc_verification_enabled', 'on', 'features');
+        Cache::flush();
+
+        $fake = new class implements KycProvider
+        {
+            public function key(): string
+            {
+                return 'fake';
+            }
+
+            public function startVerification(User $user, ?string $issuingCountry = null): KycSession
+            {
+                return new KycSession('ref-1', token: 'tok-1', metadata: ['partner_id' => 'p']);
+            }
+
+            public function verdictFromWebhook(array $payload): ?KycVerdict
+            {
+                return null;
+            }
+        };
+        $this->mock(KycProviderFactory::class, fn ($mock) => $mock->shouldReceive('forUser')->andReturn($fake));
+
+        // $1,995 already in: an $11 card order makes $2,006 and crosses $2,000.
+        $user = User::factory()->create();
+        $wallet = Wallet::create(['user_id' => $user->id, 'currency' => 'USD', 'balance' => 1995, 'is_active' => true]);
+        WalletFunding::create([
+            'user_id' => $user->id,
+            'wallet_id' => $wallet->id,
+            'reference' => 'FUND-KYCWALLET',
+            'currency' => 'USD',
+            'amount' => 1995,
+            'settled_amount_usd' => 1995,
+            'gateway' => 'flutterwave',
+            'status' => FundingStatus::Completed,
+            'completed_at' => now(),
+        ]);
+
+        $this->postCheckout($user, ['cart_id' => $this->cartWithItem($user)->id, 'payment_method' => 'flutterwave'])
+            ->assertJsonPath('kyc_required', true);
+
+        // The same $11 from wallet balance brings nothing new in: no step-up.
+        // Whatever the wallet rail says next is not this test's concern.
+        $this->postCheckout($user, ['cart_id' => Cart::where('user_id', $user->id)->latest()->first()->id, 'payment_method' => 'wallet'])
+            ->assertJsonMissingPath('kyc_required');
     }
 
     public function test_a_reviewed_checkout_is_held_with_a_neutral_message(): void

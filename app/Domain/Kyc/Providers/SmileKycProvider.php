@@ -6,8 +6,11 @@ use App\Domain\Kyc\Contracts\KycProvider;
 use App\Domain\Kyc\DTOs\KycSession;
 use App\Domain\Kyc\DTOs\KycVerdict;
 use App\Domain\Kyc\Enums\KycTier;
+use App\Domain\Kyc\Exceptions\KycAlreadyEnrolledException;
+use App\Domain\Kyc\Exceptions\KycProviderUnavailableException;
 use App\Models\KycVerification;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use SmileIdentity\Signature;
 use SmileIdentity\SmileIdentityCore;
@@ -28,6 +31,27 @@ use SmileIdentity\SmileIdentityCore;
  */
 class SmileKycProvider implements KycProvider
 {
+    /**
+     * Smile's numeric job_type for each web-integration product we run.
+     */
+    private const PRODUCTS_BY_JOB_TYPE = [
+        '1' => 'biometric_kyc',
+        '6' => 'doc_verification',
+    ];
+
+    /**
+     * Smile's refusal code for a web token requested for a user it already
+     * holds an enrollment for ("Wrong job type. This user is already
+     * enrolled."), seen in sandbox 2026-09-15.
+     */
+    private const ALREADY_ENROLLED_CODE = '2209';
+
+    /**
+     * How many of a customer's recent attempts to read back from Smile when
+     * looking for the pass behind an existing enrollment.
+     */
+    private const ENROLLMENT_LOOKBACK = 5;
+
     public function key(): string
     {
         return 'smile';
@@ -43,6 +67,17 @@ class SmileKycProvider implements KycProvider
         $product = $this->productForCountry($issuingCountry ?? $user->country);
 
         $token = $this->mintWebToken($userId, $jobId, $product);
+
+        // A new session replaces any earlier attempt still waiting on a
+        // verdict, which is almost always a capture the customer closed
+        // without submitting. Left pending it would sit there forever with
+        // nothing to resolve it. Marked abandoned rather than decided: if it
+        // was in fact submitted, its late verdict still lands on it.
+        KycVerification::query()
+            ->where('user_id', $user->getKey())
+            ->where('provider', $this->key())
+            ->where('status', 'pending')
+            ->update(['status' => 'abandoned']);
 
         // Persist the attempt so the admin page can show it and a stuck job can
         // be reconciled via queryJobStatus(); the webhook resolves it later.
@@ -86,7 +121,7 @@ class SmileKycProvider implements KycProvider
 
         $resultCode = (string) ($payload['ResultCode'] ?? $payload['result_code'] ?? '');
 
-        if ($this->isApproved($resultCode)) {
+        if ($this->isApproved($resultCode, $this->productForJob($reference, $partnerParams))) {
             return KycVerdict::approved($reference, KycTier::IdentityVerified, $payload);
         }
 
@@ -134,7 +169,7 @@ class SmileKycProvider implements KycProvider
 
         $resultCode = (string) data_get($result, 'ResultCode', data_get($result, 'result_code', ''));
 
-        if ($this->isApproved($resultCode)) {
+        if ($this->isApproved($resultCode, $this->productForJob($reference, (array) data_get($result, 'PartnerParams', [])))) {
             return KycVerdict::approved($reference, KycTier::IdentityVerified, $result);
         }
 
@@ -159,16 +194,40 @@ class SmileKycProvider implements KycProvider
     }
 
     /**
-     * Whether a Smile ResultCode means identity was verified. Config-driven so
-     * the accepted set can be tuned per product without a deploy; the default is
-     * Smile's KYC exact-match code. CONFIRM the full set against Smile's
-     * result-code documentation and sandbox before switching enforcement on.
+     * Which Smile product a finished job ran. Our own attempt row is the
+     * authority; Smile's echoed job_type covers a job minted before attempts
+     * were persisted. Null when neither says, which never approves.
+     *
+     * @param  array<string, mixed>  $partnerParams
      */
-    private function isApproved(string $resultCode): bool
+    private function productForJob(string $reference, array $partnerParams): ?string
     {
-        $approved = array_map('strval', (array) config('services.smileid.approved_result_codes', ['1012']));
+        $recorded = KycVerification::query()->where('reference', $reference)->value('product');
 
-        return $resultCode !== '' && in_array($resultCode, $approved, true);
+        if (is_string($recorded) && $recorded !== '') {
+            return $recorded;
+        }
+
+        return self::PRODUCTS_BY_JOB_TYPE[(string) ($partnerParams['job_type'] ?? '')] ?? null;
+    }
+
+    /**
+     * Whether a Smile ResultCode means identity was verified for the product
+     * the job actually ran. Every product reports success with its own code
+     * (Document Verification says 0810, not the KYC 1012 this used to accept
+     * everywhere, which marked every genuine document pass as rejected), so
+     * the accepted codes are looked up per product and an unknown product is
+     * never approved.
+     */
+    private function isApproved(string $resultCode, ?string $product): bool
+    {
+        if ($resultCode === '' || $product === null) {
+            return false;
+        }
+
+        $approved = array_map('strval', (array) config("services.smileid.approved_result_codes.{$product}", []));
+
+        return in_array($resultCode, $approved, true);
     }
 
     /**
@@ -177,7 +236,7 @@ class SmileKycProvider implements KycProvider
      */
     protected function mintWebToken(string $userId, string $jobId, string $product): ?string
     {
-        $token = $this->core()->get_web_token(
+        $response = $this->core()->get_web_token(
             $userId,
             $jobId,
             $product,
@@ -185,7 +244,69 @@ class SmileKycProvider implements KycProvider
             (string) config('services.smileid.callback_url'),
         );
 
-        return is_array($token) ? ($token['token'] ?? null) : null;
+        return $this->tokenFromResponse($response);
+    }
+
+    /**
+     * The web token out of Smile's answer, or the refusal as an exception. A
+     * refusal used to come back as a session with no token, which the
+     * customer saw as a generic "not available" and which left a pending
+     * attempt behind that nothing could ever resolve.
+     *
+     * @throws KycAlreadyEnrolledException when Smile already holds an enrollment for this user
+     * @throws KycProviderUnavailableException for any other refusal
+     */
+    public function tokenFromResponse(mixed $response): string
+    {
+        $token = is_array($response) ? ($response['token'] ?? null) : null;
+
+        if (is_string($token) && $token !== '') {
+            return $token;
+        }
+
+        $code = is_array($response) && isset($response['code']) ? (string) $response['code'] : null;
+        $message = is_array($response) && isset($response['error']) ? (string) $response['error'] : null;
+
+        throw $code === self::ALREADY_ENROLLED_CODE
+            ? new KycAlreadyEnrolledException($code, $message)
+            : new KycProviderUnavailableException($code, $message);
+    }
+
+    /**
+     * Ask Smile for the result of this customer's recent attempts, newest
+     * first, and return the first that passed. Used when Smile refuses a new
+     * session because the customer is already enrolled: that enrollment came
+     * from a pass we either never received or recorded wrongly. Null when no
+     * recent attempt reads back as approved.
+     */
+    public function latestApprovedVerdictFor(User $user): ?KycVerdict
+    {
+        $attempts = KycVerification::query()
+            ->where('user_id', $user->getKey())
+            ->where('provider', $this->key())
+            ->latest('id')
+            ->limit(self::ENROLLMENT_LOOKBACK)
+            ->get();
+
+        foreach ($attempts as $attempt) {
+            try {
+                $verdict = $this->verdictFromJobStatus($this->queryJobStatus($attempt));
+            } catch (\Throwable $e) {
+                Log::warning('kyc.enrollment_lookup_failed', [
+                    'user_id' => $user->getKey(),
+                    'reference' => $attempt->reference,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            if ($verdict?->approved) {
+                return $verdict;
+            }
+        }
+
+        return null;
     }
 
     private function core(): SmileIdentityCore

@@ -98,4 +98,39 @@ class AdminOrdersPaginationTest extends TestCase
             ->assertSee('RSR-DONE-A')
             ->assertDontSee('RSR-ABANDONED');
     }
+
+    /**
+     * A refunded order used to fall through the status map and read Pending;
+     * a partly refunded one read Completed and was listed as unpaid.
+     */
+    public function test_refunded_orders_say_so_and_sit_with_the_paid_ones(): void
+    {
+        $this->withoutVite()->asAdmin();
+
+        $user = User::factory()->create();
+
+        Order::factory()->for($user)->create([
+            'order_number' => 'RSR-FULLY-REFUNDED',
+            'payment_status' => PaymentStatus::Refunded,
+            'order_status' => OrderStatus::Refunded,
+        ]);
+        Order::factory()->for($user)->create([
+            'order_number' => 'RSR-PART-REFUNDED',
+            'payment_status' => PaymentStatus::PartiallyRefunded,
+            'order_status' => OrderStatus::Completed,
+        ]);
+
+        $this->get(route('admin.orders', ['tab' => 'all-paid']))
+            ->assertOk()
+            ->assertSee('RSR-FULLY-REFUNDED')
+            ->assertSee('RSR-PART-REFUNDED')
+            ->assertSeeInOrder(['RSR-PART-REFUNDED', 'Partly refunded'])
+            ->assertSee('Refunded')
+            ->assertDontSee('Pending');
+
+        $this->get(route('admin.orders', ['tab' => 'unpaid']))
+            ->assertOk()
+            ->assertDontSee('RSR-PART-REFUNDED')
+            ->assertDontSee('RSR-FULLY-REFUNDED');
+    }
 }

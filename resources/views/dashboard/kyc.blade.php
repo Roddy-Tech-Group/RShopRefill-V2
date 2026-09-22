@@ -175,6 +175,10 @@
                                     this.error = data.message || 'Could not start verification. Please try again.';
                                     return;
                                 }
+                                if (data.already_verified) {
+                                    window.location.reload();
+                                    return;
+                                }
                                 if (window.rshopKyc) {
                                     window.rshopKyc.launch(data.smile, () => window.location.reload());
                                 } else {
@@ -232,6 +236,11 @@
                          services.smileid.biometric_countries). --}}
                     <p x-show="error" x-cloak class="mt-4 rounded-[12px] bg-red-50 px-3 py-2.5 text-sm text-red-700" x-text="error"></p>
 
+                    {{-- The button always reads the same. Whatever stands in the
+                         way (verification switched off, or an email not yet
+                         confirmed, which verified-email on api.kyc.start refuses
+                         and re-sends the link for) is said on tap, in the error
+                         line above, from the server's own message. --}}
                     <button
                         type="button"
                         @click="start()"
