@@ -251,7 +251,7 @@ class extends Component
         {{-- eSIM identity --}}
         <section class="{{ $card }}" aria-labelledby="identity-heading">
             <h2 id="identity-heading" class="text-sm font-bold text-zinc-900 dark:text-white">eSIM</h2>
-            <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
                 <div>
                     <dt class="{{ $label }}">ICCID</dt>
                     <dd class="mt-1 break-all font-mono text-xs text-zinc-800 dark:text-zinc-200">{{ $esim->iccid }}</dd>
@@ -267,14 +267,6 @@ class extends Component
                 <div>
                     <dt class="{{ $label }}">SM-DP+ address</dt>
                     <dd class="mt-1 break-all font-mono text-xs text-zinc-800 dark:text-zinc-200">{{ $payload['lpa'] ?? 'None' }}</dd>
-                </div>
-                <div>
-                    <dt class="{{ $label }}">Phone number</dt>
-                    <dd class="mt-1 font-mono text-xs text-zinc-800 dark:text-zinc-200">{{ $payload['phone_number'] ?? 'Data only' }}</dd>
-                </div>
-                <div>
-                    <dt class="{{ $label }}">Network</dt>
-                    <dd class="mt-1 text-xs text-zinc-800 dark:text-zinc-200">{{ is_string($payload['network'] ?? null) ? $payload['network'] : 'Not given' }}</dd>
                 </div>
             </dl>
         </section>
