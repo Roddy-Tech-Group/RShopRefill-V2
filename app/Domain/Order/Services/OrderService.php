@@ -3,6 +3,7 @@
 namespace App\Domain\Order\Services;
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
+use App\Domain\Fulfillment\Services\EsimRegistry;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Enums\PaymentStatus;
@@ -170,6 +171,12 @@ class OrderService
             $order->order_status = OrderStatus::Refunded;
         }
         $order->save();
+
+        // Everything went back, so every eSIM on the order is refunded too:
+        // Manage eSIMs shows it and never offers a second refund.
+        if ($isFullyRefunded) {
+            EsimRegistry::markOrderEsimsRefunded($order);
+        }
     }
 
     /**

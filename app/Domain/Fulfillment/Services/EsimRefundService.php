@@ -65,6 +65,13 @@ class EsimRefundService
             return 'The provider already declined a refund for this eSIM.';
         }
 
+        // Money already went back on this order from the Orders page, and that
+        // refund does not say which eSIM it covered. A second refund here could
+        // pay the same eSIM twice, so the Orders page stays the place for it.
+        if ($esim->order && self::hasOrdersPageRefund($esim->order)) {
+            return 'This order already has a refund from the Orders page.';
+        }
+
         if (! $this->usage->supports($esim)) {
             return 'Refunds here are only for eSIMs from a provider with a refund process.';
         }
@@ -78,6 +85,22 @@ class EsimRefundService
         }
 
         return null;
+    }
+
+    /**
+     * Whether an admin refunded money on this order from the Orders page
+     * (refund tags admin-{uuid}). The automatic reversals of undelivered items
+     * and eSIM refunds made here do not count.
+     */
+    public static function hasOrdersPageRefund(Order $order): bool
+    {
+        foreach (array_keys((array) data_get($order->metadata, 'refund_records', [])) as $tag) {
+            if (str_starts_with((string) $tag, 'admin-')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function windowDays(): int
@@ -222,6 +245,12 @@ class EsimRefundService
 
             if (! $locked->isRefundPending()) {
                 return ['ok' => false, 'message' => 'This eSIM has no refund pending.'];
+            }
+
+            // Someone refunded the order from the Orders page while this
+            // request was pending; crediting now could pay the eSIM twice.
+            if (self::hasOrdersPageRefund($order)) {
+                return ['ok' => false, 'message' => 'This order was refunded from the Orders page since this request. Mark this refund as declined instead.'];
             }
 
             $providerCreditUsd = round((float) $locked->orderItem?->provider_cost_usd, 4);

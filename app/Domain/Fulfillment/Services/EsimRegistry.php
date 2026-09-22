@@ -2,9 +2,14 @@
 
 namespace App\Domain\Fulfillment\Services;
 
+use App\Domain\Fulfillment\Enums\EsimStatus;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
+use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Models\Esim;
+use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderRefund;
 use Illuminate\Support\Collection;
 
 /**
@@ -32,9 +37,9 @@ class EsimRegistry
             return collect();
         }
 
-        $item->loadMissing(['order:id,user_id,completed_at,created_at', 'product:id,name']);
+        $item->loadMissing(['order', 'product:id,name']);
 
-        return collect(self::iccidsFrom((array) $item->fulfillment_payload))
+        $esims = collect(self::iccidsFrom((array) $item->fulfillment_payload))
             ->map(fn (string $iccid) => Esim::firstOrCreate(
                 ['order_item_id' => $item->getKey(), 'iccid' => $iccid],
                 [
@@ -47,6 +52,43 @@ class EsimRegistry
                 ],
             ))
             ->values();
+
+        // An order already refunded in full (by hand, before this record
+        // existed) has nothing left to refund: its eSIMs read Refunded.
+        if ($item->order && self::orderIsFullyRefunded($item->order)) {
+            self::markOrderEsimsRefunded($item->order);
+            $esims->each->refresh();
+        }
+
+        return $esims;
+    }
+
+    /**
+     * The whole order went back to the customer.
+     */
+    public static function orderIsFullyRefunded(Order $order): bool
+    {
+        return $order->payment_status === PaymentStatus::Refunded
+            || $order->order_status === OrderStatus::Refunded;
+    }
+
+    /**
+     * Mark every eSIM on a fully refunded order Refunded, dated when the
+     * refund was issued. Called by the backfill for orders refunded before
+     * the eSIM record existed, and by the Orders page refund. Idempotent:
+     * an eSIM already refunded keeps its own date.
+     */
+    public static function markOrderEsimsRefunded(Order $order): int
+    {
+        $refundedAt = OrderRefund::query()
+            ->where('order_id', $order->getKey())
+            ->where('kind', OrderRefund::KIND_CUSTOMER_REFUND)
+            ->max('refunded_at') ?? $order->updated_at ?? now();
+
+        return Esim::query()
+            ->where('order_id', $order->getKey())
+            ->whereNull('refunded_at')
+            ->update(['status' => EsimStatus::Refunded->value, 'refunded_at' => $refundedAt, 'updated_at' => now()]);
     }
 
     /**

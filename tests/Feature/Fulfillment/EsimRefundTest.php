@@ -210,6 +210,103 @@ class EsimRefundTest extends TestCase
         Http::assertSentCount(3); // usage, claim, usage: never a second claim
     }
 
+    /**
+     * An admin refunds the whole order from the Orders page (money back the
+     * way it was paid). Its eSIM reads Refunded and is never offered again.
+     */
+    public function test_an_order_refunded_in_full_from_the_orders_page_refunds_its_esims(): void
+    {
+        $esim = $this->paidEsim();
+        $this->fakeAiralo();
+        $orders = app(OrderService::class);
+
+        $orders->recordRefundedAmount($esim->order, 10.00, 'admin-'.Str::uuid());
+        $orders->markRefunded($esim->order->fresh());
+
+        $esim->refresh();
+        $this->assertSame(EsimStatus::Refunded, $esim->status);
+        $this->assertNotNull($esim->refunded_at);
+        $this->assertSame('This eSIM was already refunded.', app(EsimRefundService::class)->blockedReason($esim));
+        $this->assertFalse($this->request($esim)['ok']);
+        Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/refund'));
+    }
+
+    /**
+     * Orders refunded by hand before this release: the backfill records their
+     * eSIMs as Refunded, dated when the refund was issued.
+     */
+    public function test_the_backfill_records_esims_of_an_already_refunded_order_as_refunded(): void
+    {
+        $esim = $this->paidEsim();
+        $esim->orderItem->forceFill(['fulfillment_payload' => ['iccid' => $esim->iccid]])->saveQuietly();
+        $esim->order->forceFill([
+            'payment_status' => PaymentStatus::Refunded,
+            'order_status' => OrderStatus::Refunded,
+            'metadata' => ['exchange_rate' => 1, 'refund_records' => ['admin-'.Str::uuid() => 10.00], 'refunded_total' => 10.00],
+        ])->save();
+        $iccid = $esim->iccid;
+        $esim->delete();
+
+        $this->artisan('esims:backfill')->assertSuccessful();
+
+        $recorded = Esim::where('iccid', $iccid)->sole();
+        $this->assertSame(EsimStatus::Refunded, $recorded->status);
+        $this->assertNotNull($recorded->refunded_at);
+        $this->assertNotNull(app(EsimRefundService::class)->blockedReason($recorded));
+    }
+
+    /**
+     * One eSIM of two was refunded by hand from the Orders page, and that
+     * refund does not say which. Neither can be refunded here, so the same
+     * eSIM is never paid twice.
+     */
+    public function test_a_partly_refunded_order_blocks_esim_refunds(): void
+    {
+        $esim = $this->paidEsim(quantity: 2);
+        $this->fakeAiralo();
+        $orders = app(OrderService::class);
+
+        $orders->recordRefundedAmount($esim->order, 10.00, 'admin-'.Str::uuid());
+        $orders->markRefunded($esim->order->fresh());
+
+        $esim->refresh();
+        $this->assertNotSame(EsimStatus::Refunded, $esim->status);
+        $this->assertSame('This order already has a refund from the Orders page.', app(EsimRefundService::class)->blockedReason($esim));
+        $this->assertFalse($this->request($esim)['ok']);
+        Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/refund'));
+    }
+
+    /**
+     * An automatic reversal for an undelivered item is not a refund of the
+     * eSIM, so it does not block one.
+     */
+    public function test_an_automatic_reversal_does_not_block_an_esim_refund(): void
+    {
+        $esim = $this->paidEsim();
+        $esim->order->forceFill(['metadata' => ['exchange_rate' => 1, 'refund_records' => ['item-'.Str::uuid() => 0.00]]])->save();
+
+        $this->assertNull(app(EsimRefundService::class)->blockedReason($esim->fresh()));
+    }
+
+    /**
+     * A refund was pending here when someone refunded the order from the
+     * Orders page. Completing it now could pay twice, so it is refused.
+     */
+    public function test_a_pending_refund_cannot_complete_after_an_orders_page_refund(): void
+    {
+        $esim = $this->paidEsim();
+        $this->fakeAiralo();
+        $this->request($esim);
+
+        app(OrderService::class)->recordRefundedAmount($esim->order, 4.00, 'admin-'.Str::uuid());
+        $result = $this->complete($esim);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('refunded from the Orders page since this request', $result['message']);
+        $this->assertNull($this->walletBalance($esim, Currency::USD));
+        $this->assertSame(Esim::REFUND_PENDING, $esim->fresh()->refund_status);
+    }
+
     public function test_an_esim_from_a_provider_without_refunds_is_blocked(): void
     {
         $esim = $this->paidEsim(['provider' => 'zendit']);
@@ -380,7 +477,7 @@ class EsimRefundTest extends TestCase
         $esim = $this->paidEsim();
         $this->fakeAiralo();
         $this->request($esim);
-        app(OrderService::class)->recordRefundedAmount($esim->order, 7.00, 'admin-'.Str::uuid());
+        app(OrderService::class)->recordRefundedAmount($esim->order, 7.00, 'final-'.Str::uuid());
 
         $this->complete($esim);
 
