@@ -228,5 +228,12 @@ class EsimRegistryTest extends TestCase
         $this->assertSame(EsimStatus::Recycled, EsimStatus::fromProvider('RECYCLED', null, null, false));
         $this->assertSame(EsimStatus::Unknown, EsimStatus::fromProvider('SOMETHING_NEW', null, null, false));
         $this->assertSame(EsimStatus::Unknown, EsimStatus::fromProvider(null, null, null, false));
+
+        // Refunded at the provider: NOT_ACTIVE with the package gone.
+        $this->assertSame(EsimStatus::Refunded, EsimStatus::fromProvider('NOT_ACTIVE', 0, 0, false));
+        // An unlimited plan can report 0 MB and is not a refund.
+        $this->assertSame(EsimStatus::Inactive, EsimStatus::fromProvider('NOT_ACTIVE', 0, 0, true));
+        // No figure at all proves nothing either way.
+        $this->assertSame(EsimStatus::Inactive, EsimStatus::fromProvider('NOT_ACTIVE', null, null, false));
     }
 }

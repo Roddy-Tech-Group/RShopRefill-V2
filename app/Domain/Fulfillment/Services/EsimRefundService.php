@@ -53,7 +53,9 @@ class EsimRefundService
      */
     public function blockedReason(Esim $esim): ?string
     {
-        if ($esim->isRefunded()) {
+        // Refunded here, or refunded at the provider (its dashboard says
+        // Refunded; the API shows an eSIM with no package left).
+        if ($esim->isRefunded() || $esim->status === EsimStatus::Refunded) {
             return 'This eSIM was already refunded.';
         }
 

@@ -3,10 +3,11 @@
 namespace App\Domain\Fulfillment\Enums;
 
 /**
- * An eSIM's state on the Manage eSIMs page. Every state but Refund pending and
- * Refunded is the supplier's own, read from its usage endpoint; DataLow is Active with a
- * quarter or less of the data left, the point the supplier's own 75% usage
- * webhook fires.
+ * An eSIM's state on the Manage eSIMs page, read from the supplier's usage
+ * endpoint. Refund pending is ours alone. Refunded is ours, or the supplier's
+ * own refund, which its API shows as NOT_ACTIVE with no data package left.
+ * DataLow is Active with a quarter or less of the data left, the point the
+ * supplier's own 75% usage webhook fires.
  */
 enum EsimStatus: string
 {
@@ -58,6 +59,14 @@ enum EsimStatus: string
      */
     public static function fromProvider(?string $providerStatus, ?int $remainingMb, ?int $totalMb, bool $isUnlimited): self
     {
+        // Airalo has no refunded status in its API. A refund takes the data
+        // package off the eSIM, so it reads NOT_ACTIVE with a total of 0 MB
+        // (its dashboard shows Refunded). An unused eSIM always carries its
+        // package. Unlimited plans are left out: their total can be 0.
+        if (strtoupper((string) $providerStatus) === 'NOT_ACTIVE' && ! $isUnlimited && $totalMb === 0) {
+            return self::Refunded;
+        }
+
         $status = match (strtoupper((string) $providerStatus)) {
             'NOT_ACTIVE' => self::Inactive,
             'ACTIVE' => self::Active,

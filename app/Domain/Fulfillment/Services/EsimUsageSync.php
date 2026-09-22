@@ -43,7 +43,9 @@ class EsimUsageSync
         }
 
         $status = EsimStatus::fromProvider($usage['status'], $usage['remaining_mb'], $usage['total_mb'], $usage['is_unlimited']);
-        $hasBeenUsed = ! in_array($status, [EsimStatus::Inactive, EsimStatus::Unknown], true);
+        // Only real use stamps the activation time; an eSIM the provider
+        // refunded was never switched on.
+        $hasBeenUsed = in_array($status, [EsimStatus::Active, EsimStatus::DataLow, EsimStatus::DataUsedUp, EsimStatus::Expired], true);
 
         $esim->forceFill([
             'status' => match (true) {

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Fulfillment;
 
 use App\Domain\Fulfillment\Enums\EsimStatus;
+use App\Domain\Fulfillment\Services\EsimRefundService;
 use App\Domain\Fulfillment\Services\EsimUsageSync;
 use App\Models\Esim;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -65,6 +66,52 @@ class EsimUsageSyncTest extends TestCase
         app(EsimUsageSync::class)->sync($esim);
 
         $this->assertSame(EsimStatus::DataLow, $esim->refresh()->status);
+    }
+
+    /**
+     * What Airalo returned for three real eSIMs on 2026-09-22, whose dashboard
+     * said Not active, Active and Refunded. The API has no refunded status: a
+     * refund takes the data package away, leaving NOT_ACTIVE with 0 MB.
+     */
+    public function test_the_three_airalo_states_read_as_they_do_on_airalos_dashboard(): void
+    {
+        $unused = Esim::factory()->create(['iccid' => '89852350726130140712']);
+        $active = Esim::factory()->create(['iccid' => '89852350726129316398']);
+        $refunded = Esim::factory()->create(['iccid' => '89852350726130230174']);
+
+        Http::fake([
+            self::BASE.'/sims/89852350726130140712/usage' => Http::response(['data' => ['remaining' => 1024, 'total' => 1024, 'expired_at' => null, 'is_unlimited' => false, 'status' => 'NOT_ACTIVE']]),
+            self::BASE.'/sims/89852350726129316398/usage' => Http::response(['data' => ['remaining' => 19611, 'total' => 20480, 'expired_at' => '2027-09-10 20:09:22', 'is_unlimited' => false, 'status' => 'ACTIVE']]),
+            self::BASE.'/sims/89852350726130230174/usage' => Http::response(['data' => ['remaining' => 0, 'total' => 0, 'expired_at' => null, 'is_unlimited' => false, 'status' => 'NOT_ACTIVE']]),
+        ]);
+
+        $sync = app(EsimUsageSync::class);
+        $sync->sync($unused);
+        $sync->sync($active);
+        $sync->sync($refunded);
+
+        $this->assertSame(EsimStatus::Inactive, $unused->refresh()->status);
+        $this->assertSame(EsimStatus::Active, $active->refresh()->status);
+        $this->assertSame(EsimStatus::Refunded, $refunded->refresh()->status);
+
+        // Refunded at the provider: never switched on, and never offered again.
+        $this->assertNull($refunded->activated_at);
+        $this->assertSame('This eSIM was already refunded.', app(EsimRefundService::class)->blockedReason($refunded));
+        $this->assertNull(app(EsimRefundService::class)->blockedReason($unused));
+    }
+
+    /**
+     * An eSIM whose refund we requested stays Refund pending while the
+     * provider processes it, even once the provider has taken the package.
+     */
+    public function test_a_pending_refund_stays_pending_when_the_provider_removes_the_package(): void
+    {
+        $esim = Esim::factory()->create(['status' => EsimStatus::RefundPending, 'refund_status' => Esim::REFUND_PENDING]);
+        $this->fakeUsage($esim->iccid, ['status' => 'NOT_ACTIVE', 'remaining' => 0, 'total' => 0, 'is_unlimited' => false]);
+
+        app(EsimUsageSync::class)->sync($esim);
+
+        $this->assertSame(EsimStatus::RefundPending, $esim->refresh()->status);
     }
 
     public function test_an_esim_not_yet_installed_stays_inactive_with_no_activation_time(): void
