@@ -136,13 +136,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('search-suggest', [AdminSearchController::class, 'suggest'])->name('search-suggest');
 
         Route::view('orders', 'admin.orders')->name('orders');
+        // Manage eSIMs: every eSIM sold, its live status and data, and the
+        // refund for one never activated. Shares the orders permission.
+        Volt::route('esims', 'admin.esims')->name('esims');
+        Volt::route('esims/{esim}', 'admin.esim')->whereNumber('esim')->name('esims.show');
         // Order report: preview page first (view + Download/Share), PDF behind
         // it. Viewing and downloading are separately audited.
         Route::get('orders/{order}/report', [AdminOrderReportController::class, 'show'])->name('order.report');
         Route::get('orders/{order}/report/pdf', [AdminOrderReportController::class, 'pdf'])->name('order.report.pdf');
         Route::get('orders/{order}', function (Order $order) {
             return view('admin.order', [
-                'order' => $order->load(['user', 'items', 'paymentAttempts']),
+                'order' => $order->load(['user', 'items.esims', 'paymentAttempts']),
             ]);
         })->name('order');
         Route::view('customers', 'admin.customers')->name('customers');

@@ -33,6 +33,9 @@ return [
         // common case — the controller falls back to AIRALO_CLIENT_SECRET.
         // Only set this if you're on a custom Airalo signing arrangement.
         'webhook_secret' => env('AIRALO_WEBHOOK_SECRET'),
+        // Airalo refunds an eSIM that was never activated, within this many
+        // days of purchase. The Manage eSIMs refund button follows it.
+        'refund_window_days' => (int) env('AIRALO_REFUND_WINDOW_DAYS', 14),
     ],
 
     'ses' => [

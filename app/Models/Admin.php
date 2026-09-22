@@ -213,7 +213,9 @@ class Admin extends Authenticatable
         return match (true) {
             str_starts_with($name, 'dashboard') || str_starts_with($name, 'api.dashboard.') => 'dashboard',
             str_starts_with($name, 'products') || str_starts_with($name, 'api.catalog.') => 'products',
-            str_starts_with($name, 'orders') || $name === 'order' || str_starts_with($name, 'order.') || str_starts_with($name, 'api.commerce.') => 'orders',
+            // Manage eSIMs shares the orders grant: refunding an eSIM is an
+            // order refund, so whoever may refund orders may refund eSIMs.
+            str_starts_with($name, 'orders') || $name === 'order' || str_starts_with($name, 'order.') || str_starts_with($name, 'api.commerce.') || str_starts_with($name, 'esims') => 'orders',
             // The User Management group (blocked, closures, feedback, insights,
             // retention health) shares the customers grant: same audience, same
             // sensitivity, and roles keep working without a new checkbox.

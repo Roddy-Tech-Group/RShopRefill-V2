@@ -6,6 +6,7 @@ use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Interfaces\FulfillmentProviderInterface;
 use App\Models\FulfillmentLog;
 use App\Models\OrderItem;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -140,6 +141,126 @@ class AiraloFulfillmentProvider implements FulfillmentProviderInterface
             Log::warning('Airalo fetchSharing exception: '.$e->getMessage(), ['iccid' => $iccid]);
 
             return $none;
+        }
+    }
+
+    /**
+     * Live status and data for one eSIM (GET /sims/{iccid}/usage). Airalo
+     * caches the answer for 20 minutes and allows 10 calls a minute per ICCID.
+     *
+     * Returns null on any failure, so a sync never overwrites a known state
+     * with a guess. Data is in MB. Airalo's times are UTC; they come back in
+     * the app's timezone.
+     *
+     * @return array{status: string, remaining_mb: int|null, total_mb: int|null, is_unlimited: bool, expires_at: Carbon|null, raw: array<string, mixed>}|null
+     */
+    public function fetchUsage(string $iccid): ?array
+    {
+        $iccid = trim($iccid);
+        if ($iccid === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(10)
+                ->withToken($this->getAccessToken())
+                ->acceptJson()
+                ->get("{$this->baseUrl}/sims/{$iccid}/usage");
+
+            if ($response->failed()) {
+                Log::warning('Airalo fetchUsage failed', ['iccid' => $iccid, 'status' => $response->status()]);
+
+                return null;
+            }
+
+            $data = (array) ($response->json('data') ?? []);
+
+            if (! isset($data['status'])) {
+                return null;
+            }
+
+            $expiresAt = filled($data['expired_at'] ?? null)
+                ? Carbon::parse((string) $data['expired_at'], 'UTC')->setTimezone(config('app.timezone'))
+                : null;
+
+            return [
+                'status' => strtoupper((string) $data['status']),
+                'remaining_mb' => isset($data['remaining']) ? max(0, (int) $data['remaining']) : null,
+                'total_mb' => isset($data['total']) ? max(0, (int) $data['total']) : null,
+                'is_unlimited' => (bool) ($data['is_unlimited'] ?? false),
+                'expires_at' => $expiresAt,
+                'raw' => $data,
+            ];
+        } catch (\Exception $e) {
+            Log::warning('Airalo fetchUsage exception: '.$e->getMessage(), ['iccid' => $iccid]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Reasons Airalo's refund endpoint accepts. OTHERS needs a note.
+     *
+     * @var array<string, string>
+     */
+    public const REFUND_REASONS = [
+        'TRIP_CANCELLATION' => 'Trip cancelled',
+        'WRONG_PURCHASE' => 'Wrong eSIM bought',
+        'CHANGE_OF_PLAN' => 'Customer changed plan',
+        'INCOMPATIBLE_DEVICE' => 'Device not compatible',
+        'NO_COVERAGE' => 'No coverage',
+        'INSTALLATION_FAILURE' => 'Could not install',
+        'QR_ISSUE_PARTNERS' => 'QR code problem',
+        'OTHERS' => 'Other',
+    ];
+
+    /**
+     * File a refund claim for unused eSIMs (POST /refund). Airalo reviews it by
+     * hand and, when granted, credits our account; there is no status endpoint,
+     * so the credit is confirmed from the account statement.
+     *
+     * Returns the claim id and time, or null when Airalo refused or could not
+     * be reached; the caller keeps the claim open to retry.
+     *
+     * @param  array<int, string>  $iccids  up to five
+     * @return array{refund_id: string, created_at: string|null}|null
+     */
+    public function requestRefund(array $iccids, string $reason, string $notes): ?array
+    {
+        $iccids = array_slice(array_values(array_filter(array_map('trim', $iccids))), 0, 5);
+
+        if ($iccids === [] || ! array_key_exists($reason, self::REFUND_REASONS)) {
+            return null;
+        }
+
+        $parts = array_map(fn (string $iccid) => ['name' => 'iccids[]', 'contents' => $iccid], $iccids);
+        $parts[] = ['name' => 'reason', 'contents' => $reason];
+        $parts[] = ['name' => 'notes', 'contents' => mb_substr($notes, 0, 255)];
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(15)
+                ->withToken($this->getAccessToken())
+                ->acceptJson()
+                ->asMultipart()
+                ->post("{$this->baseUrl}/refund", $parts);
+
+            if ($response->failed()) {
+                Log::warning('Airalo requestRefund failed', ['iccids' => $iccids, 'status' => $response->status(), 'body' => $response->json()]);
+
+                return null;
+            }
+
+            $refundId = $response->json('data.refund_id') ?? $response->json('refund_id');
+
+            return $refundId !== null
+                ? ['refund_id' => (string) $refundId, 'created_at' => $response->json('data.created_at') ?? $response->json('created_at')]
+                : null;
+        } catch (\Exception $e) {
+            Log::warning('Airalo requestRefund exception: '.$e->getMessage(), ['iccids' => $iccids]);
+
+            return null;
         }
     }
 

@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Shared\Enums\ComplianceCategory;
+use App\Observers\OrderItemObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $failed_at
  * @property array|null $metadata
  */
+#[ObservedBy([OrderItemObserver::class])]
 class OrderItem extends Model
 {
     use HasFactory, HasUuids;
@@ -108,5 +112,13 @@ class OrderItem extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * The eSIMs this item delivered: one per unit, none for anything else.
+     */
+    public function esims(): HasMany
+    {
+        return $this->hasMany(Esim::class);
     }
 }

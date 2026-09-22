@@ -51,3 +51,12 @@ CTO_roadmap.md
 crypto_implementation.md
 crypto_gateway_decision.md
 payment_provider_kill_switch_plan.md
+
+# Laravel Boost writes a second copy of the project rules for tools that read
+# the AGENTS.md convention instead of CLAUDE.md. Same content, different
+# reader, and Boost rewrites it on every run. CLAUDE.md and .claude/skills are
+# the committed source of truth, so the mirror stays local.
+# rshop-audit is ours, not Boost's, and stays tracked.
+/AGENTS.md
+/.agents/skills/*
+!/.agents/skills/rshop-audit/
