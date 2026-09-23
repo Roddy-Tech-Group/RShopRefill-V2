@@ -2,6 +2,7 @@
 
 namespace App\Domain\Fulfillment\Providers;
 
+use App\Domain\Catalog\Services\RejectedOfferDelister;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Interfaces\FulfillmentProviderInterface;
 use App\Domain\Shared\Services\CircuitBreaker;
@@ -256,11 +257,20 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                     return $this->recoverDuplicateTransaction($item, $customTransactionId, $isEsim, $isTopup);
                 }
 
-                $breaker->recordFailure();
                 Log::error("Zendit transaction failed: {$item->id}", [
                     'status' => $response->status(),
                     'body' => $responseBody,
                 ]);
+
+                // Zendit dropped this offer since the last catalog sync. Hide it
+                // now so the next customer cannot pay for it too. The API itself
+                // answered correctly, so a dead offer never counts toward
+                // tripping the breaker that halts every Zendit purchase.
+                if (RejectedOfferDelister::isOfferNotFound($response->status(), $response->body())) {
+                    app(RejectedOfferDelister::class)->delist($item);
+                } else {
+                    $breaker->recordFailure();
+                }
 
                 return [
                     'status' => FulfillmentStatus::Failed,

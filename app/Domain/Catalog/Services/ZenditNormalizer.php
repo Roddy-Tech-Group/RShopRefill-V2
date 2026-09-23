@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class ZenditNormalizer implements CatalogNormalizerInterface
 {
-    public function normalizeAndSave(array $rawItem, string $providerName): void
+    public function normalizeAndSave(array $rawItem, string $providerName): array
     {
         // Brands under a trademark/IP takedown must never (re)enter the
         // catalog: skip the offer entirely and force-deactivate any rows a
@@ -27,7 +27,7 @@ class ZenditNormalizer implements CatalogNormalizerInterface
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
 
-            return;
+            return [];
         }
 
         // 1. Normalize Subtype. Zendit returns subTypes as an array; pick the first.
@@ -158,5 +158,7 @@ class ZenditNormalizer implements CatalogNormalizerInterface
         if (! empty($rawItem['logoUrl']) && ! str_starts_with((string) $product->logo_url, 'local/')) {
             MediaProcessorJob::dispatch($product->id, $rawItem['logoUrl']);
         }
+
+        return [$offerId];
     }
 }

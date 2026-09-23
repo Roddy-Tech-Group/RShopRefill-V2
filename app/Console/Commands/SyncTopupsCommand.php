@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Catalog\Enums\CatalogFeed;
 use App\Domain\Catalog\Providers\ZenditTopupProvider;
+use App\Domain\Catalog\Services\CatalogSyncRunService;
 use App\Domain\Catalog\Services\CatalogSyncService;
 use App\Domain\Catalog\Services\ZenditTopupNormalizer;
 use App\Models\Category;
@@ -11,16 +13,22 @@ use Illuminate\Console\Command;
 
 class SyncTopupsCommand extends Command
 {
-    protected $signature = 'topups:sync {--page=1 : Page number to start syncing from}';
+    protected $signature = 'topups:sync
+        {--page=1 : Page number to start syncing from (a partial run never hides offers)}
+        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}';
 
-    protected $description = 'Sync the Zendit mobile top-up catalog synchronously, page by page, then report the operators pulled';
+    protected $description = 'Sync the Zendit mobile top-up catalog synchronously, page by page, hide offers Zendit no longer lists, then report the operators pulled';
 
-    public function handle(): int
+    public function handle(CatalogSyncRunService $runs): int
     {
         $syncService = new CatalogSyncService(new ZenditTopupProvider, new ZenditTopupNormalizer);
 
         $page = max(1, (int) $this->option('page'));
         $totalProcessed = 0;
+
+        // Only a pass from the first page sees the whole feed, so only it may
+        // decide what Zendit stopped listing.
+        $run = $page === 1 ? $runs->start(CatalogFeed::ZenditTopups, (bool) $this->option('force-cleanup')) : null;
 
         $this->info('Syncing Zendit mobile top-ups...');
 
@@ -29,7 +37,7 @@ class SyncTopupsCommand extends Command
 
         while (true) {
             try {
-                $result = $syncService->sync($page, 100);
+                $result = $syncService->sync($page, 100, $run);
 
                 $totalProcessed += $result['processed'];
                 $knownTotal = $result['total'] ?: $knownTotal;
@@ -56,6 +64,16 @@ class SyncTopupsCommand extends Command
 
         if (! empty($failedPages)) {
             $this->warn('Skipped pages after retries: '.implode(', ', $failedPages).' - re-run topups:sync to backfill them.');
+        }
+
+        if ($run !== null) {
+            if (! empty($failedPages)) {
+                $runs->fail($run, 'Pages skipped: '.implode(', ', $failedPages));
+            } else {
+                $runs->complete($run);
+            }
+
+            $this->info($run->refresh()->summary());
         }
 
         // Summary — operators are Products grouped under the mobile-airtime category.

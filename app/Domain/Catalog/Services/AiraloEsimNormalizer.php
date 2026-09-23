@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 class AiraloEsimNormalizer implements CatalogNormalizerInterface
 {
-    public function normalizeAndSave(array $rawItem, string $providerName): void
+    public function normalizeAndSave(array $rawItem, string $providerName): array
     {
         // 1. Ensure eSIMs Category exists
         $category = Category::firstOrCreate(
@@ -79,6 +79,7 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
 
         // 4. Variant Normalization
         $operators = $rawItem['operators'] ?? [];
+        $savedOfferIds = [];
 
         foreach ($operators as $operator) {
             $network = $operator['title'] ?? 'Multiple';
@@ -182,8 +183,12 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
                         'metadata' => $metadata,
                     ]
                 );
+
+                $savedOfferIds[] = "airalo_{$offerId}";
             }
         }
+
+        return $savedOfferIds;
     }
 
     /**

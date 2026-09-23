@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Catalog\Enums\CatalogFeed;
+use App\Domain\Catalog\Enums\CatalogSyncRunStatus;
+use App\Domain\Catalog\Services\CatalogSyncRunService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Support\SweeperPickupCounter;
 use App\Domain\Payment\Enums\PaymentStatus;
@@ -156,15 +159,20 @@ Artisan::command('payments:expire-stale', function () {
     $this->info('Done.');
 })->purpose('Expire payment sessions past their TTL and cancel their orders/fundings');
 
-Artisan::command('zendit:sync-giftcards', function () {
+Artisan::command('zendit:sync-giftcards {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}', function (CatalogSyncRunService $runs) {
     $this->info('Setting default queue connection to sync...');
     config(['queue.default' => 'sync']);
 
-    $this->info('Dispatching SyncZenditGiftCardsJob synchronously...');
-    dispatch(new SyncZenditGiftCardsJob);
+    $run = $runs->start(CatalogFeed::ZenditVouchers, (bool) $this->option('force-cleanup'));
 
-    $this->info('Zendit Gift Card and Brand Sync completed successfully!');
-})->purpose('Sync Gift Cards and Brand Assets from Zendit API');
+    $this->info('Dispatching SyncZenditGiftCardsJob synchronously...');
+    dispatch(new SyncZenditGiftCardsJob(1, $run->id));
+
+    $run->refresh();
+    $this->info($run->summary());
+
+    return $run->status === CatalogSyncRunStatus::Completed ? 0 : 1;
+})->purpose('Sync Gift Cards and Brand Assets from Zendit API, then hide offers Zendit no longer lists');
 
 // Bug #4 fix: Fulfillment fallback sweeper.
 //

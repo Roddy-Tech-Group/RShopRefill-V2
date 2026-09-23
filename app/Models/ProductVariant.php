@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Catalog\Enums\CatalogFeed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,6 +14,7 @@ class ProductVariant extends Model
         'product_id',
         'subcategory_id',
         'provider_offer_id',
+        'catalog_feed',
         'sku',
         'currency',
         'face_value',
@@ -24,6 +26,8 @@ class ProductVariant extends Model
         'max_amount',
         'is_variable',
         'is_available',
+        'last_seen_at',
+        'delisted_at',
         'metadata',
     ];
 
@@ -39,6 +43,9 @@ class ProductVariant extends Model
             'max_amount' => 'decimal:4',
             'is_variable' => 'boolean',
             'is_available' => 'boolean',
+            'catalog_feed' => CatalogFeed::class,
+            'last_seen_at' => 'datetime',
+            'delisted_at' => 'datetime',
             'metadata' => 'array',
         ];
     }

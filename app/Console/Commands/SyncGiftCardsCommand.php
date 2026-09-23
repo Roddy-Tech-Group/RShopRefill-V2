@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Catalog\Enums\CatalogFeed;
 use App\Domain\Catalog\Providers\ZenditProvider;
+use App\Domain\Catalog\Services\CatalogSyncRunService;
 use App\Domain\Catalog\Services\CatalogSyncService;
 use App\Domain\Catalog\Services\ZenditNormalizer;
 use App\Models\Category;
@@ -12,24 +14,34 @@ use Illuminate\Console\Command;
 
 class SyncGiftCardsCommand extends Command
 {
-    protected $signature = 'giftcards:sync {--page=1 : Page number to start syncing from}';
+    protected $signature = 'giftcards:sync
+        {--page=1 : Page number to start syncing from (a partial run never hides offers)}
+        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}';
 
-    protected $description = 'Sync the Zendit gift-card (/vouchers/offers) catalog synchronously, page by page, then report counts';
+    protected $description = 'Sync the Zendit gift-card (/vouchers/offers) catalog synchronously, page by page, hide offers Zendit no longer lists, then report counts';
 
-    public function handle(): int
+    public function handle(CatalogSyncRunService $runs): int
     {
         $syncService = new CatalogSyncService(new ZenditProvider, new ZenditNormalizer);
 
         $page = max(1, (int) $this->option('page'));
         $totalProcessed = 0;
 
+        // Only a pass from the first page sees the whole feed, so only it may
+        // decide what Zendit stopped listing.
+        $run = $page === 1 ? $runs->start(CatalogFeed::ZenditVouchers, (bool) $this->option('force-cleanup')) : null;
+
         $this->info('Syncing Zendit gift cards (/vouchers/offers)...');
 
         do {
             try {
-                $result = $syncService->sync($page, 100);
+                $result = $syncService->sync($page, 100, $run);
             } catch (\Throwable $e) {
                 $this->error("Page {$page} failed: {$e->getMessage()}");
+
+                if ($run !== null) {
+                    $runs->fail($run, "Page {$page}: {$e->getMessage()}");
+                }
 
                 return self::FAILURE;
             }
@@ -40,6 +52,10 @@ class SyncGiftCardsCommand extends Command
         } while ($result['has_more']);
 
         $this->info("Done. Processed {$totalProcessed} offers.");
+
+        if ($run !== null) {
+            $this->info($runs->complete($run)->summary());
+        }
 
         // Breakdown — offers map to variants; products are brand x country rows.
         $giftCat = Category::where('slug', 'gift-cards')->first();

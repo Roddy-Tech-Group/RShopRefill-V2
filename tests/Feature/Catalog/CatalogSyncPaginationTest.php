@@ -39,9 +39,11 @@ class CatalogSyncPaginationTest extends TestCase
         {
             public int $count = 0;
 
-            public function normalizeAndSave(array $rawItem, string $providerName): void
+            public function normalizeAndSave(array $rawItem, string $providerName): array
             {
                 $this->count++;
+
+                return [];
             }
         };
     }
@@ -61,12 +63,14 @@ class CatalogSyncPaginationTest extends TestCase
         {
             public array $seen = [];
 
-            public function normalizeAndSave(array $rawItem, string $providerName): void
+            public function normalizeAndSave(array $rawItem, string $providerName): array
             {
                 if ($rawItem['title'] === 'Global') {
                     throw new \RuntimeException('Duplicate entry');
                 }
                 $this->seen[] = $rawItem['title'];
+
+                return [];
             }
         };
 
