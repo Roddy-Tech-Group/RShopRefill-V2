@@ -8,6 +8,7 @@ use App\Domain\Fulfillment\Interfaces\FulfillmentProviderInterface;
 use App\Domain\Shared\Services\CircuitBreaker;
 use App\Models\FulfillmentLog;
 use App\Models\OrderItem;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -39,9 +40,16 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
         // orders, so fall back to the FK relation. Without this, every top-up
         // order was being routed to /vouchers/purchases (gift-card endpoint).
         $categorySlug = (string) ($item->product_snapshot['category']['slug'] ?? $item->category?->slug ?? '');
-        $isEsim = $categorySlug === 'esims' || strpos($title, 'esim') !== false;
-        $isTopup = $categorySlug === 'mobile-airtime' || $categorySlug === 'topups' || strpos($title, 'top up') !== false;
-        $isBill = $categorySlug === 'bill-payments' || strpos($title, 'bill') !== false;
+
+        // The product name only decides the route when no category is known
+        // at all. It is a last resort for old orders, not a rule: a gift card
+        // called "Bill's Bar & Burguer" was being sent down the bill-payment
+        // branch, asked for a meter number nobody had typed, and failed every
+        // time before Zendit was even called.
+        $uncategorised = $categorySlug === '';
+        $isEsim = $categorySlug === 'esims' || ($uncategorised && str_contains($title, 'esim'));
+        $isTopup = $categorySlug === 'mobile-airtime' || $categorySlug === 'topups' || ($uncategorised && str_contains($title, 'top up'));
+        $isBill = $categorySlug === 'bill-payments' || ($uncategorised && str_contains($title, 'bill'));
 
         $order = $item->order;
         $user = $order?->user;
@@ -134,13 +142,22 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                 ];
             }
 
+            // The account number is this category's nature and is checked above
+            // whatever the offer declares; anything else Zendit lists for the
+            // biller (a phone number, a name) is added the same way as vouchers.
+            ['fields' => $fields, 'failed' => $failed] = $this->purchaseFields($item, $offerId, $customTransactionId, [
+                ['key' => 'billing.accountId', 'value' => $accountId],
+                ['key' => 'recipient.email', 'value' => $email],
+            ], $this->fieldSources($item, $user, $email, $firstName, $lastName));
+
+            if ($failed !== null) {
+                return $failed;
+            }
+
             $requestPayload = [
                 'offerId' => $offerId,
                 'transactionId' => $customTransactionId,
-                'fields' => [
-                    ['key' => 'billing.accountId', 'value' => $accountId],
-                    ['key' => 'recipient.email', 'value' => $email],
-                ],
+                'fields' => $fields,
             ];
 
             // Variable-amount bills (post-paid, water, etc.) use the same minor-
@@ -150,39 +167,21 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
             }
             $endpoint = '/vouchers/purchases'; // Zendit routes bills through the same vouchers endpoint
         } else {
-            $fields = [
+            // Every voucher carries the buyer's contact. On top of that, Zendit
+            // names per offer what else it needs: an account number for a
+            // betting wallet or electricity brand that syncs in as a gift card,
+            // the recipient's phone for a Kenyan or Togolese brand, the buyer's
+            // own number where the operator prints it on the receipt. Anything
+            // required and not on hand fails the item here, before Zendit is
+            // asked and before a customer pays for something we cannot deliver.
+            ['fields' => $fields, 'failed' => $failed] = $this->purchaseFields($item, $offerId, $customTransactionId, [
                 ['key' => 'recipient.email', 'value' => $email],
                 ['key' => 'recipient.firstName', 'value' => $firstName],
                 ['key' => 'recipient.lastName', 'value' => $lastName],
-            ];
+            ], $this->fieldSources($item, $user, $email, $firstName, $lastName));
 
-            // Some offers outside Bill Payments are paid straight into the
-            // customer's account (betting wallets, electricity brands that
-            // sync in as gift cards). Zendit lists billing.accountId as
-            // required for those and refuses the purchase without it.
-            if ($this->offerRequiresAccountId($item)) {
-                $accountId = trim((string) ($item->metadata['account_id'] ?? ''));
-
-                if ($accountId === '') {
-                    Log::error("Zendit voucher: missing account_id on order item {$item->id}");
-
-                    FulfillmentLog::create([
-                        'order_item_id' => $item->id,
-                        'provider_name' => 'zendit',
-                        'request_payload' => ['offerId' => $offerId, 'transactionId' => $customTransactionId],
-                        'response_payload' => null,
-                        'status' => 'FAILED',
-                        'error_message' => 'No account_id in order item metadata',
-                    ]);
-
-                    return [
-                        'status' => FulfillmentStatus::Failed,
-                        'reference' => null,
-                        'payload' => ['error' => 'No account number on file for this purchase.'],
-                    ];
-                }
-
-                array_unshift($fields, ['key' => 'billing.accountId', 'value' => $accountId]);
+            if ($failed !== null) {
+                return $failed;
             }
 
             $requestPayload = [
@@ -321,15 +320,111 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
      * variant snapshot taken at checkout carries the offer's requiredFields;
      * the live variant is the fallback for items that predate it.
      */
-    private function offerRequiresAccountId(OrderItem $item): bool
+    /**
+     * The purchase fields Zendit declares required for this offer, as frozen on
+     * the order item when it was bought (variant_snapshot), falling back to the
+     * live variant for items that predate the snapshot carrying them.
+     *
+     * @return list<string>
+     */
+    private function offerRequiredFields(OrderItem $item): array
     {
         $required = data_get($item->variant_snapshot, 'metadata.requiredFields');
 
         if (is_array($required)) {
-            return in_array('billing.accountId', $required, true);
+            return array_values(array_filter($required, 'is_string'));
         }
 
-        return (bool) $item->variant?->requiresAccountId();
+        return $item->variant?->requiredFields() ?? [];
+    }
+
+    /**
+     * Where each field Zendit can require comes from. Typed fields live on the
+     * order item's metadata (the product page collects them, the cart keeps
+     * them, checkout copies them onto the item); the rest come from the
+     * customer's account. The buyer's own number falls back to their profile
+     * so nobody is asked for a number we already hold.
+     *
+     * @return array<string, array{value: string, metadata_key: string|null, customer_message: string}>
+     */
+    private function fieldSources(OrderItem $item, ?User $user, string $email, string $firstName, string $lastName): array
+    {
+        $typed = fn (string $key): string => trim((string) ($item->metadata[$key] ?? ''));
+
+        return [
+            'recipient.email' => ['value' => $email, 'metadata_key' => null, 'customer_message' => 'No email address on file for this purchase.'],
+            'recipient.firstName' => ['value' => $firstName, 'metadata_key' => null, 'customer_message' => 'No name on file for this purchase.'],
+            'recipient.lastName' => ['value' => $lastName, 'metadata_key' => null, 'customer_message' => 'No name on file for this purchase.'],
+            'sender.firstName' => ['value' => $firstName, 'metadata_key' => null, 'customer_message' => 'No name on file for this purchase.'],
+            'sender.lastName' => ['value' => $lastName, 'metadata_key' => null, 'customer_message' => 'No name on file for this purchase.'],
+            'billing.accountId' => ['value' => $typed('account_id'), 'metadata_key' => 'account_id', 'customer_message' => 'No account number on file for this purchase.'],
+            'recipient.msisdn' => ['value' => $typed('recipient_phone'), 'metadata_key' => 'recipient_phone', 'customer_message' => 'No recipient phone number on file for this purchase.'],
+            'sender.msisdn' => ['value' => $typed('sender_phone') ?: trim((string) ($user?->phone ?? '')), 'metadata_key' => 'sender_phone', 'customer_message' => 'No sender phone number on file for this purchase.'],
+        ];
+    }
+
+    /**
+     * The fields to send for a voucher-endpoint purchase: the ones every such
+     * purchase carries, plus every field Zendit requires for this offer that
+     * is not among them. A required field with no value fails the item before
+     * Zendit is called, logged the same way the branches always have, so the
+     * failed-item refund runs and nothing is charged for an undeliverable
+     * order. A required field we do not know how to fill is logged and left
+     * for Zendit to refuse by name, which is exactly what happens today.
+     *
+     * @param  list<array{key: string, value: string}>  $always
+     * @param  array<string, array{value: string, metadata_key: string|null, customer_message: string}>  $sources
+     * @return array{fields: list<array{key: string, value: string}>, failed: array{status: FulfillmentStatus, reference: null, payload: array{error: string}}|null}
+     */
+    private function purchaseFields(OrderItem $item, string $offerId, string $transactionId, array $always, array $sources): array
+    {
+        $fields = $always;
+        $present = array_column($always, 'key');
+
+        foreach ($this->offerRequiredFields($item) as $key) {
+            if (in_array($key, $present, true)) {
+                continue;
+            }
+
+            if (! array_key_exists($key, $sources)) {
+                Log::warning("Zendit voucher: offer {$offerId} requires {$key}, which this integration does not collect", [
+                    'order_item_id' => $item->id,
+                ]);
+
+                continue;
+            }
+
+            $source = $sources[$key];
+
+            if ($source['value'] === '') {
+                $missing = $source['metadata_key'] ?? $key;
+
+                Log::error("Zendit voucher: missing {$missing} on order item {$item->id}");
+
+                FulfillmentLog::create([
+                    'order_item_id' => $item->id,
+                    'provider_name' => 'zendit',
+                    'request_payload' => ['offerId' => $offerId, 'transactionId' => $transactionId],
+                    'response_payload' => null,
+                    'status' => 'FAILED',
+                    'error_message' => "No {$missing} in order item metadata",
+                ]);
+
+                return [
+                    'fields' => [],
+                    'failed' => [
+                        'status' => FulfillmentStatus::Failed,
+                        'reference' => null,
+                        'payload' => ['error' => $source['customer_message']],
+                    ],
+                ];
+            }
+
+            $fields[] = ['key' => $key, 'value' => $source['value']];
+            $present[] = $key;
+        }
+
+        return ['fields' => $fields, 'failed' => null];
     }
 
     /**
