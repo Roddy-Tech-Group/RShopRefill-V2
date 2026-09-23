@@ -298,6 +298,65 @@ class CatalogSyncCleanupTest extends TestCase
         $this->assertSame('preview', CatalogSyncRun::sole()->cleanup);
     }
 
+    /**
+     * The mirror of the went-dark alert. Apple US has been gone since
+     * 2026-09-17; the day Zendit lists it again is news, not a run record.
+     */
+    public function test_a_product_coming_back_on_sale_raises_one_alert_naming_it(): void
+    {
+        $ebay = Product::factory()->create(['name' => 'eBay (US)', 'provider_name' => 'zendit', 'category_id' => $this->category->id]);
+        $this->existingVariants(['AMAZON_US_10', 'AMAZON_US_25']);
+        // Apple: two amounts hidden by a cleanup. eBay: one hidden by hand
+        // before the engine shipped, stamped by the migration the same way.
+        $this->existingVariants(['APPLE_US_10', 'APPLE_US_25'], ['is_available' => false, 'delisted_at' => now()->subDays(6)]);
+        $this->existingVariants(['EBAY_US_10'], ['product_id' => $ebay->id, 'is_available' => false, 'delisted_at' => now()->subDays(6)]);
+
+        $run = $this->runFeed(['AMAZON_US_10', 'AMAZON_US_25', 'APPLE_US_10', 'APPLE_US_25', 'EBAY_US_10']);
+
+        $this->assertSame(3, $run->offers_restored);
+        $this->assertCount(1, $this->alerts);
+        $this->assertSame(AlertSeverity::Sev3, $this->alerts[0]['severity']);
+        $this->assertStringStartsWith('catalog-sync:zendit_vouchers:came-back:', $this->alerts[0]['key']);
+        $this->assertSame('Zendit gift cards and bills: 2 products back on sale', $this->alerts[0]['title']);
+        $this->assertStringContainsString('Apple (US) (2 amounts)', $this->alerts[0]['message']);
+        $this->assertStringContainsString('eBay (US)', $this->alerts[0]['message']);
+        $this->assertStringNotContainsString('Amazon', $this->alerts[0]['message'], 'an offer that never left is not news');
+    }
+
+    public function test_an_offer_the_supplier_relists_but_keeps_disabled_is_not_announced(): void
+    {
+        $this->existingVariants(['AMAZON_US_10']);
+        $this->existingVariants(['APPLE_US_10'], ['is_available' => false, 'delisted_at' => now()->subDays(6)]);
+
+        $runs = app(CatalogSyncRunService::class);
+        $run = $runs->start(CatalogFeed::ZenditVouchers);
+        $this->syncService(['AMAZON_US_10', 'APPLE_US_10'], disabled: ['APPLE_US_10'])->sync(1, 100, $run);
+        $runs->complete($run);
+
+        $this->assertFalse($this->variant('APPLE_US_10')->is_available);
+        $this->assertNull($this->variant('APPLE_US_10')->delisted_at, 'the marker closes: the supplier lists it, it is just not sellable');
+        $this->assertSame(0, $run->refresh()->offers_restored);
+        $this->assertSame([], $this->alerts);
+    }
+
+    public function test_a_dry_run_names_the_products_that_would_come_back(): void
+    {
+        $this->existingVariants(['AMAZON_US_10']);
+        $this->existingVariants(['APPLE_US_10', 'APPLE_US_25'], ['is_available' => false, 'delisted_at' => now()->subDays(6)]);
+
+        $runs = app(CatalogSyncRunService::class);
+        $run = $runs->start(CatalogFeed::ZenditVouchers);
+        $this->syncService(['AMAZON_US_10', 'APPLE_US_10', 'APPLE_US_25'])->sync(1, 100, $run);
+
+        $preview = $runs->previewCleanup($run);
+
+        $this->assertSame(2, $preview['restore']);
+        $this->assertSame(['Apple (US)'], $preview['back']->pluck('name')->all());
+        $this->assertSame(2, $preview['back']->first()->offers_back);
+        $this->assertNotNull($this->variant('APPLE_US_10')->delisted_at, 'a dry run leaves the marker for the real run to close');
+        $this->assertSame([], $this->alerts);
+    }
+
     public function test_a_product_losing_its_last_amount_raises_one_alert_naming_it(): void
     {
         $ebay = Product::factory()->create(['name' => 'eBay (US)', 'provider_name' => 'zendit', 'category_id' => $this->category->id]);
@@ -420,15 +479,17 @@ class CatalogSyncCleanupTest extends TestCase
 
     /**
      * A one-page feed; an offer id of "BROKEN" throws while saving, like an
-     * item our normalizer cannot parse.
+     * item our normalizer cannot parse. Offers in $disabled are listed by the
+     * supplier but marked not sellable, as Zendit's `enabled: false`.
      *
      * @param  list<string>  $offerIds
+     * @param  list<string>  $disabled
      */
-    private function syncService(array $offerIds): CatalogSyncService
+    private function syncService(array $offerIds, array $disabled = []): CatalogSyncService
     {
-        $provider = new class($offerIds) implements ProviderInterface
+        $provider = new class($offerIds, $disabled) implements ProviderInterface
         {
-            public function __construct(private array $offerIds) {}
+            public function __construct(private array $offerIds, private array $disabled) {}
 
             public function getProviderName(): string
             {
@@ -439,7 +500,7 @@ class CatalogSyncCleanupTest extends TestCase
             {
                 return [
                     'total' => count($this->offerIds),
-                    'list' => array_map(fn (string $offerId) => ['offerId' => $offerId, 'enabled' => true], $this->offerIds),
+                    'list' => array_map(fn (string $offerId) => ['offerId' => $offerId, 'enabled' => ! in_array($offerId, $this->disabled, true)], $this->offerIds),
                 ];
             }
 

@@ -72,7 +72,15 @@ trait PreviewsCatalogCleanup
 
         if ($preview['restore'] > 0) {
             $this->newLine();
-            $this->line("  {$preview['restore']} previously hidden offers would go back on sale.");
+            $this->info("  {$preview['restore']} previously hidden offers would go back on sale:");
+
+            foreach ($preview['back']->take(30) as $product) {
+                $this->line('    '.$product->name.($product->offers_back > 1 ? "  ({$product->offers_back} amounts)" : ''));
+            }
+
+            if ($preview['back']->count() > 30) {
+                $this->line('    ... and '.($preview['back']->count() - 30).' more');
+            }
         }
 
         $this->newLine();

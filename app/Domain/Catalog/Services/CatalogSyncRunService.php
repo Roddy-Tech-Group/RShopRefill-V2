@@ -96,7 +96,7 @@ class CatalogSyncRunService
             return $run;
         }
 
-        [$delisted, $restored, $wentDark] = DB::transaction(fn () => $this->applyCleanup($run));
+        [$delisted, $restored, $wentDark, $cameBack] = DB::transaction(fn () => $this->applyCleanup($run));
 
         $run->update([
             'status' => CatalogSyncRunStatus::Completed,
@@ -119,6 +119,10 @@ class CatalogSyncRunService
             $this->alertProductsWentDark($run, $wentDark);
         }
 
+        if ($cameBack->isNotEmpty()) {
+            $this->alertProductsCameBack($run, $cameBack);
+        }
+
         return $run;
     }
 
@@ -138,7 +142,8 @@ class CatalogSyncRunService
      *     skipped: CatalogCleanupSkipReason|null,
      *     delist: Collection<int, ProductVariant>,
      *     restore: int,
-     *     dark: Collection<int, Product>
+     *     dark: Collection<int, Product>,
+     *     back: Collection<int, Product>
      * }
      */
     public function previewCleanup(CatalogSyncRun $run): array
@@ -179,6 +184,7 @@ class CatalogSyncRunService
             'delist' => $missing,
             'restore' => $restore,
             'dark' => $dark,
+            'back' => $this->productsComingBack($run),
         ];
     }
 
@@ -197,9 +203,11 @@ class CatalogSyncRunService
         }
 
         // A returning offer was already switched back on by its normalizer when
-        // the run saw it; clearing the marker closes the delisting record.
+        // the run saw it; clearing the marker closes the delisting record. Who
+        // came back is read first, since clearing the marker forgets it.
         $returned = $this->returningVariants($run);
 
+        $cameBack = $this->productsComingBack($run);
         $restored = (clone $returned)->where('is_available', true)->count();
         $returned->toBase()->update(['delisted_at' => null]);
 
@@ -210,7 +218,34 @@ class CatalogSyncRunService
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return [$missing->count(), $restored, $wentDark];
+        return [$missing->count(), $restored, $wentDark, $cameBack];
+    }
+
+    /**
+     * Products with at least one offer back on sale this run, with how many:
+     * hidden by a cleanup, or already off sale when the engine shipped, and
+     * listed by the supplier again. Read before the markers are cleared.
+     *
+     * @return Collection<int, Product> each carrying `offers_back`
+     */
+    private function productsComingBack(CatalogSyncRun $run): Collection
+    {
+        $backByProduct = $this->returningVariants($run)
+            ->where('is_available', true)
+            ->toBase()
+            ->selectRaw('product_id, count(*) as offers_back')
+            ->groupBy('product_id')
+            ->pluck('offers_back', 'product_id');
+
+        if ($backByProduct->isEmpty()) {
+            return new Collection;
+        }
+
+        return Product::query()
+            ->whereIn('id', $backByProduct->keys())
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->each(fn (Product $product) => $product->setAttribute('offers_back', (int) $backByProduct[$product->id]));
     }
 
     private function skipReason(
@@ -347,6 +382,34 @@ class CatalogSyncRunService
                 'offers_hidden_this_run' => $run->offers_delisted,
             ],
             runbook: 'Ask the supplier account manager whether the removal is temporary if any of these matter commercially.',
+        );
+    }
+
+    /**
+     * The mirror of the went-dark alert. A supplier relisting something it had
+     * dropped (Apple US, gone globally since 2026-09-17) is commercial news
+     * worth hearing the hour it happens, not finding in a run record later.
+     * Good news, so the working-day tier: nothing needs doing.
+     *
+     * @param  Collection<int, Product>  $products  each carrying `offers_back`
+     */
+    private function alertProductsCameBack(CatalogSyncRun $run, Collection $products): void
+    {
+        $names = $products->map(fn (Product $product) => $product->offers_back > 1
+            ? "{$product->name} ({$product->offers_back} amounts)"
+            : $product->name);
+        $listed = $names->take(15)->implode(', ').($names->count() > 15 ? ' and '.($names->count() - 15).' more' : '');
+
+        $this->alerter->send(
+            severity: AlertSeverity::Sev3,
+            key: "catalog-sync:{$run->feed->value}:came-back:".sha1($products->pluck('id')->implode(',')),
+            title: "{$run->feed->label()}: {$names->count()} ".str('product')->plural($names->count()).' back on sale',
+            message: "The supplier lists these again and they are selling: {$listed}.",
+            context: [
+                'run_id' => $run->id,
+                'offers_back_on_sale_this_run' => $run->offers_restored,
+            ],
+            runbook: 'Nothing to do. If a product was hidden on purpose, hide it again from the admin.',
         );
     }
 

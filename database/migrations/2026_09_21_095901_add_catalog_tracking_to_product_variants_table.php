@@ -41,6 +41,18 @@ return new class extends Migration
         foreach ($claims as $feed => $scope) {
             $scope(DB::table('product_variants')->whereNull('catalog_feed'))->update(['catalog_feed' => $feed]);
         }
+
+        // Offers already off sale when this shipped were hidden without the
+        // engine: 312 stale gift cards by hand on 2026-09-17 (all of Apple US
+        // among them). Marking them delisted lets the engine count and announce
+        // their return the day the supplier lists them again, instead of
+        // switching them back on silently. A variant the supplier itself has
+        // disabled is caught here too; its marker is cleared on the first run
+        // that sees it, and it stays off sale, so nothing changes for it.
+        DB::table('product_variants')
+            ->whereNotNull('catalog_feed')
+            ->where('is_available', false)
+            ->update(['delisted_at' => now()]);
     }
 
     public function down(): void
