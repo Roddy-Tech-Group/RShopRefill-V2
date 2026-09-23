@@ -123,6 +123,66 @@ class CatalogSyncRunService
     }
 
     /**
+     * What complete() would hide and restore, without touching a single offer.
+     *
+     * The first run of a feed after this shipped is the one that catches every
+     * offer suppliers dropped before it existed, so it can hide far more than a
+     * routine run ever will. This lets that run be read before it is trusted.
+     *
+     * The run is recorded as completed with its cleanup only previewed, and
+     * raises no alert. It did walk the whole feed, so the next run's shrink
+     * guard rightly measures itself against what this one saw.
+     *
+     * @return array{
+     *     run: CatalogSyncRun,
+     *     skipped: CatalogCleanupSkipReason|null,
+     *     delist: Collection<int, ProductVariant>,
+     *     restore: int,
+     *     dark: Collection<int, Product>
+     * }
+     */
+    public function previewCleanup(CatalogSyncRun $run): array
+    {
+        $run->refresh();
+
+        $liveCount = $this->feedVariants($run)->where('is_available', true)->count();
+        $missing = $this->missingVariants($run)->with('product:id,name')->get(['id', 'product_id', 'provider_offer_id']);
+
+        $skipped = $this->skipReason($run, $this->previousCompletedRun($run), $liveCount, $missing->count());
+
+        $restore = $this->returningVariants($run)->where('is_available', true)->count();
+
+        // A product goes dark when every one of its offers still on sale is in
+        // the delist set. Read before the writes, so it has to say "apart from
+        // these" rather than "none left", which is what applyCleanup can ask.
+        $dark = Product::query()
+            ->whereIn('id', $missing->pluck('product_id')->unique())
+            ->where('is_active', true)
+            ->whereDoesntHave('variants', fn (Builder $variants) => $variants
+                ->where('is_available', true)
+                ->whereNotIn('id', $missing->pluck('id')))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $run->update([
+            'status' => CatalogSyncRunStatus::Completed,
+            'finished_at' => now(),
+            'cleanup' => 'preview',
+            'cleanup_skipped_reason' => $skipped,
+            'offers_delisted' => $skipped === null ? $missing->count() : 0,
+            'offers_restored' => $skipped === null ? $restore : 0,
+        ]);
+
+        return [
+            'run' => $run,
+            'skipped' => $skipped,
+            'delist' => $missing,
+            'restore' => $restore,
+            'dark' => $dark,
+        ];
+    }
+
+    /**
      * @return array{0: int, 1: int, 2: Collection<int, Product>}
      */
     private function applyCleanup(CatalogSyncRun $run): array
@@ -138,9 +198,7 @@ class CatalogSyncRunService
 
         // A returning offer was already switched back on by its normalizer when
         // the run saw it; clearing the marker closes the delisting record.
-        $returned = $this->feedVariants($run)
-            ->whereNotNull('delisted_at')
-            ->where('last_seen_at', '>=', $run->started_at);
+        $returned = $this->returningVariants($run);
 
         $restored = (clone $returned)->where('is_available', true)->count();
         $returned->toBase()->update(['delisted_at' => null]);
@@ -198,6 +256,18 @@ class CatalogSyncRunService
     private function feedVariants(CatalogSyncRun $run): Builder
     {
         return ProductVariant::query()->where('catalog_feed', $run->feed->value);
+    }
+
+    /**
+     * Variants of the feed that a previous run hid and this one saw again.
+     *
+     * @return Builder<ProductVariant>
+     */
+    private function returningVariants(CatalogSyncRun $run): Builder
+    {
+        return $this->feedVariants($run)
+            ->whereNotNull('delisted_at')
+            ->where('last_seen_at', '>=', $run->started_at);
     }
 
     /**

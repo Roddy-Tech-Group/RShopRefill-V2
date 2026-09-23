@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\PreviewsCatalogCleanup;
 use App\Domain\Catalog\Enums\CatalogFeed;
 use App\Domain\Catalog\Providers\AiraloEsimProvider;
 use App\Domain\Catalog\Services\AiraloEsimNormalizer;
@@ -13,9 +14,12 @@ use Illuminate\Support\Facades\Log;
 
 class SyncAiraloEsimsCommand extends Command
 {
+    use PreviewsCatalogCleanup;
+
     protected $signature = 'airalo:sync-esims
         {--page=1 : Page number to start syncing from (a partial run never hides packages)}
-        {--force-cleanup : Hide packages Airalo no longer lists even when the shrink guards would hold back}';
+        {--force-cleanup : Hide packages Airalo no longer lists even when the shrink guards would hold back}
+        {--dry-run : Report which packages the cleanup would hide, and change nothing}';
 
     protected $description = 'Sync the Airalo eSIM catalog synchronously, page by page, then hide packages Airalo no longer lists';
 
@@ -71,7 +75,11 @@ class SyncAiraloEsimsCommand extends Command
         $this->info("Total Airalo variants in DB: {$airaloCount}");
 
         if ($run !== null) {
-            $this->info($runs->complete($run)->summary());
+            if ($this->option('dry-run')) {
+                $this->reportCleanupPreview($runs, $run);
+            } else {
+                $this->info($runs->complete($run)->summary());
+            }
         }
 
         if ($totalFailed > 0) {

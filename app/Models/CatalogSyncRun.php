@@ -68,6 +68,9 @@ class CatalogSyncRun extends Model
             $this->status === CatalogSyncRunStatus::Failed => "{$seen}; no offers hidden ({$this->failure_reason}).",
             $this->cleanup === 'applied' => "{$seen}; {$this->offers_delisted} no longer listed and hidden, {$this->offers_restored} back on sale.",
             $this->cleanup === 'skipped' => "{$seen}; cleanup skipped ({$this->cleanup_skipped_reason?->value}), missing offers left on sale and an alert sent.",
+            $this->cleanup === 'preview' => $this->cleanup_skipped_reason !== null
+                ? "{$seen}; dry run, and the guards would have held the cleanup back ({$this->cleanup_skipped_reason->value}). Nothing was changed."
+                : "{$seen}; dry run, {$this->offers_delisted} would be hidden and {$this->offers_restored} put back on sale. Nothing was changed.",
             default => "{$seen}.",
         };
     }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\PreviewsCatalogCleanup;
 use App\Domain\Catalog\Enums\CatalogFeed;
 use App\Domain\Catalog\Providers\ZenditProvider;
 use App\Domain\Catalog\Services\CatalogSyncRunService;
@@ -14,9 +15,12 @@ use Illuminate\Console\Command;
 
 class SyncGiftCardsCommand extends Command
 {
+    use PreviewsCatalogCleanup;
+
     protected $signature = 'giftcards:sync
         {--page=1 : Page number to start syncing from (a partial run never hides offers)}
-        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}';
+        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}
+        {--dry-run : Report which offers the cleanup would hide, and change nothing}';
 
     protected $description = 'Sync the Zendit gift-card (/vouchers/offers) catalog synchronously, page by page, hide offers Zendit no longer lists, then report counts';
 
@@ -54,7 +58,11 @@ class SyncGiftCardsCommand extends Command
         $this->info("Done. Processed {$totalProcessed} offers.");
 
         if ($run !== null) {
-            $this->info($runs->complete($run)->summary());
+            if ($this->option('dry-run')) {
+                $this->reportCleanupPreview($runs, $run);
+            } else {
+                $this->info($runs->complete($run)->summary());
+            }
         }
 
         // Breakdown — offers map to variants; products are brand x country rows.

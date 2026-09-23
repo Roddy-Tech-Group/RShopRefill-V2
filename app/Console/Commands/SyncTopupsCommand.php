@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\PreviewsCatalogCleanup;
 use App\Domain\Catalog\Enums\CatalogFeed;
 use App\Domain\Catalog\Providers\ZenditTopupProvider;
 use App\Domain\Catalog\Services\CatalogSyncRunService;
@@ -13,9 +14,12 @@ use Illuminate\Console\Command;
 
 class SyncTopupsCommand extends Command
 {
+    use PreviewsCatalogCleanup;
+
     protected $signature = 'topups:sync
         {--page=1 : Page number to start syncing from (a partial run never hides offers)}
-        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}';
+        {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}
+        {--dry-run : Report which offers the cleanup would hide, and change nothing}';
 
     protected $description = 'Sync the Zendit mobile top-up catalog synchronously, page by page, hide offers Zendit no longer lists, then report the operators pulled';
 
@@ -69,11 +73,13 @@ class SyncTopupsCommand extends Command
         if ($run !== null) {
             if (! empty($failedPages)) {
                 $runs->fail($run, 'Pages skipped: '.implode(', ', $failedPages));
+                $this->info($run->refresh()->summary());
+            } elseif ($this->option('dry-run')) {
+                $this->reportCleanupPreview($runs, $run);
             } else {
                 $runs->complete($run);
+                $this->info($run->refresh()->summary());
             }
-
-            $this->info($run->refresh()->summary());
         }
 
         // Summary — operators are Products grouped under the mobile-airtime category.

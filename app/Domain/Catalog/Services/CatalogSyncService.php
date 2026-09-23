@@ -96,6 +96,11 @@ class CatalogSyncService
      * still lists them. Written through the base query builder so updated_at
      * keeps meaning "the offer's data changed", not "a sync walked past it".
      *
+     * A run only ever claims an offer no feed owns yet, or one its own feed
+     * already owns. Offer ids are matched on their own, so without this a feed
+     * that happened to carry an id another feed owns would take it over, and
+     * the losing feed would then hide it as missing on its next clean run.
+     *
      * @param  list<string>  $offerIds
      */
     private function markSeen(CatalogSyncRun $run, array $offerIds): void
@@ -103,6 +108,9 @@ class CatalogSyncService
         foreach (array_chunk($offerIds, 500) as $chunk) {
             ProductVariant::query()
                 ->whereIn('provider_offer_id', $chunk)
+                ->where(fn ($query) => $query
+                    ->whereNull('catalog_feed')
+                    ->orWhere('catalog_feed', $run->feed->value))
                 ->toBase()
                 ->update([
                     'catalog_feed' => $run->feed->value,

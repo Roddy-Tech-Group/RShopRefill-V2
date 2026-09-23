@@ -207,6 +207,97 @@ class CatalogSyncCleanupTest extends TestCase
         $this->assertTrue($this->variant('airalo_topup_japan-7days-1gb')->is_available);
     }
 
+    public function test_a_feed_never_claims_an_offer_another_feed_already_owns(): void
+    {
+        $this->existingVariants(['APPLE_US_10', 'APPLE_US_25', 'AMAZON_US_10', 'AMAZON_US_25']);
+
+        // Same offer id, owned by the top-ups feed. Offer ids are matched on
+        // their own, so a vouchers run that carries this id must not take it
+        // over: the top-ups feed would then hide it as missing.
+        $this->existingVariants(['SHARED_ID'], [
+            'catalog_feed' => CatalogFeed::ZenditTopups,
+            'last_seen_at' => now()->subHours(6),
+        ]);
+
+        $this->runFeed(['APPLE_US_10', 'APPLE_US_25', 'AMAZON_US_10', 'AMAZON_US_25', 'SHARED_ID']);
+
+        $shared = $this->variant('SHARED_ID');
+        $this->assertSame(CatalogFeed::ZenditTopups, $shared->catalog_feed, 'the other feed must keep its offer');
+        $this->assertTrue($shared->last_seen_at->lt(now()->subHour()), 'and must not be marked as seen by this run');
+        $this->assertTrue($shared->is_available);
+    }
+
+    public function test_a_dry_run_reports_what_it_would_hide_and_changes_nothing(): void
+    {
+        $ebay = Product::factory()->create(['name' => 'eBay (US)', 'provider_name' => 'zendit', 'category_id' => $this->category->id]);
+        $this->existingVariants(['APPLE_US_10', 'APPLE_US_25', 'AMAZON_US_10', 'AMAZON_US_25', 'AMAZON_US_50', 'AMAZON_US_100']);
+        $this->existingVariants(['EBAY_US_10'], ['product_id' => $ebay->id]);
+
+        $runs = app(CatalogSyncRunService::class);
+        $run = $runs->start(CatalogFeed::ZenditVouchers);
+        $this->syncService(['APPLE_US_25', 'AMAZON_US_10', 'AMAZON_US_25', 'AMAZON_US_50', 'AMAZON_US_100'])->sync(1, 100, $run);
+
+        $preview = $runs->previewCleanup($run);
+
+        // Everything it would have hidden is untouched.
+        $this->assertTrue($this->variant('APPLE_US_10')->is_available);
+        $this->assertNull($this->variant('APPLE_US_10')->delisted_at);
+        $this->assertTrue($this->variant('EBAY_US_10')->is_available);
+
+        // And it says exactly what a real run would do, including the product
+        // that would lose its last amount.
+        $this->assertNull($preview['skipped']);
+        $this->assertSame(2, $preview['delist']->count());
+        $this->assertEqualsCanonicalizing(
+            ['APPLE_US_10', 'EBAY_US_10'],
+            $preview['delist']->pluck('provider_offer_id')->all(),
+        );
+        $this->assertSame(['eBay (US)'], $preview['dark']->pluck('name')->all());
+
+        $this->assertSame('preview', $run->refresh()->cleanup);
+        $this->assertSame(2, $run->offers_delisted);
+        $this->assertStringContainsString('Nothing was changed', $run->summary());
+        $this->assertSame([], $this->alerts, 'a dry run must never page anyone');
+    }
+
+    public function test_a_dry_run_says_when_the_guards_would_hold_the_cleanup_back(): void
+    {
+        $this->existingVariants(['APPLE_US_10', 'APPLE_US_25', 'AMAZON_US_10', 'AMAZON_US_25', 'EBAY_US_10']);
+
+        $runs = app(CatalogSyncRunService::class);
+        $run = $runs->start(CatalogFeed::ZenditVouchers);
+        $this->syncService(['APPLE_US_25', 'AMAZON_US_10'])->sync(1, 100, $run);
+
+        $preview = $runs->previewCleanup($run);
+
+        $this->assertSame(CatalogCleanupSkipReason::TooManyMissing, $preview['skipped']);
+        $this->assertSame(0, $run->refresh()->offers_delisted);
+        $this->assertTrue($this->variant('EBAY_US_10')->is_available);
+        $this->assertSame([], $this->alerts);
+    }
+
+    public function test_the_dry_run_option_hides_nothing_through_the_command(): void
+    {
+        config(['services.zendit.api_key' => 'live_test', 'services.zendit.base_url' => 'https://api.zendit.io/v1']);
+
+        $this->existingVariants(['APPLE_US_10_EGIFT_WHS']);
+        $offers = collect(range(1, 4))->map(fn (int $n) => $this->zenditOffer("AMAZON_US_{$n}_EGIFT"));
+        foreach ($offers as $offer) {
+            $this->existingVariants([$offer['offerId']]);
+        }
+
+        Http::fake([
+            'api.zendit.io/v1/vouchers/offers*' => Http::response(['total' => 4, 'list' => $offers->values()->all()]),
+        ]);
+
+        $this->artisan('giftcards:sync', ['--dry-run' => true])
+            ->expectsOutputToContain('DRY RUN')
+            ->assertSuccessful();
+
+        $this->assertTrue($this->variant('APPLE_US_10_EGIFT_WHS')->is_available);
+        $this->assertSame('preview', CatalogSyncRun::sole()->cleanup);
+    }
+
     public function test_a_product_losing_its_last_amount_raises_one_alert_naming_it(): void
     {
         $ebay = Product::factory()->create(['name' => 'eBay (US)', 'provider_name' => 'zendit', 'category_id' => $this->category->id]);
