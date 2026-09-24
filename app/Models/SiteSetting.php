@@ -53,6 +53,31 @@ class SiteSetting extends Model
         return $cached !== null ? $cached : $default;
     }
 
+    /**
+     * Read a setting for a decision that must not be guessed. Tries the cache,
+     * then the database directly when the cache store is down, and throws
+     * only when neither can answer. Returns null for a row that does not
+     * exist, which is configuration, not failure. Money switches read through
+     * here (FeatureFlag::gatewayEnabled) so a cache outage can never turn a
+     * switch an admin flipped off back on.
+     *
+     * @throws \Throwable when the setting cannot be read from anywhere
+     */
+    public static function readOrFail(string $key): mixed
+    {
+        try {
+            return Cache::remember(
+                self::cacheKey($key),
+                now()->addHour(),
+                fn () => self::query()->where('key', $key)->value('value'),
+            );
+        } catch (\Throwable $cacheFailure) {
+            // The cache is down, or the read inside it failed. Ask the
+            // database directly; if that fails too, the caller decides.
+            return self::query()->where('key', $key)->value('value');
+        }
+    }
+
     public static function put(string $key, mixed $value, string $group = 'general', ?string $description = null): self
     {
         // CREATING a setting is not FLIPPING a setting: side effects below

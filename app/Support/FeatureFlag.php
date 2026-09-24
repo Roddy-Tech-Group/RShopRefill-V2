@@ -3,7 +3,10 @@
 namespace App\Support;
 
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Models\SiteSetting;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Tiny facade around SiteSetting for feature flags. Every features.* key
@@ -93,7 +96,53 @@ class FeatureFlag
     {
         $key = self::GATEWAY_FLAGS[$gateway] ?? null;
 
-        return $key === null ? true : self::on($key);
+        return $key === null ? true : self::moneySwitch($key);
+    }
+
+    /**
+     * A kill switch that decides whether money may move fails CLOSED.
+     *
+     * on() falls back to the flag's default when the setting store is down,
+     * and gateway flags default to on, so a cache outage used to turn a
+     * switch an admin had deliberately flipped off back on. Here the read
+     * goes cache, then database; only when neither can answer is the gateway
+     * treated as off, and someone is told why the tiles went grey. A row that
+     * simply does not exist is still on by default, as before.
+     */
+    private static function moneySwitch(string $name): bool
+    {
+        $key = 'features.'.rtrim($name, '_').'_enabled';
+
+        try {
+            $value = SiteSetting::readOrFail($key);
+        } catch (\Throwable $e) {
+            Log::critical('Gateway kill switch unreadable, failing closed', ['flag' => $key, 'error' => $e->getMessage()]);
+
+            try {
+                app(OperationalAlerter::class)->send(
+                    severity: AlertSeverity::Sev2,
+                    key: 'feature-flag:unreadable:gateway',
+                    title: 'Gateway switches unreadable',
+                    message: 'Neither the cache nor the database could answer a gateway kill switch. New payments are refused until one of them recovers.',
+                    context: ['flag' => $key, 'error' => $e->getMessage()],
+                    runbook: 'docs/runbooks/payment-provider-failure.md',
+                );
+            } catch (\Throwable) {
+                // Alerting is best effort; the refusal is what matters.
+            }
+
+            return false;
+        }
+
+        if ($value === null) {
+            return true;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower((string) $value), self::TRUTHY, true);
     }
 
     /**
