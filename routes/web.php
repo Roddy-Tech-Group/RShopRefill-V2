@@ -4,6 +4,7 @@ use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\Order\Services\CouponApplicationService;
+use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -660,11 +661,20 @@ $renderCheckout = function (CartManager $cartManager, CartPricingService $pricin
             $cart ? $cart->items->map(fn ($item) => $item->product->complianceCategory()) : [],
         );
 
+    // The wallets the customer can pay from, each with its balance and its
+    // rate against USD, so the wallet tile can say which wallets cover the
+    // cart and what each would be charged. Checkout pays from whichever
+    // wallet covers the order, not only the one in the cart's currency.
+    $walletOptions = auth()->check()
+        ? app(WalletPaymentProvider::class)->optionsFor(auth()->user())
+        : [];
+
     return view('shop.checkout', [
         'cart' => $cart,
         'totals' => $totals,
         'rate' => $rate,
         'complianceIneligibleByCurrency' => $complianceIneligibleByCurrency,
+        'walletOptions' => $walletOptions,
     ]);
 };
 Route::get('checkout', $renderCheckout)->name('shop.checkout');
