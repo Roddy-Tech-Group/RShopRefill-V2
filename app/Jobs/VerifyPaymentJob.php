@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\PaymentConfirmed;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
@@ -9,7 +10,9 @@ use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Wallet\Services\WalletFundingService;
+use App\Enums\AlertSeverity;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentWebhook;
@@ -113,6 +116,29 @@ class VerifyPaymentJob implements ShouldQueue
 
                 Log::info("VerifyPaymentJob: payment confirmed for order attempt {$attempt->id}");
 
+                // Coins (or any late payment) landing after our sweeper closed
+                // the order. The customer paid the quoted amount and the
+                // gateway has it, so the order is settled like any other late
+                // payment; but an order coming back from Cancelled is worth a
+                // human's glance, so it is stamped and ops are told.
+                $lateArrival = $order !== null && (
+                    $order->order_status === OrderStatus::Cancelled
+                    || $order->payment_status === PaymentStatus::Failed
+                );
+
+                if ($lateArrival) {
+                    $attempt->metadata = array_merge($attempt->metadata ?? [], [
+                        'crypto' => array_merge((array) data_get($attempt->metadata, 'crypto', []), [
+                            'late_arrival' => [
+                                'previous_order_status' => $order->order_status?->value,
+                                'previous_payment_status' => $order->payment_status?->value,
+                                'detected_at' => now()->toIso8601String(),
+                            ],
+                        ]),
+                    ]);
+                    $attempt->save();
+                }
+
                 // 1. Transition the order's payment status to Paid
                 if ($attempt->order) {
                     $orderService->transitionPaymentStatus($attempt->order, PaymentStatus::Paid, $attempt->verification_payload);
@@ -136,13 +162,17 @@ class VerifyPaymentJob implements ShouldQueue
                 // pattern confirmSession already uses for its events.
                 $order = Order::find($attempt->order_id);
                 if ($order) {
-                    DB::afterCommit(function () use ($order, $attempt) {
+                    DB::afterCommit(function () use ($order, $attempt, $lateArrival) {
                         PaymentConfirmed::dispatch($order, $attempt);
 
                         // Staggered: identical offers are spaced out so
                         // duplicate purchases don't trip supplier velocity
                         // protection (Zendit error -29).
                         FulfillOrderItemJob::dispatchStaggered($order->items);
+
+                        if ($lateArrival) {
+                            $this->alertLateArrival($order, $attempt);
+                        }
                     });
                 }
 
@@ -163,18 +193,44 @@ class VerifyPaymentJob implements ShouldQueue
     }
 
     /**
-     * A crypto wallet-funding attempt marked Failed by our own expiry sweep,
-     * not by the gateway. The gateway's last known word is kept on the attempt
+     * Ops hear about every order that came back from Cancelled because its
+     * payment landed late: the money is real and the order is now in flight,
+     * but a price quote that old, or a customer who has since bought the same
+     * thing again, deserves a look. Sev2, one alert per attempt.
+     */
+    private function alertLateArrival(Order $order, PaymentAttempt $attempt): void
+    {
+        try {
+            app(OperationalAlerter::class)->send(
+                severity: AlertSeverity::Sev2,
+                key: 'crypto:late-arrival:'.$attempt->id,
+                title: 'Payment landed after the order was cancelled',
+                message: "Order {$order->order_number} was cancelled by the expiry sweep, then its {$attempt->gateway} payment arrived. The order is settled and sent for fulfilment; check the customer has not bought it again.",
+                context: [
+                    'Order' => $order->order_number,
+                    'Customer id' => $order->user_id,
+                    'Gateway' => $attempt->gateway,
+                    'Amount' => number_format((float) $attempt->amount, 2).' '.strtoupper((string) $attempt->currency),
+                    'Attempt' => $attempt->id,
+                    'Admin' => route('admin.transaction', $attempt),
+                ],
+                runbook: 'docs/runbooks/payment-provider-failure.md',
+            );
+        } catch (\Throwable $e) {
+            Log::error('Late-arrival alert failed', ['attempt_id' => $attempt->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * A crypto attempt marked Failed by our own expiry sweep, not by the
+     * gateway. The gateway's last known word is kept on the attempt
      * (crypto.status); only failed / expired / refunded / cancelled from the
-     * gateway are final. Scoped to wallet fundings: an order the sweep cancelled
-     * has a fulfilment lifecycle of its own and is not reopened here.
+     * gateway are final. Used to be scoped to wallet fundings, which left an
+     * order's coins landing against a dead attempt with nothing moving and
+     * nobody told; an order settles the same way, and ops are alerted above.
      */
     private function failedLocallyWhileGatewayStillOpen(PaymentAttempt $attempt): bool
     {
-        if ($attempt->payable_type !== WalletFunding::class) {
-            return false;
-        }
-
         if (! in_array($attempt->gateway, ['nowpayments', 'crypto'], true)) {
             return false;
         }
