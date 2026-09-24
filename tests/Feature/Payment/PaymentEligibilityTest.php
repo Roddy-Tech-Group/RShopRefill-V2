@@ -7,7 +7,9 @@ use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\Currency;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Wallet\Services\WalletFundingService;
+use App\Enums\AlertSeverity;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -440,25 +442,73 @@ class PaymentEligibilityTest extends TestCase
     // --------------------------------------------- the zero-cell interlock
 
     /**
-     * The full-catalogue-outage guard: with the enforce flag ON but ZERO
-     * approved cells, enforcement must stay inert (shadow) — the runtime
-     * backstop for any write path that bypasses the admin UI's refusal.
+     * A lockdown stays a lockdown. With the enforce flag ON and ZERO approved
+     * cells (only reachable by bypassing the admin UI), enforcement used to
+     * fall back to shadow, which turned "nothing approved" into "everything
+     * allowed" the moment the last cell went off. Now it keeps refusing
+     * restricted carts and pages someone to fix the matrix.
      */
-    public function test_enforcement_stays_inert_with_zero_approved_cells(): void
+    public function test_enforcement_holds_with_zero_approved_cells_and_pages_someone(): void
     {
+        $alerts = [];
+        $this->app->instance(OperationalAlerter::class, new class($alerts) extends OperationalAlerter
+        {
+            public function __construct(private array &$sent) {}
+
+            public function send(AlertSeverity $severity, string $key, string $title, string $message, array $context = [], ?string $runbook = null): bool
+            {
+                $this->sent[] = compact('severity', 'key');
+
+                return true;
+            }
+        });
+
         SiteSetting::put('features.payment_eligibility_enforce_enabled', 'on', 'features');
         Cache::flush();
 
         $service = app(PaymentEligibilityService::class);
 
         $this->assertSame(0, $service->approvedCellCount());
-        $this->assertFalse($service->enforcementEnabled(), 'zero approved cells must force shadow mode');
+        $this->assertTrue($service->enforcementEnabled(), 'zero approved cells must not switch enforcement off');
+        $this->assertNotEmpty($service->blockers([ComplianceCategory::GiftCard], 'flutterwave', 'USD'), 'a restricted cart is refused, not waved through');
+        $this->assertTrue(collect($alerts)->pluck('key')->contains('payment_eligibility:enforcing-empty-matrix'));
 
-        // One approved cell and the same flag is now genuinely enforcing.
+        // One approved cell and the same flag is enforcing as intended.
         $this->approve(ComplianceCategory::Airtime, ['korapay']);
 
         $this->assertSame(1, $service->approvedCellCount());
         $this->assertTrue($service->enforcementEnabled());
+    }
+
+    public function test_the_admin_ui_refuses_to_switch_off_the_last_approved_cell_while_enforcing(): void
+    {
+        $this->approve(ComplianceCategory::Airtime, ['korapay']);
+        SiteSetting::put('features.payment_eligibility_enforce_enabled', 'on', 'features');
+        Cache::flush();
+
+        Volt::test('admin.system-settings')
+            ->call('updateSetting', 'features.eligibility_korapay_airtime_enabled', 'off')
+            ->assertHasErrors('settings.features.eligibility_korapay_airtime_enabled');
+
+        $this->assertSame(1, app(PaymentEligibilityService::class)->approvedCellCount(), 'the last cell is still approved');
+
+        // With a second cell approved, the same cell can be switched off.
+        $this->approve(ComplianceCategory::Airtime, ['paystack']);
+
+        Volt::test('admin.system-settings')
+            ->call('updateSetting', 'features.eligibility_korapay_airtime_enabled', 'off')
+            ->assertHasNoErrors();
+
+        Cache::flush();
+        $this->assertSame(1, app(PaymentEligibilityService::class)->approvedCellCount());
+
+        // And with enforcement off, cells come and go freely.
+        SiteSetting::put('features.payment_eligibility_enforce_enabled', 'off', 'features');
+        Cache::flush();
+
+        Volt::test('admin.system-settings')
+            ->call('updateSetting', 'features.eligibility_paystack_airtime_enabled', 'off')
+            ->assertHasNoErrors();
     }
 
     public function test_the_admin_ui_refuses_to_enforce_with_zero_approved_cells(): void

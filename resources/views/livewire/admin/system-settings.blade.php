@@ -213,6 +213,19 @@ class extends Component {
             return;
         }
 
+        // The same interlock from the other side: switching off the LAST
+        // approved cell while enforcing leaves a lockdown with nothing
+        // approved. Enforcement no longer falls back to shadow in that state
+        // (that turned a lockdown into allow-all), so the flip is refused
+        // here, where the admin can read why.
+        if (str_starts_with($key, 'features.eligibility_')
+            && ! in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
+            && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->isLastApprovedCell($key)) {
+            $this->addError('settings.'.$key, 'Refused: this is the last approved cell and enforcement is on. Approve another cell first, or switch enforcement off, otherwise every restricted cart would be refused.');
+
+            return;
+        }
+
         SiteSetting::put(
             $key,
             $stored,
