@@ -3,6 +3,7 @@
 namespace App\Domain\PaymentInsights\Services;
 
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
+use App\Domain\Payment\Support\MockMode;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Support\DeclineVerdict;
 use App\Domain\PaymentInsights\Support\IssuerCountry;
@@ -226,7 +227,7 @@ class RefusedCardRecorder
 
         $secret = (string) config('services.flutterwave.secret_key');
 
-        return $secret !== '' && ! str_contains($secret, 'MOCK');
+        return $secret !== '' && ! MockMode::forKey($secret);
     }
 
     private function productLine(PaymentSession $session): ProductLine

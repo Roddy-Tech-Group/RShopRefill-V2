@@ -60,11 +60,18 @@ class NowPaymentsProvider implements PaymentProviderInterface
 
         $this->apiKey = $apiKey ?: 'NOWPAYMENTS_KEY_MOCK';
 
-        // Mock mode is decided by environment policy, never by inspecting the key.
-        // The old str_contains($apiKey, 'MOCK') test meant a real production key
-        // that happened to contain that substring would silently disable the live
-        // gateway and start handing out fake payment addresses.
-        $this->mock = empty($apiKey) && MockMode::allowed();
+        // Mock mode is decided by environment policy (MockMode), never by the
+        // key alone: in production a real key that happens to contain "MOCK"
+        // is a real key, and nothing mocks.
+        $this->mock = MockMode::forKey($apiKey);
+
+        // The sandbox simulates outcomes and settles without a real payment
+        // (see applyVerificationResult). Pointed at production traffic it
+        // would mark orders paid for coins that never arrived, so it refuses
+        // to serve production at all rather than trusting a flag.
+        if (config('services.nowpayments.sandbox') && app()->environment('production')) {
+            throw new \RuntimeException('NOWPAYMENTS_SANDBOX=true is not allowed in production. Unset it, or the crypto gateway stays down.');
+        }
 
         $this->baseUrl = $this->resolveBaseUrl();
     }

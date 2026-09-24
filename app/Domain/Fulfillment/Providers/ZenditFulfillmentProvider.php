@@ -5,6 +5,7 @@ namespace App\Domain\Fulfillment\Providers;
 use App\Domain\Catalog\Services\RejectedOfferDelister;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Interfaces\FulfillmentProviderInterface;
+use App\Domain\Payment\Support\MockMode;
 use App\Domain\Shared\Services\CircuitBreaker;
 use App\Models\FulfillmentLog;
 use App\Models\OrderItem;
@@ -18,9 +19,22 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
 
     private string $baseUrl;
 
+    private bool $mock;
+
     public function __construct()
     {
-        $this->apiKey = config('services.zendit.api_key') ?: 'ZENDIT_API_KEY_MOCK';
+        $apiKey = config('services.zendit.api_key');
+
+        // Fail closed, like the payment gateways: a blank key outside
+        // local/testing used to ship MOCK codes to paying customers. Better no
+        // fulfilment at all (the job fails and the order is refunded) than a
+        // fake voucher.
+        if (empty($apiKey) && ! MockMode::allowed()) {
+            throw new \RuntimeException('Zendit API key (ZENDIT_API_KEY) is not configured. Refusing to fall back to mock fulfilment outside local/testing.');
+        }
+
+        $this->apiKey = $apiKey ?: 'ZENDIT_API_KEY_MOCK';
+        $this->mock = MockMode::forKey($apiKey);
 
         // Explicit base URL from config always wins.
         $explicitUrl = config('services.zendit.base_url');
@@ -198,7 +212,7 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
         }
 
         // Mock mode
-        if (str_contains($this->apiKey, 'MOCK')) {
+        if ($this->mock) {
             $responsePayload = $this->getMockResponse($item, $requestPayload['transactionId']);
 
             FulfillmentLog::create([
@@ -541,7 +555,7 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
 
     public function verifyStatus(OrderItem $item): array
     {
-        if (str_contains($this->apiKey, 'MOCK')) {
+        if ($this->mock) {
             return [
                 'status' => FulfillmentStatus::Fulfilled,
                 'payload' => $item->fulfillment_payload ?? [],

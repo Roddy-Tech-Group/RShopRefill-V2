@@ -34,6 +34,9 @@ class PaystackPaymentProvider implements PaymentProviderInterface
 {
     private string $secretKey;
 
+    /** Decided by environment policy (MockMode), never by the key alone. */
+    private bool $mock;
+
     private string $baseUrl;
 
     public function __construct()
@@ -48,6 +51,7 @@ class PaystackPaymentProvider implements PaymentProviderInterface
         }
 
         $this->secretKey = $secretKey ?: 'PAYSTACK_SECRET_KEY_MOCK';
+        $this->mock = MockMode::forKey($secretKey);
         $this->baseUrl = 'https://api.paystack.co';
     }
 
@@ -95,7 +99,7 @@ class PaystackPaymentProvider implements PaymentProviderInterface
             default => $methodKey,
         };
 
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $mockUrl = $returnUrl.(str_contains($returnUrl, '?') ? '&' : '?').'reference='.$attempt->idempotency_key.'&status=successful&mock=1';
 
             return [
@@ -183,7 +187,7 @@ class PaystackPaymentProvider implements PaymentProviderInterface
 
     public function verifyPayment(PaymentAttempt $attempt): bool
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $attempt->payment_status = PaymentStatus::Paid;
             $attempt->confirmed_at = now();
             $attempt->save();
@@ -246,7 +250,7 @@ class PaystackPaymentProvider implements PaymentProviderInterface
 
     public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $attempt->payment_status = PaymentStatus::Refunded;
             $attempt->save();
 
