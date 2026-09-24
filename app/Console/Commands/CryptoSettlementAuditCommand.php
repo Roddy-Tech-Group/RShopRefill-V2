@@ -3,8 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Models\PaymentAttempt;
+use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 
 /**
  * Surfaces crypto payments whose settled amount does not match what was invoiced.
@@ -14,8 +18,8 @@ use Illuminate\Console\Command;
  * and the reconciler simply re-verified it every hour forever. Overpayments were
  * worse, since nothing in the schema could even find them after the fact.
  *
- * Run on a schedule so a human sees the queue; --json makes it pipeable into an
- * alerting channel.
+ * Run on a schedule: held payments are announced by name on the ops channel;
+ * --json makes it pipeable and never alerts.
  */
 class CryptoSettlementAuditCommand extends Command
 {
@@ -89,9 +93,46 @@ class CryptoSettlementAuditCommand extends Command
             $this->comment('Overpaid orders were fulfilled. The surplus is owed back to the customer.');
         }
 
-        // Non-zero exit so a scheduled run can trip an alert on a queue that
-        // still needs a human. Dust and operator settlements are closed.
-        return $underpaid->isEmpty() && $overpaid->isEmpty() ? self::SUCCESS : self::FAILURE;
+        // A held payment needs a human, so it is announced by name on the ops
+        // channel. This used to be an exit code of 1 (for held AND overpaid),
+        // which the scheduler filed every morning in Sentry as "the report
+        // crashed" (issue 7618307421), and overpaid is normal: the quoted
+        // amount rounds up, so a satoshi of surplus is routine and already
+        // fulfilled. The report ran, so it exits 0; held rows reach Telegram.
+        if ($underpaid->isNotEmpty()) {
+            $this->alertHeld($underpaid, $since);
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param  Collection<int, PaymentAttempt>  $underpaid
+     */
+    private function alertHeld(Collection $underpaid, CarbonInterface $since): void
+    {
+        $lines = $underpaid->map(fn (PaymentAttempt $a) => sprintf(
+            '%s: received %s of %s%s, waiting since %s, %s',
+            $a->order?->order_number ?? ($a->payable_type ? 'wallet funding' : 'attempt '.$a->id),
+            $this->trim($a->actually_paid),
+            $this->trim($a->pay_amount),
+            trim(' '.strtoupper((string) $a->pay_currency)),
+            $a->created_at?->toDateString() ?? 'unknown',
+            route('admin.transaction', $a),
+        ))->values();
+
+        app(OperationalAlerter::class)->send(
+            severity: AlertSeverity::Sev2,
+            key: 'crypto:settlements:held',
+            title: 'Crypto payments held short',
+            message: sprintf(
+                '%d crypto payment(s) arrived short since %s and are held, never fulfilled on their own. Settle with a reason on the transaction page, wait for the customer to pay the rest, or refund what arrived to their wallet. This repeats daily until none are held.',
+                $underpaid->count(),
+                $since->toDateString(),
+            ),
+            context: ['Payments' => $lines->take(10)->implode("\n")] + ($lines->count() > 10 ? ['More' => ($lines->count() - 10).' not listed; run crypto:settlements'] : []),
+            runbook: 'docs/runbooks/payment-provider-failure.md',
+        );
     }
 
     /**
