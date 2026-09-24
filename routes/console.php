@@ -313,6 +313,17 @@ Schedule::command('ledger:verify')
     ->name('ledger:verify-nightly')
     ->sentryMonitor('ledger-verify-nightly');
 
+// The wallet ledger chain: the hash-linked events WalletService writes for
+// every credit, debit, lock and unlock, re-proved link by link and checked
+// against each wallet's balance. This is the chain production actually
+// writes (the double-entry journals above have no writer yet), so this is
+// the check that stands behind every balance customers spend from.
+Schedule::command('ledger:verify-chain')
+    ->dailyAt('02:40')
+    ->withoutOverlapping()
+    ->name('ledger:verify-chain-nightly')
+    ->sentryMonitor('ledger-verify-chain-nightly');
+
 // Margin protection. Runs before the morning sweep so any below-cost sale from
 // overnight is on the desk before the day starts.
 Schedule::command('pricing:audit-below-cost')

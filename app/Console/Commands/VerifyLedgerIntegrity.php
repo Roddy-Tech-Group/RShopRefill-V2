@@ -6,6 +6,7 @@ use App\Domain\Ledger\Services\LedgerIntegrityService;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class VerifyLedgerIntegrity extends Command
 {
@@ -53,6 +54,16 @@ class VerifyLedgerIntegrity extends Command
         );
 
         if ($result['status'] === 'passed') {
+            // Passing on empty tables proves nothing. Say so, so nobody reads
+            // "verified" as assurance about the wallet balances; those are
+            // proved by ledger:verify-chain, which reads the chain WalletService
+            // actually writes.
+            if (DB::table('ledger_journals')->doesntExist()) {
+                $this->warn('The double-entry ledger holds no journals, so there was nothing to verify. Wallet balances are proved by ledger:verify-chain.');
+
+                return self::SUCCESS;
+            }
+
             $this->info('Ledger integrity verified. No violations found.');
 
             return self::SUCCESS;
