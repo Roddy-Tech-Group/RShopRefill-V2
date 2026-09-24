@@ -1719,6 +1719,7 @@ new class extends Component
                                                 Copy
                                             </button>
                                         </div>
+                                        <p class="mt-1 text-[10px] text-zinc-500">Network fees included. Send this exact amount.</p>
                                     </div>
                                     <div>
                                         <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Deposit Address</span>

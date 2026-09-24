@@ -123,6 +123,8 @@ class SendRecoveryRemindersJob implements ShouldQueue
                     ? $recovery->customer_email
                     : null,
                 metadata: [
+                    // Read by the in-app bell and the push notification.
+                    'url' => route('recovery.show', ['token' => $recovery->token]),
                     'recovery_id' => $recovery->id,
                     'payment_session_id' => $recovery->payment_session_id,
                     'failure_reason_code' => $recovery->failure_reason_code,

@@ -5,6 +5,7 @@ namespace Tests\Feature\Payments;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Enums\CommunicationChannel;
 use App\Domain\Communication\Mail\Transactions\PaymentRecoveryMail;
+use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Communication\Services\PreferenceManager;
 use App\Domain\Communication\Support\UnsubscribeLink;
 use App\Domain\Order\Enums\OrderStatus;
@@ -379,5 +380,44 @@ class RecoveryLandingTest extends TestCase
         $this->assertStringNotContainsString('Reason:', $notice->message);
         $this->assertStringNotContainsString('wallet balance', $notice->message);
         $this->assertSame('insufficient_funds', $notice->metadata['failure_reason_code'] ?? null);
+
+        // Tapping the notice opens the funding sheet on this currency and
+        // amount, the same deep link the recovery email uses.
+        $this->assertSame(route('dashboard', ['fund' => 'USD', 'amount' => 50.0]), $notice->metadata['url'] ?? null);
+    }
+
+    /**
+     * The in-app notice and the push both read metadata.url; without it the
+     * customer taps "complete your payment" and lands nowhere.
+     */
+    public function test_the_in_app_recovery_notice_links_to_the_recovery_page(): void
+    {
+        $user = User::factory()->create();
+        $session = $this->orderSession($user, ['payment_status' => 'failed', 'order_status' => 'failed']);
+        $recovery = $this->recoveryFor($session, $user);
+
+        app(CommunicationManager::class)->send(
+            recipient: $user,
+            category: CommunicationCategory::PaymentRecovery,
+            title: 'Complete your payment',
+            message: 'Your bank declined the payment.',
+            correlationId: 'test_recovery_'.$recovery->id,
+            metadata: ['url' => route('recovery.show', ['token' => $recovery->token])],
+        );
+
+        $notice = Notification::where('user_id', $user->id)
+            ->where('type', CommunicationCategory::PaymentRecovery->value)
+            ->firstOrFail();
+
+        $this->assertSame(route('recovery.show', ['token' => $recovery->token]), $notice->metadata['url']);
+
+        // The notifications page carries the link into the detail sheet (the
+        // URL is JSON-encoded into the Alpine payload, so look for the token
+        // and the Open control rather than the raw URL).
+        $this->actingAs($user)->withoutVite()
+            ->get(route('dashboard.notifications'))
+            ->assertOk()
+            ->assertSee($recovery->token)
+            ->assertSee(':href="note.url"', false);
     }
 }

@@ -131,6 +131,10 @@ class EvaluateRecoveryJob implements ShouldQueue
                 ? $session->customer_email
                 : null,
             metadata: [
+                // The in-app bell and the push notification read `url`:
+                // without it the customer taps "complete your payment" and
+                // lands nowhere. Same landing page the email links to.
+                'url' => route('recovery.show', ['token' => $recovery->token]),
                 'payment_session_id' => $session->id,
                 'recovery_id' => $recovery->id,
                 'payment_outcome_id' => $outcome->id,

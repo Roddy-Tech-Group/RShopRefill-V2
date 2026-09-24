@@ -62,7 +62,7 @@ class extends Component {
     class="flex w-full flex-col gap-5"
     x-data="{
         show: false,
-        note: { id: null, title: '', message: '', time: '', read: false },
+        note: { id: null, title: '', message: '', time: '', read: false, url: '' },
         open(data) { this.note = data; this.show = true; },
         close() { this.show = false; },
     }"
@@ -93,7 +93,7 @@ class extends Component {
                     {{-- Clickable area — opens the detail sheet. --}}
                     <button
                         type="button"
-                        @click="open({ id: @js((string) $note->id), title: @js($note->title), message: @js($note->message), time: @js($note->created_at->diffForHumans()), read: @js((bool) $note->read_at) })"
+                        @click="open({ id: @js((string) $note->id), title: @js($note->title), message: @js($note->message), time: @js($note->created_at->diffForHumans()), read: @js((bool) $note->read_at), url: @js((string) (data_get($note->metadata, 'url') ?? '')) })"
                         class="flex min-w-0 flex-1 items-start gap-3 px-4 py-3.5 text-left"
                     >
                         {{-- Priority icon tile --}}
@@ -190,6 +190,17 @@ class extends Component {
             </div>
             <p class="mt-1 text-[11px] text-zinc-400" x-text="note.time"></p>
             <p class="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-700" x-text="note.message"></p>
+
+            {{-- A notification that points somewhere (complete a payment, fund
+                 the wallet) opens there; marking it read on the way. --}}
+            <a
+                x-show="note.url"
+                :href="note.url"
+                @click="if (! note.read) { $wire.markRead(note.id); note.read = true }"
+                class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800"
+            >
+                Open
+            </a>
 
             <div class="mt-6 flex items-center gap-3">
                 <button
