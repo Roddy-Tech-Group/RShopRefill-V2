@@ -6,6 +6,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -131,6 +132,26 @@ class CryptoTopUpTest extends TestCase
         $this->assertSame('0xnewaddress', $fresh->pay_address);
         // Pending, not PartiallyPaid — otherwise the reconciler skips it.
         $this->assertSame(PaymentStatus::Pending, $fresh->payment_status);
+    }
+
+    /**
+     * A top-up is a fresh crypto charge. With the crypto gateway switched off
+     * it must be refused like any other new charge, not slip past because the
+     * first payment happened while the gateway was still on.
+     */
+    public function test_it_refuses_a_top_up_while_the_crypto_gateway_is_switched_off(): void
+    {
+        [$session, $attempt] = $this->underpaidSession();
+        SiteSetting::put('features.gateway_nowpayments_enabled', 'off', 'features');
+        Http::fake();
+
+        $this->actingAs($this->user)
+            ->postJson(route('api.payment-sessions.top-up', $session->id))
+            ->assertStatus(503)
+            ->assertJson(['gateway_disabled' => true]);
+
+        Http::assertNothingSent();
+        $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status, 'the shortfall is still owed, nothing was reset');
     }
 
     public function test_it_refuses_a_top_up_when_nothing_is_outstanding(): void
