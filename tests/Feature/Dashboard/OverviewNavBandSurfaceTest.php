@@ -85,4 +85,17 @@ class OverviewNavBandSurfaceTest extends TestCase
             $this->assertStringNotContainsString($old, $this->layout(), "{$old} should be gone from the layout");
         }
     }
+
+    /**
+     * The wallet balance area is the dashboard's dark blue in the dark theme:
+     * the mobile hero header carries the navy the sidebar marks wear, under
+     * the black bar, and stays on the panel itself in the light theme.
+     */
+    public function test_the_balance_area_is_dark_blue_in_the_dark_theme(): void
+    {
+        $this->assertStringContainsString(
+            '<header class="relative z-10 bg-transparent px-5 pt-5 pb-6 dark:bg-[#0c1337] lg:hidden">',
+            $this->layout(),
+        );
+    }
 }

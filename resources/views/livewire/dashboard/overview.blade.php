@@ -251,7 +251,7 @@ new #[Lazy] class extends Component
              grid below. --}}
         <section aria-labelledby="purchase-heading">
             {{-- font-[499] is a literal weight: the weight utilities all resolve to 399 (see @theme in app.css), and this one heading is asked to sit a step heavier. --}}
-            <h3 id="purchase-heading" class="px-1 text-[14px] font-[499] uppercase tracking-[0.16em] text-black dark:text-zinc-400">Purchase</h3>
+            <h3 id="purchase-heading" class="relative z-10 px-1 text-[14px] font-[499] uppercase tracking-[0.16em] text-black dark:text-zinc-400">Purchase</h3>
             @php
                 // Each line is the catalogue's own figure; with an empty store
                 // (a fresh install) it falls back to a plain description.
@@ -273,7 +273,14 @@ new #[Lazy] class extends Component
                         : 'Shop gift cards', 'purchase/giftcards.svg', route('dashboard.shop.gift-cards')],
                 ];
             @endphp
-            <div class="mt-3 grid grid-cols-2 gap-4">
+            <div class="relative isolate mt-3 grid grid-cols-2 gap-4">
+                {{-- The wallet band runs on from the balance header, under the
+                     heading, and halfway down this first row of cards, so the
+                     cards sit half on the navy and half on the panel. Dark theme
+                     only; it reaches up past the heading and the page's top
+                     padding, and sideways past the page padding to the panel's
+                     edges (the page clips sideways rather than scrolling). --}}
+                <div aria-hidden="true" class="pointer-events-none absolute -inset-x-4 -top-24 bottom-[75%] -z-10 hidden bg-[#0c1337] dark:block sm:-inset-x-6" data-wallet-band></div>
                 @foreach ($purchaseCards as [$label, $blurb, $icon, $href])
                     <a href="{{ $href }}" wire:navigate class="group flex flex-col rounded-[10px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-[0.98] dark:shadow-none">
                         <img src="{{ asset('assets/' . $icon) }}" alt="" class="no-dark-invert h-10 w-10 object-contain" loading="lazy">

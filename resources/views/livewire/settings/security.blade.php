@@ -177,17 +177,28 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Manage your passwords, PINs, and connected devices.</p>
     </div>
 
-    {{-- Tabs Navigation --}}
-    <div class="flex space-x-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-[#070f1c]">
-        <button type="button" @click="tab = 'password'" :class="{ 'bg-white text-black shadow-sm dark:bg-[#24364f] dark:text-white': tab === 'password', 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': tab !== 'password' }" class="flex-1 rounded-[10px] px-3 py-2 text-sm font-semibold transition-all focus:outline-none">
-            Password
-        </button>
-        <button type="button" @click="tab = 'pin'" :class="{ 'bg-white text-black shadow-sm dark:bg-[#24364f] dark:text-white': tab === 'pin', 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': tab !== 'pin' }" class="flex-1 rounded-[10px] px-3 py-2 text-sm font-semibold transition-all focus:outline-none">
-            Transaction PIN
-        </button>
-        <button type="button" @click="tab = 'preferences'" :class="{ 'bg-white text-black shadow-sm dark:bg-[#24364f] dark:text-white': tab === 'preferences', 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': tab !== 'preferences' }" class="flex-1 rounded-[10px] px-3 py-2 text-sm font-semibold transition-all focus:outline-none">
-            Preferences & Devices
-        </button>
+    {{-- Tabs Navigation. The white tile is one thumb that slides to the chosen
+         tab (a third of the bar: three equal tabs, two 0.25rem gaps inside the
+         0.25rem padding); the tabs themselves only change colour. The slide is
+         armed a tick after the first paint so the opening tab is not animated
+         into from the left. --}}
+    <div
+        x-data="{ slide: false }"
+        x-init="$nextTick(() => slide = true)"
+        class="relative flex space-x-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-[#070f1c]"
+    >
+        <span
+            aria-hidden="true"
+            class="security-tab-thumb pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-[10px] bg-white shadow-sm duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:bg-[#24364f]"
+            :class="slide && 'transition-transform'"
+            :style="'transform: translateX(calc(' + ['password','pin','preferences'].indexOf(tab) + ' * (100% + 0.25rem)))'"
+        ></span>
+        {{-- Short names, so each tab stays on one line at phone width. --}}
+        @foreach (['password' => 'Password', 'pin' => 'PIN', 'preferences' => 'Devices'] as $key => $label)
+            <button type="button" @click="tab = '{{ $key }}'" :class="{ 'text-black dark:text-white': tab === '{{ $key }}', 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': tab !== '{{ $key }}' }" class="security-tab relative z-10 flex-1 rounded-[10px] px-3 py-2 text-sm font-semibold transition-colors duration-300 focus:outline-none">
+                {{ $label }}
+            </button>
+        @endforeach
     </div>
 
     {{-- Password Tab --}}

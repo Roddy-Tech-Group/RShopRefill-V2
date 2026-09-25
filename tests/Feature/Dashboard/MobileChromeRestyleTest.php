@@ -151,7 +151,9 @@ class MobileChromeRestyleTest extends TestCase
         $this->assertStringContainsString('block text-[14px] leading-snug text-zinc-500 dark:text-zinc-400">{{ $blurb }}', $mobile);
         // The heading: black in light mode and a literal 499 (every weight
         // utility resolves to 399 in app.css, so font-bold would not do).
-        $this->assertStringContainsString('<h3 id="purchase-heading" class="px-1 text-[14px] font-[499] uppercase tracking-[0.16em] text-black dark:text-zinc-400">Purchase</h3>', $mobile);
+        // relative z-10: the heading paints above the wallet band that runs
+        // under it in the dark theme.
+        $this->assertStringContainsString('<h3 id="purchase-heading" class="relative z-10 px-1 text-[14px] font-[499] uppercase tracking-[0.16em] text-black dark:text-zinc-400">Purchase</h3>', $mobile);
         // The old coloured icon tiles are gone with their line icons.
         $this->assertStringNotContainsString('brightness-0 invert', $mobile);
         $this->assertStringNotContainsString('bg-teal-500', $mobile);
