@@ -225,7 +225,7 @@ class extends Component {
     </div>
 
     {{-- Records --}}
-    <div class="overflow-hidden rounded-[12px] bg-white ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/10">
+    <div class="overflow-hidden rounded-[12px] bg-white dark:bg-white/5">
         @forelse ($this->records as $record)
             @php
                 $done = $this->translatedCount($record);
@@ -277,7 +277,7 @@ class extends Component {
                                         <p class="mb-1.5 text-[12px] font-bold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
                                             {{ Str::headline($field) }} — original
                                         </p>
-                                        <div class="max-h-40 overflow-y-auto rounded-[12px] bg-white p-3 text-sm leading-relaxed text-zinc-700 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10">
+                                        <div class="max-h-40 overflow-y-auto rounded-[12px] bg-white p-3 text-sm leading-relaxed text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
                                             {{ $this->source($record, $field) ?: '—' }}
                                         </div>
                                     </div>

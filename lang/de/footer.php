@@ -17,11 +17,11 @@ return [
     'legal' => 'Rechtliches und Vertrauen',
 
     // Brand column
-    'tagline' => 'Ihr Marktplatz für Geschenkkarten, Reise-eSIMs, Handy-Aufladungen und Rechnungszahlungen.',
+    'tagline' => 'Ihr Marktplatz für Geschenkkarten, eSIMs, Handy-Aufladungen und Rechnungszahlungen.',
 
     // Shop column
     'gift_cards' => 'Geschenkkarten',
-    'travel_esims' => 'Reise-eSIMs',
+    'esims' => 'eSIMs',
     'mobile_topups' => 'Handy-Aufladungen',
     'data_bundles' => 'Datenpakete',
     'bill_payments' => 'Rechnungszahlungen',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Alle Rechte vorbehalten.',
     'legal_line' => 'Betrieben von :company, RC :rc, mit eingetragenem Sitz in :address.',
     'verify_company' => 'Unternehmen prüfen',
+
+    'newsletter_pitch' => 'Angebote für Geschenkkarten, eSIMs und Aufladungen direkt in Ihr Postfach',
+    'newsletter_label' => 'E-Mail-Adresse',
+    'newsletter_placeholder' => 'sie@beispiel.com',
+    'newsletter_cta' => 'Anmelden',
+    'newsletter_sending' => 'Anmeldung läuft',
+    'newsletter_done' => 'Sie stehen auf der Liste. Danke!',
 ];

@@ -52,9 +52,14 @@ class CategoryCardsTest extends TestCase
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        foreach (['Gift Cards', 'eSIMs', 'Mobile Refill', 'Bill Payments'] as $label) {
-            $this->assertStringContainsString($label, $html);
+        // The cards take the nav's own labels, so the tile and the category
+        // rail name a category the same way - "Bills", not "Bill Payments",
+        // since 2026-09-20.
+        foreach (['gift_cards', 'esims', 'mobile_refill', 'bill_payments'] as $key) {
+            $this->assertStringContainsString(e(__("navigation.{$key}")), $html);
         }
+
+        $this->assertStringContainsString('Bills', $html);
 
         // Four cards, four blooms, one wash. Counted inside the card list
         // only: the payment panel further down the page borrows the same bloom

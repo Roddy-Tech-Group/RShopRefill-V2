@@ -21,14 +21,8 @@
     invites the reader to check it, and there is nothing to check it against.
 --}}
 @php
-    $counts = \Illuminate\Support\Facades\Cache::remember('home:counts:v2', now()->addMinutes(15), fn () => [
-        'customers' => (int) \App\Models\User::where('is_guest', false)->count(),
-        'countries' => (int) \App\Models\Product::query()
-            ->where('is_active', true)
-            ->whereNotNull('country_code')
-            ->distinct()
-            ->count('country_code'),
-    ]);
+    // Shared with the partner page, so the two never state different numbers.
+    $counts = \App\Support\CatalogFigures::headlineCounts();
 
     $floorTo = fn (int $n, int $step) => intdiv($n, $step) * $step;
 

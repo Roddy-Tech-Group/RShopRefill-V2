@@ -82,7 +82,8 @@
                     @click="open = ! open"
                     :aria-expanded="open.toString()"
                     aria-haspopup="listbox"
-                    class="flex h-11 items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-blue-400/50"
+                    :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                    class="flex h-9 items-center gap-2 rounded-full border-2 bg-white px-3.5 text-sm text-zinc-900 transition-colors focus:outline-none dark:bg-white/5 dark:text-white"
                 >
                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M7 4v16m0 0l-3-3m3 3l3-3M17 20V4m0 0l-3 3m3-3l3 3"/>
@@ -109,7 +110,7 @@
                             :aria-selected="(sort === '{{ $key }}').toString()"
                             @click="sort = '{{ $key }}'; open = false"
                             :class="sort === '{{ $key }}' ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"
-                            class="flex w-full items-center rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors"
+                            class="flex w-full items-center rounded-full px-3 py-2 text-left text-sm font-medium transition-colors"
                         >{{ $label }}</button>
                     @endforeach
                 </div>
@@ -149,7 +150,7 @@
                                 :rating="$review->rating"
                                 :label="__('products.reviews_stars_aria', ['rating' => number_format((float) $review->rating, 1)])"
                             />
-                            <span class="text-xs text-zinc-600 dark:text-zinc-400">{{ $review->reviewed_at->format('M j, Y') }}</span>
+                            <span class="text-xs text-zinc-600 dark:text-zinc-400">{{ $review->reviewed_at->translatedFormat('M j, Y') }}</span>
                         </p>
 
                         {{-- Clamped to four lines, released inline so the server-rendered

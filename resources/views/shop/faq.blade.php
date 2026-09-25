@@ -42,9 +42,9 @@
                 @foreach ($groups as $heading => $items)
                     <section class="mt-2 first:mt-0">
                         <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ $heading }}</h2>
-                        <div class="mt-3 border-t border-zinc-100 dark:border-zinc-700/60">
+                        <div class="mt-3">
                             @foreach ($items as [$q, $a])
-                                <div x-data="{ open: false }" class="border-b border-zinc-100 dark:border-zinc-700/60">
+                                <div x-data="{ open: false }">
                                     <button type="button" @click="open = ! open" :aria-expanded="open.toString()" class="flex w-full items-center justify-between gap-4 py-4 text-left">
                                         <span class="text-sm font-semibold text-zinc-900 sm:text-base dark:text-white">{{ $q }}</span>
                                         <svg class="h-5 w-5 shrink-0 text-zinc-500 transition-transform duration-200 dark:text-zinc-400" :class="open && 'rotate-45'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

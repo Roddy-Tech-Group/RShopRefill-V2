@@ -11,11 +11,11 @@
 <x-layouts.app.header :title="'Compliance and Regulatory Framework | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Compliance</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Compliance and Regulatory Framework</h1>
-            <p class="mt-3 text-sm text-zinc-600">Last updated: {{ $lastUpdated }}</p>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Compliance</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">Compliance and Regulatory Framework</h1>
+            <p class="mt-3 text-sm text-white/75">Last updated: {{ $lastUpdated }}</p>
         </div>
     </section>
 
@@ -31,7 +31,7 @@
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#statement" class="font-medium text-blue-600 hover:underline">1. Compliance statement and commitment</a></li>
@@ -78,7 +78,7 @@
                 <li><span class="font-semibold text-zinc-900">Record-keeping</span> of transactions and verification data for the periods required by law.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Designed to detect structuring and smurfing</p>
@@ -96,7 +96,7 @@
                 higher-risk activity carries stronger checks.
             </p>
 
-            <div class="mt-5 overflow-x-auto rounded-[12px] ring-1 ring-zinc-100">
+            <div class="mt-5 overflow-x-auto rounded-[12px]">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -105,7 +105,7 @@
                             <th class="px-4 py-3 font-semibold text-zinc-900">Requirements</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody>
                         <tr>
                             <td class="px-4 py-3 font-medium text-zinc-900">Tier 1<br><span class="text-xs font-normal text-zinc-500">Registered</span></td>
                             <td class="px-4 py-3 text-zinc-600">Everyday digital purchases below our identity-verification threshold.</td>
@@ -137,7 +137,7 @@
                 politically-exposed-person list checks, as the platform scales.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">No onboarding or payments involving sanctioned territories</p>
@@ -174,7 +174,7 @@
                 lawful information requests.
             </p>
 
-            <div class="mt-5 rounded-[12px] bg-zinc-50 p-6 ring-1 ring-zinc-100">
+            <div class="mt-5 rounded-[12px] bg-zinc-50 p-6">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Compliance department</p>
                 <a href="mailto:{{ $complianceEmail }}" class="mt-2 inline-flex items-center gap-2 text-lg font-bold text-blue-600 hover:underline">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
@@ -183,14 +183,13 @@
                 <p class="mt-3 text-sm leading-relaxed text-zinc-600">We aim to acknowledge institutional and regulatory enquiries promptly and to cooperate fully with all lawful requests.</p>
             </div>
 
-            <div class="mt-8 border-t border-zinc-100 pt-8">
+            <div class="mt-8 pt-8">
                 <p class="text-sm leading-relaxed text-zinc-600">
                     This framework is reviewed regularly and may be updated to reflect changes in law, regulation and best
                     practice. The date at the top of this page shows the latest version.
                 </p>
             </div>
         </section>
-        <x-legal-footer />
     </div>
 
 </x-layouts.app.header>

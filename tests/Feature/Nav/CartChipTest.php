@@ -47,12 +47,14 @@ class CartChipTest extends TestCase
     {
         $tag = $this->cartTag($this->actingAs(User::factory()->create())->withoutVite()->get('/')->assertOk()->getContent());
 
-        foreach (['h-9 w-9', 'rounded-full', 'border-2', 'border-[#0c1337]/30', 'hover:bg-[#0c1337]/10', 'text-zinc-700', self::DARK] as $class) {
+        foreach (['h-9 w-9', 'rounded-full', 'border-2 border-[#0c1337]/30', 'hover:border-edge', 'hover:bg-[#0c1337]/10', 'text-zinc-700', self::DARK] as $class) {
             $this->assertStringContainsString($class, $tag, "Missing {$class}.");
         }
 
-        // The old kit: a grey fill on the phone, a labelled 10px pill from md.
-        foreach (['bg-[#f4f6f5]', 'hover:bg-[#e8ecea]', 'md:rounded-[10px]', 'md:px-3', 'md:h-auto', 'nav-text'] as $old) {
+        // The old kit: a grey fill on the phone, a labelled 10px pill from md,
+        // and the blue edge and pale blue wash that were tried at rest and
+        // reverted. The blue now shows on hover only.
+        foreach (['bg-[#f4f6f5]', 'hover:bg-[#e8ecea]', 'md:rounded-[10px]', 'md:px-3', 'md:h-auto', 'nav-text', ' border-edge', 'dark:border-edge', 'hover:bg-edge/10'] as $old) {
             $this->assertStringNotContainsString($old, $tag, "{$old} is still on the cart.");
         }
     }
@@ -77,10 +79,17 @@ class CartChipTest extends TestCase
         $storefront = $this->storefront();
         $dashboard = $this->dashboard();
 
-        foreach ([self::BADGE, self::DARK, self::GLYPH] as $shared) {
+        // The badge and the glyph are shared outright. The dark border is not:
+        // the dashboard's bar is navy, so its chip is white-edged, while the
+        // storefront's chip keeps a neutral hairline that turns blue on hover.
+        // Each is asserted against its own bar.
+        foreach ([self::BADGE, self::GLYPH] as $shared) {
             $this->assertStringContainsString($shared, $storefront);
             $this->assertStringContainsString($shared, $dashboard, 'The dashboard chip changed; the storefront copy must follow.');
         }
+
+        $this->assertStringContainsString(self::DARK, $storefront);
+        $this->assertStringContainsString('border-white/30', $dashboard, 'The dashboard chip is white-edged on its navy bar.');
 
         // The old rounded badge is gone from the storefront.
         $this->assertStringNotContainsString('min-w-[18px] h-[18px] px-1 rounded-[12px] bg-blue-600 text-[10px]', $storefront);

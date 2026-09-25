@@ -11,168 +11,127 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Mobile chrome visibility, per the 2026-07-29 spec:
- *   - The floating bottom nav bar (its centre Menu button dispatches
- *     'open-mobile-menu') stays on EVERY dashboard page - it is the primary
- *     navigation and must always be reachable.
- *   - The nav band and the notification pill belong to the OVERVIEW alone.
- *   - The two shopping pills - cart and country switcher - ride on the overview
- *     and the shop pages, floating without a band on the latter.
- *   - Task/inner pages (orders, wallet, settings, ...) carry no top chrome at
- *     all; the bottom nav bar is their navigation.
+ * Mobile chrome, per the 2026-09-23 redesign:
+ *   - The desktop header IS the phone bar (app.css fixes it below lg): the
+ *     hamburger on the left, then the desktop's own pills - refer & earn (a
+ *     gift chip standing in for the rotating text pill), region, search,
+ *     cart, notifications, account - with the same dropdowns, which drop as
+ *     full-width sheets under the bar.
+ *   - The hamburger opens a sidebar drawer that slides in from the left in
+ *     the bar's colour, with the app logo at its top, then one row per
+ *     destination in three groups. Region and log out live in the account menu.
+ *   - Gone: the bottom tab bar, the popup card-grid menu, the overview's
+ *     identity band ("Hi name / Visit site") and the floating pill row.
  */
 class MobileNavChromeVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Bottom nav bar's Menu FAB - present on every page. */
-    private const NAV_BAR_MARKER = "\$dispatch('open-mobile-menu')";
+    private const BAR_MARKER = 'data-flux-header';
 
-    /** Country switcher trigger - a SHOPPING control, so overview + shop only. */
-    private const TOP_CHROME_MARKER = "\$dispatch('open-locale-modal')";
+    private const HAMBURGER_MARKER = "\$dispatch('open-mobile-menu')";
 
-    /** The notification bell - overview-only furniture, like the band. */
-    private const BELL_MARKER = 'floating-notif-inner';
+    private const REFER_MARKER = 'aria-label="Refer & earn"';
 
-    /** The cart chip - the other shopping-only control. */
-    private const CART_MARKER = 'aria-label="Cart"';
+    private const SEARCH_MARKER = 'x-ref="searchInput"';
 
-    /** The nav band the overview's identity strip sits in. */
-    private const BAND_MARKER = 'nav-band-top';
+    private const CART_MARKER = 'aria-label="Shopping cart"';
 
-    public function test_overview_shows_the_nav_band_bell_and_shopping_pills(): void
-    {
-        $this->withoutVite();
+    private const BELL_MARKER = 'wire:key="header-notif"';
 
-        $response = $this->actingAs(User::factory()->create())
-            ->get('/dashboard')
-            ->assertOk();
+    private const ACCOUNT_MARKER = 'dashboard-avatar-button';
 
-        $response->assertSee(self::NAV_BAR_MARKER, false);
-        $response->assertSee(self::BAND_MARKER, false);
-        $response->assertSee(self::BELL_MARKER, false);
-        $response->assertSee(self::TOP_CHROME_MARKER, false);
-        $response->assertSee(self::CART_MARKER, false);
-    }
+    private const DRAWER_MARKER = 'class="dash-drawer';
 
-    public function test_shop_pages_show_only_the_shopping_pills(): void
-    {
-        $this->withoutVite();
+    private const DRAWER_CLOSE_MARKER = 'aria-label="Close menu"';
 
-        $response = $this->actingAs(User::factory()->create())
-            ->get('/dashboard/shop/cart')
-            ->assertOk();
+    private const DRAWER_ROWS_MARKER = 'aria-label="Menu">';
 
-        // Cart + country switcher ride along - this is a shopping context...
-        $response->assertSee(self::NAV_BAR_MARKER, false);
-        $response->assertSee(self::TOP_CHROME_MARKER, false);
-        $response->assertSee(self::CART_MARKER, false);
+    private const REGION_MARKER = "\$dispatch('open-locale-modal')";
 
-        // ...but the nav band and the bell are the overview's furniture.
-        $response->assertDontSee(self::BAND_MARKER, false);
-        $response->assertDontSee(self::BELL_MARKER, false);
-    }
+    /** The drawer's Orders badge - distinct from the desktop sidebar's. */
+    private const BADGE_MARKER = 'rounded-[5px] bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">';
 
-    public function test_inner_pages_carry_no_top_chrome_at_all(): void
-    {
-        $this->withoutVite();
+    private const PAGES = ['/dashboard', '/dashboard/shop/cart', '/dashboard/orders'];
 
-        $response = $this->actingAs(User::factory()->create())
-            ->get('/dashboard/orders')
-            ->assertOk();
-
-        // The bottom nav bar is the navigation on task pages...
-        $response->assertSee(self::NAV_BAR_MARKER, false);
-
-        // ...and nothing floats on top: no band, no bell, no shopping pills.
-        $response->assertDontSee(self::BAND_MARKER, false);
-        $response->assertDontSee(self::BELL_MARKER, false);
-        $response->assertDontSee(self::TOP_CHROME_MARKER, false);
-        $response->assertDontSee(self::CART_MARKER, false);
-    }
-
-    /**
-     * The country / language / currency chip, unique to the mobile top chrome.
-     * It must render exactly ONCE: it used to be emitted by both an in-flow bar
-     * and the fixed pinned chrome, which made the top pills (country switcher,
-     * cart, notification) visibly duplicate as the page scrolled.
-     */
-    private function localeChipMarker(): string
-    {
-        // Built from the keys, not the English: the label was hardcoded when
-        // this was written and is translated now, so a literal would hold in
-        // one locale and quietly stop testing anything in the other.
-        return 'aria-label="'.__('common.country').' / '.__('common.payment_currency').'"';
-    }
-
-    public function test_shop_pages_render_the_top_chrome_pills_only_once(): void
-    {
-        $this->withoutVite();
-
-        $html = $this->actingAs(User::factory()->create())
-            ->get('/dashboard/shop/cart')
-            ->assertOk()
-            ->getContent();
-
-        $this->assertSame(1, substr_count($html, $this->localeChipMarker()));
-    }
-
-    public function test_overview_renders_the_top_chrome_pills_only_once(): void
-    {
-        $this->withoutVite();
-
-        $html = $this->actingAs(User::factory()->create())
-            ->get('/dashboard')
-            ->assertOk()
-            ->getContent();
-
-        $this->assertSame(1, substr_count($html, $this->localeChipMarker()));
-    }
-
-    /** Back button - removed entirely; the bottom nav bar covers navigation. */
-    private const BACK_BUTTON_MARKER = 'aria-label="Go back"';
-
-    /** The greeting + storefront chip, which belong to the overview alone. */
-    private const GREETING_MARKER = 'aria-label="Go to the storefront"';
-
-    /** Orders-tab count badge's distinctive glass classes. */
-    private const BADGE_MARKER = 'dark:min-w-[20px] dark:bg-white/15';
-
-    public function test_no_page_shows_a_back_button(): void
+    public function test_every_page_carries_the_same_top_bar_and_drawer(): void
     {
         $this->withoutVite();
         $user = User::factory()->create();
 
-        // The bottom nav bar is on every page and its centre Menu FAB opens the
-        // full sidebar nav, so a back affordance is redundant. Removing it also
-        // keeps the top band identical everywhere rather than swapping its left
-        // slot per route.
-        foreach (['/dashboard', '/dashboard/shop/cart', '/dashboard/orders'] as $path) {
-            $this->actingAs($user)
-                ->get($path)
-                ->assertOk()
-                ->assertDontSee(self::BACK_BUTTON_MARKER, false);
+        foreach (self::PAGES as $path) {
+            $html = $this->actingAs($user)->get($path)->assertOk()->getContent();
+
+            foreach ([
+                self::BAR_MARKER, self::HAMBURGER_MARKER, self::REFER_MARKER, self::SEARCH_MARKER,
+                self::CART_MARKER, self::BELL_MARKER, self::ACCOUNT_MARKER,
+                self::DRAWER_MARKER, self::DRAWER_CLOSE_MARKER,
+            ] as $marker) {
+                $this->assertStringContainsString($marker, $html, "{$path} is missing {$marker}");
+            }
+
+            // One hamburger, one bar: the old bottom bar carried a second "Open menu".
+            $this->assertSame(1, substr_count($html, 'aria-label="Open menu"'), "{$path} should have exactly one hamburger");
+            // The attribute also appears in stylesheet selectors, so count the element.
+            $this->assertSame(1, preg_match_all('/<header[^>]*data-flux-header/', $html), "{$path} should render the header once: it is the phone bar too");
         }
     }
 
-    public function test_the_greeting_belongs_to_the_overview_alone(): void
+    public function test_the_drawer_opens_with_the_app_logo_at_the_top(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs(User::factory()->create())->get('/dashboard')->assertOk()->getContent();
+        $drawer = substr($html, strpos($html, self::DRAWER_MARKER));
+
+        // The full logo (mark + wordmark), the same file the storefront header shows.
+        $aside = substr($drawer, 0, strpos($drawer, '</aside>'));
+        $logo = strpos($aside, 'assets/logo.webp');
+        $rows = strpos($aside, self::DRAWER_ROWS_MARKER);
+
+        $this->assertNotFalse($logo, 'the drawer should show the app logo');
+        $this->assertNotFalse($rows, 'the drawer should list the navigation rows');
+        $this->assertLessThan($rows, $logo, 'the logo sits first, above the rows');
+
+        // The close button sits outside the panel, on the backdrop beside it.
+        $this->assertStringNotContainsString(self::DRAWER_CLOSE_MARKER, $aside);
+        $this->assertStringContainsString('dash-drawer-close', $drawer);
+
+        // The rows are the sidebar's destinations. Region / currency and log
+        // out are not among them: they live in the account menu.
+        foreach (['Overview', 'Shop', 'Orders', 'My eSIMs', 'Wallet', 'Transactions', 'Settings', 'Security', 'Verify (KYC)', 'Appearance', 'Notifications', 'For Partners', 'Support'] as $label) {
+            $this->assertStringContainsString($label, $aside, "the drawer should list {$label}");
+        }
+        $this->assertStringNotContainsString('Log out', $aside);
+        $this->assertStringNotContainsString(self::REGION_MARKER, $aside);
+
+        $menu = substr($html, strpos($html, 'dashboard-account-menu'));
+        // The menu opens the same modal on its language pane.
+        $this->assertStringContainsString("\$dispatch('open-locale-modal'", $menu);
+        $this->assertStringContainsString(route('logout'), $menu);
+    }
+
+    public function test_the_old_mobile_chrome_is_gone(): void
     {
         $this->withoutVite();
         $user = User::factory()->create();
 
-        // "Hi {name} / Visit site" is the overview's own furniture. Task pages
-        // keep the band (so the nav looks identical) but leave that slot empty.
-        $this->actingAs($user)->get('/dashboard')->assertOk()
-            ->assertSee(self::GREETING_MARKER, false);
-
-        foreach (['/dashboard/orders', '/dashboard/shop/cart'] as $path) {
+        foreach (self::PAGES as $path) {
             $this->actingAs($user)->get($path)->assertOk()
-                ->assertDontSee(self::GREETING_MARKER, false);
+                ->assertDontSee('dash-mobile-bar', false)                   // the interim custom bar
+                ->assertDontSee('mobileSearchInput', false)                 // and its own search sheet
+                ->assertDontSee('nav-glass', false)                         // the floating bottom bar
+                ->assertDontSee('liquid-pill', false)                       // its sliding active pill
+                ->assertDontSee('nav-band-top', false)                      // the overview's identity band
+                ->assertDontSee('aria-label="Go to the storefront"', false) // "Hi name / Visit site"
+                ->assertDontSee('floating-notif-inner', false)              // the floating bell pill
+                ->assertDontSee('aria-label="Go back"', false)              // no back affordance either
+                ->assertDontSee('id="mobile-menu-title"', false);           // the popup card-grid menu
         }
     }
 
-    /** The rewards page is the Rcoin programme; its menu tile says so. */
-    public function test_the_menu_names_rcoin_not_the_old_referrals_alias(): void
+    /** The rewards page is the partner programme; nothing calls it Referrals. */
+    public function test_the_menu_names_the_partner_programme_not_the_old_referrals_alias(): void
     {
         $this->withoutVite();
 
@@ -181,12 +140,14 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('>Rcoin<', $html);
-        $this->assertStringContainsString('dashboard/rewards', $html);
+        $drawer = substr($html, strpos($html, self::DRAWER_MARKER));
+
+        $this->assertStringContainsString('For Partners', $drawer);
+        $this->assertStringContainsString('dashboard/rewards', $drawer);
         $this->assertStringNotContainsString('Referrals', $html);
     }
 
-    public function test_orders_tab_shows_the_completed_order_count_badge(): void
+    public function test_the_orders_row_shows_the_completed_order_count_badge(): void
     {
         $this->withoutVite();
         $user = User::factory()->create();
@@ -197,12 +158,11 @@ class MobileNavChromeVisibilityTest extends TestCase
 
         $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();
 
-        $this->assertStringContainsString(self::BADGE_MARKER, $html);
         // Only the two Completed orders are counted, not the Failed one.
-        $this->assertStringContainsString('dark:backdrop-blur-md">2<', $html);
+        $this->assertStringContainsString(self::BADGE_MARKER.'2<', $html);
     }
 
-    public function test_orders_tab_has_no_badge_without_completed_orders(): void
+    public function test_the_orders_row_has_no_badge_without_completed_orders(): void
     {
         $this->withoutVite();
         $user = User::factory()->create();

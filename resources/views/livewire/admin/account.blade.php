@@ -228,7 +228,7 @@ class extends Component {
     <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
         {{-- Profile --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5">
             <h2 class="text-base font-semibold text-zinc-900">Profile</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Your name, photo and the email you sign in with.</p>
 
@@ -289,7 +289,7 @@ class extends Component {
         </div>
 
         {{-- Account details (read-only) --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5">
             <h2 class="text-base font-semibold text-zinc-900">Account details</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Role and status are managed by a super admin.</p>
 
@@ -322,7 +322,7 @@ class extends Component {
         </div>
 
         {{-- Security Question --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5">
             <h2 class="text-base font-semibold text-zinc-900">Security Question</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Set a personal question and answer to verify your identity on new devices.</p>
 
@@ -389,7 +389,7 @@ class extends Component {
         </div>
 
         {{-- Security --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5">
             <h2 class="text-base font-semibold text-zinc-900">Security</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Use a long, random password to keep the admin panel secure.</p>
 
@@ -482,7 +482,7 @@ class extends Component {
         </div>
 
         {{-- Two-Factor Authentication --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5">
             <h2 class="text-base font-semibold text-zinc-900">Two-Factor Authentication</h2>
             <p class="mt-0.5 text-xs text-zinc-600">Add an extra layer of security using an Authenticator app (like Google Authenticator or Authy).</p>
 
@@ -504,7 +504,7 @@ class extends Component {
                     </div>
                 @else
                     @if (!$showTotpSetup)
-                        <div class="flex items-center justify-between rounded-[12px] border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <div class="flex items-center justify-between rounded-[12px] bg-zinc-50 px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <svg class="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -519,12 +519,12 @@ class extends Component {
                             </button>
                         </div>
                     @else
-                        <div class="rounded-[12px] border border-zinc-200 p-5">
+                        <div class="rounded-[12px] p-5 bg-zinc-50 dark:bg-white/5">
                             <h3 class="text-sm font-medium text-zinc-900">Configure Authenticator App</h3>
                             <p class="mt-1 text-xs text-zinc-600">Scan this QR code using Google Authenticator, Authy, or your preferred TOTP app.</p>
 
                             <div class="mt-4 flex flex-col sm:flex-row sm:items-start gap-6">
-                                <div class="rounded-[12px] bg-white p-2 shadow-sm ring-1 ring-zinc-200">
+                                <div class="rounded-[12px] bg-white p-2 shadow-sm">
                                     {!! \BaconQrCode\Renderer\Image\SvgImageBackEnd::class ? (new \BaconQrCode\Writer(new \BaconQrCode\Renderer\ImageRenderer(new \BaconQrCode\Renderer\RendererStyle\RendererStyle(160), new \BaconQrCode\Renderer\Image\SvgImageBackEnd())))->writeString($totpQrCode) : '' !!}
                                 </div>
                                 <div class="flex-1 space-y-4">

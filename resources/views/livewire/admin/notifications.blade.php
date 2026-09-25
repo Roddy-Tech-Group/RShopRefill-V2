@@ -159,7 +159,7 @@ class extends Component {
                 ];
             @endphp
             @foreach ($cards as [$label, $value, $bg, $fg])
-                <div class="rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5">
                     <span class="inline-flex items-center rounded-[5px] {{ $bg }} {{ $fg }} px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">{{ $label }}</span>
                     <p class="mt-3 text-2xl font-extrabold tabular-nums text-zinc-900">{{ $value }}</p>
                 </div>
@@ -193,7 +193,7 @@ class extends Component {
                     wire:click="retryAllFailed"
                     wire:loading.attr="disabled"
                     wire:target="retryAllFailed"
-                    wire:confirm="Re-send every failed notification through the Communication Platform?"
+                    data-confirm="Re-send every failed notification through the Communication Platform?" data-confirm-title="Re-send failed notifications" data-confirm-tone="primary" data-confirm-text="Re-send"
                     class="inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                 >
                     <svg wire:loading.remove wire:target="retryAllFailed" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -214,26 +214,26 @@ class extends Component {
         </div>
 
         {{-- Notifications table --}}
-        <div class="overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
-            <div class="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <table class="w-full min-w-[720px] text-left text-sm">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
+            <div class="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden p-3">
+                <table class="w-full min-w-[720px] text-left text-sm admin-table">
                     <thead>
-                        <tr class="border-b border-zinc-100 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                            <th class="px-5 py-3">Recipient</th>
-                            <th class="px-5 py-3">Notification</th>
-                            <th class="px-5 py-3">Channel</th>
-                            <th class="px-5 py-3">Priority</th>
-                            <th class="px-5 py-3">Status</th>
-                            <th class="px-5 py-3">Created</th>
-                            <th class="px-5 py-3 text-right">Action</th>
+                        <tr class="">
+                            <th class="">Recipient</th>
+                            <th class="">Notification</th>
+                            <th class="">Channel</th>
+                            <th class="">Priority</th>
+                            <th class="">Status</th>
+                            <th class="">Created</th>
+                            <th class="text-right">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-inset">
+                    <tbody class="">
                         @forelse ($notifications as $n)
                             <tr
                                 wire:key="admin-note-{{ $n->id }}"
                                 @click="open({ id: @js((string) $n->id), recipient: @js($n->user?->name ?? 'Unknown'), email: @js($n->user?->email ?? ''), title: @js($n->title), message: @js($n->message), channel: @js($n->channel->value), priority: @js($n->priority->value), status: @js($n->status->value), time: @js($n->created_at->format('M j, Y g:i A')) })"
-                                class="cursor-pointer transition-colors hover:bg-zinc-50"
+                                class="cursor-pointer transition-colors hover:bg-blue-50"
                             >
                                 <td class="px-5 py-3.5">
                                     <p class="font-semibold text-zinc-900">{{ $n->user?->name ?? 'Unknown' }}</p>

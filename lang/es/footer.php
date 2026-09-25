@@ -17,11 +17,11 @@ return [
     'legal' => 'Legal y confianza',
 
     // Brand column
-    'tagline' => 'Tu marketplace de tarjetas de regalo, eSIM de viaje, recargas móviles y pago de facturas.',
+    'tagline' => 'Tu marketplace de tarjetas de regalo, eSIMs, recargas móviles y pago de facturas.',
 
     // Shop column
     'gift_cards' => 'Tarjetas de regalo',
-    'travel_esims' => 'eSIM de viaje',
+    'esims' => 'eSIMs',
     'mobile_topups' => 'Recargas móviles',
     'data_bundles' => 'Paquetes de datos',
     'bill_payments' => 'Pago de facturas',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Todos los derechos reservados.',
     'legal_line' => 'Propiedad y gestión de :company, RC :rc, con domicilio social en :address.',
     'verify_company' => 'Verificar empresa',
+
+    'newsletter_pitch' => 'Recibe ofertas de tarjetas de regalo, eSIM y recargas en tu correo',
+    'newsletter_label' => 'Correo electrónico',
+    'newsletter_placeholder' => 'tu@ejemplo.com',
+    'newsletter_cta' => 'Suscribirme',
+    'newsletter_sending' => 'Suscribiendo',
+    'newsletter_done' => 'Ya estás en la lista. ¡Gracias!',
 ];

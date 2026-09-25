@@ -13,8 +13,32 @@
 --}}
 @props(['listClass' => 'max-h-[60vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'])
 
-{{-- Loading --}}
-<div x-show="loading && results.length === 0" class="px-5 py-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
+@php
+    // The section headings and row types, in the page's language. navBrandSearch()
+    // lives in app.js and keys results by the API's English type names, so the
+    // copy is handed to it from here, the one partial all three mounts share.
+    $searchLabels = [
+        'groups' => [
+            'Gift card' => __('navigation.gift_cards'),
+            'Mobile top-up' => __('navigation.mobile_refill'),
+            'Bill payment' => __('navigation.search_group_bill_payments'),
+            'eSIM' => __('navigation.esims'),
+            'Page' => __('navigation.search_group_suggestions'),
+            'Country' => __('common.change_country'),
+        ],
+        'types' => [
+            'Gift card' => __('navigation.search_type_gift_card'),
+            'Mobile top-up' => __('navigation.search_type_topup'),
+            'Bill payment' => __('navigation.search_type_bill'),
+            'eSIM' => __('navigation.search_type_esim'),
+            'Page' => __('navigation.search_type_page'),
+        ],
+    ];
+@endphp
+
+{{-- Loading. Also where the labels reach the search scope: this element is
+     the partial's first, so x-init runs before any result row renders. --}}
+<div x-init="labels = @js($searchLabels)" x-show="loading && results.length === 0" class="px-5 py-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
     <svg class="mx-auto h-5 w-5 animate-spin text-zinc-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
     <p class="mt-2">{{ __('common.searching') }}</p>
 </div>
@@ -33,7 +57,7 @@
             <button
                 type="button"
                 @click="useRecent(term)"
-                class="mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-3 rounded-[10px] px-3.5 py-2 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
+                class="mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-3 rounded-full px-3.5 py-2 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
             >
                 <svg class="h-4 w-4 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -62,14 +86,14 @@
                         <button
                             type="button"
                             @click="pickCountry(r)"
-                            class="mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
+                            class="mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-3 rounded-full px-3.5 py-2.5 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
                         >
-                            <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-white p-0.5 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/10">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white p-0.5 dark:bg-white/5">
                                 <img :src="r.logo" :alt="r.name" class="h-full w-full object-contain">
                             </span>
                             <span class="flex min-w-0 flex-1 flex-col">
                                 <span class="truncate text-sm font-semibold text-zinc-900 dark:text-white" x-text="r.name"></span>
-                                <span class="text-[11px] text-zinc-500 dark:text-zinc-400">Shop in <span x-text="r.currency"></span></span>
+                                <span class="text-[11px] text-zinc-500 dark:text-zinc-400">{!! __('common.shop_in', ['currency' => '<span x-text="r.currency"></span>']) !!}</span>
                             </span>
                         </button>
                     </template>
@@ -79,19 +103,19 @@
                             :href="r.url"
                             wire:navigate
                             @click="open = false"
-                            class="mx-1.5 flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
+                            class="mx-1.5 flex items-center gap-3 rounded-full px-3.5 py-2.5 transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
                         >
                             <template x-if="r.logo">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[6px] bg-white p-0.5 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/10">
+                                <span class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-white p-0.5 dark:bg-white/5">
                                     <img :src="r.logo" :alt="r.name" class="h-full w-full object-contain">
                                 </span>
                             </template>
                             <template x-if="! r.logo">
-                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-white text-[11px] font-black uppercase text-zinc-700 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10" x-text="r.name.substring(0, 2).toUpperCase()"></span>
+                                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-white text-[13px] uppercase text-zinc-700 dark:bg-white/5 dark:text-zinc-200" x-text="r.name.substring(0, 2).toUpperCase()"></span>
                             </template>
                             <span class="flex min-w-0 flex-1 flex-col">
                                 <span class="truncate text-sm font-semibold text-zinc-900 dark:text-white" x-text="r.name"></span>
-                                <span class="text-[11px] text-zinc-500 dark:text-zinc-400" x-text="r.type"></span>
+                                <span class="text-[11px] text-zinc-500 dark:text-zinc-400" x-text="typeLabel(r.type)"></span>
                             </span>
                         </a>
                     </template>
@@ -102,7 +126,7 @@
 
     {{-- No results --}}
     <div x-show="! loading && results.length === 0 && query.length >= 2" class="px-5 py-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
-        No results for "<span class="font-semibold text-zinc-900 dark:text-white" x-text="query"></span>"
+        {!! __('navigation.search_no_results', ['query' => '<span class="font-semibold text-zinc-900 dark:text-white" x-text="query"></span>']) !!}
     </div>
 </div>
 

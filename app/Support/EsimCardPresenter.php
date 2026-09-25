@@ -98,11 +98,27 @@ class EsimCardPresenter
      * count has to read variant metadata - which is large JSON, and the whole
      * reason EsimCoverage stops at the first variant that carries any.
      *
+     * The cache is shared by every locale, so it holds the description as a
+     * lang key and its values, and the sentence is written in the visitor's
+     * language on the way out.
+     *
      * @return Collection<int, array<string, mixed>>
      */
     public static function family(): Collection
     {
-        return Cache::remember('esim-branded-cards-v1', now()->addHour(), function () {
+        return self::cachedFamily()->map(fn (array $card) => $card + [
+            'description' => __($card['descriptionKey'], $card['descriptionParams']),
+        ]);
+    }
+
+    /**
+     * The locale-neutral card data behind family().
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private static function cachedFamily(): Collection
+    {
+        return Cache::remember('esim-branded-cards-v2', now()->addHour(), function () {
             $catalog = EsimStoreController::catalogSummary();
 
             $cards = collect();
@@ -164,10 +180,10 @@ class EsimCardPresenter
         // Global states its reach in words; a region states its country count,
         // and drops the line entirely when the supplier gave us no coverage
         // data rather than claiming "across 0 countries".
-        $description = match (true) {
-            $key === 'global' => 'USA Data + Real USA Number. Keeps you connected everywhere.',
-            $count > 0 => 'Stay connected across '.$count.' countries.',
-            default => 'Stay connected across the region.',
+        [$descriptionKey, $descriptionParams] = match (true) {
+            $key === 'global' => ['esim.card_global_description', []],
+            $count > 0 => ['esim.card_region_description', ['count' => $count]],
+            default => ['esim.card_region_description_generic', []],
         };
 
         // Straight from coverage: the countries this plan serves with the most
@@ -200,7 +216,8 @@ class EsimCardPresenter
             'name' => $isHero ? $region['title'].' eSIM+' : $region['title'],
             'type' => $key === 'global' ? 'global' : 'regional',
             'countryCount' => $count > 0 ? $count : null,
-            'description' => $description,
+            'descriptionKey' => $descriptionKey,
+            'descriptionParams' => $descriptionParams,
             'accentColor' => $region['accent'],
             'backgroundPattern' => $region['motif'],
         ], $entry, $product);
@@ -219,7 +236,6 @@ class EsimCardPresenter
             '/^(United |Netherlands|Philippines|Bahamas|Maldives|Gambia|Seychelles|Comoros|Czech Republic|Dominican Republic|Central African Republic|Democratic Republic)/',
             $country
         );
-        $destination = ($needsArticle ? 'the ' : '').$country;
 
         $cc = strtoupper((string) ($product?->country_code ?? ''));
 
@@ -230,7 +246,10 @@ class EsimCardPresenter
             'name' => $country,
             'type' => 'local',
             'countryCount' => 1,
-            'description' => 'Reliable mobile data for your trip to '.$destination.'.',
+            // English says the article, so it has its own line; a language
+            // that does not can make both lines the same.
+            'descriptionKey' => $needsArticle ? 'esim.card_local_description_article' : 'esim.card_local_description',
+            'descriptionParams' => ['country' => $country],
             'accentColor' => self::LOCAL_ACCENT,
             // Same orbit rings as every other card in the family.
             'backgroundPattern' => 'orbit',

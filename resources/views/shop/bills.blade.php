@@ -142,7 +142,10 @@
 <x-shop.layout :title="'Bill Payments | '.$siteName">
 
     <section class="min-h-full bg-zinc-100">
-        <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
+        {{-- Inside the dashboard the frame pads the page itself (16px a side on a
+             phone, what the overview gets), so the wrapper adds none of its own:
+             with both, the listing ran 16px narrower than the overview each side. --}}
+        <div class="mx-auto w-full max-w-[1550px] {{ $inDash ? '' : 'px-4 py-8 sm:px-6 lg:px-8' }}">
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-[268px_1fr] lg:gap-8">
 
@@ -174,7 +177,7 @@
                                     wire:navigate
                                     role="tab"
                                     aria-selected="{{ $sort === $opt['value'] ? 'true' : 'false' }}"
-                                    class="inline-flex items-center justify-center rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
+                                    class="inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
                                 >
                                     {{ $opt['label'] }}
                                 </a>
@@ -189,7 +192,7 @@
                                 <a
                                     href="{{ $filterUrl(['subcategory' => null]) }}"
                                     wire:navigate
-                                    class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                    class="inline-flex shrink-0 items-center rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                 >
                                     All billers
                                 </a>
@@ -197,7 +200,7 @@
                                     <a
                                         href="{{ $filterUrl(['subcategory' => $s->slug]) }}"
                                         wire:navigate
-                                        class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                        class="inline-flex shrink-0 items-center rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                     >
                                         {{ $s->name }}
                                     </a>
@@ -320,6 +323,26 @@
             </div>
 
         </div>
+
+        {{-- The store's own FAQ. Questions come from the faqs table through
+             <x-home.faq>, the same component and the same admin editor as the
+             homepage, gift card and eSIM stores, scoped to the Bill Payments
+             topic. Nothing is written here, so the copy cannot drift from /faq.
+
+             It sits inside the section so it keeps the page ground, and the
+             component is full-bleed, so it spans the window like the footer
+             rather than the 1550 column that closes above it. --}}
+        @if (! $inDash)
+            <div class="pb-3 sm:pb-4 lg:pb-5">
+                <x-home.faq
+                    :topics="['Bill Payments']"
+                    :limit="12"
+                    heading-id="bills-faq-heading"
+                    :grow-from="1100"
+                    top-margin=""
+                />
+            </div>
+        @endif
     </section>
 
 </x-shop.layout>

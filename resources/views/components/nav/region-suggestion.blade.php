@@ -119,7 +119,7 @@
                 <button
                     type="button"
                     x-on:click="switchRegion()"
-                    class="flex min-w-0 flex-1 items-center gap-2.5 rounded-[10px] bg-white/10 px-3 py-2 text-left transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    class="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-white/10 px-3 py-2 text-left transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 >
                     <img
                         src="https://flagcdn.com/w40/{{ strtolower($suggestion['iso']) }}.png"
@@ -135,7 +135,7 @@
                 <button
                     type="button"
                     x-on:click="switchRegion()"
-                    class="shrink-0 rounded-[10px] bg-[#ffffff] px-4 py-2 text-sm font-bold text-[#0c1a36] transition-colors hover:bg-[#f4f6f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    class="shrink-0 rounded-full bg-[#ffffff] px-4 py-2 text-sm font-bold text-[#0c1a36] transition-colors hover:bg-[#f4f6f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 >
                     {{ __('navigation.region_suggest_switch') }}
                 </button>

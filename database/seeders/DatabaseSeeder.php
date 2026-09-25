@@ -22,6 +22,10 @@ class DatabaseSeeder extends Seeder
             FaqSeeder::class,
             GiftCardFaqSeeder::class,
             EsimFaqSeeder::class,
+            TopupFaqSeeder::class,
+            BillFaqSeeder::class,
+            AffiliateFaqSeeder::class,
+            MobileMoneyApprovalSeeder::class,
         ]);
     }
 }

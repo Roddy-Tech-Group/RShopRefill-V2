@@ -137,7 +137,7 @@ class extends Component {
         ])->save();
 
         $this->resetForm();
-        session()->flash('status', 'Hero card saved.');
+        $this->dispatch('toast', message: 'Hero card saved.');
     }
 
     public function toggle(int $id): void
@@ -158,7 +158,7 @@ class extends Component {
             $this->resetForm();
         }
 
-        session()->flash('status', 'Hero card deleted.');
+        $this->dispatch('toast', message: 'Hero card deleted.');
     }
 
     /** Remove an uploaded card image from disk. Only paths inside hero-cards/
@@ -195,11 +195,7 @@ class extends Component {
         </div>
     </header>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-    @endif
-
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
@@ -250,7 +246,7 @@ class extends Component {
                                 <div class="inline-flex items-center gap-1.5">
                                     <button wire:click="toggle({{ $card->id }})" type="button" class="rounded-[5px] bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-700/50 dark:text-zinc-300 dark:hover:bg-zinc-700">{{ $card->is_enabled ? 'Turn off' : 'Turn on' }}</button>
                                     <button wire:click="edit({{ $card->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">Edit</button>
-                                    <button wire:click="delete({{ $card->id }})" wire:confirm="Delete this hero card permanently?" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
+                                    <button wire:click="delete({{ $card->id }})" data-confirm="Delete this hero card permanently?" data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
                                 </div>
                             </td>
                         </tr>

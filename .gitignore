@@ -64,3 +64,7 @@ CTO_roadmap.md
 crypto_implementation.md
 crypto_gateway_decision.md
 payment_provider_kill_switch_plan.md
+
+# Local screenshot scratch and tool debug output, never source.
+/scratch-pw/
+/debug.log

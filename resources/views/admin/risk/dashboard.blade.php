@@ -19,12 +19,6 @@
         Fraud &amp; risk decisions over the last {{ $windowDays }} days.
     </x-slot:subheading>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
-            {{ session('status') }}
-        </div>
-    @endif
-
     {{-- Enforcement status + window selector --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap items-center gap-2">
@@ -38,7 +32,7 @@
             @else
                 <x-admin.badge tone="amber">Shadow mode</x-admin.badge>
             @endif
-            <a href="{{ route('admin.risk.reviews') }}" class="ml-2 inline-flex items-center gap-1 rounded-[10px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
+            <a href="{{ route('admin.risk.reviews') }}" class="ml-2 inline-flex items-center gap-1 rounded-[12px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
                 Review queue
                 @if ($m['reviews']['pending'] > 0)
                     <span class="rounded-full bg-white/25 px-1.5 text-xs">{{ $m['reviews']['pending'] }}</span>
@@ -71,7 +65,7 @@
             ['label' => 'Decline rate', 'value' => $m['rates']['decline_rate'].'%', 'sub' => number_format($m['outcomes']['deny']).' denied'],
             ['label' => 'Step-up rate', 'value' => $m['rates']['step_up_rate'].'%', 'sub' => number_format($m['outcomes']['step_up']).' verified'],
         ] as $card)
-            <div class="rounded-[12px] bg-white p-5 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm dark:bg-[#1d3252]">
                 <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $card['label'] }}</div>
                 <div class="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">{{ $card['value'] }}</div>
                 <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $card['sub'] }}</div>
@@ -81,7 +75,7 @@
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
         {{-- Band distribution --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10 lg:col-span-2">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm dark:bg-[#1d3252] lg:col-span-2">
             <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Band distribution</h3>
             <div class="mt-4 space-y-3">
                 @foreach ($m['bands'] as $band => $count)
@@ -99,7 +93,7 @@
         </div>
 
         {{-- Queue health --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm dark:bg-[#1d3252]">
             <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Review queue</h3>
             <dl class="mt-4 space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Pending</dt><dd class="font-semibold text-zinc-900 dark:text-white">{{ $m['reviews']['pending'] }}</dd></div>
@@ -113,7 +107,7 @@
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
         {{-- Chargeback rate --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm dark:bg-[#1d3252]">
             <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Chargeback rate</h3>
             @php $cb = $m['chargeback']; $over = $cb['rate'] > $cb['ceiling']; @endphp
             <div class="mt-3 text-3xl font-bold {{ $over ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ $cb['rate'] }}%</div>
@@ -124,11 +118,11 @@
         </div>
 
         {{-- Top signals --}}
-        <div class="rounded-[12px] bg-white p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10 lg:col-span-2">
+        <div class="rounded-[12px] bg-white p-6 shadow-sm dark:bg-[#1d3252] lg:col-span-2">
             <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Top firing signals</h3>
-            <div class="mt-3 overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <tbody class="divide-y divide-zinc-100 dark:divide-white/5">
+            <div class="mt-3 overflow-x-auto p-3">
+                <table class="w-full text-left text-sm admin-table">
+                    <tbody class="">
                         @forelse ($m['top_signals'] as $signal)
                             <tr>
                                 <td class="py-2 font-mono text-xs font-semibold text-zinc-900 dark:text-white">{{ $signal['code'] }}</td>
@@ -144,7 +138,7 @@
     </div>
 
     {{-- Manual label (feedback loop) --}}
-    <div class="mt-6 rounded-[12px] bg-white p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+    <div class="mt-6 rounded-[12px] bg-white p-6 shadow-sm dark:bg-[#1d3252]">
         <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Record a label</h3>
         <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Feed the engine ground truth: a chargeback, confirmed fraud, a false positive, or a good actor.</p>
         <form method="POST" action="{{ route('admin.risk.label') }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -166,7 +160,7 @@
                 <label class="block text-xs text-zinc-500 dark:text-zinc-400">Note</label>
                 <input type="text" name="note" class="mt-1 w-full rounded-[8px] border-zinc-300 text-sm dark:border-white/10 dark:bg-white/5">
             </div>
-            <button type="submit" class="rounded-[10px] bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900">Record</button>
+            <button type="submit" class="rounded-[12px] bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900">Record</button>
         </form>
     </div>
 </x-layouts.admin>

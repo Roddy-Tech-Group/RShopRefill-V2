@@ -72,7 +72,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --queue=critical-alerts,emails,notifications,airalo,rewards,default --tries=1\" \"npm run dev\" --names='server,queue,vite'"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php -d zend_extension=opcache -d opcache.enable_cli=1 -d opcache.validate_timestamps=1 -d opcache.revalidate_freq=0 -S 127.0.0.1:8000 -t public server.php\" \"php artisan queue:listen --queue=critical-alerts,emails,notifications,airalo,rewards,default --tries=1\" \"npm run dev\" --names='server,queue,vite'"
         ]
     },
     "extra": {

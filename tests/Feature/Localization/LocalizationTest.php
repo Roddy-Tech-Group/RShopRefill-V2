@@ -40,9 +40,18 @@ class LocalizationTest extends TestCase
      * translated and sitting in lang/, one config entry away each, but they
      * are not offered - see config/localization.php.
      */
-    public function test_only_english_and_french_are_offered(): void
+    /**
+     * All ten built translations are offered. The eight beyond English and
+     * French were complete and sitting in lang/ for a while before being
+     * switched on, which is why the invariant that matters is the second
+     * assertion: nothing may be offered that has no lang directory behind it.
+     */
+    public function test_every_built_language_is_offered(): void
     {
-        $this->assertSame(['en', 'fr'], array_keys(config('localization.supported')));
+        $this->assertSame(
+            ['en', 'fr', 'es', 'pt', 'de', 'it', 'sw', 'ha', 'zh', 'ar'],
+            array_keys(config('localization.supported'))
+        );
 
         foreach (array_keys(config('localization.supported')) as $locale) {
             $this->assertDirectoryExists(lang_path($locale));
@@ -189,7 +198,27 @@ class LocalizationTest extends TestCase
      * English, not the unoffered translation. The config list is the gate, not
      * the presence of a lang directory.
      */
-    public function test_a_translated_but_unoffered_language_is_not_served(): void
+    /**
+     * A language the site does not carry falls back to the default rather
+     * than being served half-translated.
+     *
+     * Japanese, because it is the case that still exists: every language with
+     * a lang directory is now offered, so the only way to be unoffered is to
+     * have no translation at all.
+     */
+    public function test_a_language_the_site_does_not_carry_falls_back(): void
+    {
+        $this->assertDirectoryDoesNotExist(lang_path('ja'));
+
+        $this->withoutVite()
+            ->withHeader('Accept-Language', 'ja-JP,ja;q=0.9')
+            ->get('/')
+            ->assertOk()
+            ->assertSee('lang="en"', false);
+    }
+
+    /** A built language IS served when the browser asks for it. */
+    public function test_a_built_language_is_served_when_requested(): void
     {
         $this->assertDirectoryExists(lang_path('es'));
 
@@ -197,7 +226,7 @@ class LocalizationTest extends TestCase
             ->withHeader('Accept-Language', 'es-MX,es;q=0.9')
             ->get('/')
             ->assertOk()
-            ->assertSee('lang="en"', false);
+            ->assertSee('lang="es"', false);
     }
 
     // ── Rendering ───────────────────────────────────────────────────────

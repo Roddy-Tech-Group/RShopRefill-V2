@@ -106,7 +106,7 @@
         @endif
 
         @if ($item['popular'])
-            <span class="shrink-0 rounded-full bg-[#0c1337] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">Popular</span>
+            <span class="shrink-0 rounded-full bg-[#0c1337] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">{{ __('products.detail_popular') }}</span>
         @endif
     </span>
 
@@ -126,33 +126,33 @@
         @if (! empty($item['data_range']))
             <span class="{{ $chip }}">{{ $item['data_range'] }}</span>
         @elseif (! empty($item['data']))
-            <span class="{{ $chip }}">from {{ $item['data'] }}</span>
+            <span class="{{ $chip }}">{{ __('esim.from_data', ['data' => strcasecmp((string) $item['data'], 'Unlimited') === 0 ? __('esim.unlimited') : $item['data']]) }}</span>
         @endif
 
         @if (! empty($item['unlimited']))
-            <span class="rounded-full bg-[#0c1337] px-2.5 py-1 text-[12px] text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">Unlimited</span>
+            <span class="rounded-full bg-[#0c1337] px-2.5 py-1 text-[12px] text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]">{{ __('esim.unlimited') }}</span>
         @endif
 
         @if (! empty($item['days_range']))
-            <span class="{{ $chip }} tabular-nums">{{ $item['days_range'] }}</span>
+            <span class="{{ $chip }} tabular-nums">{{ __('esim.days_range', ['range' => $item['days_range']]) }}</span>
         @endif
 
         {{-- One chip per thing the plan carries. Where there is no number, the
              single chip says so: "Data only" is the fact a traveller needs,
              where a bare "Data" leaves them wondering about calls. --}}
         @if ($item['with_number'] ?? false)
-            <span class="{{ $chip }}">Data</span>
-            <span class="{{ $chip }}">Phone number</span>
+            <span class="{{ $chip }}">{{ __('esim.chip_data') }}</span>
+            <span class="{{ $chip }}">{{ __('esim.chip_phone_number') }}</span>
         @else
-            <span class="{{ $chip }}">Data only</span>
+            <span class="{{ $chip }}">{{ __('esim.chip_data_only') }}</span>
         @endif
     </span>
 
     <span class="mt-3 flex items-baseline gap-1.5">
-        <span class="text-[12px] text-zinc-500 dark:text-zinc-400">from</span>
+        <span class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ __('esim.from') }}</span>
         <span class="text-[17px] tabular-nums text-[#0c1337] dark:text-white">${{ number_format($item['from'], 2) }}</span>
     </span>
 
     {{-- The action reads as a button but stays part of the card's own link. --}}
-    <span class="mt-4 block w-full rounded-full bg-[#f4f6f5] px-3 py-2 text-center text-[14px] text-[#0c1337] transition-colors group-hover:bg-[#e8ecea] dark:bg-white/10 dark:text-white dark:group-hover:bg-white/15">View plans</span>
+    <span class="mt-4 block w-full rounded-full bg-[#f4f6f5] px-3 py-2 text-center text-[14px] text-[#0c1337] transition-colors group-hover:bg-[#e8ecea] dark:bg-white/10 dark:text-white dark:group-hover:bg-white/15">{{ __('esim.view_plans') }}</span>
 </a>

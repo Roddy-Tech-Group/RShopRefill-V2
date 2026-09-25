@@ -72,19 +72,19 @@
              why its cards never open this. --}}
         <h2 id="esim-pick-heading" class="pr-8 text-lg font-bold leading-snug text-zinc-900 dark:text-white">
             <span x-show="pick.scope !== 'regional'">
-                Only buy this eSIM if you are in <span x-text="pick.name"></span> or travelling there
+                {!! str_replace(':name', '<span x-text="pick.name"></span>', e(__('esim.tip_local_heading'))) !!}
             </span>
             <span x-show="pick.scope === 'regional'" x-cloak>
-                Check <span x-text="pick.name"></span> covers the country you are travelling to
+                {!! str_replace(':name', '<span x-text="pick.name"></span>', e(__('esim.tip_regional_heading'))) !!}
             </span>
         </h2>
 
         <p class="mt-2.5 text-[14px] leading-relaxed text-zinc-600 dark:text-zinc-300">
             <span x-show="pick.scope !== 'regional'">
-                It connects to networks there, so it is no use anywhere else.
+                {{ __('esim.tip_local_body') }}
             </span>
             <span x-show="pick.scope === 'regional'" x-cloak>
-                It works across the countries this plan lists and nowhere else. The full list is on the plan's page.
+                {{ __('esim.tip_regional_body') }}
             </span>
         </p>
 
@@ -93,12 +93,12 @@
             wire:navigate
             class="mt-5 flex h-11 w-full items-center justify-center rounded-[12px] bg-[#0c1337] px-4 text-[14px] text-white transition-colors hover:bg-[#1a2560] dark:bg-[#fdfdfd] dark:text-[#0c1337] dark:hover:bg-[#e4e5f3]"
         >
-            Continue to <span class="ml-1" x-text="pick.name"></span>
+            {!! str_replace(':name', '<span class="ml-1" x-text="pick.name"></span>', e(__('esim.tip_continue'))) !!}
         </a>
 
         @if ($globalUrl)
             <p class="mt-5 text-[13px] text-zinc-500 dark:text-zinc-400">
-                Not going there? One eSIM covers you worldwide.
+                {{ __('esim.tip_not_going') }}
             </p>
 
             <a
@@ -106,7 +106,7 @@
                 wire:navigate
                 class="mt-2 flex h-11 w-full items-center justify-center rounded-[12px] border border-zinc-200 px-4 text-[14px] text-[#0c1337] transition-colors hover:bg-[#f4f6f5] dark:border-white/15 dark:text-white dark:hover:bg-white/10"
             >
-                Buy {{ $globalName }}
+                {{ __('esim.tip_buy_global', ['name' => $globalName]) }}
             </a>
         @endif
     </div>

@@ -33,12 +33,6 @@
          plain zinc scale. --}}
     <body class="storefront flex min-h-screen flex-col bg-white dark:bg-[#0c1a36] text-zinc-900 antialiased">
 
-        {{-- Themed branded loader on hard reload / first paint. Shown on the
-             storefront too (not just the dashboard) so a website reload follows
-             the active theme instead of flashing unbranded. Hides on
-             DOMContentLoaded; never shown on wire:navigate. --}}
-        <x-ui.app-loader />
-
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
 
         <div

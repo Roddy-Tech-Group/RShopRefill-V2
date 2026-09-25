@@ -26,11 +26,11 @@ return [
     'legal' => 'Legal & Trust',
 
     // Brand column
-    'tagline' => 'Your marketplace for gift cards, travel eSIMs, mobile top-ups and bill payments.',
+    'tagline' => 'Your marketplace for gift cards, eSIMs, mobile top-ups and bill payments.',
 
     // Shop column
     'gift_cards' => 'Gift Cards',
-    'travel_esims' => 'Travel eSIMs',
+    'esims' => 'eSIMs',
     'mobile_topups' => 'Mobile Top-Ups',
     'data_bundles' => 'Data Bundles',
     'bill_payments' => 'Bill Payments',

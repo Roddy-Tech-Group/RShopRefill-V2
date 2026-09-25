@@ -116,14 +116,13 @@
             background-color: rgb(255 255 255 / 0.08);
         }
         .cust-body:hover::after { display: none; }
-        .cust-body:hover { border-radius: 12px; }
     </style>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
-        <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
+    <div class="overflow-hidden rounded-[12px] pb-3 bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
+        <div class="scroll-y-thin overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill --}}
-        <div class="cust-row grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+        <div class="cust-row grid mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
             <span class="col-user">User</span>
             <span class="col-status">Status</span>
             <span>Wallet Balance</span>
@@ -140,13 +139,13 @@
             
             @if ($isModerator)
             <div
-                class="cust-row cust-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10"
+                class="cust-row cust-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252]"
             >
             @else
             <a
                 href="{{ route('admin.customer', $user) }}"
                 wire:navigate
-                class="cust-row cust-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400"
+                class="cust-row cust-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252]"
             >
             @endif
                 {{-- User — avatar + name + email stacked. --}}

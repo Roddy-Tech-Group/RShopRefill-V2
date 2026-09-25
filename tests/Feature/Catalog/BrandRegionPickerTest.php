@@ -115,7 +115,7 @@ class BrandRegionPickerTest extends TestCase
 
         $html = $this->page();
 
-        $this->assertStringContainsString('May only be redeemable in United States', $html);
+        $this->assertStringContainsString('Redeemable only in United States, or on an account or device set to the United States region', $html);
         $this->assertStringNotContainsString('Choose another region', $html);
         $this->assertStringNotContainsString('Find your country', $html);
     }
@@ -128,7 +128,7 @@ class BrandRegionPickerTest extends TestCase
 
         $html = $this->page('GB');
 
-        $this->assertStringContainsString('May only be redeemable in United Kingdom', $html);
+        $this->assertStringContainsString('Redeemable only in United Kingdom, or on an account or device set to the United Kingdom region', $html);
 
         $picker = $this->picker($html);
         $this->assertMatchesRegularExpression('/aria-selected="true"[\s\S]{0,600}?United Kingdom/', $picker);

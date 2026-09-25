@@ -110,7 +110,8 @@ html.dark .flatpickr-months .flatpickr-next-month:hover svg { fill: #fff; }
     background: transparent;
     border: none;
     font: inherit;
-    font-weight: 600;
+    /* 399 like everything else; this control is chrome, not emphasis. */
+    font-weight: var(--font-weight-base, 399);
     color: inherit;
     cursor: pointer;
 }
@@ -144,7 +145,7 @@ html.dark .flatpickr-months .flatpickr-next-month:hover svg { fill: #fff; }
     white-space: nowrap;
 }
 .flatpickr-modernSelect-opt:hover { background: #f4f6f5; color: #2563eb; }
-.flatpickr-modernSelect-opt.is-selected { background: #2563eb; color: #fff; font-weight: 600; }
+.flatpickr-modernSelect-opt.is-selected { background: #2563eb; color: #fff; font-weight: var(--font-weight-base, 399); }
 html.dark .flatpickr-modernSelect-panel { background: var(--ash); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
 html.dark .flatpickr-modernSelect-opt { color: #e5e7eb; }
 html.dark .flatpickr-modernSelect-opt:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
@@ -194,6 +195,31 @@ body {
     --font-sans: 'DM Sans', sans-serif;
     --font-weight-base: 399;
 
+    /* One weight, everywhere: DM Sans 399.
+       ------------------------------------------------------------------
+       Setting it on body was never enough. Tailwind's weight utilities are
+       `font-weight: var(--font-weight-bold)` and friends, and the views carry
+       about 2,900 of them - font-semibold 1,261 times, font-bold 926 - so
+       every one of them beat the body rule. Rather than strip a class from
+       three thousand places, the numbers those classes resolve TO are set to
+       399 here. font-bold still exists, still compiles, and now draws 399.
+
+       This is why the face is loaded as a variable font across wght 100..1000
+       at the top of this file: 399 is off-axis and a static cut would snap it
+       to 400.
+
+       Hierarchy on this site is carried by size and colour, not weight. To give
+       one back, change the number here - nothing in the views has to move. */
+    --font-weight-thin: 399;
+    --font-weight-extralight: 399;
+    --font-weight-light: 399;
+    --font-weight-normal: 399;
+    --font-weight-medium: 399;
+    --font-weight-semibold: 399;
+    --font-weight-bold: 399;
+    --font-weight-extrabold: 399;
+    --font-weight-black: 399;
+
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
     --color-zinc-150: #ececee;
@@ -219,6 +245,20 @@ body {
     --color-brand-hover: #0036cc;
     --color-brand-50: #f4f6f5;
     --color-brand-100: #e8ecea;
+
+    /* The interactive edge. One blue for every border that means "this control
+       is yours to use": a field you are typing in, a dropdown you have opened,
+       and, on hover only, the three chips in the nav that hold your region,
+       your account and your cart. At rest those chips wear a neutral hairline.
+
+       It is its own token rather than blue-600 or --color-brand because it is a
+       third job. --color-brand fills marketing surfaces; blue-600 fills the
+       buttons. This one is only ever drawn as a line, so it is picked to read
+       as an edge at 1px against both the light page and the dark chrome.
+
+       Tailwind makes utilities from it: border-edge, focus:border-edge,
+       ring-edge. Never write the hex in a view. */
+    --color-edge: #1447e6;
 
     /* No light blue anywhere in the app. Tailwind's pale blues (50 to 400) are
        redefined as the neutral greys the dashboard is built from, so every
@@ -269,6 +309,15 @@ body {
     font-weight: var(--font-weight-base, 399);
 }
 
+/* The two elements the browser bolds on its own. Tailwind's preflight sets
+   them to `bolder`, which is relative, so it climbs off 399 without any class
+   asking it to. Markdown-rendered copy (help articles, blog posts, product
+   terms from the supplier) is full of them. */
+b,
+strong {
+    font-weight: var(--font-weight-base, 399);
+}
+
 @layer theme {
     .dark {
         --color-accent: var(--color-white);
@@ -292,13 +341,28 @@ body {
    bar. Every in-page scroll container (dropdown panels, scroll areas, modals)
    shows NO scrollbar at all; the content still scrolls by wheel/touch/drag. */
 
-/* Default: hide every scrollbar. */
-* {
+/* Default: hide every scrollbar, EXCEPT containers that opt back in with
+   .scroll-x-thin (see the rule further down).
+
+   The exclusion has to live here, in the hide itself. Un-hiding later does not
+   work: once `*::-webkit-scrollbar { display: none }` has matched an element,
+   Chromium drops the scrollbar entirely, and a more specific
+   `::-webkit-scrollbar { display: block }` afterwards does NOT bring it back -
+   the bar neither lays out nor paints. Verified against a reduced test case.
+   So the opt-in container must never match the hide in the first place. */
+/* :where() keeps the hide at zero specificity, as the bare `*` it replaced
+   was. Written as a plain :not() it outranked `body::-webkit-scrollbar` below
+   and took the page's own scrollbar away on every screen. */
+:where(*:not(.scroll-x-thin):not(.scroll-y-thin)) {
     scrollbar-width: none;
 }
-*::-webkit-scrollbar {
+:where(*:not(.scroll-x-thin):not(.scroll-y-thin))::-webkit-scrollbar {
     display: none;
 }
+/* .scroll-y-thin: a container that styles its own thin bar with utilities
+   (the admin list pages' scroll wrappers, the customer notification menu).
+   The :not() above raised the hide's specificity past those utilities and
+   took their bars away; this opts them back out of the hide. */
 
 /* Exception: the page itself keeps a modern slim scrollbar.
    Chromium draws its native Windows scrollbar, up/down arrow buttons and all,
@@ -324,6 +388,52 @@ body::-webkit-scrollbar-button {
     display: none;
 }
 
+/* Exception: a card whose table is wider than the card.
+   The blanket rule above hides the bar, which is right for dropdowns and
+   modals - nothing is hidden off to the side there. A table that scrolls
+   sideways is the opposite case: with no bar there is nothing on screen
+   saying more columns exist, so the only way to find them is to guess and
+   drag. This opts a container back in, slim and arrow-less.
+
+   Same Chromium quirk as the page rule above: setting scrollbar-width makes
+   Chromium draw its native Windows bar and ignore ::-webkit-scrollbar, so the
+   standard properties are only handed to browsers with no ::-webkit-scrollbar
+   support (Firefox), and the slim bar itself comes from the webkit selectors.
+
+   There is no `display: block` here on purpose. This class is excluded from
+   the blanket hide at the top of this section instead, because re-enabling
+   after the fact does not work in Chromium. */
+@supports not selector(::-webkit-scrollbar) {
+    .scroll-x-thin {
+        scrollbar-width: thin;
+        scrollbar-color: #d4d4d8 transparent;   /* zinc-300 */
+    }
+}
+.scroll-x-thin::-webkit-scrollbar {
+    height: 6px;
+}
+.scroll-x-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scroll-x-thin::-webkit-scrollbar-thumb {
+    background-color: #a1a1aa;                  /* zinc-400 - the bar is the
+                                                   only hint that columns are
+                                                   off-screen, so it has to be
+                                                   readable, not decorative */
+    border-radius: 9999px;
+}
+.scroll-x-thin::-webkit-scrollbar-button {
+    display: none;
+}
+html.dark .scroll-x-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 0.38);
+}
+@supports not selector(::-webkit-scrollbar) {
+    html.dark .scroll-x-thin {
+        scrollbar-color: rgb(255 255 255 / 0.38) transparent;
+    }
+}
+
 /* Active sidebar item in dark mode — black tile with white icons.
    The class lives on every active <a>/<button> in admin + customer sidebars
    (see navItem/navItemClass closures in the layout views). In light mode the
@@ -337,18 +447,29 @@ html.dark .nav-item-active img {
 html.dark .nav-item-active svg {
     color: #ffffff;
 }
-/* The active row in dark mode. It used to be pinned to #0a1729, the soft-dark
-   navy, back when the active class carried `bg-blue-50` for light mode and that
-   utility was remapped to navy further down the stylesheet. Neither is true any
-   more: the active class is `bg-[#ffffff] dark:bg-black!`, whose `!` already
-   beats the remap, and soft dark is retired, so a navy here was the one place
-   it kept surfacing. Black in dark, a neutral charcoal on a true-black sidebar
-   where black would vanish. */
+/* The active row wears exactly what hover wears - same wash, same text, no
+   outline - so the rail has ONE treatment rather than two competing ones. It
+   used to be a filled pill (white in light, black in dark) with a 1px ring,
+   which read as a different component to the row you were merely pointing at.
+
+   The values below are duplicated from the hover block that follows, per
+   theme, deliberately: grouping the two selectors into one rule would make a
+   row that is both active AND hovered ambiguous to read later, and the pair
+   must stay in sync anyway. Change one, change the other.
+
+   These carry `!important` because the rail markup no longer sets any fill of
+   its own; the flag is what kept the retired soft-dark navy remap from
+   resurfacing here, and is cheap insurance against a utility creeping back. */
+.nav-item-active {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    color: #000000;
+}
 html.dark .nav-item-active {
-    background-color: #000000 !important;
+    background-color: rgba(255, 255, 255, 0.10) !important;
+    color: #ffffff;
 }
 html.dark.pure-dark .nav-item-active {
-    background-color: #1a1a1a !important;
+    background-color: rgba(255, 255, 255, 0.14) !important;
 }
 
 /* Hover on an INACTIVE sidebar row. Written here rather than as
@@ -429,32 +550,47 @@ html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); 
        remain visually connected. */
     border-spacing: 0 6px;
 }
-/* Pull the table up by the leading border-spacing so the first row still
-   aligns with the wrapper's top padding (otherwise the 6px row gap stacks
-   on top of the p-3 wrapper and the whole table looks misaligned). */
+/* Inside a padded (p-3) wrapper, pull the table up by the leading
+   border-spacing so the first row still aligns with the wrapper's padding
+   (otherwise the 6px row gap stacks on the p-3 and the table looks
+   misaligned). Only there: in a plain overflow-x-auto wrapper the negative
+   bottom margin pushed the table 6px past the box, and the box grew a
+   vertical scrollbar for it. */
 .admin-table thead tr th {
     padding-top: 0.75rem;
 }
-.admin-table { margin-top: -6px; margin-bottom: -6px; }
+/* In a plain wrapper the trailing border-spacing leaves only 6px under the
+   last row; the extra 6px lifts it clear of the card's rounded corner, the
+   same 12px the div-grid lists keep with pb-3. */
+.admin-table { margin-bottom: 6px; }
+.p-3 > .admin-table { margin-top: -6px; margin-bottom: -6px; }
+/* The opt-in scroll containers slim both axes, not just the bottom bar. */
+.scroll-x-thin::-webkit-scrollbar { width: 6px; }
+/* Table header pill. The same neutral chip the div-grid lists (customers,
+   orders, products, transactions) use, so a header reads identically whichever
+   markup a page happens to be built from.
+
+   It was a blue pill - #eff6ff fill, blue-700 text, a 2px blue-500 frame -
+   hardcoded here rather than written in Tailwind, so it bypassed the palette
+   override and stayed blue while every list built the other way went neutral.
+   The frame is gone with it: the fill alone separates the header from the rows,
+   the way the rest of the admin now works. */
 .admin-table thead th {
-    background-color: rgb(239 246 255);            /* blue-50 */
-    color: rgb(29 78 216);                          /* blue-700 */
+    background-color: #fafafa;                      /* zinc-50 */
+    color: #243049;                                 /* the muted ink tier */
     font-size: 10px;
-    font-weight: 700;
+    /* The caps and the letter-spacing carry this header, not a heavier cut. */
+    font-weight: var(--font-weight-base, 399);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.75rem 1.25rem;
     text-align: left;
-    border-top: 2px solid rgb(59 130 246);          /* blue-500 */
-    border-bottom: 2px solid rgb(59 130 246);
 }
 .admin-table thead th:first-child {
-    border-left: 2px solid rgb(59 130 246);
     border-top-left-radius: 12px;
     border-bottom-left-radius: 12px;
 }
 .admin-table thead th:last-child {
-    border-right: 2px solid rgb(59 130 246);
     border-top-right-radius: 12px;
     border-bottom-right-radius: 12px;
 }
@@ -463,20 +599,37 @@ html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); 
     font-size: 14px;
     color: rgb(63 63 70);                           /* zinc-700 */
 }
+/* The dense sub-tables on the detail pages (customer, order, transaction) and
+   the dashboard's latest-rows cards are set at 11px. They get the same header
+   pill, flat hover and inset dividers as every other table; only the body type
+   stays at the size the card around it is set in. */
+.admin-table.admin-table-compact tbody td {
+    font-size: 11px;
+}
 .admin-table tbody tr {
     transition: background-color 150ms;
-    border-radius: 12px;
 }
-/* Hover ring: paint the row background + a 1px blue inset ring directly on
-   the <tr>. Cells stay transparent so the row-level background + shadow
-   read through. Works because we use border-collapse: separate +
-   border-spacing: 0, which keeps each tr renderable as its own box.
-   border-radius on the tr makes the box-shadow inset ring follow the same
-   12px curve as the header pill. */
+/* Row hover: paint the background directly on the <tr>. Cells stay
+   transparent so the row-level background reads through. Works because we use
+   border-collapse: separate + border-spacing: 0, which keeps each tr
+   renderable as its own box. The rows are square: a hovered row is a flat band
+   across the list, not a rounded pill.
+
+   The neutral #f4f6f5 is the page surface, and it is deliberately the same
+   value the div-grid lists (customers, orders, products, transactions) land on
+   - they write `hover:bg-blue-50`, which the palette override at the top of
+   this file remaps to exactly this grey. This rule used to hardcode
+   rgb(239 246 255) with a blue-500 inset ring, which bypassed that override
+   and left the table pages hovering blue while every div-grid page hovered
+   grey. Same interaction, two different colours, depending only on which
+   markup a page happened to be built with.
+
+   No ring: the background change is the whole signal here, as it is on the
+   div-grid rows. Dark mode was already neutral and keeps its own faint ring
+   (see the html.dark rule below), because the ash-on-ash lift is too subtle to
+   read on its own. */
 .admin-table tbody tr:hover {
-    background-color: rgb(239 246 255) !important;          /* blue-50 */
-    box-shadow: inset 0 0 0 1px rgb(59 130 246) !important; /* blue-500 ring */
-    border-radius: 12px;
+    background-color: #f4f6f5 !important;
 }
 /* Cells override the inset ring with their own backgrounds + gradient
    borders by default. On hover, switch the cell to transparent so the
@@ -491,12 +644,16 @@ html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); 
 }
 /* Inset divider between body rows. Uses a border on each <td> with a
    gradient so the line stops short of the first and last cells'
-   horizontal padding, matching the .divide-inset look on div-based lists. */
+   horizontal padding, matching the .divide-inset look on div-based lists.
+   The end cells keep their border transparent and paint the gradient in
+   the border band (background-origin: border-box), so their line sits on
+   the same pixel row as the middle cells' border rather than one above it. */
 .admin-table tbody tr:not(:last-child) td {
     border-bottom: 1px solid rgb(244 244 245);
 }
 .admin-table tbody tr:not(:last-child) td:first-child {
     background-image: linear-gradient(to right, transparent 1.5rem, rgb(244 244 245) 1.5rem);
+    background-origin: border-box;
     background-position: 0 100%;
     background-size: 100% 1px;
     background-repeat: no-repeat;
@@ -504,6 +661,7 @@ html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); 
 }
 .admin-table tbody tr:not(:last-child) td:last-child {
     background-image: linear-gradient(to left, transparent 1.5rem, rgb(244 244 245) 1.5rem);
+    background-origin: border-box;
     background-position: 0 100%;
     background-size: 100% 1px;
     background-repeat: no-repeat;
@@ -513,9 +671,8 @@ html.dark .dark\:hover\:bg-white\/5:hover { background-color: var(--ash-hover); 
 /* Dark mode overrides. Blue header tint shifts to a brighter ring; body
    rows pick up the navy-grey palette used on the rest of the admin. */
 html.dark .admin-table thead th {
-    background-color: rgb(37 99 235 / 0.15);        /* blue-600/15 */
-    color: rgb(147 197 253);                         /* blue-300 */
-    border-color: rgb(96 165 250);                   /* blue-400 */
+    background-color: rgb(255 255 255 / 0.05);      /* matches dark:bg-white/5 on the div-grid headers */
+    color: rgb(212 212 216);                         /* zinc-300 */
 }
 html.dark .admin-table tbody td {
     color: rgb(212 212 216);                         /* zinc-300 */
@@ -530,12 +687,23 @@ html.dark .admin-table tbody tr:hover {
 html.dark .admin-table tbody tr:not(:last-child) td {
     border-bottom-color: rgb(255 255 255 / 0.08);
 }
+/* The end cells' divider is their gradient alone. The rule above recolours
+   every cell's border, which would put a second line under the gradient on
+   these two cells, so their border stays transparent as it does in light. */
 html.dark .admin-table tbody tr:not(:last-child) td:first-child {
     background-image: linear-gradient(to right, transparent 1.5rem, rgb(255 255 255 / 0.08) 1.5rem);
+    border-bottom-color: transparent;
 }
 html.dark .admin-table tbody tr:not(:last-child) td:last-child {
     background-image: linear-gradient(to left, transparent 1.5rem, rgb(255 255 255 / 0.08) 1.5rem);
+    border-bottom-color: transparent;
 }
+/* The eSIM store's sticky tab band. In the dashboard frame the page scrolls
+   inside [data-page-content], under a header that is not part of that panel,
+   so the band parks at the panel's top edge: offset by --nav-h there, it
+   floated a header's height down the panel, over the cards. */
+body.dashboard .esim-tab-band { top: 0; }
+
 /* Mobile-only horizontal-overflow lock. Stops dropdowns / off-canvas panels
    / decorative gradients from pushing the viewport wider than the screen.
    Disabled at lg+ because the collapsed-sidebar flyout popups deliberately
@@ -558,10 +726,11 @@ html.dark .admin-table tbody tr:not(:last-child) td:last-child {
 body.storefront {
     overflow-x: clip;
 }
+/* A hairline: 4px, thin enough to disappear into the edge, wide enough to drag. */
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: block;
-    width: 10px;
+    width: 4px;
 }
 
 /* Full-bleed rows -------------------------------------------------------
@@ -617,32 +786,72 @@ body::-webkit-scrollbar {
    and keep the plain zinc scale, since sweeping surfaces I cannot see is how
    contrast bugs get shipped. */
 
-/* Storefront ink ---------------------------------------------------------
-   One text colour across the customer-facing site: #0c1a36, the navy the rest
-   of the storefront already uses for dark surfaces.
+/* Product ink ------------------------------------------------------------
+   One text colour across the storefront and the admin: #1f2b45, a navy a step
+   softer than the #0c1a36 used for dark surfaces. It replaced that darker
+   value (2026-09-23) because at body size the near-black navy read as heavy
+   against the white cards.
 
    Remapped here for the same reason the outline colour below is: the zinc text
    tokens are spread across every template, and one block is one place to
    change them.
 
-   The scale survives - strong ink at #0c1a36, muted at #4a5a72. Collapsing
-   both onto one value would flatten the difference between a heading and the
-   line under it.
+   The scale survives - strong ink at #16223c, then the muted and faint tiers
+   below. Collapsing them onto one value would flatten the difference between
+   a heading and the line under it.
 
-   Light only, storefront only. */
+   Every tier was stepped up again on 2026-09-23: #1f2b45 / #303c54 / #555f72
+   read as washed at the sizes the admin tables use. The hue is unchanged, only
+   the strength. If a heading ever looks heavy, lighten the tier rather than
+   changing the hue - the navy is what ties this to the brand.
+
+   The muted tier used to be #4a5a72, the navy at about 72%, and the faint
+   tier #6b7a90, about 55%: on the page that read as grey rather than as a
+   softer navy, so both stepped up (2026-09-20). Solid hex rather than a real
+   alpha, so the ink is the same colour on a white card as on the #f4f6f5
+   page instead of shifting with whatever is behind it.
+
+   Light only. Applied to the storefront AND the admin surface, so a
+   heading reads the same navy wherever it appears in the product. */
 
 html:not(.dark) body.storefront .text-zinc-950,
 html:not(.dark) body.storefront .text-zinc-900,
-html:not(.dark) body.storefront .text-zinc-800 { color: #0c1a36; }
+html:not(.dark) body.storefront .text-zinc-800,
+html:not(.dark) body.admin .text-zinc-950,
+html:not(.dark) body.admin .text-zinc-900,
+html:not(.dark) body.admin .text-zinc-800 { color: #16223c; }
 
 html:not(.dark) body.storefront .text-zinc-700,
-html:not(.dark) body.storefront .text-zinc-600 { color: #4a5a72; }
+html:not(.dark) body.storefront .text-zinc-600,
+html:not(.dark) body.admin .text-zinc-700,
+html:not(.dark) body.admin .text-zinc-600 { color: #243049; }
 
-html:not(.dark) body.storefront .text-zinc-500 { color: #6b7a90; }
+html:not(.dark) body.storefront .text-zinc-500,
+html:not(.dark) body.admin .text-zinc-500 { color: #3d4a63; }
 
 /* Hover states that darken toward black land on the same navy. */
 html:not(.dark) body.storefront .hover\:text-zinc-900:hover,
-html:not(.dark) body.storefront .hover\:text-zinc-800:hover { color: #0c1a36; }
+html:not(.dark) body.storefront .hover\:text-zinc-800:hover,
+html:not(.dark) body.admin .hover\:text-zinc-900:hover,
+html:not(.dark) body.admin .hover\:text-zinc-800:hover { color: #16223c; }
+
+/* Admin type scale ---------------------------------------------------------
+   The admin tables were built on 10px and 11px type, which is small enough to
+   be tiring on a dense screen. Every arbitrary size from 10 to 15 steps up one
+   pixel, so the whole surface grows together and the existing hierarchy is
+   kept: what was a step apart stays a step apart.
+
+   Done here rather than by rewriting ~600 class attributes across forty views:
+   one block, one place to tune, and trivially reversible. It follows the same
+   pattern as the ink scale above, which likewise remaps utilities per surface.
+
+   Specificity beats the utility (0,2,2 against 0,1,0), including inside media
+   queries, so a `text-[11px] sm:text-xs` pair still lands where it should. */
+html body.admin .text-\[10px\] { font-size: 11px; }
+html body.admin .text-\[11px\] { font-size: 12px; }
+html body.admin .text-\[12px\] { font-size: 13px; }
+html body.admin .text-\[13px\] { font-size: 14px; }
+html body.admin .text-\[15px\] { font-size: 16px; }
 
 html:not(.dark) body.storefront .border-zinc-100,
 html:not(.dark) body.storefront .border-zinc-200,
@@ -681,8 +890,6 @@ html::-webkit-scrollbar-thumb,
 body::-webkit-scrollbar-thumb {
     background-color: #c4cad6;
     border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: content-box;
 }
 html::-webkit-scrollbar-thumb:hover,
 body::-webkit-scrollbar-thumb:hover {
@@ -853,87 +1060,149 @@ html.dark .wallet-glass {
     position: relative;
 }
 
-/* Smooth SPA page entrance — every wire:navigate slides the new page in from the
-   right with a soft fade, giving the app-like feel of the menu modal opening
-   instead of a hard reload. Re-triggered on each livewire:navigated (see app.js).
-   Honours reduced-motion. */
-.page-enter {
-    animation: page-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes page-enter {
-    from { opacity: 0; transform: translateX(64px); }
-    to   { opacity: 1; transform: translateX(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .page-enter { animation: none; }
-}
-
-/* Bottom nav pill — a quick, low-amplitude shake when a tab is tapped, paired
-   with navigator.vibrate() haptics in the markup, so presses feel tactile. */
-@keyframes pill-shake {
-    0%, 100% { transform: translateX(0); }
-    20%      { transform: translateX(-3px); }
-    40%      { transform: translateX(3px); }
-    60%      { transform: translateX(-2px); }
-    80%      { transform: translateX(2px); }
-}
-.pill-shake { animation: pill-shake 0.3s ease-in-out; }
-@media (prefers-reduced-motion: reduce) {
-    .pill-shake { animation: none; }
-}
-
 /* The payment strip no longer scrolls - it is a static pyramid now, so the
    marquee keyframes, the hover/paused states and the reduced-motion fallback
    that went with them have all been removed. See home/payment-methods. */
 
-/* Liquid-glass active pill (mobile bottom nav): a near-transparent water bead
-   that refracts the frosted bar behind it rather than sitting on a solid tint.
-   The inset top highlight + soft inner/drop shadow give the convex "water" gloss. */
-.liquid-pill {
-    background: #d4d4d8; /* zinc-300 - lighter grey for the light theme */
-    box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.18);
-}
-html.dark .liquid-pill {
-    /* Dark active tab = the card grey we use everywhere (Soft Dark #363636,
-       Extra Dark var(--ash) below), a filled bead like the light theme. */
-    background: #363636;
-    box-shadow: inset 0 0 0 1px #3a3a3a;
+
+/* Mobile dashboard frame (below lg). The bar's colour runs behind the whole
+   page - body and main alike - and the page sits on it as a panel with rounded
+   top corners, the way the desktop frame lifts its pane off the header. The
+   dark bar is the page black rather than the card grey a div would get, so bar
+   and ground read as one surface with the panel lifted off them. overflow:
+   clip, not hidden: hidden would make the panel the "scroll container" for
+   position: sticky inside the page and stop every sticky element there. */
+@media (max-width: 1023.98px) {
+    /* The desktop header IS the phone bar: fixed to the top, a little more
+       air above the pills than the desktop's py-2, and the status-bar inset.
+       The desktop header's own colour: navy in light, black in dark - the
+       same colour runs behind the page so the panel's curve sits on it. */
+    body.dashboard > [data-flux-header] {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        z-index: 55;
+        padding-top: calc(0.75rem + env(safe-area-inset-top));
+        padding-bottom: 0.75rem;
+        background-color: #0c1337 !important;
+        background-image: none !important;
+    }
+    /* Every header popup (search, cart, notifications, account, refer) drops
+       under the bar as a full-width sheet instead of hanging off its chip,
+       which would run off the screen's left edge on a phone. */
+    body.dashboard .dashboard-frame-popup,
+    body.dashboard .dashboard-refer-popup {
+        position: fixed;
+        left: 0.75rem;
+        right: 0.75rem;
+        top: calc(env(safe-area-inset-top) + 4.25rem);
+        width: auto;
+        max-width: none;
+        margin-top: 0;
+        max-height: calc(100dvh - env(safe-area-inset-top) - 5rem);
+        overflow-y: auto;
+    }
+    /* Except the account menu: a 300px panel hanging under the avatar at the
+       bar's right edge, not a full-width sheet. */
+    body.dashboard .dashboard-account-menu {
+        left: auto;
+        right: 0.75rem;
+        width: 300px;
+        max-width: calc(100vw - 1.5rem);
+    }
+    /* And the notification panel, which is a bottom sheet on phones: full
+       width, the handle at its top, sliding up over the dimmed page. */
+    body.dashboard .dashboard-notification-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        max-height: 85dvh;
+        overflow: hidden;
+        border-radius: 24px 24px 0 0;
+        border: 0;
+        padding-bottom: env(safe-area-inset-bottom);
+        /* Solid: frosted white over the dimmed page read as grey. Dark mode
+           keeps its own surface (the html.dark rule outranks this one). */
+        background-color: #ffffff;
+        backdrop-filter: none;
+    }
+    body.dashboard .dashboard-notification-panel.dash-popup-hidden { opacity: 1; transform: translateY(100%); }
+    body.dashboard .dashboard-notification-panel.dash-popup-motion {
+        transition-duration: 300ms;
+        transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    body.dashboard,
+    body.dashboard > [data-flux-main] {
+        background-color: #0c1337 !important;
+        background-image: none !important;
+    }
+    /* The window does not scroll on the phone: the panel does, inside its own
+       rounded frame, so the curve stays pinned under the bar while the
+       content moves - the way the desktop pane scrolls inside its frame. Its
+       height is the viewport minus the bar's spacer; overscroll is contained
+       so a flick at the end never rubber-bands the black ground. */
+    body.dashboard {
+        height: 100dvh;
+        overflow: hidden;
+    }
+    .dash-mobile-panel {
+        /* flow-root: the hero's own top margin was collapsing through the
+           panel and pushing its curved top 12px below the bar. */
+        display: flow-root;
+        height: calc(100dvh - 3.75rem - env(safe-area-inset-top));
+        overflow-x: clip;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        border-top-left-radius: 32px;
+        border-top-right-radius: 32px;
+        /* The desktop pane's hairline: transparent in light, a faint line in
+           dark, so the panel's curve reads against the black ground. */
+        border-top: 1px solid var(--dash-pane-line, transparent);
+        background-color: #f4f6f5;
+    }
+    .dash-mobile-panel [data-page-content] {
+        background-color: transparent !important;
+        background-image: none !important;
+    }
+    html.dark body.dashboard,
+    html.dark body.dashboard > [data-flux-main],
+    html.dark body.dashboard > [data-flux-header] {
+        background-color: #000000 !important;
+        background-image: none !important;
+    }
+    html.dark .dash-mobile-panel {
+        /* The desktop pane's own dark tone (#101011): above the ground, below
+           the cards, so the bar behind it and the cards on it both keep their
+           lift, and both frames match. */
+        background-color: #101011;
+        background-image: var(--grain);
+        background-size: 220px 220px;
+    }
+
+    /* The sidebar drawer wears the bar's colour: navy, black in dark mode,
+       the logo drawn white on it, the current page on a soft white tile. */
+    body.dashboard .dash-drawer { background-color: #0c1337; color: #fff; }
+    html.dark body.dashboard .dash-drawer { background-color: #000000; }
+    body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }
+    body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+    body.dashboard .dash-drawer-row { color: rgb(255 255 255 / .85); }
+    body.dashboard .dash-drawer-row:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
+    body.dashboard .dash-drawer-row-active { background-color: rgb(255 255 255 / .12); color: #fff; }
+    body.dashboard .dash-drawer-row .anim-icon { color: rgb(255 255 255 / .85); }
+    body.dashboard .dash-drawer-row-active .anim-icon { color: #fff; }
+    body.dashboard .dash-drawer-label { color: rgb(255 255 255 / .5); }
+    /* The categories under Shop: a shade quieter than the rows, the current
+       one on the rows' tile. */
+    body.dashboard .dash-drawer-subrow { color: rgb(255 255 255 / .7); }
+    body.dashboard .dash-drawer-subrow:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
+    body.dashboard .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }
 }
 
-/* Floating bottom-nav bar — iOS "liquid glass". A soft top→bottom white gradient
-   over a heavy, saturated backdrop blur (so the page bleeds through with colour),
-   a glossy 1px top highlight + lower inner sheen for the convex glass curve, and a
-   deep soft drop shadow so the whole pill reads as a physical pane floating above
-   the page. */
-.nav-glass {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.78) 100%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.65);
-    box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.85),
-        inset 0 -10px 14px -10px rgba(255, 255, 255, 0.40),
-        0 12px 34px -8px rgba(15, 23, 42, 0.25);
-}
-html.dark .nav-glass {
-    background: linear-gradient(180deg, rgba(20, 20, 20, 0.88) 0%, rgba(10, 10, 10, 0.82) 100%);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.14),
-        inset 0 -10px 14px -10px rgba(255, 255, 255, 0.06),
-        0 14px 40px -8px rgba(0, 0, 0, 0.60);
-}
-
-/* Full-width TOP bar for the mobile dashboard overview - the page scrolls
-   beneath it. Deliberately NOT glass: the band wears the page's own surface,
-   so it is invisible at rest and simply hides whatever passes under it.
-   The frosted version read as a smeared strip across the top of the screen -
-   cards scrolling beneath stayed half-legible through the blur, and its white
-   gradient sat a shade off the page it was covering. No border and no
-   shadow either: nothing should announce where the band ends. */
-.nav-band-top {
-    background: #f4f6f5;
-}
 /* Cart dropdown / sheet.
 
    In dark mode it wore a translucent navy (#0c1a36 at 80-90%) that the theme's
@@ -950,12 +1219,6 @@ html.dark .cart-panel {
     background-image: var(--grain);
     background-size: 220px 220px;
     backdrop-filter: none;
-}
-
-html.dark .nav-band-top {
-    background-color: var(--ground);
-    background-image: var(--grain);
-    background-size: 220px 220px;
 }
 
 /* Scroll-edge fade for tall modal bodies. A scrolling panel slices its content
@@ -1450,9 +1713,9 @@ html.dark .glass-panel {
 /* Dark mode: the bar goes white. Brand blue on the near-black ground is the
    one place the brand colour works against itself - it is a 3px line the eye
    has to catch at the very top of the screen, and blue-on-black is the lowest
-   contrast pairing on the site. #e5e5e5 rather than pure #fff to match the two
-   other loading indicators (.app-loader__progress and .rshop-ptr-circle), which
-   already switch to exactly this. The light rules above use !important, so
+   contrast pairing on the site. #e5e5e5 rather than pure #fff to match the
+   pull-to-refresh spinner (.rshop-ptr-circle), which already switches to
+   exactly this. The light rules above use !important, so
    these have to as well. */
 html.dark #nprogress .bar {
     background: #e5e5e5 !important;
@@ -1877,10 +2140,12 @@ html.dark .dark\:ring-white\/10 { --tw-ring-color: rgb(255 255 255 / 0.06); }
 html.dark .dark\:ring-white\/15 { --tw-ring-color: rgb(255 255 255 / 0.08); }
 .dark .hover\:border-zinc-500:hover { border-color: #444444; }
 
-/* Nav search box — a white resting border in dark mode so the field stands
-   out against the navy chrome. Focus still shows the blue border + ring
-   (the `border-zinc-400` class is only present while the field is closed). */
-.dark form[role="search"].border-zinc-400 { border-color: #ffffff; }
+/* Nav search box. This used to paint a white resting border in dark mode,
+   keyed off the `border-zinc-400` class the desktop field carried while
+   closed. Both search fields now state their own dark borders inline
+   (dark:border-white/10, and blue on focus), so a rule reaching in from here
+   to override them would win over both and the focus colour would never
+   show. Deliberately empty of the old selector. */
 
 /* Form controls — text colour for every input; a dark surface only for inputs
    that actually paint their own background. Inputs marked `bg-transparent`
@@ -2302,13 +2567,6 @@ html.dark .dark\:bg-\[\#0c1a36\]\! { background-color: var(--ash) !important; ba
 html.dark.pure-dark .wallet-glass {
     background: var(--ash);
 }
-html.dark.pure-dark .liquid-pill {
-    background: var(--ash);
-    box-shadow: inset 0 0 0 1px #3a3a3a;
-}
-html.dark.pure-dark .nav-glass {
-    background: linear-gradient(180deg, rgba(20, 20, 20, 0.88) 0%, rgba(0, 0, 0, 0.82) 100%);
-}
 html.dark.pure-dark .glass-panel {
     background: rgba(0, 0, 0, 0.85);
 }
@@ -2417,7 +2675,8 @@ html.dark .group:hover .group-hover\:ring-zinc-300 { --tw-ring-color: #4a4a4f; }
    dark + Extra Dark ramps above are untouched. Split rule:
      - page / flat surfaces (bg-[#eff6ff])               -> #f4f6f5
      - cards + footer (bg-[#eff6ff] AND .dash-shimmer)    -> #ffffff
-     - row / surface hovers                               -> #e5e5e5
+     - surface hovers (buttons, chips)                    -> #e5e5e5
+     - list row hovers (.divide-inset)                    -> #f4f6f5
    The compound .bg-[#eff6ff].dash-shimmer selector whitens only the
    NEUTRAL cards; colored cards (bg-red/green + .dash-shimmer) keep
    their tint because they aren't bg-[#eff6ff]. Dropdown panels keep
@@ -2428,7 +2687,9 @@ html:not(.dark) .bg-\[\#eff6ff\] { background-color: #f4f6f5; }
     html:not(.dark) .lg\:bg-white { background-color: #f5f5f6; }
 }
 html:not(.dark) .bg-\[\#eff6ff\].dash-shimmer { background-color: #ffffff; }
-html:not(.dark) .divide-inset > *:hover { background-color: #e5e5e5; }
+/* List rows hover the same #f4f6f5 band as every .admin-table row and the
+   div-grid lists; #e5e5e5 here was the one place a row hovered darker. */
+html:not(.dark) .divide-inset > *:hover { background-color: #f4f6f5; }
 html:not(.dark) .hover\:bg-zinc-50:hover,
 html:not(.dark) .hover\:bg-zinc-100:hover { background-color: #e5e5e5; }
 
@@ -2598,12 +2859,14 @@ body.dashboard .dashboard-search-panel,
 body.dashboard .dashboard-notification-panel {
     border: 1px solid #dfe2e5;
     max-height: calc(100dvh - 88px);
-    scrollbar-width: thin;
+    /* No scrollbar-width here: a set value makes Chromium draw its native
+       bar and ignore the site-wide hide, which put a bar down the account
+       menu. They scroll bare, like every other panel. */
 }
-body.dashboard .dashboard-account-row { min-height: 49px; }
+body.dashboard .dashboard-account-row { min-height: 40px; }
 body.dashboard .dashboard-account-row-icon { color: #667085; }
 body.dashboard .dashboard-account-row-icon > svg,
-body.dashboard .dashboard-account-row-icon .anim-icon { flex: 0 0 20px; }
+body.dashboard .dashboard-account-row-icon .anim-icon { flex: 0 0 18px; }
 body.dashboard .dashboard-search-panel { max-height: calc(100dvh - 92px); overflow-y: auto; }
 /* The refer pull-down is the shared x-nav.referral-panel card, which draws
    itself at 15px on solid white for the storefront nav. On the dashboard it
@@ -2662,11 +2925,19 @@ html.dark body.dashboard .dashboard-refer-popup > div {
     border-color: #3b3b3f;
     box-shadow: 0 22px 48px rgb(0 0 0 / .38);
 }
-html.dark body.dashboard .dashboard-account-menu > div[class*="border-t"] { border-color: #39393d; }
+/* The account menu alone is a solid lifted panel: the ash tone, no grain,
+   a soft hairline. On the phone bar's pure black the page ground would
+   vanish into the bar; this stands a step off it. */
+html.dark body.dashboard .dashboard-account-menu {
+    background-color: #1b1b1f;
+    background-image: none;
+    border-color: #303035;
+}
+html.dark body.dashboard .dashboard-account-menu > div[class*="border-t"] { border-color: #2c2c31; }
 html.dark body.dashboard .dashboard-account-row { color: #f4f4f5; }
 html.dark body.dashboard .dashboard-account-row:hover,
 html.dark body.dashboard .dashboard-account-menu form button:hover {
-    background-color: #343438;
+    background-color: #29292e;
     background-image: none;
     color: #fff;
 }
@@ -2729,3 +3000,14 @@ html.dark body.dashboard .dashboard-notification-panel [role="menuitem"]:hover {
     background-color: #343438;
     background-image: none;
 }
+
+/* Notification rows: hairlines between them, a wash on hover, read ones
+   dimmed. Dashboard popup motion is a pair of state classes rather than
+   utilities so the notification panel can fade down on desktop and slide up
+   as a sheet on phones from one markup (see the phone block). */
+body.dashboard .dashboard-notification-row + .dashboard-notification-row { border-top: 1px solid #f0f2f1; }
+body.dashboard .dashboard-notification-row:hover { background-color: #f4f6f5; }
+body.dashboard .dashboard-notification-row-read { opacity: .7; }
+html.dark body.dashboard .dashboard-notification-row + .dashboard-notification-row { border-top-color: #2c2c31; }
+.dash-popup-hidden { opacity: 0; transform: translateY(-4px); }
+.dash-popup-shown { opacity: 1; transform: translateY(0); }

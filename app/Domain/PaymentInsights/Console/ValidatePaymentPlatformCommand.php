@@ -1606,8 +1606,12 @@ class ValidatePaymentPlatformCommand extends Command
     {
         foreach (array_keys($this->touchedFlagKeys) as $key) {
             try {
+                // The model's own forget: it clears the shared cache AND the
+                // per-request memo. Clearing the cache alone left this process
+                // still answering from the value the probe wrote before the
+                // transaction rolled it back.
+                SiteSetting::forget($key);
                 Cache::forget('site_setting_'.$key);
-                Cache::forget('site_setting:'.$key);
             } catch (\Throwable) {
                 // A cache hiccup here must not mask the probe results.
             }

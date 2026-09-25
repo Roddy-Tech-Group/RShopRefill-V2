@@ -95,7 +95,7 @@ class extends Component {
             $this->viewingId = null;
         }
 
-        session()->flash('status', 'Ticket marked as resolved.');
+        $this->dispatch('toast', message: 'Ticket marked as resolved.');
     }
 
     public function with(): array
@@ -129,10 +129,6 @@ class extends Component {
 
     <div class="flex flex-col gap-6">
 
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
-
         {{-- KPI strip --}}
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             @foreach ([
@@ -141,7 +137,7 @@ class extends Component {
                 ['label' => 'Resolved', 'value' => $this->counts['resolved'], 'dot' => 'bg-emerald-500'],
                 ['label' => 'Total',    'value' => $this->counts['total'],    'dot' => 'bg-amber-500'],
             ] as $stat)
-                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -181,7 +177,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead class="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-600 dark:bg-[#0c1a36] dark:text-zinc-400">
@@ -205,7 +201,7 @@ class extends Component {
                                     default    => 'zinc',
                                 };
                             @endphp
-                            <tr class="transition-colors hover:bg-zinc-50 dark:hover:bg-[#26416b]/40">
+                            <tr class="transition-colors hover:bg-blue-50 dark:hover:bg-[#26416b]/40">
                                 <td class="px-5 py-3 tabular-nums text-zinc-500 dark:text-zinc-400">#{{ $msg->id }}</td>
                                 <td class="px-5 py-3">
                                     <p class="font-semibold text-zinc-900 dark:text-white">{{ $msg->name }}</p>
@@ -313,7 +309,7 @@ class extends Component {
                     {{-- Message body --}}
                     <div>
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Message</p>
-                        <div class="mt-2 rounded-[12px] border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-700 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-zinc-300">
+                        <div class="mt-2 rounded-[12px] bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-700 dark:bg-[#0c1a36] dark:text-zinc-300">
                             {{ $msg->message }}
                         </div>
                     </div>

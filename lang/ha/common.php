@@ -38,6 +38,20 @@ return [
     'theme_system' => 'Na na\'ura',
     'help' => 'Taimako',
     'invite_a_friend' => 'Gayyaci aboki',
+    'certified_reseller' => 'Mai sayarwa mai takardar shaida',
     'change_country' => 'Canza ƙasa',
     'shop_in' => 'Saya da :currency',
+
+    // Carousel and theme controls shared by several rows.
+    'theme_auto' => 'Na kai',
+    'theme_label' => 'Jigo:',
+    'see_more' => 'Duba ƙari',
+    'see_less' => 'Duba ƙasa',
+    'show_more' => 'Nuna ƙari',
+    'see_more_named' => 'Duba ƙari: :name',
+    'previous' => 'Na baya',
+    'next' => 'Na gaba',
+    'appearance' => 'Kamanni',
+    'appearance_intro' => 'Zaɓi yadda :site zai bayyana gare ka. Na kai yana bin saitin na’urarka.',
+    'theme_hint' => 'Sauya tsakanin yanayin haske da duhu, ko ka bi tsarin na’urarka.',
 ];

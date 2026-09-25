@@ -33,8 +33,8 @@
     $supplierCost  = (float) $moneySplit['supplier_cost_usd'];
 
     // ── Tables ─────────────────────────────────────────────────────────
-    $latestUsers        = $dashboardQuery->getLatestUsers(5)->items();
-    $latestTransactions = $dashboardQuery->getLatestTransactions(5)->items();
+    $latestUsers        = $dashboardQuery->getLatestUsers(12)->items();
+    $latestTransactions = $dashboardQuery->getLatestTransactions()->items();
 
     // ── Trends chart series — `?revenue_days=N` (1-365) ──────────────
     // Sales / Cost timeseries rendered by ApexCharts in the browser. The
@@ -184,20 +184,12 @@
             {{-- $kpiCards is computed in the top-level data block above. --}}
 
             @foreach ($kpiCards as $kpi)
+                {{-- Success Rate still skips the percentage in its caption: the
+                     donut reads the same number the card's value already shows,
+                     so repeating it gives "21.43% ... 21.4% Rate". --}}
                 @php $isSuccessRate = $kpi['label'] === 'Success Rate'; @endphp
-                <div class="kpi-card relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5 {{ $kpi['span'] ? 'sm:col-span-2 md:col-span-3 lg:col-span-1' : '' }}">
-                    {{-- Success Rate keeps its floating illustration (no donut). --}}
-                    @if ($isSuccessRate)
-                        <img
-                            src="{{ asset('assets/' . rawurlencode('success rates admin.svg')) }}"
-                            alt=""
-                            aria-hidden="true"
-                            loading="lazy"
-                            class="no-dark-invert pointer-events-none absolute right-8 top-1/2 h-28 w-28 -translate-y-1/2 select-none object-contain opacity-90 animate-float sm:right-10 sm:h-32 sm:w-32 lg:right-6 lg:h-28 lg:w-28"
-                        >
-                    @endif
-
-                    <div class="relative z-10 flex flex-1 flex-col {{ $isSuccessRate ? 'pr-24 sm:pr-32' : '' }}">
+                <div class="kpi-card relative flex flex-col overflow-hidden rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5 {{ $kpi['span'] ? 'sm:col-span-2 md:col-span-3 lg:col-span-1' : '' }}">
+                    <div class="relative z-10 flex flex-1 flex-col">
                         {{-- Top row: tile icon (left) + animated mini-donut (right).
                              Donut is suppressed on Success Rate — that card keeps
                              its decorative illustration instead. --}}
@@ -209,14 +201,12 @@
                                      invert in app.css. --}}
                                 <img src="{{ asset('assets/' . rawurlencode($kpi['icon'])) }}" alt="" class="no-dark-invert h-5 w-5 sm:h-6 sm:w-6" loading="lazy">
                             </span>
-                            @unless ($isSuccessRate)
-                                <x-mini-donut
-                                    :percent="$kpi['donut']['pct']"
-                                    :color="$kpi['donut']['color']"
-                                    :size="48"
-                                    :stroke="6"
-                                />
-                            @endunless
+                            <x-mini-donut
+                                :percent="$kpi['donut']['pct']"
+                                :color="$kpi['donut']['color']"
+                                :size="48"
+                                :stroke="6"
+                            />
                         </div>
                         {{-- `.kpi-label` / `.kpi-sub` get their dark-mode colour from the
                              inline <style> block at the top of this view — bypasses the
@@ -237,7 +227,7 @@
         {{-- Money separation: customer float (a liability) vs company earnings.
              Live + all-time, so it ignores the date-range picker above - a wallet
              balance is a current figure and profit is cumulative. --}}
-        <div class="rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6 dark:bg-[#1d3252]">
             <div>
                 <h2 class="text-base font-bold tracking-tight text-zinc-900 sm:text-lg dark:text-white">Money separation</h2>
                 <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">What you hold for customers vs what the business has earned - live, all-time.</p>
@@ -245,9 +235,9 @@
 
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {{-- Held for customers: a liability, NOT the company's money --}}
-                <div class="rounded-[12px] border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+                <div class="rounded-[12px] bg-blue-50/60 p-4 dark:bg-blue-500/10">
                     <div class="flex items-center gap-2">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 3h16.5A1.5 1.5 0 0121.75 4.5v15a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-15A1.5 1.5 0 013.75 3z"/></svg>
                         </span>
                         <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Held for customers</p>
@@ -259,7 +249,7 @@
                 {{-- Company earnings: the business's actual money --}}
                 <div class="rounded-[12px] border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                     <div class="flex items-center gap-2">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-emerald-600/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-emerald-600/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </span>
                         <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Company earnings</p>
@@ -293,7 +283,7 @@
                     codeToContinent: @js($codeToContinent),
                 })"
                 x-on:map-data-updated.window="updateData($event.detail)"
-                class="flex min-w-0 flex-col overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                class="flex min-w-0 flex-col overflow-hidden rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252]"
             >
                 {{-- Header: title (left), continent scope dropdown (right).
                      Picking a continent filters which countries get shaded on
@@ -316,7 +306,7 @@
                             x-show="open"
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             style="display:none;"
-                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10 dark:bg-[#1d3252]"
                             role="menu"
                         >
                             @php
@@ -334,7 +324,7 @@
                                 <button
                                     type="button"
                                     @click="setContinent(@js($opt['key'])); open = false"
-                                    :class="continent === @js($opt['key']) ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
+                                    :class="continent === @js($opt['key']) ? 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
                                     class="flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
                                 >
                                     <span>{{ $opt['label'] }}</span>
@@ -388,7 +378,7 @@
                                 x-show="open"
                                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                                 style="display:none;"
-                                class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                                class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10 dark:bg-[#1d3252]"
                                 role="menu"
                             >
                                 @foreach ($countryPeriods as $p)
@@ -398,7 +388,7 @@
                                         @click="open = false"
                                         @class([
                                             'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
-                                            'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentCountryPeriod === $p['label'],
+                                            'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!' => $currentCountryPeriod === $p['label'],
                                             'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentCountryPeriod !== $p['label'],
                                         ])
                                     >
@@ -430,7 +420,7 @@
                                 x-show="open"
                                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                                 style="display:none;"
-                                class="absolute left-0 bottom-full z-30 mb-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                                class="absolute left-0 bottom-full z-30 mb-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10 dark:bg-[#1d3252]"
                                 role="menu"
                             >
                                 @foreach ($countryCategories as $cat)
@@ -440,7 +430,7 @@
                                         @click="open = false"
                                         @class([
                                             'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
-                                            'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentCountryCategory === $cat['label'],
+                                            'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!' => $currentCountryCategory === $cat['label'],
                                             'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentCountryCategory !== $cat['label'],
                                         ])
                                     >
@@ -473,7 +463,7 @@
             <div
                 x-data="salesCostChart(@js($salesCostSeries))"
                 x-on:trends-data-updated.window="updateData($event.detail)"
-                class="min-w-0 overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                class="min-w-0 overflow-hidden rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252]"
             >
                 {{-- Header: title + squiggle legend (left), Sales/Cost dropdown (right) --}}
                 <div class="flex items-start justify-between gap-3">
@@ -515,14 +505,14 @@
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             x-transition:leave="transition ease-in duration-100"   x-transition:leave-start="opacity-100 translate-y-0"  x-transition:leave-end="opacity-0 -translate-y-1"
                             style="display:none;"
-                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10 dark:bg-[#1d3252]"
                             role="menu"
                         >
                             @foreach ([['both', 'Sales / Cost'], ['sales', 'Sales'], ['cost', 'Cost']] as [$key, $label])
                                 <button
                                     type="button"
                                     @click="setMode('{{ $key }}'); open = false"
-                                    :class="mode === '{{ $key }}' ? 'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
+                                    :class="mode === '{{ $key }}' ? 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!' : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]'"
                                     class="flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors"
                                 >
                                     {{ $label }}
@@ -574,7 +564,7 @@
                             x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                             x-transition:leave="transition ease-in duration-100"   x-transition:leave-start="opacity-100 translate-y-0"  x-transition:leave-end="opacity-0 -translate-y-1"
                             style="display:none;"
-                            class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                            class="absolute left-0 bottom-full z-30 mb-2 w-40 overflow-hidden rounded-[12px] bg-white p-1.5 shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10 dark:bg-[#1d3252]"
                             role="menu"
                         >
                             @foreach ($trendsPeriods as $p)
@@ -584,7 +574,7 @@
                                     @click="open = false"
                                     @class([
                                         'flex w-full items-center justify-between rounded-[12px] px-3 py-1.5 text-left text-xs font-medium transition-colors',
-                                        'bg-blue-50 text-blue-700 dark:bg-blue-600/15 dark:text-blue-300' => $currentTrendsLabel === $p['label'],
+                                        'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!' => $currentTrendsLabel === $p['label'],
                                         'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-[#26416b]' => $currentTrendsLabel !== $p['label'],
                                     ])
                                 >
@@ -607,10 +597,16 @@
         <div>
             {{-- Skeleton overlay removed — same reason as the KPI overlay above.
                  The tables render with the page; no transitional placeholder needed. --}}
+        {{-- Both cards share one height (the grid's default stretch).
+             Transaction rows are taller than user rows - status pills, two-line
+             amounts - so an equal row count leaves the users card padding out
+             the difference. Latest Users therefore asks for a couple more rows
+             to fill the same height; Latest Transactions takes the query
+             default and sets it. --}}
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
             {{-- Latest Users --}}
-            <div class="min-w-0 overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="flex min-w-0 flex-col overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
                 <div class="flex items-center justify-between border-b border-zinc-200 p-5">
                     <div class="flex items-center gap-2">
                         <img src="{{ asset('assets/' . rawurlencode('user.svg')) }}" alt="" class="h-5 w-5" loading="lazy">
@@ -619,14 +615,14 @@
                     <a href="{{ route('admin.customers') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View All</a>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="inset-divide w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-600">
+                <div class="scroll-x-thin flex-1 overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">User</th>
-                                <th class="px-5 py-3 font-semibold">Status</th>
-                                <th class="px-5 py-3 font-semibold">Registered</th>
-                                <th class="px-5 py-3 text-right font-semibold">Actions</th>
+                                <th class="">User</th>
+                                <th class="">Status</th>
+                                <th class="">Registered</th>
+                                <th class="text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -673,7 +669,7 @@
             </div>
 
             {{-- Latest Transactions --}}
-            <div class="min-w-0 overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+            <div class="flex min-w-0 flex-col overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252]">
                 <div class="flex items-center justify-between border-b border-zinc-200 p-5 dark:border-zinc-700/60">
                     <div class="flex items-center gap-2">
                         <img src="{{ asset('assets/' . rawurlencode('Latest transactions.webp')) }}" alt="" class="h-5 w-5 dark:invert dark:brightness-200" loading="lazy">
@@ -682,16 +678,16 @@
                     <a href="{{ route('admin.transactions') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#34507a]">View All</a>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="inset-divide w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-600">
+                <div class="scroll-x-thin flex-1 overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">Reference</th>
-                                <th class="px-5 py-3 font-semibold">Customer</th>
-                                <th class="px-5 py-3 font-semibold">Type</th>
-                                <th class="px-5 py-3 font-semibold">Amount</th>
-                                <th class="px-5 py-3 font-semibold">Status</th>
-                                <th class="px-5 py-3 font-semibold">Date</th>
+                                <th class="">Reference</th>
+                                <th class="">Customer</th>
+                                <th class="">Type</th>
+                                <th class="">Amount</th>
+                                <th class="">Status</th>
+                                <th class="">Date</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -701,11 +697,11 @@
                                     // dashboard preview matches the full table 1:1.
                                     $statusValue = $tx->status ?? 'pending';
                                     $txStatus = match ($statusValue) {
-                                        'paid', 'completed' => ['label' => 'Paid', 'class' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30'],
-                                        'failed', 'expired', 'cancelled' => ['label' => 'Failed', 'class' => 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
-                                        'refunded', 'partially_refunded' => ['label' => 'Refunded', 'class' => 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-zinc-700/60'],
-                                        'processing', 'reserved' => ['label' => 'Processing', 'class' => 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-                                        default => ['label' => 'Pending', 'class' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
+                                        'paid', 'completed' => ['label' => 'Paid', 'class' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'],
+                                        'failed', 'expired', 'cancelled' => ['label' => 'Failed', 'class' => 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
+                                        'refunded', 'partially_refunded' => ['label' => 'Refunded', 'class' => 'bg-zinc-100 text-zinc-700 dark:bg-white/5! dark:text-zinc-300!'],
+                                        'processing', 'reserved' => ['label' => 'Processing', 'class' => 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!'],
+                                        default => ['label' => 'Pending', 'class' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'],
                                     };
                                     // Type badge — same ring style as status, with a category
                                     // tone (blue for payment, purple for wallet) so the two
@@ -715,21 +711,21 @@
                                         ? 'Wallet · ' . ucfirst(str_replace('_', ' ', (string) $tx->type))
                                         : 'Payment · ' . ucfirst((string) ($tx->gateway ?? 'gateway'));
                                     $typePillClass = $isWalletTx
-                                        ? 'bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30'
-                                        : 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30';
+                                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300'
+                                        : 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!';
                                     $reference = $tx->reference ?: '#' . $tx->id;
                                 @endphp
                                 <tr>
                                     <td class="px-5 py-3 text-[11px] font-mono text-zinc-600">{{ $reference }}</td>
                                     <td class="px-5 py-3 text-[11px] font-medium text-zinc-900">{{ $tx->customer_name ?? '—' }}</td>
                                     <td class="px-5 py-3">
-                                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $typePillClass }}">
+                                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $typePillClass }}">
                                             {{ $typeLabel }}
                                         </span>
                                     </td>
                                     <td class="px-5 py-3 text-[11px] font-semibold text-zinc-900">{{ \App\Models\Product::currencySymbol($tx->currency ?? 'USD') }}{{ number_format((float) $tx->amount, 2) }}</td>
                                     <td class="px-5 py-3">
-                                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $txStatus['class'] }}">
+                                        <span class="inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $txStatus['class'] }}">
                                             {{ $txStatus['label'] }}
                                         </span>
                                     </td>

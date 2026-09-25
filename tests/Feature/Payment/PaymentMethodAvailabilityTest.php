@@ -142,9 +142,12 @@ class PaymentMethodAvailabilityTest extends TestCase
         $this->assertContains('pay_with_bank', SupportedPaymentMethods::forCurrency('GBP'));
         $this->assertContains('pay_with_bank', SupportedPaymentMethods::forCurrency('EUR'));
         $this->assertContains('mobile_money', SupportedPaymentMethods::forCurrency('KES'));
+        // USD borrows the Francophone rail and is charged in CFA francs
+        // (MobileMoneyRail), so a dollar order is offered MTN and Orange too.
+        $this->assertContains('mobile_money', SupportedPaymentMethods::forCurrency('USD'));
 
         // Methods the gateway does not accept on the currency stay rejected.
-        $this->assertNotContains('mobile_money', SupportedPaymentMethods::forCurrency('USD'));
+        $this->assertNotContains('mobile_money', SupportedPaymentMethods::forCurrency('EUR'));
         $this->assertNotContains('bank_transfer', SupportedPaymentMethods::forCurrency('GBP'));
     }
 

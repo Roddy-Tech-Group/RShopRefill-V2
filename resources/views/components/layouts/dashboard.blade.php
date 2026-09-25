@@ -374,8 +374,8 @@
 
             /* Collapsed: the Shop services list does not show at all, neither
                inline nor as a hover popup beside the icon (that flyout was
-               removed). The Shop icon is a plain link to the shop; the list
-               comes back under it once the rail is expanded. */
+               removed). Pressing the Shop icon opens the shop instead; the
+               list comes back under it once the rail is expanded. */
             html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu {
                 display: none !important;
             }
@@ -389,13 +389,11 @@
     </style>
     <body class="dashboard min-h-screen bg-[#f4f6f5] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
 
-        <x-ui.app-loader />
-
         {{-- Impersonation banner: shown only when an admin is signed in as this
              customer (admin guard still authenticated). Floating bottom pill so
-             it never disrupts the layout; sits above the mobile bottom nav. --}}
+             it never disrupts the layout. --}}
         @auth('admin')
-            <div class="fixed bottom-20 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30 lg:bottom-4">
+            <div class="fixed bottom-4 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30">
                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span>Viewing as {{ Auth::user()?->name }}</span>
                 <form method="POST" action="{{ route('impersonation.leave') }}">
@@ -422,13 +420,13 @@
             // into the card grey the sidebar already is, so the dark active tile
             // has to force its black (the `!`).
             $navItem = fn (bool $active) => $active
-                ? 'group flex items-center justify-between gap-2.5 rounded-[8px] bg-[#ffffff] px-2.5 py-2 text-sm font-medium text-black dark:bg-black! dark:text-white nav-item-active'
+                ? 'group flex items-center justify-between gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
                 : 'nav-item group flex items-center justify-between gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-800 transition-colors dark:text-zinc-300';
             $iconCls = fn (bool $active) => $active
                 ? 'h-[18px] w-[18px] shrink-0 text-[#0c1337] dark:text-white'
                 : 'h-[18px] w-[18px] shrink-0 text-[#0c1337] transition-colors dark:text-zinc-200';
             $subItem = fn (bool $active) => $active
-                ? 'flex items-center gap-2.5 rounded-[8px] bg-[#ffffff] px-2.5 py-2 text-sm font-medium text-black dark:bg-black! dark:text-white nav-item-active'
+                ? 'flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
                 : 'nav-item flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors dark:text-zinc-300';
 
             // One colour for every text badge on a sidebar row (New, the orders
@@ -519,7 +517,7 @@
                     // [label, href, feature flag (null = none), new-badge key, active]
                     $shopSubItems = array_values(array_filter([
                         ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards', 'gift_cards', request()->routeIs('dashboard.shop.gift-cards', 'dashboard.shop.brand') && ! $onGaming],
-                        ['Travel eSIMs',   route('dashboard.shop.esims'),      'esims',      'esims',      request()->routeIs('dashboard.shop.esim*')],
+                        ['eSIMs',          route('dashboard.shop.esims'),      'esims',      'esims',      request()->routeIs('dashboard.shop.esim*')],
                         ['Mobile Top-Ups', route('dashboard.shop.topups'),     'topups',     'topups',     request()->routeIs('dashboard.shop.topup*')],
                         ['Bill Payments',  route('dashboard.shop.bills'),      'bills',      'bills',      request()->routeIs('dashboard.shop.bill*')],
                         ['Gaming',         route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment']), 'gift_cards', 'gaming', $onGaming],
@@ -534,42 +532,43 @@
                     @click.outside="if (! $store.dashboardSidebar?.isCollapsed) { locked = false; expanded = false }"
                     class="nav-group flex flex-col gap-1"
                 >
-                    {{-- The Shop row is the main shop link; the arrow beside it is a
-                         separate button that reveals the services. The arrow sits over
-                         a spacer at the end of the row, so the label never runs under
-                         it, and both hide when the sidebar collapses to icons. --}}
-                    <div class="relative">
-                        @php $active = $isCurrent('dashboard.shop.*'); @endphp
-                        <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate.hover data-tip="Shop" class="{{ $navItem($active) }}">
-                            <span class="flex items-center gap-3">
-                                <x-ui.anim-icon file="Shop.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
-                                Shop
+                    {{-- The whole Shop row is the toggle, as it is in the phone drawer:
+                         pressing anywhere on it drops the services down, and the chevron
+                         at its end turns to say so. Gift Cards leads that list, so the
+                         row no longer needs to be a link itself. Folded to icons, the
+                         list cannot show (see the collapse rules above), so the same
+                         press opens the shop instead. --}}
+                    @php $active = $isCurrent('dashboard.shop.*'); @endphp
+                    <button
+                        type="button"
+                        @click="if ($store.dashboardSidebar?.isCollapsed) { Livewire.navigate(@js(route('dashboard.shop.gift-cards'))) } else { locked = ! locked; expanded = locked }"
+                        :aria-expanded="expanded.toString()"
+                        aria-controls="dash-shop-services"
+                        data-tip="Shop"
+                        class="{{ $navItem($active) }} w-full text-left"
+                    >
+                        <span class="flex items-center gap-3">
+                            <x-ui.anim-icon file="Shop.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
+                            Shop
+                        </span>
+                        <span class="flex items-center gap-2">
+                            @if ($newServices)
+                                <span class="dash-row-badge {{ $newBadge }}">New</span>
+                            @endif
+                            {{-- The round tinted chip is the chevron's resting look: it reads
+                                 as a control at a glance. It hides with the labels when the
+                                 rail folds to icons. --}}
+                            <span class="dash-nav-toggle flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/5 text-[#0c1337] transition-colors dark:bg-white/10 dark:text-zinc-300" aria-hidden="true">
+                                <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
                             </span>
-                            <span class="flex items-center gap-2">
-                                @if ($newServices)
-                                    <span class="dash-row-badge {{ $newBadge }}">New</span>
-                                @endif
-                                <span class="dash-nav-toggle h-5 w-5 shrink-0" aria-hidden="true"></span>
-                            </span>
-                        </a>
-                        <button
-                            type="button"
-                            @click.stop="locked = ! locked; expanded = locked"
-                            :aria-expanded="expanded.toString()"
-                            aria-label="Show shop services"
-                            {{-- The round tinted chip is its resting look, not a hover state:
-                                 it reads as a control at a glance. Hover only deepens it. --}}
-                            class="dash-nav-toggle absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-black/5 text-[#0c1337] transition-colors hover:bg-black/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15 dark:hover:text-white"
-                        >
-                            <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-                    </div>
+                        </span>
+                    </button>
 
                     {{-- Submenu rows are text-only: the parent Shop item carries
                          the icon, repeating one per child just adds noise. --}}
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-0.5 border-l border-zinc-200 pl-3 dark:border-white/10">
+                    <div id="dash-shop-services" x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-0.5 border-l border-zinc-200 pl-3 dark:border-white/10">
                         @foreach ($shopSubItems as [$label, $href, $flag, $newKey, $subActive])
                             @php $catEnabled = $flag === null || \App\Support\FeatureFlag::on($flag); @endphp
                             @if ($catEnabled)
@@ -838,13 +837,35 @@
         {{-- Top header (desktop only). Search is absolutely centered horizontally so it stays middle regardless of cart/profile width on the right. --}}
         {{-- NOTE: no Flux `sticky` prop — it freezes `top` to a JS-read offsetTop and floats
              the bar mid-page when the read races the body grid. `sticky top-0` below is pure CSS. --}}
-        <flux:header class="sticky top-0 z-40 hidden items-center gap-3 !border-b-0 bg-[#0c1337] dark:bg-[#0c1a36] px-4 py-2 sm:px-6 lg:flex">
+        <flux:header class="sticky top-0 z-40 flex items-center gap-2 !border-b-0 bg-[#0c1337] dark:bg-[#0c1a36] px-4 py-2 sm:px-6 lg:gap-3">
 
-            {{-- Brand, at the left of the full-width bar. --}}
-            <div class="flex shrink-0 items-center">
+            {{-- Phones and tablets: this same header is the top bar, fixed by
+                 app.css, and it leads with the hamburger that opens the sidebar
+                 drawer (at the foot of this layout). The pills to its right are
+                 the desktop ones, unchanged: same controls, same dropdowns. --}}
+            <button
+                type="button"
+                x-data
+                x-on:click="$dispatch('open-mobile-menu')"
+                aria-label="Open menu"
+                class="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition-colors active:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+            >
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+                </svg>
+            </button>
+
+            <flux:spacer />
+
+            {{-- Brand and the referral pull-down. On desktop lg:order-first puts
+                 this group at the left of the bar, beside the (hidden) hamburger.
+                 On phones only the gift chip inside it renders, and it sits here
+                 in the flow: first in the right-hand group, in the slot the
+                 language pill has on desktop. --}}
+            <div class="flex shrink-0 items-center lg:order-first">
                 {{-- The R mark alone (no wordmark, no tagline). The artwork is brand
                      blue on transparent, so it renders white on the dark bar. --}}
-                <a href="{{ route('dashboard') }}" wire:navigate.hover class="flex rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="{{ $siteName }} dashboard">
+                <a href="{{ route('dashboard') }}" wire:navigate.hover class="hidden rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:flex" aria-label="{{ $siteName }} dashboard">
                     <img
                         src="{{ asset('assets/PWAicon.webp') }}"
                         alt="{{ $siteName }}"
@@ -892,8 +913,26 @@
                     }"
                     @click.outside="referOpen = false"
                     @keydown.escape.window="referOpen = false"
-                    class="relative ml-4"
+                    class="relative lg:ml-4"
                 >
+                    @if ($promoHasPanel)
+                        {{-- Phone: the rotating pill has no room, so a gift chip in
+                             the same outline as the other pills pulls the same
+                             referral panel down. It stands where the language
+                             pill stands on desktop, first in the right-hand group. --}}
+                        <button
+                            type="button"
+                            @click="referOpen = ! referOpen"
+                            :aria-expanded="referOpen.toString()"
+                            aria-haspopup="dialog"
+                            aria-label="Refer & earn"
+                            class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+                        >
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+                            </svg>
+                        </button>
+                    @endif
                     <div
                         @mouseenter="paused = true"
                         @mouseleave="paused = false"
@@ -902,7 +941,7 @@
                         {{-- Clipped to the pill's own height and shape, so a message swiping
                              up disappears through the top edge while the next one rises in
                              from below, the two moving together. --}}
-                        class="dash-promo-pill relative grid h-8 items-center overflow-hidden rounded-full"
+                        class="dash-promo-pill relative hidden h-8 items-center overflow-hidden rounded-full lg:grid"
                     >
                         @foreach ($promoSlides as $i => $promo)
                             {{-- The pill element only moves; its look (and hover colour) sits
@@ -982,14 +1021,15 @@
                 </div>
             </div>
 
-            <flux:spacer />
-
-            {{-- Language + currency: flag, language code and currency, opening the
-                 shared country / language / currency sheet (the modal at the foot of
-                 this layout). The language half renders server-side from the active
-                 locale, like the storefront's region pill, so it can never name a
-                 language the page is not in; country and currency are the saved
-                 locale choices, and the flag follows locale-updated. --}}
+            {{-- Language + currency (desktop only): flag, language code and
+                 currency, opening the shared country / language / currency sheet
+                 (the modal at the foot of this layout). The language half renders
+                 server-side from the active locale, like the storefront's region
+                 pill, so it can never name a language the page is not in; country
+                 and currency are the saved locale choices, and the flag follows
+                 locale-updated. Phones do without the pill: the account menu's
+                 Language row opens the same sheet, and the referral chip takes
+                 this slot in the bar. --}}
             <button
                 type="button"
                 x-data="{
@@ -1005,7 +1045,7 @@
                 @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                 @click="$dispatch('open-locale-modal')"
                 aria-label="{{ __('common.language') }} / {{ __('common.payment_currency') }}"
-                class="flex h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+                class="hidden h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 lg:flex focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
             >
                 <img :src="'https://flagcdn.com/w40/' + code + '.png'" alt="" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20">
                 <span>{{ strtoupper((string) config('localization.supported.'.app()->getLocale().'.short', 'EN')) }} / <span x-text="currency">USD</span></span>
@@ -1347,62 +1387,61 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="dashboard-frame-popup dashboard-account-menu absolute right-0 top-full z-50 mt-3 w-[360px] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
+                    class="dashboard-frame-popup dashboard-account-menu absolute right-0 top-full z-50 mt-3 w-[300px] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                     role="menu"
                 >
-                    {{-- Account menu: identity header, then groups split by inset
-                         hairlines (account, settings, help, preferences, log out).
-                         Rows share one shape; icons sit muted beside the label.
-                         The preference switches carry over what the overview's
-                         Customize panel used to hold (theme, hide balances,
-                         compact mode), so removing that panel lost nothing. --}}
+                    {{-- Account menu: identity header, then groups split by
+                         edge-to-edge hairlines (account, settings, help,
+                         preferences, log out). A compact list: 40px rows, 14px
+                         labels, 18px muted icons, no tiles, the row's value or
+                         switch at its right edge. --}}
                     @php
-                        $menuRow = 'dashboard-account-row flex w-full items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 text-left text-[15px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200';
-                        $menuIcon = 'dashboard-account-row-icon flex items-center gap-4 text-[#0c1337] dark:text-zinc-300';
-                        $menuDivider = 'mx-4 border-t border-zinc-200/80 dark:border-white/10';
+                        $menuRow = 'dashboard-account-row flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[14px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200';
+                        $menuIcon = 'dashboard-account-row-icon flex items-center gap-3 text-[#0c1337] dark:text-zinc-300';
+                        $menuDivider = 'border-t border-zinc-200/80 dark:border-white/10';
                         $menuSwitchTrack = 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors';
                         $menuSwitchKnob = 'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform';
                         $menuKycVerified = $user?->isKycVerified() ?? false;
                     @endphp
 
-                    <div class="px-4 pb-3.5 pt-4">
-                        <p class="truncate text-[18px] font-semibold text-zinc-900 dark:text-white">{{ $user?->name ?? 'Account' }}</p>
-                        <p class="mt-0.5 truncate text-[13px] text-zinc-500 dark:text-zinc-400">{{ $user?->email ?? '' }}</p>
+                    <div class="px-4 pb-3 pt-4">
+                        <p class="truncate text-[15px] font-semibold text-zinc-900 dark:text-white">{{ $user?->name ?? 'Account' }}</p>
+                        <p class="mt-0.5 truncate text-[12px] text-zinc-500 dark:text-zinc-400">{{ $user?->email ?? '' }}</p>
                     </div>
 
                     <div class="{{ $menuDivider }}"></div>
 
                     {{-- Account --}}
-                    <div class="p-2">
+                    <div class="py-1.5">
                         <a href="{{ route('dashboard.profile') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="user.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Profile</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="user.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Profile</span></span>
                         </a>
                         <a href="{{ route('dashboard.kyc') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="customer.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">{{ $menuKycVerified ? 'Identity Verified' : 'Verify Identity' }}</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="customer.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">{{ $menuKycVerified ? 'Identity Verified' : 'Verify Identity' }}</span></span>
                             @if ($menuKycVerified)
                                 <svg class="h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-label="Verified"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                             @endif
                         </a>
                         <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="for-partners.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">For Partners</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="for-partners.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">For Partners</span></span>
                         </a>
                     </div>
 
                     <div class="{{ $menuDivider }}"></div>
 
                     {{-- Settings --}}
-                    <div class="p-2">
+                    <div class="py-1.5">
                         <a href="{{ route('dashboard.security') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="admin access.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Security</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="admin access.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Security</span></span>
                         </a>
                         <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="notification 2.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Notifications</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="notification 2.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Notifications</span></span>
                             @if ($notificationCount > 0)
                                 <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ $notificationCount > 9 ? '9+' : $notificationCount }}</span>
                             @endif
                         </a>
                         <a href="{{ route('dashboard.appearance') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Appearance.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Appearance</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Appearance.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Appearance</span></span>
                         </a>
                         {{-- Language: shows the language in force and opens the shared
                              country and language sheet straight on its language list. --}}
@@ -1413,10 +1452,10 @@
                             role="menuitem"
                         >
                             <span class="{{ $menuIcon }}">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"/></svg>
+                                <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"/></svg>
                                 <span class="text-zinc-800 dark:text-zinc-200">Language</span>
                             </span>
-                            <span class="text-sm font-normal text-zinc-500 dark:text-zinc-400">{{ \App\Support\Languages::nameFor(app()->getLocale()) ?? \App\Support\Languages::defaultName() }}</span>
+                            <span class="text-[13px] font-normal text-zinc-500 dark:text-zinc-400">{{ \App\Support\Languages::nameFor(app()->getLocale()) ?? \App\Support\Languages::defaultName() }}</span>
                         </button>
                     </div>
 
@@ -1424,13 +1463,13 @@
 
                     {{-- Help + leaving the dashboard. The arrow marks rows that take you
                          out of the account area. --}}
-                    <div class="p-2">
+                    <div class="py-1.5">
                         <a href="{{ route('shop.contact') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="support.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Help &amp; support</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="support.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Help &amp; support</span></span>
                             <svg class="h-4 w-4 shrink-0 text-[#0c1337] dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
                         </a>
                         <a href="{{ route('home') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
-                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Back to shop.svg" tone="inherit" class="h-5 w-5" /><span class="text-zinc-800 dark:text-zinc-200">Back to store</span></span>
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Back to shop.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Back to store</span></span>
                             <svg class="h-4 w-4 shrink-0 text-[#0c1337] dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
                         </a>
                     </div>
@@ -1440,8 +1479,10 @@
                     {{-- Preferences. Dark mode goes through the theme engine
                          (window.setTheme, partials/theme-engine), which saves the
                          choice and fires theme-changed so this switch re-syncs.
-                         Hide balances and Compact mode are the dashPrefs store. --}}
-                    <div class="p-2">
+                         Hide balances and Compact mode used to sit here as well
+                         and were removed on request; the wallet figures keep
+                         their own eye toggle. --}}
+                    <div class="py-1.5">
                         <button
                             type="button"
                             x-data="{ dark: window.themeIsDark ? window.themeIsDark() : document.documentElement.classList.contains('dark') }"
@@ -1452,41 +1493,11 @@
                             class="{{ $menuRow }}"
                         >
                             <span class="{{ $menuIcon }}">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg>
+                                <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg>
                                 <span class="text-zinc-800 dark:text-zinc-200">Dark mode</span>
                             </span>
                             <span :class="dark ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
                                 <span :class="dark ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            @click="$store.dashPrefs.setHideBalance(! $store.dashPrefs.hideBalance)"
-                            role="menuitemcheckbox"
-                            :aria-checked="$store.dashPrefs.hideBalance.toString()"
-                            class="{{ $menuRow }}"
-                        >
-                            <span class="{{ $menuIcon }}">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.244 7.244L19.5 19.5m-2.876-2.876L13.875 13.875M9.878 9.878a3 3 0 105.249 5.249"/></svg>
-                                <span class="text-zinc-800 dark:text-zinc-200">Hide balances</span>
-                            </span>
-                            <span :class="$store.dashPrefs.hideBalance ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
-                                <span :class="$store.dashPrefs.hideBalance ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            @click="$store.dashPrefs.setCompactMode(! $store.dashPrefs.compactMode)"
-                            role="menuitemcheckbox"
-                            :aria-checked="$store.dashPrefs.compactMode.toString()"
-                            class="{{ $menuRow }}"
-                        >
-                            <span class="{{ $menuIcon }}">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5"/></svg>
-                                <span class="text-zinc-800 dark:text-zinc-200">Compact mode</span>
-                            </span>
-                            <span :class="$store.dashPrefs.compactMode ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
-                                <span :class="$store.dashPrefs.compactMode ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
                             </span>
                         </button>
                     </div>
@@ -1494,11 +1505,11 @@
                     <div class="{{ $menuDivider }}"></div>
 
                     {{-- Log out --}}
-                    <div class="p-2">
+                    <div class="py-1.5">
                         <form method="POST" action="{{ route('logout') }}" class="w-full">
                             @csrf
-                            <button type="submit" class="dashboard-account-row flex w-full items-center gap-4 rounded-[12px] px-3 py-2.5 text-left text-[15px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200">
-                                <x-ui.logout-icon class="h-5 w-5" />
+                            <button type="submit" class="dashboard-account-row flex w-full items-center gap-3 px-4 py-2 text-left text-[14px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200">
+                                <x-ui.logout-icon class="h-[18px] w-[18px]" />
                                 Log out
                             </button>
                         </form>
@@ -1514,26 +1525,13 @@
         <div data-dash-subnav class="hidden lg:block"></div>
 
         @php
-            // The blue hero shows ONLY on the dashboard overview. Every other dashboard
-            // page uses the slim white inner top bar (hamburger + title + bell) below.
+            // The blue hero (wallet carousel) shows ONLY on the dashboard overview.
+            // Every page shares the same fixed top bar above it: the hamburger on
+            // the left, the round action chips on the right. The hamburger opens
+            // the sidebar drawer, which is the whole mobile navigation - there is
+            // no bottom tab bar and no popup menu any more, and no back affordance:
+            // every destination is one tap away inside the drawer.
             $skipMobileHero = ! request()->routeIs('dashboard');
-
-            // Top chrome placement: the nav band and the notification pill
-            // belong to the OVERVIEW alone. Store pages keep only the two shopping
-            // pills - cart and country switcher - floating without a band, because
-            // that is where the cart can be acted on and where the country switcher
-            // changes prices you are about to pay. Task/inner pages (orders,
-            // wallet, settings, ...) get no top chrome at all; the bottom nav bar
-            // is their navigation.
-            $showMobileTopChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
-
-            // The bell is overview-only furniture, same as the identity strip.
-            $showNotificationChrome = ! $skipMobileHero;
-
-            // No back affordance anywhere: the bottom nav bar is on every page and its
-            // centre Menu FAB opens the full sidebar nav, so every destination is one
-            // tap away without one. Removing it also keeps the top band identical on
-            // every page instead of swapping its left slot per route.
         @endphp
 
         {{-- flux:main is the single main-axis child of Flux's layout container.
@@ -1548,282 +1546,27 @@
              and centred, so pages do not run the full width of wide screens. --}}
         <flux:main x-data class="!p-0 bg-[#f4f6f5] dark:bg-[#0c1a36] dark:lg:bg-[#0c1a36]">
 
-        {{-- Mobile header (blue hero, visible only on mobile).
-             Pages can extend the blue area by filling the $mobileHero slot
-             (e.g. wallet card on the overview). Inner pages with their own sticky header
-             (settings, password, appearance) skip this hero entirely. --}}
+        {{-- Spacer holding the fixed header's room in normal flow (its height
+             is set in app.css with the header's mobile padding). --}}
+        <div class="lg:hidden" style="height: calc(env(safe-area-inset-top) + 3.75rem);" aria-hidden="true"></div>
+
+        {{-- Below lg the bar's colour runs behind the page and everything from
+             here down sits on it as a panel with rounded top corners, the way
+             the desktop frame lifts its pane off the header (.dash-mobile-panel
+             in app.css). lg:contents removes the wrapper from the desktop
+             layout entirely. --}}
+        <div class="dash-mobile-panel lg:contents" x-data x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))">
         @unless ($skipMobileHero)
-        {{-- Identity strip - OVERVIEW ONLY, a fixed nav band; the page
-             scrolls beneath it. Fixed instead of sticky because the
-             pull-to-refresh transform moves sticky ancestors and makes them
-             bounce. The z-[55] chrome pills (flag / cart / bell) float on top
-             of this band, composing one nav. Store and task pages render no
-             band at all - store pages carry only the floating shopping pills. --}}
-        <div class="nav-band-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
-            {{-- Compact identity strip - avatar + small online dot on the left,
-                 notification bell on the right. Replaces the old "Hello /
-                 Welcome back" greeting so the wallet card sits closer to the
-                 top and the product categories get more vertical room. --}}
-            <div class="flex items-center justify-between gap-3 text-zinc-900 dark:text-white">
-                @php $mobileFirstName = strtok(trim((string) ($user?->name ?? '')), ' ') ?: ''; @endphp
-                <div class="flex min-w-0 items-center gap-2.5">
-                    {{-- The avatar taps through to Settings. Pull-to-refresh already
-                         handles reloading fresh wallet / order data, so the tap is
-                         free for the more useful destination. --}}
-                    <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
-                        <span class="dashboard-mobile-avatar flex h-10 w-10 items-center justify-center overflow-hidden rounded-full">
-                            @if ($user?->avatar_url)
-                                <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
-                            @else
-                                <flux:icon.user class="h-6 w-6" />
-                            @endif
-                        </span>
-                        @if (($user?->kyc_status ?? null) === 'verified')
-                            {{-- KYC verified: small blue tick over the avatar. The badge
-                                 has its own white edge so it pops on the blue hero. --}}
-                            <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
-                        @else
-                            <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#f4f6f5] dark:ring-[#0c1a36]" aria-label="Online"></span>
-                        @endif
-                    </a>
-                    {{-- The greeting doubles as a storefront shortcut. The tiny
-                         chip keeps an obvious door back to the storefront for PWA
-                         users, who have no browser address bar to type into. --}}
-                    <a
-                        href="{{ route('home') }}"
-                        wire:navigate.hover
-                        class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
-                        aria-label="Go to the storefront"
-                    >
-                        <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
-                        <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
-                    </a>
-                </div>
-                {{-- The locale / cart / notification chips render in the pinned
-                     floating row (see the mobile top chrome below), so the hero
-                     carries no copy of its own. This spacer keeps the identity
-                     strip clear of the fixed pills above it. --}}
-                <span class="h-10 w-[8.5rem] shrink-0" aria-hidden="true"></span>
-            </div>
-        </div>
-
-        {{-- Spacer holding the nav band's room in normal flow. --}}
-        <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
-
-        {{-- Blue hero - overview only, same @unless as the identity strip above.
-             Scrolls away with the page; the floating wallet chip + Top Up button
-             inside <x-slot:mobileHero> take over once the hero leaves the viewport. --}}
-        {{-- Wallet card slot - scrolls with the page (under the nav band),
-             so the wallet info hits the customer immediately on page load,
-             leaving the rest of the viewport for product categories. --}}
         <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden">
             @isset($mobileHero)
-                <div class="mt-3">
+                <div class="mt-5">
                     {{ $mobileHero }}
                 </div>
             @endisset
         </header>
         @endunless
 
-        {{-- Mobile cart sheet. The desktop cart popup lives in the lg:flex header
-             (hidden on phones), so on mobile the shared $store.cart.open state needs
-             its own surface. Teleported to <body> and pinned above the mobile bottom
-             nav, it drops open the moment an item is added - mirroring the storefront
-             nav so adding to cart on a phone gives the same feedback. --}}
-        <div x-data>
-            <template x-teleport="body">
-                <div class="lg:hidden">
-                    <div
-                        x-show="$store.cart.open"
-                        x-transition.opacity.duration.150ms
-                        @click="$store.cart.open = false"
-                        style="display:none;"
-                        class="fixed inset-0 z-[80]"
-                    ></div>
-                    <div
-                        x-show="$store.cart.open"
-                        x-transition:enter="transition ease-out duration-150"
-                        x-transition:enter-start="opacity-0 translate-y-2"
-                        x-transition:enter-end="opacity-100 translate-y-0"
-                        x-transition:leave="transition ease-in duration-100"
-                        x-transition:leave-start="opacity-100 translate-y-0"
-                        x-transition:leave-end="opacity-0 translate-y-2"
-                        style="display:none;"
-                        class="cart-panel fixed inset-x-3 bottom-20 z-[80] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[14px] bg-white/80 px-3 py-2 backdrop-blur-2xl backdrop-saturate-150 shadow-xl shadow-zinc-900/15 dark:bg-[#0c1a36]/80 dark:ring-1 dark:ring-white/10"
-                        role="menu"
-                    >
-                        {{-- Empty state --}}
-                        <div x-show="$store.cart.count === 0" class="flex flex-col items-center px-3 py-5 text-center">
-                            <h3 class="text-xl font-bold text-zinc-900 dark:text-white">Your cart is empty</h3>
-                            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Your cart needs items</p>
-                        </div>
-
-                        {{-- Populated state --}}
-                        <div x-show="$store.cart.count > 0" x-cloak>
-                            <div class="flex items-center justify-between px-3 pt-3">
-                                <h3 class="text-lg font-bold text-zinc-900 dark:text-white">Your cart</h3>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="$store.cart.count + ' item' + ($store.cart.count === 1 ? '' : 's')"></span>
-                            </div>
-
-                            <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                <template x-for="item in $store.cart.items" :key="item.id">
-                                    <li class="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
-                                        <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#f4f6f5] shadow-sm">
-                                            <template x-if="item.logo">
-                                                <img :src="item.logo" alt="" class="h-full w-full object-cover">
-                                            </template>
-                                            <template x-if="!item.logo">
-                                                <span class="text-sm font-black uppercase text-zinc-700" x-text="item.name.substring(0,2).toUpperCase()"></span>
-                                            </template>
-                                        </span>
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block truncate text-sm font-bold text-zinc-900 dark:text-white" x-text="item.name"></span>
-                                            <span class="mt-0.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300" x-text="$store.cart.pay(item.unit_price)"></span>
-                                        </span>
-                                        <span class="flex shrink-0 items-center gap-1.5">
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Decrease">
-                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
-                                            </button>
-                                            <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="item.quantity"></span>
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Increase">
-                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
-                                            </button>
-                                        </span>
-                                    </li>
-                                </template>
-                            </ul>
-
-                            <div class="mt-3 flex gap-2 rounded-[12px] bg-[#f4f6f5] dark:bg-white/5 px-3 py-3">
-                                <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white dark:bg-white/10 px-4 py-3.5 text-sm font-semibold text-zinc-700 dark:text-zinc-200 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/15">
-                                    View cart
-                                </a>
-                                <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
-                                    Checkout
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </div>
-
-        {{-- Sticky mobile top bar for inner pages (settings, password, appearance).
-             Acts as the single mobile chrome on those pages — title derived from the route
-             so individual pages don't need to render their own sticky header. --}}
-        @if ($skipMobileHero)
-            @php
-                $innerTitle = match (true) {
-                    request()->routeIs('dashboard.orders')        => 'Orders',
-                    request()->routeIs('dashboard.esims')         => 'My eSIMs',
-                    request()->routeIs('dashboard.transactions')  => 'Transactions',
-                    request()->routeIs('dashboard.wallet')        => 'Wallet',
-                    request()->routeIs('dashboard.notifications') => 'Notifications',
-                    request()->routeIs('dashboard.saved-cards')   => 'Saved Cards',
-                    request()->routeIs('dashboard.kyc')           => 'Verify Identity',
-                    request()->routeIs('dashboard.rewards')       => 'For Partners',
-                    request()->routeIs('dashboard.security')      => 'Security',
-                    request()->routeIs('dashboard.appearance')    => 'Appearance',
-                    default                                       => 'Settings',
-                };
-            @endphp
-            {{-- Nothing renders in flow here. The back button now lives in the
-                 identity band at the top of this file (it swaps with the avatar),
-                 and the locale / cart / notification pills live in the FIXED chrome
-                 below. Both used to be duplicated here, which made the pills appear
-                 twice on scroll. --}}
-        @endif
-
-            {{-- ─────────────────────────────────────────────────────── --}}
-            {{-- FLOATING TOP CHROME (top cart / country switcher / bell) --}}
-            {{-- Pins to the viewport once the page scrolls past the      --}}
-            {{-- header. Overview + shop pages only; hidden elsewhere.     --}}
-            {{-- ─────────────────────────────────────────────────────── --}}
-            @if ($showMobileTopChrome)
-            {{-- ALWAYS pinned - no scroll-triggered show/hide, so the pills can
-                 never flicker or shake. This row IS the chips: the overview gets
-                 flag + cart + bell floating over its band; shop pages get
-                 flag + cart alone, with no band underneath. --}}
-            <div
-                x-data="{
-                    scrolled: false,
-                    country: 'United States',
-                    countryCode: 'US',
-                    // Hysteresis for the hamburger only: appears past 96px, leaves
-                    // under 40px, so boundary jitter can't toggle it repeatedly.
-                    onScroll() {
-                        const y = window.scrollY;
-                        if (! this.scrolled && y > 96) { this.scrolled = true; }
-                        else if (this.scrolled && y < 40) { this.scrolled = false; }
-                    },
-                    init() {
-                        this.onScroll();
-                        window.addEventListener('scroll', () => this.onScroll(), { passive: true });
-                    },
-                }"
-                @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode"
-                class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-end gap-2 px-3 lg:hidden"
-                style="top: max(0.5rem, env(safe-area-inset-top));"
-            >
-                {{-- Locale + cart chips (right) - same glass treatment, pinned.
-                     They ride wherever this row renders (overview + shop). The
-                     bell below is additionally scoped to the overview, where the
-                     nav band it visually belongs to lives. --}}
-                <div class="pointer-events-auto flex items-center gap-2" x-data>
-                    {{-- Region + currency toggle (opens the locale modal,
-                         which also holds the language pane - no separate
-                         language control up here). --}}
-                    <button
-                        type="button"
-                        x-data="{ code: (localStorage.getItem('locale.countryCode') || 'US').toLowerCase() }"
-                        @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
-                        x-on:click="$dispatch('open-locale-modal')"
-                        aria-label="{{ __('common.country') }} / {{ __('common.payment_currency') }}"
-                        class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95"
-                    >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
-                    </button>
-
-                    <a
-                        href="{{ route('dashboard.shop.cart') }}"
-                        wire:navigate.hover
-                        aria-label="Cart"
-                        class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95"
-                    >
-                        <span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0 text-black" aria-hidden="true"><x-icons.cart /></span>
-                        <span
-                            x-show="$store.cart && $store.cart.count > 0"
-                            x-text="$store.cart ? $store.cart.count : ''"
-                            x-cloak
-                            class="absolute -top-1 -right-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/60 dark:ring-[#0c1a36]"
-                        ></span>
-                    </a>
-                    @if ($showNotificationChrome)
-                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ffffff] shadow-md shadow-zinc-900/[0.06]">
-                            <livewire:notifications-menu tone="dark" wire:key="floating-notif-inner" />
-                        </div>
-                    @endif
-                </div>
-            </div>
-            @endif
-
-            {{-- Status-bar / floating-pill spacer for every page that is NOT the
-                 overview. The overview has its own spacer above (it holds the
-                 band's room); nothing held room here, so once
-                 viewport-fit=cover made env(safe-area-inset-top) resolve to a
-                 real number the viewport grew upward under the status bar and
-                 these pages had only pt-5 to survive on - the whole page read as
-                 shifted up. Shop pages additionally float the 2.75rem pill row
-                 (flag + cart) over the page with no band beneath it, so they
-                 reserve its height too; task pages only owe the inset. --}}
-            @if ($skipMobileHero)
-                <div
-                    class="lg:hidden"
-                    style="height: {{ $showMobileTopChrome ? 'calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem)' : 'env(safe-area-inset-top)' }};"
-                    aria-hidden="true"
-                ></div>
-            @endif
-
-            <div data-page-content x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))" class="flex flex-col bg-[#f4f6f5] px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
+            <div data-page-content x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))" class="flex flex-col bg-[#f4f6f5] px-4 pt-5 pb-10 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
                 <div class="w-full min-w-0 lg:mx-auto lg:max-w-[1400px] lg:flex-1">
                     {{-- Suspension banner: visible on every dashboard page when the
                          account is suspended. Carries the admin-authored reason +
@@ -1855,149 +1598,11 @@
                 {{-- The Terms / Refund Policy / Privacy Policy / version / copyright
                      footer line was removed from the dashboard at the user's request. --}}
             </div>
+        </div>
         </flux:main>
 
         {{-- Global confirm modal — intercepts any form/button with `data-confirm`. --}}
         <x-confirm-modal />
-
-        {{-- Mobile bottom tab bar (mobile + tablet). Five equal inline tabs:
-             Home, Orders, Menu, Transactions, Profile. The active tab is derived
-             from the current route so the right one highlights on first paint. --}}
-        @php
-            $activeIndex = match (true) {
-                request()->routeIs('dashboard.orders*')       => 1,
-                request()->routeIs('dashboard.transactions*') => 3,
-                request()->routeIs('dashboard.profile')       => 4,
-                request()->routeIs('dashboard.security')      => 4,
-                request()->routeIs('dashboard.appearance')    => 4,
-                default                                       => 0, // dashboard / overview
-            };
-        @endphp
-        @php
-            $tabs = [
-                ['idx' => 0, 'href' => route('dashboard'),              'icon' => 'Home.svg',           'label' => 'Home',         'nav' => true],
-                ['idx' => 1, 'href' => route('dashboard.orders'),       'icon' => 'order.svg',          'label' => 'Orders',       'nav' => true],
-                // index 2 is the Menu button, rendered between the two loops
-                ['idx' => 3, 'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'label' => 'History',      'nav' => true],
-                ['idx' => 4, 'href' => route('dashboard.profile'),      'icon' => 'system setting.svg', 'label' => 'Settings',     'nav' => true],
-            ];
-
-            // Successful (completed) order count - drives the Orders tab badge.
-            $successfulOrderCount = auth()->user()
-                ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
-                : 0;
-        @endphp
-        {{-- Frosted scrim behind the floating nav: as the page scrolls, content
-             blurs + fades into the bottom-bar area instead of showing sharply behind
-             it. Fixed strip below the nav (z-40), masked so the blur eases in from
-             nothing at the top to full at the bottom; never blocks taps. --}}
-        <div
-            aria-hidden="true"
-            class="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 backdrop-blur-md lg:hidden"
-            style="-webkit-mask-image: linear-gradient(to top, #000 38%, transparent); mask-image: linear-gradient(to top, #000 38%, transparent);"
-        ></div>
-
-        {{-- Floating rounded nav bar (neobank style): detached from the edges with
-             a pill highlight behind the active tab. The wrapper's bottom padding
-             keeps it clear of the iOS home indicator. Shown on every page. --}}
-        <div
-            x-data="{
-                active: {{ $activeIndex }},
-                shaking: false,
-                tap() {
-                    // Haptic feedback on supported devices (Android); iOS Safari has
-                    // no Vibration API, so it just no-ops there. The shake gives a
-                    // visual tap response on every device.
-                    try { navigator.vibrate && navigator.vibrate(12); } catch (e) {}
-                    this.shaking = false;
-                    requestAnimationFrame(() => { this.shaking = true; });
-                },
-            }"
-            {{-- The bar is already detached from the edge by design, so it does
-                 not owe the full inset on top of that gap - taking the float's
-                 own 12px back out of the inset keeps it clear of the home
-                 indicator without sitting as high as a flush bar would have to.
-                 The max() floor keeps the original 12px on devices with no
-                 inset at all. --}}
-            class="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(12px,calc(env(safe-area-inset-bottom)_-_12px))] lg:hidden"
-        >
-            <nav
-                class="nav-glass mx-auto max-w-md rounded-full p-1.5"
-                aria-label="Primary"
-                :class="shaking && 'pill-shake'"
-                @animationend="shaking = false"
-            >
-                <div class="relative flex items-stretch">
-                    {{-- Apple-glass sliding pill: one frosted bubble that fills the
-                         bar height and glides to the active tab. Width = one of
-                         five equal columns; translateX(active * 100%) lands it on
-                         the active slot (Menu is slot 2, never an active route). --}}
-                    <span
-                        aria-hidden="true"
-                        class="liquid-pill pointer-events-none absolute -inset-y-1 left-0 w-1/5 rounded-full transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-                        :style="'transform: translateX(' + (active * 100) + '%)'"
-                    ></span>
-
-                    {{-- Tabs 0 + 1 --}}
-                    @foreach (array_slice($tabs, 0, 2) as $t)
-                        <a
-                            href="{{ $t['href'] }}"
-                            @if ($t['nav'] && $t['href'] !== '#') wire:navigate.hover @endif
-                            @click="active = {{ $t['idx'] }}; tap()"
-                            aria-label="{{ $t['label'] }}"
-                            class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                        >
-                            <span class="relative inline-flex">
-                                {{-- x-bind:class, not :class: on a Blade component a bare
-                                     :class is read as PHP, not handed to Alpine. --}}
-                                <x-ui.anim-icon
-                                    :file="$t['icon']"
-                                    tone="inherit"
-                                    class="h-6 w-6 transition-colors duration-200"
-                                    x-bind:class="active === {{ $t['idx'] }} ? 'text-blue-600' : 'text-zinc-900 dark:text-zinc-300'"
-                                />
-                                {{-- Successful-order count on the Orders tab. Light: small
-                                     pill, dark number. Dark: bigger frosted-glass pill, light text. --}}
-                                @if ($t['idx'] === 1 && $successfulOrderCount > 0)
-                                    <span class="pointer-events-none absolute -top-2 -right-3 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold leading-none text-zinc-900 ring-1 ring-zinc-200 shadow-sm dark:h-5 dark:min-w-[20px] dark:bg-white/15 dark:px-1.5 dark:text-[11px] dark:text-white dark:shadow-none dark:ring-white/25 dark:backdrop-blur-md">{{ $successfulOrderCount > 99 ? '99+' : $successfulOrderCount }}</span>
-                                @endif
-                            </span>
-                            <span class="text-[10px] leading-none transition-colors duration-200" :class="active === {{ $t['idx'] }} ? 'text-blue-600 font-semibold' : 'font-medium text-zinc-700 dark:text-zinc-300'">{{ $t['label'] }}</span>
-                        </a>
-                    @endforeach
-
-                    {{-- Menu — opens the bottom-sheet menu (slot 2). --}}
-                    <button
-                        type="button"
-                        x-on:click="tap(); $dispatch('open-mobile-menu')"
-                        aria-label="Open menu"
-                        class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                    >
-                        <x-ui.anim-icon file="Hamburger menu.svg" tone="inherit" class="h-6 w-6 text-zinc-900 transition-colors duration-200 dark:text-zinc-300" />
-                        <span class="text-[10px] font-medium leading-none text-zinc-700 dark:text-zinc-300">Menu</span>
-                    </button>
-
-                    {{-- Tabs 2 + 3 --}}
-                    @foreach (array_slice($tabs, 2, 2) as $t)
-                        <a
-                            href="{{ $t['href'] }}"
-                            @if ($t['nav'] && $t['href'] !== '#') wire:navigate.hover @endif
-                            @click="active = {{ $t['idx'] }}; tap()"
-                            aria-label="{{ $t['label'] }}"
-                            class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                        >
-                            <x-ui.anim-icon
-                                :file="$t['icon']"
-                                tone="inherit"
-                                class="h-6 w-6 transition-colors duration-200"
-                                x-bind:class="active === {{ $t['idx'] }} ? 'text-blue-600' : 'text-zinc-900 dark:text-zinc-300'"
-                            />
-                            <span class="text-[10px] leading-none transition-colors duration-200" :class="active === {{ $t['idx'] }} ? 'text-blue-600 font-semibold' : 'font-medium text-zinc-700 dark:text-zinc-300'">{{ $t['label'] }}</span>
-                        </a>
-                    @endforeach
-                </div>
-            </nav>
-        </div>
 
         {{-- Action flashes pop as a floating pill toast (status / success / error /
              wallet_created), so pages don't need their own inline banners. --}}
@@ -2027,37 +1632,59 @@
             <x-nav.locale-modal />
         </div>
 
-        {{-- Mobile menu popup. Triggered by every mobile hamburger / Menu FAB via the
-             'open-mobile-menu' window event. Renders the sidebar nav as a card grid
-             instead of sliding the Flux sidebar drawer out. lg:hidden so it never shows on desktop. --}}
+        {{-- Mobile sidebar drawer. Opened by the top bar's hamburger (and any
+             other trigger that dispatches 'open-mobile-menu'), it slides in from
+             the left wearing the bar's own colour (navy, black in dark mode),
+             the app logo level with the bar, then the desktop sidebar's rows in
+             three groups. It covers about two thirds of the screen, the page
+             dimmed beside it. lg:hidden so it never shows on desktop, where the
+             real sidebar is. --}}
         @php
-            $mobileMenuItems = array_values(array_filter([
-                ['label' => 'Home',          'href' => route('dashboard'),           'icon' => 'Home.svg',           'tone' => 'bg-blue-500',     'nav' => true],
-                ['label' => 'Shop',          'href' => route('dashboard.shop.gift-cards'), 'icon' => 'Shop.svg',           'tone' => 'bg-pink-500',     'nav' => true],
-                ['label' => 'Orders',        'href' => route('dashboard.orders'),    'icon' => 'order.svg',          'tone' => 'bg-sky-500',      'nav' => true],
-                ['label' => 'My eSIMs',      'href' => route('dashboard.esims'),     'icon' => 'esim.svg',           'tone' => 'bg-blue-600',     'nav' => true],
-                ['label' => 'Wallet',        'href' => route('dashboard.wallet'),    'icon' => 'Wallet.svg',         'tone' => 'bg-emerald-500',  'nav' => true],
-                ['label' => 'Transactions',  'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'tone' => 'bg-teal-500',  'nav' => true],
-                ['label' => 'Settings',      'href' => route('dashboard.profile'),   'icon' => 'system setting.svg', 'tone' => 'bg-indigo-500',   'nav' => true],
-                ['label' => 'Security',      'href' => route('dashboard.security'),  'icon' => 'admin access.svg',   'tone' => 'bg-violet-500',   'nav' => true],
-                ['label' => 'Verify (KYC)',  'href' => route('dashboard.kyc'),       'icon' => 'customer.svg',       'tone' => 'bg-amber-500',    'nav' => true],
-                ['label' => 'Appearance',    'href' => route('dashboard.appearance'),'icon' => 'Appearance.svg',     'tone' => 'bg-fuchsia-500',  'nav' => true],
-                ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
-                // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
-                // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
+            // Completed orders drive the badge on the Orders row, as on the
+            // desktop sidebar.
+            $completedOrderCount = auth()->user()
+                ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
+                : 0;
+
+            $drawerItems = [
+                ['label' => 'Overview',      'href' => route('dashboard'),                 'icon' => 'Home.svg',           'active' => request()->routeIs('dashboard'),               'nav' => true],
+                // Shop does not navigate: tapping it drops the categories down
+                // beneath it (the desktop sidebar's $shopSubItems, same order
+                // and gating), open already when the customer is on one.
+                ['label' => 'Shop',          'href' => route('dashboard.shop.gift-cards'), 'icon' => 'Shop.svg',           'active' => request()->routeIs('dashboard.shop.*'),        'nav' => true, 'expands' => true],
+                ['label' => 'Orders',        'href' => route('dashboard.orders'),          'icon' => 'order.svg',          'active' => request()->routeIs('dashboard.orders*'),       'nav' => true, 'badge' => $completedOrderCount],
+                ['label' => 'My eSIMs',      'href' => route('dashboard.esims'),           'icon' => 'esim.svg',           'active' => request()->routeIs('dashboard.esims'),         'nav' => true],
+                ['label' => 'Wallet',        'href' => route('dashboard.wallet'),          'icon' => 'Wallet.svg',         'active' => request()->routeIs('dashboard.wallet'),        'nav' => true],
+                ['label' => 'Transactions',  'href' => route('dashboard.transactions'),    'icon' => 'transactions 1.svg', 'active' => request()->routeIs('dashboard.transactions*'), 'nav' => true],
+                // The account rows sit under an "Account" label, the last two
+                // under "More"; the label is drawn when the group changes.
+                ['label' => 'Settings',      'href' => route('dashboard.profile'),         'icon' => 'system setting.svg', 'active' => request()->routeIs('dashboard.profile'),       'nav' => true, 'group' => 'Account'],
+                ['label' => 'Security',      'href' => route('dashboard.security'),        'icon' => 'admin access.svg',   'active' => request()->routeIs('dashboard.security'),      'nav' => true, 'group' => 'Account'],
+                ['label' => 'Verify (KYC)',  'href' => route('dashboard.kyc'),             'icon' => 'customer.svg',       'active' => request()->routeIs('dashboard.kyc'),           'nav' => true, 'group' => 'Account'],
+                ['label' => 'Appearance',    'href' => route('dashboard.appearance'),      'icon' => 'Appearance.svg',     'active' => request()->routeIs('dashboard.appearance'),    'nav' => true, 'group' => 'Account'],
+                ['label' => 'Notifications', 'href' => route('dashboard.notifications'),   'icon' => 'notification 2.svg', 'active' => request()->routeIs('dashboard.notifications'), 'nav' => true, 'group' => 'Account'],
                 // The rewards page is the Rcoin programme (cashback, referrals,
-                // withdrawals, conversion) - the tile carries the Rcoin name,
-                // not the old "Referrals" alias that hid it.
-                ['label' => 'For Partners',  'href' => route('dashboard.rewards'),    'icon' => 'for-partners.svg',        'tone' => 'bg-yellow-500',   'nav' => true],
-                ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'tone' => 'bg-cyan-500', 'nav' => false],
-            ]));
+                // withdrawals, conversion); the row carries the partner name.
+                ['label' => 'For Partners',  'href' => route('dashboard.rewards'),         'icon' => 'for-partners.svg',   'active' => request()->routeIs('dashboard.rewards'),       'nav' => true, 'group' => 'More'],
+                ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'active' => false, 'nav' => false, 'group' => 'More'],
+            ];
+
+            // Drawer rows: 14px semibold on the bar's colour, 18px icons, 10px
+            // corners, the current page on a soft white tile. The colours are
+            // app.css's (.dash-drawer), so dark mode's remaps cannot touch them.
+            $drawerRow = fn (bool $active) => 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-semibold transition-colors'.($active ? ' dash-drawer-row-active' : '');
+            $drawerIcon = 'h-[18px] w-[18px] shrink-0';
+            // The categories under Shop: a size down, text only (the Shop row
+            // carries the icon), the current one on the same soft tile.
+            $drawerSubRow = fn (bool $active) => 'dash-drawer-subrow flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-colors'.($active ? ' dash-drawer-subrow-active' : '');
         @endphp
-        {{-- Mobile menu wrapper: `contents` removes the div from Flux's grid layout so it
-             doesn't push flux:sidebar/header/main into an unexpected row. --}}
+        {{-- `contents` keeps the wrapper out of Flux's grid so it cannot push
+             flux:sidebar/header/main into an unexpected row. --}}
         <div
             x-data="{ menuOpen: false }"
             x-on:open-mobile-menu.window="$nextTick(() => menuOpen = true)"
             x-on:keydown.escape.window="menuOpen = false"
+            x-on:livewire:navigated.window="menuOpen = false"
             x-effect="menuOpen ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
             class="contents lg:hidden"
         >
@@ -2076,62 +1703,127 @@
                 aria-hidden="true"
             ></div>
 
-            {{-- Bottom-sheet panel (full width, slides up from below) --}}
-            <div
+            {{-- The drawer: the bar's colour, slid in from the left. --}}
+            <aside
                 x-show="menuOpen"
                 x-transition:enter="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                x-transition:enter-start="translate-y-full"
-                x-transition:enter-end="translate-y-0"
-                x-transition:leave="transition-transform duration-250 ease-in"
-                x-transition:leave-start="translate-y-0"
-                x-transition:leave-end="translate-y-full"
+                x-transition:enter-start="-translate-x-full"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition-transform duration-200 ease-in"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="-translate-x-full"
                 style="display: none;"
-                class="modal-norise fixed inset-x-3 bottom-3 z-[70] max-h-[85vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
+                class="dash-drawer fixed inset-y-0 left-0 z-[70] flex w-[min(69vw,270px)] flex-col"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="mobile-menu-title"
+                aria-label="Menu"
             >
-                {{-- Drag handle (visual affordance) --}}
-                <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300 dark:bg-white/25"></span>
+                {{-- Logo row: as tall as the bar, so the logo sits level with the
+                     bar's chips and the close button beside the panel. The logo
+                     is drawn white (app.css) on the panel's dark colour. --}}
+                <div class="dash-drawer-head flex shrink-0 items-center px-4">
+                    <a href="{{ route('dashboard') }}" wire:navigate.hover @click="menuOpen = false" class="flex items-center rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="{{ $siteName }} dashboard">
+                        {{-- The full logo (mark + wordmark), the file the storefront
+                             header shows from md up. --}}
+                        <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-10 w-auto object-contain">
+                    </a>
                 </div>
 
-                <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
-                    {{-- Header — app-native pattern: title alone, no X button. Dismissed
-                         via tap-outside (backdrop), Esc key, or the drag handle above. --}}
-                    <h2 id="mobile-menu-title" class="mb-5 text-lg font-bold text-zinc-900 dark:text-white">Menu</h2>
-
-                    {{-- Card grid, staggered entrance --}}
-                    <div class="skeleton-stagger-fast grid grid-cols-4 gap-3">
-                        @foreach ($mobileMenuItems as $i => $item)
-                            <a
-                                href="{{ $item['href'] }}"
-                                @if ($item['nav'] && $item['href'] !== '#') wire:navigate.hover @endif
-                                @click="menuOpen = false"
-                                style="--i: {{ $i }}"
-                                class="group flex flex-col items-center justify-center gap-2 rounded-[6px] px-2 py-3 text-center transition-transform duration-200 active:scale-95"
-                            >
-                                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm">
-                                    <x-ui.anim-icon :file="$item['icon']" tone="white" class="h-6 w-6" />
-                                </span>
-                                <span class="text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">{{ $item['label'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-
-                    {{-- Logout footer --}}
-                    <form method="POST" action="{{ route('logout') }}" class="mt-5 border-t border-zinc-100 pt-4">
-                        @csrf
-                        <button
-                            type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                {{-- The rows, grouped: the main destinations, then Account, then More. --}}
+                <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6 pt-3" aria-label="Menu">
+                    @php $drawerGroup = null; @endphp
+                    @foreach ($drawerItems as $item)
+                        @if (($item['group'] ?? null) !== $drawerGroup)
+                            @php $drawerGroup = $item['group']; @endphp
+                            <p class="dash-drawer-label mb-1 mt-5 px-3 text-[12px] font-semibold">{{ $drawerGroup }}</p>
+                        @endif
+                        @if ($item['expands'] ?? false)
+                            {{-- Shop: the row is a button. Tapping it drops the categories
+                                 down beneath it; the chevron turns to say so. The list
+                                 starts open on a shop page so the current category shows.
+                                 The current category, not the Shop row, is the page. --}}
+                            <div x-data="{ shopOpen: @js($item['active']) }" class="flex flex-col gap-0.5">
+                                <button
+                                    type="button"
+                                    @click="shopOpen = ! shopOpen"
+                                    :aria-expanded="shopOpen.toString()"
+                                    aria-controls="dash-drawer-shop-categories"
+                                    class="{{ $drawerRow($item['active']) }} w-full text-left"
+                                >
+                                    <span class="flex min-w-0 items-center gap-3">
+                                        <x-ui.anim-icon :file="$item['icon']" tone="inherit" :class="$drawerIcon" />
+                                        <span class="truncate">{{ $item['label'] }}</span>
+                                    </span>
+                                    <svg :class="shopOpen && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <div id="dash-drawer-shop-categories" x-show="shopOpen" x-collapse class="ml-5 flex flex-col gap-0.5 border-l border-white/10 pl-3">
+                                    @foreach ($shopSubItems as [$label, $href, $flag, $newKey, $subActive])
+                                        @if ($flag === null || \App\Support\FeatureFlag::on($flag))
+                                            <a
+                                                href="{{ $href }}"
+                                                wire:navigate.hover
+                                                @click="menuOpen = false"
+                                                class="{{ $drawerSubRow($subActive) }}"
+                                                @if ($subActive) aria-current="page" @endif
+                                            >
+                                                <span class="truncate">{{ $label }}</span>
+                                                @if (in_array($newKey, $newServices, true))
+                                                    <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New</span>
+                                                @endif
+                                            </a>
+                                        @else
+                                            {{-- Feature off: listed but greyed and not a link, as on desktop. --}}
+                                            <span class="{{ $drawerSubRow(false) }} cursor-not-allowed opacity-50" aria-disabled="true" title="Temporarily unavailable">
+                                                <span class="truncate">{{ $label }}</span>
+                                            </span>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                            @continue
+                        @endif
+                        <a
+                            href="{{ $item['href'] }}"
+                            @if ($item['nav']) wire:navigate.hover @else target="_blank" rel="noopener" @endif
+                            @click="menuOpen = false"
+                            class="{{ $drawerRow($item['active']) }}"
+                            @if ($item['active']) aria-current="page" @endif
                         >
-                            <x-ui.logout-icon class="h-4 w-4" />
-                            Log out
-                        </button>
-                    </form>
-                </div>
-            </div>
+                            <span class="flex min-w-0 items-center gap-3">
+                                <x-ui.anim-icon :file="$item['icon']" tone="inherit" :class="$drawerIcon" />
+                                <span class="truncate">{{ $item['label'] }}</span>
+                            </span>
+                            @if (($item['badge'] ?? 0) > 0)
+                                <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}</span>
+                            @endif
+                        </a>
+                    @endforeach
+                </nav>
+            </aside>
+
+            {{-- Close: outside the panel, on the backdrop beside its top edge,
+                 level with the bar's chips and the logo. Tapping the backdrop
+                 closes too. --}}
+            <button
+                type="button"
+                x-show="menuOpen"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="menuOpen = false"
+                style="display: none; left: calc(min(69vw, 270px) + 0.75rem); top: calc(env(safe-area-inset-top) + 0.75rem);"
+                aria-label="Close menu"
+                class="dash-drawer-close fixed z-[70] flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors active:bg-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
 
         {{-- PWA pull-to-refresh (standalone mode only). --}}
@@ -2158,7 +1850,7 @@
 
                 let tip = null;
                 const linkFor = (target) => target && target.closest
-                    ? target.closest('[data-flux-sidebar] nav a[data-tip]')
+                    ? target.closest('[data-flux-sidebar] nav :is(a, button)[data-tip]')
                     : null;
 
                 const show = (link) => {

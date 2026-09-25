@@ -42,7 +42,7 @@
                 >
                 <span class="leading-tight">
                     <span class="block text-[15px] font-semibold text-zinc-900 dark:text-white">{{ $signal['title'] }}</span>
-                    <span class="block text-[13px] text-[#0c1a36]/70 dark:text-zinc-400">{{ $signal['note'] }}</span>
+                    <span class="block text-[13px] text-[#0c1a36]/90 dark:text-zinc-400">{{ $signal['note'] }}</span>
                 </span>
             </li>
         @endforeach

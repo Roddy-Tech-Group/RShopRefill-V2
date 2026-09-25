@@ -80,7 +80,7 @@ new class extends Component {
         $this->recordTurnstileFailure();
 
         throw ValidationException::withMessages([
-            'turnstileToken' => 'Security verification failed. Please try again.',
+            'turnstileToken' => __('navigation.feedback_security_failed'),
         ]);
     }
 
@@ -231,7 +231,7 @@ new class extends Component {
         : `top:${topPx}px; left:0; right:auto;`"
     :class="dragging && 'select-none'"
     class="fixed z-[55] hidden md:block"
-    aria-label="Site feedback"
+    aria-label="{{ __('navigation.feedback_region') }}"
 >
     <div class="relative flex items-center">
         {{-- Compact popover. Anchored just left of the button, only slightly
@@ -261,19 +261,19 @@ new class extends Component {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                         </svg>
                     </span>
-                    <h4 class="mt-2 text-sm font-bold text-zinc-900 dark:text-white">Thanks for the feedback</h4>
-                    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">A ticket has been opened with the team.</p>
+                    <h4 class="mt-2 text-sm font-bold text-zinc-900 dark:text-white">{{ __('navigation.feedback_thanks') }}</h4>
+                    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{{ __('navigation.feedback_ticket_opened') }}</p>
                     <button
                         type="button"
                         wire:click="startOver"
                         x-on:click="$nextTick(() => renderTurnstile())"
                         class="mt-3 rounded-[12px] bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                    >Send another</button>
+                    >{{ __('navigation.feedback_send_another') }}</button>
                 </div>
             @else
                 <div class="mb-2 flex items-start justify-between gap-2">
-                    <h3 id="feedback-title" class="text-sm font-bold text-zinc-900 dark:text-white">Send feedback</h3>
-                    <button type="button" @click="open = false" aria-label="Close" class="-mt-0.5 -mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white">
+                    <h3 id="feedback-title" class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('navigation.feedback_title') }}</h3>
+                    <button type="button" @click="open = false" aria-label="{{ __('common.close') }}" class="-mt-0.5 -mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
                         </svg>
@@ -286,7 +286,7 @@ new class extends Component {
                         type="email"
                         required
                         autocomplete="email"
-                        placeholder="Your email"
+                        placeholder="{{ __('navigation.feedback_email_placeholder') }}"
                         class="w-full rounded-[12px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     >
                     @error('email') <p class="-mt-1 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
@@ -295,7 +295,7 @@ new class extends Component {
                         wire:model="message"
                         rows="3"
                         required
-                        placeholder="Your feedback..."
+                        placeholder="{{ __('navigation.feedback_message_placeholder') }}"
                         class="w-full rounded-[12px] border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     ></textarea>
                     @error('message') <p class="-mt-1 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
@@ -314,8 +314,8 @@ new class extends Component {
                         type="submit"
                         class="inline-flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700"
                     >
-                        <span wire:loading.remove wire:target="submit">Send</span>
-                        <span wire:loading wire:target="submit">Sending...</span>
+                        <span wire:loading.remove wire:target="submit">{{ __('navigation.feedback_send') }}</span>
+                        <span wire:loading wire:target="submit">{{ __('navigation.feedback_sending') }}</span>
                     </button>
                 </form>
             @endif
@@ -337,8 +337,8 @@ new class extends Component {
             @keydown.left.prevent="side = 'left'; save()"
             @keydown.right.prevent="side = 'right'; save()"
             :aria-expanded="open.toString()"
-            aria-label="Send us feedback. Drag to move, or use the arrow keys."
-            title="Drag to move"
+            aria-label="{{ __('navigation.feedback_tab_label') }}"
+            title="{{ __('navigation.feedback_drag') }}"
             :class="[side === 'right' ? 'rounded-l-[10px]' : 'rounded-r-[10px]', dragging ? 'cursor-grabbing' : 'cursor-grab']"
             class="flex cursor-grab items-center gap-2 bg-blue-600 px-3 py-4 text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-900/30 transition-colors hover:bg-blue-700"
             style="writing-mode: vertical-rl;"
@@ -346,7 +346,7 @@ new class extends Component {
             <svg class="h-4 w-4 -rotate-90 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
             </svg>
-            Feedback
+            {{ __('navigation.feedback_tab') }}
         </button>
     </div>
 </div>

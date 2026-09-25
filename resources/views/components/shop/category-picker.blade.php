@@ -23,13 +23,13 @@
     // Single source of truth for the mobile category strip. Mirrors the desktop
     // sidebar's list so swapping between the two surfaces is consistent.
     $categories = [
-        ['slug' => 'gift-cards',      'label' => 'Gift Cards',  'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
+        ['slug' => 'gift-cards',      'label' => __('navigation.gift_cards'), 'icon' => 'gift cards.svg', 'url' => $r('gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',        'icon' => 'Shop.svg',       'url' => $r('gomarket')],
-        ['slug' => 'esims',           'label' => 'eSIMs',           'icon' => 'esim.svg',       'url' => $r('esims')],
-        ['slug' => 'mobile-airtime',  'label' => 'Mobile top-ups',  'icon' => 'topup1.svg',     'url' => $r('topups')],
-        ['slug' => 'bill-payments',   'label' => 'Bill payments',   'icon' => 'Bills 2.svg',    'url' => $r('bills')],
-        ['slug' => 'flights',         'label' => 'Flights',         'icon' => 'flight 2.svg',   'url' => $r('flights')],
-        ['slug' => 'stays',           'label' => 'Stays',           'icon' => 'stay 2.svg',     'url' => $r('stays')],
+        ['slug' => 'esims',           'label' => __('navigation.esims'), 'icon' => 'esim.svg',       'url' => $r('esims')],
+        ['slug' => 'mobile-airtime',  'label' => __('giftcards.category_mobile_topups'), 'icon' => 'topup1.svg',     'url' => $r('topups')],
+        ['slug' => 'bill-payments',   'label' => __('giftcards.category_bill_payments'), 'icon' => 'Bills 2.svg',    'url' => $r('bills')],
+        ['slug' => 'flights',         'label' => __('navigation.flights'), 'icon' => 'flight 2.svg',   'url' => $r('flights')],
+        ['slug' => 'stays',           'label' => __('navigation.stays'), 'icon' => 'stay 2.svg',     'url' => $r('stays')],
     ];
 
     // Coming-soon categories stay hidden until their feature flag is switched
@@ -202,7 +202,7 @@
                                 :class="activeCategory === @js($slug)
                                     ? 'font-bold text-[#0c1a36] dark:text-white'
                                     : 'font-medium text-[#0c1a36] dark:text-zinc-200'"
-                                class="flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm"
+                                class="flex items-center gap-3 rounded-full px-3 py-2.5 text-sm"
                             @else
                                 @class([
                                     'flex items-center gap-3 rounded-[15px] px-3 py-2.5 text-sm',

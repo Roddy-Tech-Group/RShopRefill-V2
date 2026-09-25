@@ -34,13 +34,13 @@ class extends Component {
 <x-slot:heading>Payment Insights</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
     $sectionTitle = 'text-sm font-bold text-zinc-900 dark:text-white';
     $subtle = 'text-[12px] text-zinc-500 dark:text-zinc-400';
     $label = 'truncate text-[12px] font-medium text-zinc-500 dark:text-zinc-400';
     $stat = 'mt-1 text-2xl font-bold tracking-tight tabular-nums';
     $foot = 'mt-1 text-[11px] text-zinc-400 dark:text-zinc-500';
-    $th = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400';
+    $th = 'text-left';
     $td = 'px-3 py-2.5 text-[13px] tabular-nums text-zinc-700 dark:text-zinc-200';
     $row = 'flex items-center justify-between text-[13px]';
 
@@ -183,22 +183,22 @@ class extends Component {
             <header class="px-5 pt-5 pb-3">
                 <h2 class="{{ $sectionTitle }}">Top Failure Reasons</h2>
             </header>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full admin-table">
+                    <thead class="">
                         <tr>
                             <th class="{{ $th }} pl-5">Reason</th>
                             <th class="{{ $th }} text-right">Share</th>
                             <th class="{{ $th }} pr-5 text-right">Count</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                    <tbody class="">
                         @forelse($topReasons as $reason)
                             <tr>
                                 <td class="{{ $td }} pl-5">
                                     <span class="font-semibold text-zinc-900 dark:text-white">{{ $reason->label }}</span>
                                     @if ($reason->retryable)
-                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">retryable</span>
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">retryable</span>
                                     @endif
                                     <span class="mt-0.5 block text-[11px] text-zinc-400 dark:text-zinc-500">{{ $reason->failure_reason_code ?: 'unknown' }}</span>
                                 </td>
@@ -222,9 +222,9 @@ class extends Component {
             <header class="px-5 pt-5 pb-3">
                 <h2 class="{{ $sectionTitle }}">By Payment Method</h2>
             </header>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full admin-table">
+                    <thead class="">
                         <tr>
                             <th class="{{ $th }} pl-5">Method</th>
                             <th class="{{ $th }} text-right">Started</th>
@@ -232,7 +232,7 @@ class extends Component {
                             <th class="{{ $th }} pr-5 text-right">Success</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                    <tbody class="">
                         @forelse($methods as $method)
                             <tr>
                                 <td class="{{ $td }} pl-5 font-semibold capitalize text-zinc-900 dark:text-white">{{ str_replace('_', ' ', $method->payment_method) }}</td>
@@ -257,9 +257,9 @@ class extends Component {
         <header class="px-5 pt-5 pb-3">
             <h2 class="{{ $sectionTitle }}">Recent Lost Payments</h2>
         </header>
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+        <div class="overflow-x-auto p-3">
+            <table class="w-full admin-table">
+                <thead class="">
                     <tr>
                         <th class="{{ $th }} pl-5">When</th>
                         <th class="{{ $th }}">Outcome</th>
@@ -269,19 +269,19 @@ class extends Component {
                         <th class="{{ $th }} pr-5">Gateway said</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                <tbody class="">
                     @forelse($recentFailures as $failure)
                         @php
                             $tone = match ($failure['outcome']) {
-                                'failed' => 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30',
-                                'expired' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30',
-                                default => 'bg-zinc-100 text-zinc-600 ring-zinc-200 dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10',
+                                'failed' => 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+                                'expired' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+                                default => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15! dark:text-zinc-300!',
                             };
                         @endphp
                         <tr @if ($loop->index >= $visibleFailures) x-show="expanded" x-cloak @endif>
                             <td class="{{ $td }} pl-5 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ \Illuminate\Support\Carbon::parse($failure['at'])->diffForHumans(short: true) }}</td>
                             <td class="{{ $td }} whitespace-nowrap">
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $tone }}">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $tone }}">
                                     {{ $failure['outcome'] === 'failed' ? 'declined' : $failure['outcome'] }}
                                 </span>
                             </td>
@@ -290,9 +290,9 @@ class extends Component {
                             <td class="{{ $td }} whitespace-nowrap">
                                 <span class="font-semibold text-zinc-900 dark:text-white">{{ $failure['label'] }}</span>
                                 @if ($failure['suspected_testing'] ?? false)
-                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30">suspected testing</span>
+                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">suspected testing</span>
                                 @elseif ($failure['retryable'])
-                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">retryable</span>
+                                    <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">retryable</span>
                                 @endif
                                 @if (($failure['refused_cards'] ?? 0) > 1)
                                     <span class="block text-[11px] text-zinc-400 dark:text-zinc-500">{{ $failure['refused_cards'] }} cards refused</span>
@@ -412,16 +412,16 @@ class extends Component {
             <header class="px-5 pt-5 pb-3">
                 <h2 class="{{ $sectionTitle }}">Provider Success Rate</h2>
             </header>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full admin-table">
+                    <thead class="">
                         <tr>
                             <th class="{{ $th }} pl-5">Provider</th>
                             <th class="{{ $th }} text-right">Outcomes</th>
                             <th class="{{ $th }} pr-5 text-right">Success</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                    <tbody class="">
                         @forelse($providers as $provider)
                             <tr>
                                 <td class="{{ $td }} pl-5 font-semibold capitalize text-zinc-900 dark:text-white">{{ $provider->provider }}</td>

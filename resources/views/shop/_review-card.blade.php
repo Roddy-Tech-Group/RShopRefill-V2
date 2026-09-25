@@ -41,7 +41,7 @@
 <article
     x-data="{ expanded: false, clamped: false }"
     x-init="$nextTick(() => { clamped = $refs.reviewBody.scrollHeight > $refs.reviewBody.clientHeight + 1; })"
-    class="flex w-72! shrink-0 flex-col rounded-[14px] dash-shimmer border border-zinc-200 bg-transparent p-5 transition-colors hover:border-green-200 sm:w-80! dark:border-white dark:hover:border-white"
+    class="flex w-72! shrink-0 flex-col rounded-[12px] dash-shimmer bg-white p-5 shadow-md shadow-zinc-900/[0.06] transition-colors sm:w-80! dark:shadow-none"
 >
 
     <div class="flex items-start justify-between gap-3">
@@ -66,7 +66,7 @@
                         <x-verified-badge size="xs" />
                     @endif
                 </p>
-                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $review->reviewed_at->format('M j, Y') }}</p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $review->reviewed_at->isoFormat('ll') }}</p>
             </div>
         </div>
 
@@ -85,8 +85,10 @@
                     {{-- Our own brand mark for system reviews --}}
                     <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-4 w-4 object-contain" loading="lazy">
                 @else
-                    {{-- Trustpilot-style emerald star (default for Trustpilot) --}}
-                    <svg class="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    {{-- A neutral star for any other platform. No platform's own mark
+                         is drawn here: the TrustBox widgets are the only place
+                         that branding appears, as its guidelines ask. --}}
+                    <svg class="h-3.5 w-3.5 text-zinc-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
                     </svg>
                 @endif
@@ -100,7 +102,7 @@
                  where the review came from, and the card links out to the
                  platform that holds the score. --}}
             @if ($isSystem)
-            <div class="flex gap-0.5" aria-label="{{ number_format($r, 1) }} out of 5 stars">
+            <div class="flex gap-0.5" aria-label="{{ __('reviews.stars_aria', ['rating' => number_format($r, 1)]) }}">
                 @for ($i = 0; $i < $full; $i++)
                     @if ($isGoogle)
                         <svg class="h-4 w-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -184,6 +186,6 @@
         :aria-expanded="expanded.toString()"
         class="mt-2 self-start text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
     >
-        <span x-text="expanded ? 'See less' : 'See more'">See more</span>
+        <span x-text="expanded ? @js(__('common.see_less')) : @js(__('common.see_more'))">{{ __('common.see_more') }}</span>
     </button>
 </article>

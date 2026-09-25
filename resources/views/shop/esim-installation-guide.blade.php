@@ -12,11 +12,11 @@
 <x-layouts.app.header :title="'eSIM Installation Guide | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">eSIM</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">eSIM Installation Guide</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm text-zinc-600 sm:text-base">How to install and turn on your travel eSIM on iPhone and Android.</p>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">eSIM</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">eSIM Installation Guide</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm text-white/75 sm:text-base">How to install and turn on your eSIM on iPhone and Android.</p>
         </div>
     </section>
 
@@ -51,9 +51,9 @@
                 Menu names vary between phone makers and software versions. These are the most common paths.
             </p>
             <ul class="mt-4 space-y-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
-                <li class="rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100"><span class="font-semibold text-zinc-900">Samsung Galaxy:</span> Settings, Connections, SIM manager, Add eSIM, then scan the QR code.</li>
-                <li class="rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100"><span class="font-semibold text-zinc-900">Google Pixel:</span> Settings, Network and internet, SIMs, Add SIM, then choose to download a SIM and scan the QR code.</li>
-                <li class="rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100"><span class="font-semibold text-zinc-900">Other Android phones:</span> look in Settings under Network, SIM or Mobile network for an option to add or download an eSIM.</li>
+                <li class="rounded-[12px] bg-zinc-50 p-4"><span class="font-semibold text-zinc-900">Samsung Galaxy:</span> Settings, Connections, SIM manager, Add eSIM, then scan the QR code.</li>
+                <li class="rounded-[12px] bg-zinc-50 p-4"><span class="font-semibold text-zinc-900">Google Pixel:</span> Settings, Network and internet, SIMs, Add SIM, then choose to download a SIM and scan the QR code.</li>
+                <li class="rounded-[12px] bg-zinc-50 p-4"><span class="font-semibold text-zinc-900">Other Android phones:</span> look in Settings under Network, SIM or Mobile network for an option to add or download an eSIM.</li>
             </ul>
         </section>
 
@@ -76,7 +76,7 @@
                 <li>Installed but no signal: check that data roaming is on for the eSIM line and that it is selected for mobile data, then turn airplane mode on and off or restart your phone.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Still stuck?</p>

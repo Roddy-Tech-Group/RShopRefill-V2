@@ -38,6 +38,20 @@ return [
     'theme_system' => 'Sistema',
     'help' => 'Ajuda',
     'invite_a_friend' => 'Convidar um amigo',
+    'certified_reseller' => 'Revendedor certificado',
     'change_country' => 'Mudar de país',
     'shop_in' => 'Comprar em :currency',
+
+    // Carousel and theme controls shared by several rows.
+    'theme_auto' => 'Auto',
+    'theme_label' => 'Tema:',
+    'see_more' => 'Ver mais',
+    'see_less' => 'Ver menos',
+    'show_more' => 'Mostrar mais',
+    'see_more_named' => 'Ver mais: :name',
+    'previous' => 'Anterior',
+    'next' => 'Seguinte',
+    'appearance' => 'Aparência',
+    'appearance_intro' => 'Escolha como a :site aparece para você. Auto segue a configuração do seu dispositivo.',
+    'theme_hint' => 'Alterne entre o modo claro e o escuro, ou siga o seu sistema.',
 ];

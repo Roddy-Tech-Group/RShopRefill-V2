@@ -31,6 +31,22 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // The admin panel is English only. Its copy is written in English
+        // rather than translated, so a non-English locale changes nothing it
+        // says - but it does set `dir` from the locale, and an RTL language
+        // mirrors the whole layout: sidebar on the right, every row reversed,
+        // around an interface whose text is still English.
+        //
+        // Set the locale for THIS request without resolving or storing one, so
+        // an operator who was reading the storefront in another language keeps
+        // that choice when they go back to it. Falling through to the code
+        // below would write `en` into the session and silently reset them.
+        if ($this->isAdminArea($request)) {
+            App::setLocale($this->default());
+
+            return $next($request);
+        }
+
         $locale = $this->resolve($request);
 
         App::setLocale($locale);
@@ -120,5 +136,17 @@ class SetLocale
     private function default(): string
     {
         return (string) config('localization.default', config('app.fallback_locale', 'en'));
+    }
+
+    /**
+     * Whether this request is for the admin panel.
+     *
+     * Matched on the URL rather than the admin guard: an operator can be signed
+     * into the admin guard while reading the storefront, and that visit should
+     * still honour their chosen language.
+     */
+    private function isAdminArea(Request $request): bool
+    {
+        return $request->is('admin', 'admin/*');
     }
 }

@@ -37,7 +37,7 @@
 
         @if ($section->cta_label && $section->cta_url)
             <div class="mt-8">
-                <a href="{{ $section->cta_url }}" class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
+                <a href="{{ $section->cta_url }}" class="inline-flex items-center rounded-full bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
                     {{ $section->cta_label }}
                 </a>
             </div>

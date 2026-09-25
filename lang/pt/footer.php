@@ -17,11 +17,11 @@ return [
     'legal' => 'Jurídico e confiança',
 
     // Brand column
-    'tagline' => 'Seu marketplace de cartões-presente, eSIMs de viagem, recargas de celular e pagamento de contas.',
+    'tagline' => 'Seu marketplace de cartões-presente, eSIMs, recargas de celular e pagamento de contas.',
 
     // Shop column
     'gift_cards' => 'Cartões-presente',
-    'travel_esims' => 'eSIMs de viagem',
+    'esims' => 'eSIMs',
     'mobile_topups' => 'Recargas de celular',
     'data_bundles' => 'Pacotes de dados',
     'bill_payments' => 'Pagamento de contas',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Todos os direitos reservados.',
     'legal_line' => 'Pertence e é operado por :company, RC :rc, com endereço registrado em :address.',
     'verify_company' => 'Verificar empresa',
+
+    'newsletter_pitch' => 'Receba ofertas de cartões-presente, eSIM e recargas no seu e-mail',
+    'newsletter_label' => 'Endereço de e-mail',
+    'newsletter_placeholder' => 'voce@exemplo.com',
+    'newsletter_cta' => 'Inscrever-me',
+    'newsletter_sending' => 'Inscrevendo',
+    'newsletter_done' => 'Você está na lista. Obrigado!',
 ];

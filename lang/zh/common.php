@@ -36,6 +36,20 @@ return [
     'theme_system' => '跟随系统',
     'help' => '帮助',
     'invite_a_friend' => '邀请好友',
+    'certified_reseller' => '认证经销商',
     'change_country' => '更改国家',
     'shop_in' => '以 :currency 购买',
+
+    // Carousel and theme controls shared by several rows.
+    'theme_auto' => '自动',
+    'theme_label' => '主题：',
+    'see_more' => '查看更多',
+    'see_less' => '收起',
+    'show_more' => '显示更多',
+    'see_more_named' => '查看更多：:name',
+    'previous' => '上一个',
+    'next' => '下一个',
+    'appearance' => '外观',
+    'appearance_intro' => '选择 :site 的显示外观。“自动”将跟随您的设备设置。',
+    'theme_hint' => '在浅色和深色模式之间切换，或跟随系统设置。',
 ];

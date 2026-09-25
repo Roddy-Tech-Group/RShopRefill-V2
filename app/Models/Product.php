@@ -128,14 +128,33 @@ class Product extends Model
      * Used as a branded fallback — mobile-airtime operators carry no logo, so
      * their cards become a coloured name tile instead of an empty box.
      */
-    public static function tileColor(?string $key): string
+    /**
+     * @param  list<string>  $avoid  Colours already used by nearby tiles.
+     */
+    public static function tileColor(?string $key, array $avoid = []): string
     {
         $palette = [
             '#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2',
             '#db2777', '#4f46e5', '#ca8a04', '#0d9488', '#e11d48', '#9333ea',
         ];
 
-        return $palette[abs(crc32((string) $key)) % count($palette)];
+        $start = abs(crc32((string) $key)) % count($palette);
+
+        // The colour is derived from the brand, so an operator keeps the same
+        // tile wherever it appears. With 194 logo-less brands over twelve
+        // colours, though, neighbours collide often, and two identical tiles
+        // side by side read as a rendering fault rather than a palette. A
+        // caller drawing a grid passes the colours it just used and the brand
+        // steps to the next free one.
+        foreach (range(0, count($palette) - 1) as $step) {
+            $candidate = $palette[($start + $step) % count($palette)];
+
+            if (! in_array($candidate, $avoid, true)) {
+                return $candidate;
+            }
+        }
+
+        return $palette[$start];
     }
 
     /**

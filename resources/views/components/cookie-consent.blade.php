@@ -28,11 +28,16 @@
          home indicator in the installed PWA, same as the old bar did. --}}
     class="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-[70] w-[calc(100%-2rem)] max-w-sm rounded-[12px] border border-zinc-200 bg-white p-4 shadow-2xl shadow-zinc-900/20 sm:w-full"
     role="region"
-    aria-label="Cookie consent"
+    aria-label="{{ __('navigation.cookie_consent') }}"
 >
+    {{-- The sentence is one key so a translation can reorder it around the
+         site name and the link. Both placeholders are escaped before they go
+         in; only the anchor markup itself is raw. --}}
     <p class="text-sm leading-relaxed text-zinc-600">
-        We use cookies to keep you signed in, secure your payments and improve {{ $siteName }}.
-        See our <a href="{{ route('shop.cookie-policy') }}" wire:navigate class="font-medium text-blue-600 hover:underline">Cookie Policy</a>.
+        {!! __('navigation.cookie_body', [
+            'site' => e($siteName),
+            'policy' => '<a href="'.e(route('shop.cookie-policy')).'" wire:navigate class="font-medium text-blue-600 hover:underline">'.e(__('navigation.cookie_policy')).'</a>',
+        ]) !!}
     </p>
 
     <div class="mt-4 flex items-center gap-3">
@@ -41,14 +46,14 @@
             @click="localStorage.setItem('cookie_consent', 'declined'); show = false"
             class="flex-1 rounded-[12px] border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
         >
-            Decline
+            {{ __('navigation.cookie_decline') }}
         </button>
         <button
             type="button"
             @click="localStorage.setItem('cookie_consent', 'accepted'); show = false; window.dispatchEvent(new Event('cookie-consent-accepted'))"
             class="flex-1 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
         >
-            Accept cookies
+            {{ __('navigation.cookie_accept') }}
         </button>
     </div>
 </div>

@@ -68,14 +68,23 @@ class MobileSearchRowTest extends TestCase
     }
 
     /**
-     * The primary row collapses on scroll behind a max-height cap. Two rows on
-     * a phone need more headroom than one; desktop still has a single row and
-     * keeps the tighter cap, because a cap far above the content height leaves
-     * the collapse looking like it stalls before it starts.
+     * The row stays on scroll. It used to fold with the category strip behind
+     * a max-height cap; now only the strip folds (NavFoldTest), and it does so
+     * as a grid row rather than under a cap, so no cap exists anywhere in the
+     * nav for this row to clear.
      */
-    public function test_the_collapse_cap_clears_both_rows_on_a_phone(): void
+    public function test_the_row_does_not_fold_on_scroll(): void
     {
-        $this->assertStringContainsString('max-h-[150px] md:max-h-[140px]', $this->nav());
+        $nav = $this->nav();
+
+        // The phone row's own element carries no scroll-driven class binding.
+        preg_match('/<div\s+x-data="navBrandSearch\(\)"[^>]*md:hidden"/s', $nav, $row);
+        $this->assertNotEmpty($row, 'The phone search row did not render.');
+        $this->assertStringNotContainsString(':class="hidden', $row[0]);
+        $this->assertStringNotContainsString('max-h-', $row[0]);
+
+        $this->assertStringNotContainsString('max-h-[150px]', $nav);
+        $this->assertStringNotContainsString('max-h-[120px]', $nav);
     }
 
     public function test_both_search_fields_render_on_the_storefront(): void

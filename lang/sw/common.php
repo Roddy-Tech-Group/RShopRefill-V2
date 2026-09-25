@@ -36,6 +36,20 @@ return [
     'theme_system' => 'Mfumo',
     'help' => 'Msaada',
     'invite_a_friend' => 'Mwalike rafiki',
+    'certified_reseller' => 'Muuzaji aliyeidhinishwa',
     'change_country' => 'Badilisha nchi',
     'shop_in' => 'Nunua kwa :currency',
+
+    // Carousel and theme controls shared by several rows.
+    'theme_auto' => 'Otomatiki',
+    'theme_label' => 'Mandhari:',
+    'see_more' => 'Ona zaidi',
+    'see_less' => 'Ona kidogo',
+    'show_more' => 'Onyesha zaidi',
+    'see_more_named' => 'Ona zaidi: :name',
+    'previous' => 'Iliyotangulia',
+    'next' => 'Inayofuata',
+    'appearance' => 'Mwonekano',
+    'appearance_intro' => 'Chagua jinsi :site inavyoonekana kwako. Otomatiki hufuata mpangilio wa kifaa chako.',
+    'theme_hint' => 'Badilisha kati ya hali ya mwanga na giza, au fuata mfumo wako.',
 ];

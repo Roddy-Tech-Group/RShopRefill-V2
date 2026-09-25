@@ -80,7 +80,7 @@ new class extends Component {
         @click="open = ! open"
         :aria-expanded="open.toString()"
         aria-label="Notifications"
-        class="relative flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white"
+        class="relative flex h-10 w-10 items-center justify-center rounded-[12px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white"
     >
         {{-- Masked so the bell inherits the chip's text colour (light on the grey
              chip, white on the blue hover) - an <img> can't be recoloured. --}}
@@ -114,18 +114,16 @@ new class extends Component {
                     @click="pushEnabled ? window.RshopPush?.unsubscribe().then(() => pushEnabled = false) : window.RshopPush?.subscribe().then(res => pushEnabled = res)"
                     type="button"
                     class="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
-                    :class="pushEnabled ? 'bg-blue-600' : 'bg-zinc-200'"
+                    :class="pushEnabled ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-white/25!'"
                     title="Toggle Web Push"
                 >
-                    <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="pushEnabled ? 'translate-x-3' : 'translate-x-0'"></span>
+                    {{-- dark:bg-zinc-100! : .dark .bg-white remaps to the panel grey, which is how the whole toggle vanished in dark mode. --}}
+                    <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out dark:bg-zinc-100!" :class="pushEnabled ? 'translate-x-3' : 'translate-x-0'"></span>
                 </button>
             </div>
-            @if ($this->unreadCount > 0)
-                <button type="button" wire:click="markAllRead" class="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700">Mark all read</button>
-            @endif
         </div>
 
-        <div class="max-h-80 overflow-y-auto [scrollbar-width:thin]">
+        <div class="max-h-80 overflow-y-auto">
             @forelse ($this->items as $n)
                 <button
                     type="button"
@@ -158,6 +156,21 @@ new class extends Component {
                     <p class="mt-0.5 text-xs text-zinc-600">New notifications will appear here.</p>
                 </div>
             @endforelse
+        </div>
+
+        {{-- Sits under the list, not in the header: the list scrolls, the
+             action stays put. Disabled rather than hidden when nothing is
+             unread, so the panel keeps its shape. --}}
+        <div class="border-t border-zinc-100 p-2 dark:border-white/10">
+            <button
+                type="button"
+                wire:click="markAllRead"
+                @disabled($this->unreadCount === 0)
+                class="flex w-full items-center justify-center gap-2 rounded-[8px] px-3 py-2 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-default disabled:text-zinc-400 disabled:hover:bg-transparent dark:text-blue-400 dark:disabled:text-zinc-500"
+            >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                Mark all as read
+            </button>
         </div>
     </div>
 </div>

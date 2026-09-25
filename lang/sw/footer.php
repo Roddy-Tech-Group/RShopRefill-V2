@@ -17,11 +17,11 @@ return [
     'legal' => 'Sheria na uaminifu',
 
     // Brand column
-    'tagline' => 'Soko lako la kadi za zawadi, eSIM za safari, salio la simu na malipo ya bili.',
+    'tagline' => 'Soko lako la kadi za zawadi, eSIM, salio la simu na malipo ya bili.',
 
     // Shop column
     'gift_cards' => 'Kadi za zawadi',
-    'travel_esims' => 'eSIM za safari',
+    'esims' => 'eSIM',
     'mobile_topups' => 'Salio la simu',
     'data_bundles' => 'Vifurushi vya data',
     'bill_payments' => 'Malipo ya bili',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Haki zote zimehifadhiwa.',
     'legal_line' => 'Inamilikiwa na kuendeshwa na :company, RC :rc, yenye anwani rasmi katika :address.',
     'verify_company' => 'Thibitisha kampuni',
+
+    'newsletter_pitch' => 'Pata ofa za kadi za zawadi, eSIM na salio kwenye barua pepe yako',
+    'newsletter_label' => 'Anwani ya barua pepe',
+    'newsletter_placeholder' => 'wewe@mfano.com',
+    'newsletter_cta' => 'Jisajili',
+    'newsletter_sending' => 'Inasajili',
+    'newsletter_done' => 'Umo kwenye orodha. Asante!',
 ];

@@ -124,7 +124,7 @@ new #[Layout('components.layouts.auth')] class extends Component
             <a
                 href="{{ route('auth.google.redirect', ['popup' => 1]) }}"
                 @click.prevent="window.rshopOpenGoogleOAuth($el.href)"
-                class="flex items-center justify-center gap-3 rounded-[12px] border border-zinc-300 bg-white px-4 py-3 text-base font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                class="flex items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 py-3 text-base font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
             >
                 <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -159,7 +159,7 @@ new #[Layout('components.layouts.auth')] class extends Component
                         autofocus
                         autocomplete="email"
                         placeholder="Enter your email address"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 focus:border-edge dark:focus:border-edge"
                     />
                 </div>
                 @error('email') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -177,7 +177,7 @@ new #[Layout('components.layouts.auth')] class extends Component
                         required
                         autocomplete="current-password"
                         placeholder="Enter your password"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-3 pl-4 pr-12 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white py-3 pl-4 pr-12 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 focus:border-edge dark:focus:border-edge"
                     />
                     <button
                         type="button"
@@ -223,7 +223,7 @@ new #[Layout('components.layouts.auth')] class extends Component
 
             <button
                 type="submit"
-                class="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                class="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
             >
                 <span>Sign In</span>
             </button>

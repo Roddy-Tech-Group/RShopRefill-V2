@@ -23,19 +23,19 @@
     // the sentence when their flag is off. Leaving them in would promise a
     // service with no catalogue, no page and no nav entry behind it.
     $offerings = array_values(array_filter([
-        'gift cards',
-        'eSIMs',
-        \App\Support\FeatureFlag::categoryVisible('flights') ? 'flights' : null,
-        \App\Support\FeatureFlag::categoryVisible('stays') ? 'stays' : null,
-        'mobile top-ups',
+        __('home.offering_gift_cards'),
+        __('home.offering_esims'),
+        \App\Support\FeatureFlag::categoryVisible('flights') ? __('home.offering_flights') : null,
+        \App\Support\FeatureFlag::categoryVisible('stays') ? __('home.offering_stays') : null,
+        __('home.offering_topups'),
     ]));
-    $offeringsAnd = \Illuminate\Support\Arr::join($offerings, ', ', ' and ');
-    $offeringsList = implode(', ', $offerings);
+    $offeringsAnd = \Illuminate\Support\Arr::join($offerings, __('home.list_glue'), __('home.list_last_glue'));
+    $offeringsList = implode(__('home.list_glue'), $offerings);
 @endphp
 
-<section data-reveal aria-label="How it works">
+<section data-reveal aria-label="{{ __('home.how_heading') }}">
 
-    <h2 class="mb-5 text-xl font-bold text-zinc-900 sm:text-2xl">How it works</h2>
+    <h2 class="mb-5 text-xl font-bold text-zinc-900 sm:text-2xl">{{ __('home.how_heading') }}</h2>
 
     {{-- Mobile: horizontal scroll. Desktop: 3-col grid. Mobile py-2 prevents the card ring/shadow from being clipped. --}}
     <div class="-mx-4 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0 sm:py-0">
@@ -47,9 +47,9 @@
                 <x-illo name="cardFan" class="h-full w-full" />
             </div>
             <div class="bg-zinc-100 dark:bg-[var(--ash)] p-5">
-                <h3 class="text-base font-semibold text-zinc-900">1. Pick a product or service</h3>
+                <h3 class="text-base font-semibold text-zinc-900">{{ __('home.how_step1_title') }}</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">
-                    Choose from {{ $productsRounded }}+ {{ $offeringsAnd }} made ready for you to simplify your shopping experience.
+                    {{ __('home.how_step1_body', ['count' => $productsRounded, 'offerings' => $offeringsAnd]) }}
                 </p>
             </div>
         </article>
@@ -60,9 +60,9 @@
                 <x-illo name="payWeb" class="h-full w-full" />
             </div>
             <div class="bg-zinc-100 dark:bg-[var(--ash)] p-5">
-                <h3 class="text-base font-semibold text-zinc-900">2. Pay with Cards, Crypto, Mobile Money, Bank Transfers etc</h3>
+                <h3 class="text-base font-semibold text-zinc-900">{{ __('home.how_step2_title') }}</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">
-                    Access {{ $productsRounded }}+ digital products including {{ $offeringsList }}, and more, all in one seamless platform.
+                    {{ __('home.how_step2_body', ['count' => $productsRounded, 'offerings' => $offeringsList]) }}
                 </p>
             </div>
         </article>
@@ -73,9 +73,9 @@
                 <x-illo name="delivery" class="h-full w-full" />
             </div>
             <div class="bg-zinc-100 dark:bg-[var(--ash)] p-5">
-                <h3 class="text-base font-semibold text-zinc-900">3. Receive instantly</h3>
+                <h3 class="text-base font-semibold text-zinc-900">{{ __('home.how_step3_title') }}</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">
-                    Your product arrives in seconds, to your email address and your clients dashboard if you are signed up with us ready to use.
+                    {{ __('home.how_step3_body') }}
                 </p>
             </div>
         </article>

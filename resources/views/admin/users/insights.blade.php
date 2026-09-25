@@ -35,7 +35,7 @@
 
     <div class="space-y-6">
         <div class="grid gap-6 lg:grid-cols-2">
-            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Users by country</h2>
                 <p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Top 10 · {{ number_format($insights['total_users']) }} users in this window</p>
                 <div wire:key="um-users-{{ $window ?? 'all' }}" wire:ignore x-data="umBarChart({
@@ -48,7 +48,7 @@
                 </div>
             </div>
 
-            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Revenue by country</h2>
                 <p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Top 10 · ${{ number_format($insights['total_revenue_usd'], 2) }} across {{ number_format($insights['total_orders']) }} completed orders</p>
                 <div wire:key="um-revenue-{{ $window ?? 'all' }}" wire:ignore x-data="umBarChart({
@@ -63,7 +63,7 @@
             </div>
         </div>
 
-        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">Weekly signups</h2>
             <p class="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Last 12 weeks · top 5 countries, everyone else as Rest</p>
             <div wire:ignore x-data="umAreaChart(@js($insights['weekly_signups']))" x-on:livewire:navigating.window="destroy()">
@@ -73,17 +73,17 @@
 
         {{-- The table view: every country, exportable, and the accessible twin
              of the charts above. --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full text-sm admin-table">
                     <thead>
-                        <tr class="border-b border-zinc-100 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-                            <th class="px-5 py-3">Country</th>
-                            <th class="px-5 py-3 text-right">Users</th>
-                            <th class="px-5 py-3 text-right">Orders</th>
-                            <th class="px-5 py-3 text-right">Revenue (USD)</th>
-                            <th class="px-5 py-3 text-right">Avg order (USD)</th>
-                            <th class="px-5 py-3 text-right">Verified</th>
+                        <tr class="text-left">
+                            <th class="">Country</th>
+                            <th class="text-right">Users</th>
+                            <th class="text-right">Orders</th>
+                            <th class="text-right">Revenue (USD)</th>
+                            <th class="text-right">Avg order (USD)</th>
+                            <th class="text-right">Verified</th>
                         </tr>
                     </thead>
                     <tbody>

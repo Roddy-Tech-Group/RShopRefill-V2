@@ -24,14 +24,18 @@
     @toast.window="triggerToast($event.detail.message, $event.detail.isError || false)"
     x-show="show"
     x-cloak
+    {{-- Top centre at every width, dropping in from above. It used to slide in
+         from the right and park at the top-right corner on sm+, which put it
+         over the header actions and read as a different component from the
+         mobile one. One position, one motion. --}}
     x-transition:enter="transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-    x-transition:enter-start="opacity-0 translate-y-3 sm:translate-y-0 sm:translate-x-4"
-    x-transition:enter-end="opacity-100 translate-y-0 sm:translate-x-0"
+    x-transition:enter-start="opacity-0 -translate-y-3"
+    x-transition:enter-end="opacity-100 translate-y-0"
     x-transition:leave="transition duration-200 ease-in"
-    x-transition:leave-start="opacity-100 translate-x-0"
-    x-transition:leave-end="opacity-0 translate-x-4"
+    x-transition:leave-start="opacity-100 translate-y-0"
+    x-transition:leave-end="opacity-0 -translate-y-3"
     style="display:none;"
-    class="fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-sm items-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium shadow-lg shadow-zinc-900/15 ring-1 sm:inset-x-auto sm:right-5 sm:top-5"
+    class="fixed inset-x-4 top-4 z-[100] mx-auto flex w-fit max-w-sm items-center gap-2.5 rounded-[5px] px-5 py-3 text-sm font-medium shadow-lg shadow-zinc-900/15 ring-1 sm:top-5"
     :class="isError 
         ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30' 
         : 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30'"

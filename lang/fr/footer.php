@@ -18,11 +18,11 @@ return [
     'legal' => 'Juridique et confiance',
 
     // Brand column
-    'tagline' => 'Votre marketplace de cartes cadeaux, d’eSIM de voyage, de recharges mobiles et de paiement de factures.',
+    'tagline' => 'Votre marketplace de cartes cadeaux, d’eSIM, de recharges mobiles et de paiement de factures.',
 
     // Shop column
     'gift_cards' => 'Cartes cadeaux',
-    'travel_esims' => 'eSIM de voyage',
+    'esims' => 'eSIM',
     'mobile_topups' => 'Recharges mobiles',
     'data_bundles' => 'Forfaits internet',
     'bill_payments' => 'Paiement de factures',

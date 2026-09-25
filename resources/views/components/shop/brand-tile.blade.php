@@ -90,18 +90,18 @@
 
             @if ($outOfStock)
                 <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-zinc-900/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-                    Out of stock
+                    {{ __('products.out_of_stock') }}
                 </span>
             @elseif (! $categoryEnabled)
                 <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-amber-500/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-                    Unavailable
+                    {{ __('giftcards.badge_unavailable') }}
                 </span>
             @elseif ($product->is_popular)
                 {{-- Round pill with a soft fuchsia glow halo. --}}
-                <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-fuchsia-500 bg-fuchsia-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-600 shadow-[0_0_12px_rgba(217,70,239,0.55)] backdrop-blur-sm">Popular</span>
+                <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-fuchsia-500 bg-fuchsia-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-600 shadow-[0_0_12px_rgba(217,70,239,0.55)] backdrop-blur-sm">{{ __('products.detail_popular') }}</span>
             @elseif ($product->is_featured)
                 {{-- Round pill with a soft amber glow halo. --}}
-                <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-amber-500 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.6)] backdrop-blur-sm">Featured</span>
+                <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-amber-500 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.6)] backdrop-blur-sm">{{ __('navigation.featured') }}</span>
             @endif
 
         </div>

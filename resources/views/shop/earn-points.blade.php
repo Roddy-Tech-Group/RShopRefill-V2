@@ -16,26 +16,26 @@
              paused and let the page end early so we don't promise rewards
              that won't be paid. Existing balances stay spendable from the
              Rewards dashboard. --}}
-        <section class="border-b border-zinc-100 bg-blue-50">
+        <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
             <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-                <span class="inline-flex items-center gap-2 rounded-[5px] bg-amber-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">Paused</span>
-                <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">Rewards are currently paused</h1>
-                <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+                <span class="inline-flex items-center gap-2 rounded-[5px] bg-amber-400/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-200">Paused</span>
+                <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">Rewards are currently paused</h1>
+                <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                     The Rcoin earning programme is temporarily off. Any Rcoin already in your wallet stays yours and can still be used at checkout when the programme resumes.
                 </p>
                 <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    <a href="{{ route('home') }}" class="inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Back to home</a>
+                    <a href="{{ route('home') }}" class="inline-flex items-center justify-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Back to home</a>
                 </div>
             </div>
         </section>
     @else
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Rewards</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">Earn points every time you shop</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Rewards</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">Earn points every time you shop</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                 Every order earns you Rcoin, our rewards currency. Collect it as you shop and redeem it for credit you can spend across the platform.
             </p>
         </div>
@@ -48,7 +48,7 @@
 
         <div class="mt-9 grid grid-cols-1 gap-5 sm:grid-cols-3">
             @foreach ($ways as $i => $way)
-                <div class="rounded-[12px] bg-white p-6 text-center ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-white p-6 text-center">
                     <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
                         <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $way['path'] }}"/></svg>
                     </span>
@@ -60,7 +60,7 @@
         </div>
 
         {{-- Earn-rate highlight --}}
-        <div class="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+        <div class="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-[12px] bg-blue-50 p-4">
             <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
             <div>
                 <p class="text-sm font-bold text-blue-700">Earn as you spend</p>
@@ -75,11 +75,11 @@
             <h2 class="text-2xl font-bold text-white sm:text-3xl">Start earning today</h2>
             <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-blue-100">Shop the products you already love and watch your Rcoin grow.</p>
             <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
+                <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
                     Start shopping
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </a>
-                <a href="{{ route('dashboard.rewards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] border border-white/40 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
+                <a href="{{ route('dashboard.rewards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
                     View your rewards
                 </a>
             </div>

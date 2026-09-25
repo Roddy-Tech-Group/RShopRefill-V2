@@ -87,7 +87,11 @@
             role="menu"
             aria-label="{{ __('navigation.gift_cards') }}"
         >
-            <div class="mx-auto grid w-full max-w-[1550px] grid-cols-[220px_1fr_240px] gap-10 px-4 sm:px-6 lg:px-8">
+            {{-- The third column is reserved only when it has something in it.
+                 Popular brands are per region and some regions have none, and a
+                 standing 240px column plus its gap left 280px of empty panel to
+                 the right of the categories. --}}
+            <div class="mx-auto grid w-full max-w-[1550px] {{ $popular->isNotEmpty() ? 'grid-cols-[220px_1fr_240px]' : 'grid-cols-[220px_1fr]' }} gap-10 px-4 sm:px-6 lg:px-8">
 
                 {{-- Ways in, before any category: most visitors want everything
                      or the popular ones, not a taxonomy. --}}
@@ -116,7 +120,12 @@
                      balanced columns so the list reads down, not across. --}}
                 <div class="border-l border-[#dee3e1] pl-8 dark:border-white/10">
                     <p class="{{ $headingClass }}">{{ __('navigation.categories') }}</p>
-                    <ul class="mt-4 grid grid-cols-3 gap-x-6 gap-y-3">
+                    {{-- A fourth column when the popular panel is not there to
+                         take the width. Three columns stretched across the full
+                         panel put half a screen between a label and the next
+                         one; four keeps the reading distance and shortens the
+                         list by a row. --}}
+                    <ul class="mt-4 grid {{ $popular->isNotEmpty() ? 'grid-cols-3' : 'grid-cols-4' }} gap-x-6 gap-y-3">
                         @foreach ($menuCategories as $category)
                             <li>
                                 <a href="{{ route('shop.gift-cards', ['subcategory' => $category['slug']]) }}" wire:navigate class="{{ $columnClass }}">

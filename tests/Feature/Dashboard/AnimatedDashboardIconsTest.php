@@ -86,8 +86,10 @@ class AnimatedDashboardIconsTest extends TestCase
         $layout = $this->layout();
 
         $this->assertStringNotContainsString('new cart.svg', $layout);
-        $this->assertSame(2, substr_count($layout, 'anim-icon anim-icon--cart'));
-        $this->assertSame(2, substr_count($layout, '<x-icons.cart />'));
+        // One header serves desktop and phone alike since the 2026-09-23 mobile
+        // redesign, so the layout draws the cart glyph once.
+        $this->assertSame(1, substr_count($layout, 'anim-icon anim-icon--cart'));
+        $this->assertSame(1, substr_count($layout, '<x-icons.cart />'));
         $this->assertStringContainsString('<x-icons.cart', file_get_contents(resource_path('views/components/nav/account-cart.blade.php')));
     }
 

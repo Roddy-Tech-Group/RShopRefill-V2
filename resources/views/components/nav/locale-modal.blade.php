@@ -84,27 +84,33 @@
     $languageLocales = \App\Support\Languages::localeMap();
     $currentLanguage = \App\Support\Languages::nameFor(app()->getLocale())
         ?? \App\Support\Languages::defaultName();
+
+    // What the sheet SHOWS for a language: its own name for itself and its
+    // short code, both from the same config entries. The English display name
+    // above stays the value that is staged and posted; these only label it.
+    $languageNativeNames = array_column(\App\Support\Languages::all(), 'native_name', 'name');
+    $languageShortCodes = array_column(\App\Support\Languages::all(), 'short', 'name');
     $currencies = [
-        ['code' => 'USD', 'symbol' => '$',   'name' => 'United States Dollar'],
-        ['code' => 'EUR', 'symbol' => '€',   'name' => 'Euro'],
-        ['code' => 'GBP', 'symbol' => '£',   'name' => 'British Pound'],
-        ['code' => 'NGN', 'symbol' => '₦',   'name' => 'Nigerian Naira'],
-        ['code' => 'XAF', 'symbol' => 'XAF ','name' => 'Central African CFA Franc'],
-        ['code' => 'ZAR', 'symbol' => 'R',   'name' => 'South African Rand'],
-        ['code' => 'KES', 'symbol' => 'KSh', 'name' => 'Kenyan Shilling'],
-        ['code' => 'GHS', 'symbol' => '₵',   'name' => 'Ghanaian Cedi'],
-        ['code' => 'EGP', 'symbol' => 'E£',  'name' => 'Egyptian Pound'],
-        ['code' => 'MAD', 'symbol' => 'DH',  'name' => 'Moroccan Dirham'],
-        ['code' => 'CAD', 'symbol' => 'CA$', 'name' => 'Canadian Dollar'],
-        ['code' => 'AUD', 'symbol' => 'A$',  'name' => 'Australian Dollar'],
-        ['code' => 'JPY', 'symbol' => '¥',   'name' => 'Japanese Yen'],
-        ['code' => 'CNY', 'symbol' => '¥',   'name' => 'Chinese Yuan'],
-        ['code' => 'INR', 'symbol' => '₹',   'name' => 'Indian Rupee'],
-        ['code' => 'BRL', 'symbol' => 'R$',  'name' => 'Brazilian Real'],
-        ['code' => 'AED', 'symbol' => 'AED', 'name' => 'UAE Dirham'],
-        ['code' => 'SAR', 'symbol' => 'SAR', 'name' => 'Saudi Riyal'],
-        ['code' => 'TRY', 'symbol' => '₺',   'name' => 'Turkish Lira'],
-        ['code' => 'CHF', 'symbol' => 'Fr',  'name' => 'Swiss Franc'],
+        ['code' => 'USD', 'symbol' => '$',   'name' => __('navigation.currency_names.USD')],
+        ['code' => 'EUR', 'symbol' => '€',   'name' => __('navigation.currency_names.EUR')],
+        ['code' => 'GBP', 'symbol' => '£',   'name' => __('navigation.currency_names.GBP')],
+        ['code' => 'NGN', 'symbol' => '₦',   'name' => __('navigation.currency_names.NGN')],
+        ['code' => 'XAF', 'symbol' => 'XAF ','name' => __('navigation.currency_names.XAF')],
+        ['code' => 'ZAR', 'symbol' => 'R',   'name' => __('navigation.currency_names.ZAR')],
+        ['code' => 'KES', 'symbol' => 'KSh', 'name' => __('navigation.currency_names.KES')],
+        ['code' => 'GHS', 'symbol' => '₵',   'name' => __('navigation.currency_names.GHS')],
+        ['code' => 'EGP', 'symbol' => 'E£',  'name' => __('navigation.currency_names.EGP')],
+        ['code' => 'MAD', 'symbol' => 'DH',  'name' => __('navigation.currency_names.MAD')],
+        ['code' => 'CAD', 'symbol' => 'CA$', 'name' => __('navigation.currency_names.CAD')],
+        ['code' => 'AUD', 'symbol' => 'A$',  'name' => __('navigation.currency_names.AUD')],
+        ['code' => 'JPY', 'symbol' => '¥',   'name' => __('navigation.currency_names.JPY')],
+        ['code' => 'CNY', 'symbol' => '¥',   'name' => __('navigation.currency_names.CNY')],
+        ['code' => 'INR', 'symbol' => '₹',   'name' => __('navigation.currency_names.INR')],
+        ['code' => 'BRL', 'symbol' => 'R$',  'name' => __('navigation.currency_names.BRL')],
+        ['code' => 'AED', 'symbol' => 'AED', 'name' => __('navigation.currency_names.AED')],
+        ['code' => 'SAR', 'symbol' => 'SAR', 'name' => __('navigation.currency_names.SAR')],
+        ['code' => 'TRY', 'symbol' => '₺',   'name' => __('navigation.currency_names.TRY')],
+        ['code' => 'CHF', 'symbol' => 'Fr',  'name' => __('navigation.currency_names.CHF')],
     ];
 
     // Picking a country drives the currency — there is no separate currency picker.
@@ -197,22 +203,33 @@
         /** Only these can be staged, stored or posted. */
         offeredLanguages: @js($languages),
 
+        /** Display name -> the language's own name for itself. */
+        nativeNames: @js($languageNativeNames),
+
+        /** Display name -> short code for the round badge. */
+        shortCodes: @js($languageShortCodes),
+
+        nativeFor(name) {
+            return this.nativeNames[name] ?? name;
+        },
+
+        shortFor(name) {
+            return this.shortCodes[name] ?? String(name).slice(0, 2).toUpperCase();
+        },
+
         localeFor(name) {
             return this.languageLocales[name] ?? @js(config('localization.default', 'en'));
         },
 
         /*
-         * A stored language that is no longer offered falls back rather than
-         * being staged: it has no row in the list, so honouring it would show
-         * a sheet where nothing is checked and Save could not change anything.
+         * The language in force is the one this page was RENDERED in, never
+         * the localStorage copy. Storage is shared by every tab: switching to
+         * English in one tab left this sheet reading English in another tab
+         * still showing French, and Save then thought nothing had changed.
+         * The server value cannot disagree with the page it labels.
          */
         readLanguage() {
-            try {
-                const stored = localStorage.getItem('locale.language');
-                return this.offeredLanguages.includes(stored) ? stored : @js($currentLanguage);
-            } catch (e) {
-                return @js($currentLanguage);
-            }
+            return @js($currentLanguage);
         },
 
         /*
@@ -445,7 +462,7 @@
 
             <div>
                 <span class="mb-1.5 block text-[13px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.country') }}</span>
-                <button type="button" @click="pane = 'country'" class="flex w-full items-center gap-3 rounded-[12px] bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <button type="button" @click="pane = 'country'" class="flex w-full items-center gap-3 rounded-full bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
                     <img :src="'https://flagcdn.com/w40/' + (draftCountryCode || 'us').toLowerCase() + '.png'" alt="" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
                     <span class="flex-1 text-left" x-text="draftCountry">United States</span>
                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -460,16 +477,16 @@
                  is presentation; the preferences stay independent. --}}
             <div>
                 <span class="mb-1.5 block text-[13px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.language') }}</span>
-                <button type="button" @click="pane = 'language'" class="flex w-full items-center gap-3 rounded-[12px] bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f4f6f5] text-[11px] font-bold text-zinc-900 dark:bg-white/10 dark:text-white" x-text="draftLanguage.slice(0, 2).toUpperCase()">EN</span>
-                    <span class="flex-1 truncate text-left" x-text="draftLanguage">English</span>
+                <button type="button" @click="pane = 'language'" class="flex w-full items-center gap-3 rounded-full bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f4f6f5] text-[11px] font-bold text-zinc-900 dark:bg-white/10 dark:text-white" x-text="shortFor(draftLanguage)">{{ $languageShortCodes[$currentLanguage] ?? 'EN' }}</span>
+                    <span class="flex-1 truncate text-left" x-text="nativeFor(draftLanguage)">{{ $languageNativeNames[$currentLanguage] ?? $currentLanguage }}</span>
                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
                 </button>
             </div>
 
             <div>
                 <span class="mb-1.5 block text-[13px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.payment_currency') }}</span>
-                <button type="button" @click="pane = 'currency'" class="flex w-full items-center gap-3 rounded-[12px] bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <button type="button" @click="pane = 'currency'" class="flex w-full items-center gap-3 rounded-full bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#dee3e1] text-[13px] font-bold text-zinc-900 dark:bg-white/10 dark:text-white" x-text="draftCurrencySymbol">$</span>
                     <span class="flex-1 text-left" x-text="draftCurrency">USD</span>
                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -506,14 +523,14 @@
             class="col-start-1 row-start-1 flex min-h-0 flex-col"
         >
             <div class="relative mb-3">
-                <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </span>
                 {{-- Enter would otherwise submit the form this pane sits in, saving a
                      half-made choice from the search box. --}}
-                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.country') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.country') }}" class="h-9 w-full rounded-full border-2 border-edge bg-[#ffffff] pl-10 pr-4 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-500 focus:ring-2 focus:ring-edge/30 dark:border-edge dark:bg-white/5 dark:text-white">
             </div>
 
             <div class="min-h-0 max-h-[18.5rem] overflow-y-auto rounded-[12px] bg-[#ffffff] p-1 ring-1 ring-[#dee3e1] dark:bg-white/5 dark:ring-white/10">
@@ -521,7 +538,7 @@
                     <button
                         type="button"
                         @click="pickCountry(entry[0], entry[1], codes, currencyByCode, symbolByCurrency); search = ''"
-                        class="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-base text-zinc-900 transition-colors hover:bg-[#f4f6f5] dark:text-white dark:hover:bg-white/10"
+                        class="flex w-full items-center gap-3 rounded-full px-3 py-3 text-left text-base text-zinc-900 transition-colors hover:bg-[#f4f6f5] dark:text-white dark:hover:bg-white/10"
                     >
                         <img :src="'https://flagcdn.com/w40/' + (codes[entry[0]] || '').toLowerCase() + '.png'" alt="" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
                         <span class="flex-1 truncate" :class="draftCountry === entry[0] ? 'font-semibold' : ''" x-text="entry[0]"></span>
@@ -558,7 +575,7 @@
                  and nested two 18.5rem scroll areas inside each other. The
                  country pane above builds its search and list as siblings for
                  the same reason. --}}
-            <x-nav.language-switcher :languages="$languages" />
+            <x-nav.language-switcher :languages="$languages" :native-names="$languageNativeNames" />
         </div>
 
         {{-- Payment currency chooser.
@@ -578,14 +595,14 @@
             class="col-start-1 row-start-1 flex min-h-0 flex-col"
         >
             <div class="relative mb-3">
-                <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </span>
                 {{-- Enter would otherwise submit the form this pane sits in, saving a
                      half-made choice from the search box. --}}
-                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.payment_currency') }}" class="w-full rounded-[12px] bg-[#ffffff] py-3 pl-11 pr-4 text-base text-zinc-900 outline-none ring-1 ring-[#dee3e1] placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
+                <input x-model="search" @keydown.enter.prevent="null" type="text" placeholder="{{ __('common.search') }}" aria-label="{{ __('common.payment_currency') }}" class="h-9 w-full rounded-full border-2 border-edge bg-[#ffffff] pl-10 pr-4 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-500 focus:ring-2 focus:ring-edge/30 dark:border-edge dark:bg-white/5 dark:text-white">
             </div>
 
             <div class="min-h-0 max-h-[18.5rem] overflow-y-auto rounded-[12px] bg-[#ffffff] p-1 ring-1 ring-[#dee3e1] dark:bg-white/5 dark:ring-white/10">
@@ -593,7 +610,7 @@
                     <button
                         type="button"
                         @click="draftCurrency = c.code; draftCurrencySymbol = c.symbol; pane = 'root'; search = ''"
-                        class="flex w-full items-center gap-3 rounded-[10px] px-3 py-3 text-left text-base text-zinc-900 transition-colors hover:bg-[#f4f6f5] dark:text-white dark:hover:bg-white/10"
+                        class="flex w-full items-center gap-3 rounded-full px-3 py-3 text-left text-base text-zinc-900 transition-colors hover:bg-[#f4f6f5] dark:text-white dark:hover:bg-white/10"
                     >
                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f4f6f5] text-[11px] font-bold dark:bg-white/10" x-text="c.symbol"></span>
                         <span class="flex-1 truncate" :class="draftCurrency === c.code ? 'font-semibold' : ''"><span x-text="c.code"></span> - <span x-text="c.name"></span></span>

@@ -2,12 +2,14 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Domain\Catalog\Support\FaceValueCheck;
 use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Subcategory;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ZenditTopupNormalizer implements CatalogNormalizerInterface
@@ -42,8 +44,9 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
         $costBlock = $rawItem['cost'] ?? [];
         // The SEND block is the value credited to the recipient's phone, in its own
         // currency (a Ghana top-up is GHS). The price block is Zendit's USD price;
-        // the cost block is our USD cost. Use the send block for the card currency.
-        $currencyCode = strtoupper($sendBlock['currency'] ?? $priceBlock['currency'] ?? $rawItem['currency'] ?? 'USD');
+        // the cost block is our USD cost. Use the send block for the card currency;
+        // an EMPTY send label (data bundles) falls through to the price block.
+        $currencyCode = FaceValueCheck::currency($sendBlock, $priceBlock, $rawItem);
 
         // Products are grouped by operator + country. The `topup-` slug prefix keeps
         // it from ever colliding with a gift-card brand that shares a brand_key.
@@ -121,6 +124,21 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
         $isVariable = in_array($priceType, ['VARIABLE', 'RANGE'], true)
             || ($minAmount !== null && $maxAmount !== null && $minAmount !== $maxAmount);
 
+        // A face the supplier labelled or sized wrongly (a "3 PEN" bundle that
+        // costs $3.40) is kept but not offered, with the reading on the row,
+        // until the offer is corrected.
+        $faceCheck = FaceValueCheck::verdict($faceValue, $currencyCode, $costPrice, $isVariable);
+
+        if (FaceValueCheck::isSuspect($faceCheck)) {
+            Log::warning('Catalog offer hidden: face value out of line with its cost', [
+                'offer' => $offerId,
+                'brand' => $brandKey,
+                'country' => $countryCode,
+                'face' => $faceValue,
+                'currency' => $currencyCode,
+            ] + $faceCheck);
+        }
+
         ProductVariant::updateOrCreate(
             ['provider_offer_id' => $offerId],
             [
@@ -136,8 +154,8 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
                 'is_variable' => $isVariable,
-                'is_available' => (bool) ($rawItem['enabled'] ?? true),
-                'metadata' => $rawItem,
+                'is_available' => (bool) ($rawItem['enabled'] ?? true) && ! FaceValueCheck::isSuspect($faceCheck),
+                'metadata' => array_merge($rawItem, ['face_check' => $faceCheck]),
             ]
         );
 

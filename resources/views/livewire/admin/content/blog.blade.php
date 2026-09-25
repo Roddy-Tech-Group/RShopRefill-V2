@@ -249,10 +249,10 @@ class extends Component {
 
         if ($this->editingId) {
             BlogPost::findOrFail($this->editingId)->update($payload);
-            session()->flash('status', 'Post updated.');
+            $this->dispatch('toast', message: 'Post updated.');
         } else {
             BlogPost::create($payload);
-            session()->flash('status', 'Post created.');
+            $this->dispatch('toast', message: 'Post created.');
         }
 
         $this->resetForm();
@@ -262,7 +262,7 @@ class extends Component {
     public function delete(int $id): void
     {
         BlogPost::findOrFail($id)->delete();
-        session()->flash('status', 'Post deleted.');
+        $this->dispatch('toast', message: 'Post deleted.');
         unset($this->posts);
     }
 
@@ -317,11 +317,7 @@ class extends Component {
         </div>
     </header>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-    @endif
-
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
@@ -351,7 +347,7 @@ class extends Component {
                                 <div class="inline-flex items-center gap-1.5">
                                     <button wire:click="togglePublish({{ $post->id }})" type="button" class="rounded-[5px] bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-700/50 dark:text-zinc-300 dark:hover:bg-zinc-700">{{ $post->is_published ? 'Unpublish' : 'Publish' }}</button>
                                     <button wire:click="edit({{ $post->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">Edit</button>
-                                    <button wire:click="delete({{ $post->id }})" wire:confirm="Delete this post permanently?" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
+                                    <button wire:click="delete({{ $post->id }})" data-confirm="Delete this post permanently?" data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
                                 </div>
                             </td>
                         </tr>

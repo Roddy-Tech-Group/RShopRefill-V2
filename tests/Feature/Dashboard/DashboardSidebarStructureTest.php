@@ -4,12 +4,14 @@ namespace Tests\Feature\Dashboard;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
 use Tests\TestCase;
 
 /**
- * The customer sidebar: Overview; a Shop section whose Shop row is the main
- * shop link with an arrow that reveals the services; an Account section; the
- * Need Help card at the bottom. Settings and Logout live in the avatar menu.
+ * The customer sidebar: Overview; a Shop section whose Shop row drops the
+ * services down when pressed anywhere along it (and opens the shop when the
+ * rail is folded to icons); an Account section; the Need Help card at the
+ * bottom. Settings and Logout live in the avatar menu.
  */
 class DashboardSidebarStructureTest extends TestCase
 {
@@ -30,16 +32,24 @@ class DashboardSidebarStructureTest extends TestCase
         return substr($html, $start, strpos($html, '</nav>', strpos($html, 'aria-label="Account management"')) - $start);
     }
 
-    public function test_the_shop_row_is_a_link_with_a_separate_arrow_for_the_services(): void
+    public function test_the_whole_shop_row_drops_the_services_down(): void
     {
         $sidebar = $this->sidebar();
 
-        $this->assertStringContainsString('data-tip="Shop"', $sidebar);
+        // The row itself is the toggle, as in the phone drawer: a button that
+        // controls the list, with the chevron inside it. No separate arrow.
+        $this->assertMatchesRegularExpression('/<button\s+type="button"\s+@click="if \(\$store\.dashboardSidebar\?\.isCollapsed\) \{ Livewire\.navigate\([^)]*\) \} else \{ locked = ! locked; expanded = locked \}"\s+:aria-expanded="expanded\.toString\(\)"\s+aria-controls="dash-shop-services"\s+data-tip="Shop"/s', $sidebar);
+        $this->assertStringContainsString('id="dash-shop-services"', $sidebar);
+        $this->assertStringNotContainsString('aria-label="Show shop services"', $sidebar);
+
+        // Folded to icons the list cannot show, so the same press opens the shop.
+        $this->assertStringContainsString('Livewire.navigate('.Js::from(route('dashboard.shop.gift-cards')).')', $sidebar);
+
+        // Gift Cards leads the list, so the shop is still one press away.
         $this->assertStringContainsString('href="'.route('dashboard.shop.gift-cards').'"', $sidebar);
-        $this->assertStringContainsString('aria-label="Show shop services"', $sidebar);
 
         $last = -1;
-        foreach (['Gift Cards', 'Travel eSIMs', 'Mobile Top-Ups', 'Bill Payments', 'Gaming'] as $label) {
+        foreach (['Gift Cards', 'eSIMs', 'Mobile Top-Ups', 'Bill Payments', 'Gaming'] as $label) {
             $at = strpos($sidebar, $label);
             $this->assertNotFalse($at, $label.' is missing from the Shop menu.');
             $this->assertGreaterThan($last, $at, $label.' is out of order.');

@@ -97,22 +97,30 @@ class TranslateEngineTest extends TestCase
 
     public function test_the_offered_languages_are_exactly_the_configured_ones(): void
     {
-        $this->assertSame(['English', 'French'], Languages::names());
+        $this->assertSame(
+            ['English', 'French', 'Spanish', 'Portuguese', 'German', 'Italian', 'Swahili', 'Hausa', 'Chinese', 'Arabic'],
+            Languages::names()
+        );
     }
 
     /**
-     * The storefront ships in the two business languages. Eight more are
-     * translated and sitting in lang/ ready to be switched on; they must not
-     * leak into the picker until someone lists them in config.
+     * Only what config lists reaches the picker.
+     *
+     * The eight extra translations used to be the subject here, held back
+     * until someone listed them; they are all offered now. The rule they were
+     * proving still holds and still matters, so it is tested against a
+     * language the site has never carried.
      */
-    public function test_the_unoffered_translations_are_not_in_the_picker(): void
+    public function test_a_language_config_does_not_list_is_not_in_the_picker(): void
     {
-        foreach (['Spanish', 'Standard Arabic', 'Swahili', 'German'] as $name) {
-            $this->assertFalse(Languages::offers($name), $name.' should not be offered yet.');
+        foreach (['Japanese', 'Korean', 'Standard Arabic'] as $name) {
+            $this->assertFalse(Languages::offers($name), $name.' is not configured and must not be offered.');
         }
 
-        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertStringNotContainsString('Kiswahili', $html);
+        // And the ones config DOES list are really there.
+        foreach (['Swahili', 'German', 'Arabic'] as $name) {
+            $this->assertTrue(Languages::offers($name), $name.' is configured and should be offered.');
+        }
     }
 
     public function test_the_picker_order_leads_with_the_business_languages(): void
@@ -132,7 +140,10 @@ class TranslateEngineTest extends TestCase
 
         $this->assertSame('French', $names[0]);
         $this->assertContains('English', $names);
-        $this->assertCount(2, $names);
+
+        // Every configured language still reaches the picker; leaving one out
+        // of the order moves it, it never removes it.
+        $this->assertCount(count(config('localization.supported')), $names);
     }
 
     /**
@@ -141,6 +152,15 @@ class TranslateEngineTest extends TestCase
      */
     public function test_a_built_translation_can_be_offered_with_one_config_entry(): void
     {
+        // Wind config back to the two it shipped with, so the promise is
+        // actually exercised rather than assumed from a list that already
+        // contains Swahili.
+        config()->set('localization.supported', [
+            'en' => ['name' => 'English', 'native_name' => 'English', 'short' => 'EN'],
+            'fr' => ['name' => 'French', 'native_name' => 'Français', 'short' => 'FR'],
+        ]);
+
+        // The one entry.
         config()->set('localization.supported.sw', [
             'name' => 'Swahili', 'native_name' => 'Kiswahili', 'short' => 'SW',
         ]);
@@ -409,10 +429,24 @@ class TranslateEngineTest extends TestCase
         }
     }
 
-    public function test_everything_offered_today_reads_left_to_right(): void
+    /**
+     * Arabic reads right to left and everything else reads left to right.
+     *
+     * This used to assert ltr for every offered language, which was true only
+     * while Arabic sat unoffered in lang/. Offering it is exactly the case the
+     * dir attribute exists for, so the direction is now asserted per language
+     * rather than assumed for all of them.
+     */
+    public function test_arabic_reads_right_to_left_and_the_rest_do_not(): void
     {
+        $this->assertSame('rtl', Languages::direction('ar'));
+
         foreach ($this->locales() as $locale) {
-            $this->assertSame('ltr', Languages::direction($locale));
+            if ($locale === 'ar') {
+                continue;
+            }
+
+            $this->assertSame('ltr', Languages::direction($locale), $locale.' should read left to right.');
         }
     }
 

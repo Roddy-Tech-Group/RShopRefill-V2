@@ -25,7 +25,14 @@
 <a
     href="{{ route('shop.earn-points') }}"
     @if ($navigate) wire:navigate @endif
-    {{ $attributes->class('flex shrink-0 items-center gap-2 rounded-full bg-[#f4f6f5] px-3.5 py-1.5 nav-text text-zinc-900 transition-colors duration-150 hover:bg-[#e8ecea] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/8 dark:text-zinc-200 dark:hover:bg-white/15') }}
+    {{-- Glass, the string x-nav.main-nav's category rail and
+         x-nav.certified-badge wear: frosted white on a hairline, lit to a
+         fuller white under a pointer. It used to be the page-tone wash.
+
+         From md the padding is the category links' (px-4 py-2 on 16/16 type),
+         so every pill on that line reads at one height; below md, in the
+         sheet, it keeps the tighter pill. --}}
+    {{ $attributes->class('flex shrink-0 items-center gap-2 rounded-full bg-white/50 backdrop-blur-md backdrop-saturate-150 ring-1 ring-[#dee3e1] px-3.5 py-1.5 nav-text text-zinc-900 transition-colors duration-150 hover:bg-white/80 hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 md:px-4 md:py-2 dark:bg-white/5 dark:ring-white/10 dark:text-zinc-200 dark:hover:bg-white/15 dark:hover:ring-white/25') }}
 >
     {{-- Same gift glyph the account menu uses for Rcoin Rewards. --}}
     <svg class="h-[18px] w-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">

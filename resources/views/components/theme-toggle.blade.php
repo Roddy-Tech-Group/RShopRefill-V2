@@ -29,9 +29,9 @@
     // (components/icons/theme-*). Inline SVGs inherit currentColor, so the
     // same icon recolors automatically on light, dark, and selected rows.
     $themeChoices = [
-        ['value' => 'light',  'label' => 'Light', 'icon' => 'icons.theme-light'],
-        ['value' => 'dark',   'label' => 'Dark',  'icon' => 'icons.theme-dark'],
-        ['value' => 'system', 'label' => 'Auto',  'icon' => 'icons.theme-auto'],
+        ['value' => 'light',  'label' => __('common.theme_light'), 'icon' => 'icons.theme-light'],
+        ['value' => 'dark',   'label' => __('common.theme_dark'), 'icon' => 'icons.theme-dark'],
+        ['value' => 'system', 'label' => __('common.theme_auto'), 'icon' => 'icons.theme-auto'],
     ];
 @endphp
 
@@ -68,12 +68,12 @@
         x-on:theme-changed.window="choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
         {{ $attributes->class('inline-flex w-fit items-center gap-2 text-sm') }}
         role="radiogroup"
-        aria-label="Theme"
+        aria-label="{{ __('common.theme') }}"
     >
-        <span class="font-medium text-zinc-600 dark:text-zinc-400">Theme:</span>
+        <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.theme_label') }}</span>
 
         <div class="inline-flex items-center gap-1 rounded-full bg-[#f4f6f5] p-1 dark:bg-white/10">
-            @foreach ([['light', 'Light'], ['system', 'System'], ['dark', 'Dark']] as [$value, $label])
+            @foreach ([['light', __('common.theme_light')], ['system', __('common.theme_system')], ['dark', __('common.theme_dark')]] as [$value, $label])
                 <button
                     type="button"
                     @click="pick('{{ $value }}', $event)"
@@ -108,7 +108,7 @@
         x-on:theme-changed.window="choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
         {{ $attributes->class('inline-flex w-fit items-center gap-0.5 rounded-full p-0.5 ring-1 ring-zinc-200') }}
         role="radiogroup"
-        aria-label="Theme"
+        aria-label="{{ __('common.theme') }}"
     >
         @foreach ($themeChoices as $opt)
             <button
@@ -168,8 +168,8 @@
             type="button"
             @click="locked = ! locked; open = locked"
             :aria-expanded="open.toString()"
-            aria-label="Theme"
-            title="Theme"
+            aria-label="{{ __('common.theme') }}"
+            title="{{ __('common.theme') }}"
             :class="switching ? 'theme-toggle-pop' : ''"
             {{ $attributes->class('inline-flex items-center justify-center transition-colors') }}
         >
@@ -194,7 +194,7 @@
             x-transition:leave-end="opacity-0 {{ $offStart }}"
             class="absolute right-0 {{ $panelPos }} z-50 w-max overflow-hidden rounded-[10px] bg-white/70 backdrop-blur-md shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252]/70 dark:ring-white/10"
             role="menu"
-            aria-label="Theme"
+            aria-label="{{ __('common.theme') }}"
         >
             <div class="p-1">
                 @foreach ($themeChoices as $opt)

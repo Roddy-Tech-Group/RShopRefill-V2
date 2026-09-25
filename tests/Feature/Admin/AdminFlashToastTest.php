@@ -40,7 +40,12 @@ class AdminFlashToastTest extends TestCase
         $response->assertSee('Returned to your admin account.');
         // The floating toast's distinctive top-right positioning + auto-dismiss
         // init; a static inline banner would carry neither.
-        $response->assertSee('sm:right-5 sm:top-5', false);
+        // Top centre at every width, squared to the 5px radius - it used to park
+        // in the top-right corner on sm+ as a pill, over the header actions.
+        $response->assertSee('fixed inset-x-4 top-4 z-[100] mx-auto flex w-fit max-w-sm', false);
+        $response->assertSee('rounded-[5px]', false);
+        $response->assertDontSee('sm:right-5', false);
+        $response->assertDontSee('rounded-full px-5 py-3', false);
         $response->assertSee('show = false', false);
     }
 

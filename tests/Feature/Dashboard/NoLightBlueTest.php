@@ -43,7 +43,6 @@ class NoLightBlueTest extends TestCase
             'js/app.js',
             'views/components/layouts/dashboard.blade.php',
             'views/components/layouts/admin.blade.php',
-            'views/components/ui/app-loader.blade.php',
             'views/components/pull-to-refresh.blade.php',
             'views/components/emails/layout.blade.php',
             'views/components/emails/panel.blade.php',

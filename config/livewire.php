@@ -201,7 +201,12 @@ return [
         // read a flash of blue - so it read as the page stuttering rather than
         // as feedback.
         //
-        // The colour stays configured so re-enabling is a one-word change.
+        // It was briefly switched back on, on the grounds that it was the only
+        // loading signal left once the full-screen branded loader was removed.
+        // That is true and still not worth the stutter on fast navigations.
+        //
+        // The colour stays configured, and the #nprogress brand rules stay in
+        // app.css, so re-enabling is a one-word change.
         'show_progress_bar' => false,
         'progress_bar_color' => '#2299dd',
     ],

@@ -40,16 +40,16 @@ class UtilityLinksLocaleTest extends TestCase
         $bar = $this->cluster();
 
         $this->assertStringContainsString(':aria-label=', $bar);
-        foreach (["' + country + '", "' + currency + '"] as $part) {
+        foreach ([".replace('__COUNTRY__', country)", ".replace('__CURRENCY__', currency)"] as $part) {
             $this->assertStringContainsString($part, $bar);
         }
 
-        // The language half names the language in force. It is Alpine state
-        // rather than a Blade echo so the pill can repaint without a reload;
-        // the value it holds comes from the server (window.rshopLanguage),
-        // so it can no longer disagree with the page it labels.
-        $this->assertStringContainsString("language || 'English'", $bar);
-        $this->assertStringContainsString("' + (language || 'English') + '", $bar);
+        // The language half is the active locale's native name, rendered by
+        // the server into a translated sentence. Country and currency stay
+        // Alpine state because the sheet can change them without a reload;
+        // the language cannot change without one, since saving it reloads.
+        $this->assertStringContainsString("__('navigation.region_pill_label', ['language' => \$activeLanguageNative, 'country' => '__COUNTRY__', 'currency' => '__CURRENCY__'])", $bar);
+        $this->assertStringNotContainsString("language || 'English'", $bar);
     }
 
     public function test_it_renders_with_a_sane_default_before_alpine_boots(): void
@@ -65,16 +65,21 @@ class UtilityLinksLocaleTest extends TestCase
     }
 
     /**
-     * The pill paints from Alpine, seeded by the server. The server-rendered
-     * fallback stays neutral ("EN") because the markup is cached per layout,
-     * not per locale; Alpine fills in the real name on hydration.
+     * The pill prints the active locale's own short code. It used to slice the
+     * first two letters off the English language name in Alpine, which
+     * painted "SP" for Spanish and "GE" for German. Nothing caches this
+     * markup, so the server can print the code for the page it renders.
      */
-    public function test_the_pill_paints_the_language_from_alpine_state(): void
+    public function test_the_pill_prints_the_active_locales_code(): void
     {
         $pill = File::get(resource_path('views/components/nav/region-pill.blade.php'));
 
-        $this->assertStringContainsString("x-text=\"(language || 'English')", $pill);
-        $this->assertStringNotContainsString("{{ config('localization.supported.'.app()->getLocale().'.short') }} /", $pill);
+        $this->assertStringContainsString('<span>{{ $activeLanguageShort }}</span> /', $pill);
+        $this->assertStringNotContainsString('.slice(0, 2).toUpperCase()', $pill);
+
+        $spanish = $this->withoutVite()->withSession(['locale' => 'es'])->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('<span>ES</span> /', $spanish);
+        $this->assertStringNotContainsString('<span>SP</span>', $spanish);
     }
 
     /**
@@ -210,7 +215,8 @@ class UtilityLinksLocaleTest extends TestCase
         // The root list previews the draft, not what is in force.
         $this->assertStringContainsString('x-text="draftCountry"', $modal);
         $this->assertStringContainsString('x-text="draftCurrency"', $modal);
-        $this->assertStringContainsString('x-text="draftLanguage"', $modal);
+        // The language row shows the staged language by its native name.
+        $this->assertStringContainsString('x-text="nativeFor(draftLanguage)"', $modal);
     }
 
     /**

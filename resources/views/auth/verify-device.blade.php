@@ -18,6 +18,11 @@
                 digits: ['', '', '', '', '', ''],
                 loading: false,
                 resending: false,
+                {{-- Latches the moment the code is sent, so the sixth digit fires
+                     exactly one submit. Without it, any later input event - a
+                     stray keystroke, an autofill re-run - posts the code twice
+                     and burns a second attempt against the throttle. --}}
+                submitted: false,
                 {{-- Both clocks start from what the server measured; nothing here invents a time. --}}
                 expiresIn: @js($expiresIn),
                 cooldown: {{ (int) ($cooldown ?? 0) }},
@@ -48,6 +53,7 @@
                     this.digits[i] = value;
                     event.target.value = value;
                     if (value && i < 5) this.box(i + 1).focus();
+                    this.autoSubmit();
                 },
                 onKeydown(i, event) {
                     if (event.key === 'Backspace' && ! this.digits[i] && i > 0) {
@@ -62,10 +68,42 @@
                     const pasted = (event.clipboardData?.getData('text') || '').replace(/\D/g, '');
                     if (pasted) { event.preventDefault(); this.fill(pasted, 0); }
                 },
+                {{-- Writes BOTH the state and the input elements. The boxes are
+                     uncontrolled - only :class is bound, not :value - so setting
+                     digits alone flipped them to their filled colour while they
+                     still looked empty, which is what a pasted code used to do.
+                     Typing never hit this because onInput assigns target.value
+                     itself. Reached by paste, and by onInput when a browser or
+                     password manager drops the whole code into one box. --}}
                 fill(value, from) {
                     const chars = value.slice(0, 6 - from).split('');
-                    chars.forEach((c, k) => { this.digits[from + k] = c; });
+                    chars.forEach((c, k) => {
+                        this.digits[from + k] = c;
+                        const el = this.box(from + k);
+                        if (el) el.value = c;
+                    });
                     this.box(Math.min(5, from + chars.length)).focus();
+                    this.autoSubmit();
+                },
+                {{-- Sends the code the moment the sixth digit lands, typed or
+                     pasted, so nobody has to reach for the button after already
+                     entering everything the form needs.
+
+                     Guarded on `submitted` (one send per page), `loading` (a send
+                     already in flight) and `expired` (a dead code would spend an
+                     attempt for nothing). The short delay is deliberate: it lets
+                     the last box paint its filled state, so the form is visibly
+                     complete before it disappears rather than vanishing under the
+                     keystroke. requestSubmit, not submit, so the form's own
+                     @submit guard still runs. --}}
+                autoSubmit() {
+                    if (this.submitted || this.loading || this.expired || ! this.complete) return;
+                    this.submitted = true;
+                    setTimeout(() => {
+                        const form = document.getElementById('verify-form');
+                        if (! form) return;
+                        form.requestSubmit ? form.requestSubmit() : form.submit();
+                    }, 180);
                 },
             }"
         >
@@ -147,8 +185,15 @@
                                 @input="onInput({{ $i }}, $event)"
                                 @keydown="onKeydown({{ $i }}, $event)"
                                 @focus="$event.target.select()"
+                                {{-- A filled box takes the same blue as the submit
+                                     button below it, so the code you have typed and
+                                     the action it feeds read as one control. It was
+                                     #0c1337, a near-black navy, which landed as six
+                                     heavy dark blocks on a white card and did not
+                                     match anything else on the page - dark mode was
+                                     already blue here, so light was the odd one. --}}
                                 :class="digits[{{ $i }}]
-                                    ? 'border-[#0c1337] bg-[#0c1337] text-white dark:border-blue-500 dark:bg-blue-600'
+                                    ? 'border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-600'
                                     : 'border-zinc-200 bg-zinc-50 text-zinc-900 dark:border-white/15 dark:bg-white/5 dark:text-white'"
                                 class="h-14 w-full max-w-[3.25rem] rounded-[12px] border-2 text-center text-2xl font-bold outline-none transition-colors focus:border-blue-600 focus:ring-4 focus:ring-blue-600/15 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                             >
@@ -237,6 +282,109 @@
         </div>
     </div>
 </div>
+
+{{--
+    No-Alpine fallback for the code boxes.
+
+    Everything above is an Alpine island, including `<input name="otp" :value="code">`
+    - the field that actually posts. If Alpine does not boot, that binding never
+    runs, so the form submits an EMPTY code no matter what is typed, and the boxes
+    stop advancing and stop accepting a paste. On an auth step that is the
+    difference between signing in and being stuck, and it fails silently: no error,
+    just a form that will not work.
+
+    Alpine arrives as a module through @vite, so anything that stops that request -
+    a dev server on the wrong interface, a blocked or cached bundle, an unrelated
+    script error earlier in the page - takes this page down with it.
+
+    This is plain, non-module JS that always parses, and it checks for Alpine
+    before doing anything. If Alpine booted, Alpine owns the form and this exits;
+    exactly one of the two is ever active, so they cannot fight over focus or
+    double-advance.
+--}}
+<script>
+(function () {
+    function wireFallback() {
+        if (typeof window.Alpine !== 'undefined') {
+            return; // Alpine is driving; leave it alone.
+        }
+
+        var boxes = [];
+        for (var i = 0; i < 6; i++) {
+            var el = document.getElementById('otp-box-' + i);
+            if (! el) { return; }
+            boxes.push(el);
+        }
+
+        var form = document.getElementById('verify-form');
+        var hidden = form && form.querySelector('input[name="otp"]');
+        if (! hidden) { return; }
+
+        var submitted = false;
+
+        function sync() {
+            hidden.value = boxes.map(function (b) { return b.value; }).join('');
+            autoSubmit();
+        }
+
+        // Same one-shot auto-send as the Alpine path, so losing Alpine costs the
+        // styling and the countdown but never the behaviour.
+        function autoSubmit() {
+            if (submitted || ! /^[0-9]{6}$/.test(hidden.value)) { return; }
+            submitted = true;
+            setTimeout(function () {
+                form.requestSubmit ? form.requestSubmit() : form.submit();
+            }, 180);
+        }
+
+        function fillFrom(text, from) {
+            var chars = String(text).replace(/\D/g, '').slice(0, 6 - from).split('');
+            chars.forEach(function (c, k) { boxes[from + k].value = c; });
+            boxes[Math.min(5, from + chars.length)].focus();
+            sync();
+        }
+
+        boxes.forEach(function (box, i) {
+            box.addEventListener('input', function () {
+                var value = (box.value || '').replace(/\D/g, '');
+                if (value.length > 1) { fillFrom(value, i); return; }
+                box.value = value;
+                if (value && i < 5) { boxes[i + 1].focus(); }
+                sync();
+            });
+
+            box.addEventListener('keydown', function (event) {
+                if (event.key === 'Backspace' && ! box.value && i > 0) {
+                    boxes[i - 1].value = '';
+                    boxes[i - 1].focus();
+                    sync();
+                    event.preventDefault();
+                }
+                if (event.key === 'ArrowLeft' && i > 0) { boxes[i - 1].focus(); }
+                if (event.key === 'ArrowRight' && i < 5) { boxes[i + 1].focus(); }
+            });
+
+            box.addEventListener('paste', function (event) {
+                var data = (event.clipboardData || window.clipboardData);
+                var text = data && data.getData('text');
+                if (text) { event.preventDefault(); fillFrom(text, 0); }
+            });
+
+            box.addEventListener('focus', function () { box.select(); });
+        });
+
+        boxes[0].focus();
+    }
+
+    // Alpine loads as a deferred module, so it is not there at parse time. Wait
+    // for load, then give it a beat before deciding it is absent.
+    if (document.readyState === 'complete') {
+        setTimeout(wireFallback, 400);
+    } else {
+        window.addEventListener('load', function () { setTimeout(wireFallback, 400); });
+    }
+})();
+</script>
 
 </body>
 </html>

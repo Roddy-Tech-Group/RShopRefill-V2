@@ -10,23 +10,36 @@
     ['pickerLabelText' => '...'] to word it differently, and ['pickerCodeOnly' => true]
     where the total is already printed beside it, so the button names the currency
     instead of repeating the figure.
+
+    ['pickerHeadingClass' => '...'] sizes the label. The gift card purchase card
+    passes a heading-sized one, because there the label sits over a card of its
+    own rather than captioning one field in a row of them.
+
+    ['pickerTriggerClass' => '...'] sets the trigger's height, padding, rounding
+    and type size together; the gift card card passes a compact pill.
+    ['pickerListMaxClass' => 'max-h-...'] caps how far the list may open, so it
+    does not run off the bottom of the card it belongs to.
+
+    The list opens on click, never on hover.
 --}}
 <div class="sm:min-w-[9rem]">
     @if ($pickerLabel ?? true)
-    <label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-zinc-200">{{ $pickerLabelText ?? __('products.detail_estimated_price') }}</label>
+    <label class="{{ $pickerHeadingClass ?? 'mb-2 block text-sm font-semibold' }} text-zinc-900 dark:text-zinc-200">{{ $pickerLabelText ?? __('products.detail_estimated_price') }}</label>
     @endif
     <div
-        x-data="{ open: false, locked: false }"
-        @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
-        @mouseleave="if (window.matchMedia('(hover: hover)').matches && ! locked) open = false"
-        @click.outside="open = false; locked = false"
+        x-data="{ open: false }"
+        @click.outside="open = false"
+        @keydown.escape="open = false"
         class="relative"
     >
         <button
             type="button"
-            @click="open = ! open; locked = open"
-            :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-            class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+            @click="open = ! open"
+            :aria-expanded="open.toString()"
+            aria-haspopup="listbox"
+            aria-label="{{ $pickerLabelText ?? __('products.detail_estimated_price') }}"
+            :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+            class="pure-card flex w-full items-center gap-2 border-2 bg-[#eff6ff] text-zinc-900 transition-colors dark:text-white {{ $pickerTriggerClass ?? 'h-11 rounded-full px-4 text-base' }}"
         >
             <template x-if="cryptos[selectedCrypto]?.icon">
                 <img :src="cryptos[selectedCrypto].icon" :alt="selectedCrypto" class="h-5 w-5 shrink-0 rounded-[12px]">
@@ -55,15 +68,17 @@
             x-transition:enter-start="opacity-0 -translate-y-1"
             x-transition:enter-end="opacity-100 translate-y-0"
             style="display:none;"
-            class="absolute right-0 top-full z-20 max-h-80 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            class="absolute right-0 top-full z-20 mt-1 w-56 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] pure-card p-1 shadow-xl shadow-zinc-900/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden {{ $pickerListMaxClass ?? 'max-h-80' }}"
             role="listbox"
         >
             <template x-for="(meta, code) in cryptos" :key="code">
                 <button
                     type="button"
                     @click="selectedCrypto = code; open = false"
+                    role="option"
+                    :aria-selected="(selectedCrypto === code).toString()"
                     :class="selectedCrypto === code ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                    class="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
+                    class="flex w-full items-center gap-2 rounded-full px-3 py-2.5 text-left text-sm font-medium transition-colors"
                 >
                     <template x-if="meta.icon">
                         <img :src="meta.icon" :alt="code" class="h-5 w-5 shrink-0 rounded-[12px]">

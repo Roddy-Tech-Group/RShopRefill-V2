@@ -232,11 +232,9 @@
             :next="$carousel ? 'nudge(1)' : null"
             prev-disabled="! canPrev"
             next-disabled="! canNext"
-            prev-label="Previous"
-            next-label="Next"
         >
             @if ($viewAllVariant === 'plus')
-                <a href="{{ $viewAllHref }}" wire:navigate aria-label="See more {{ $title }}" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
+                <a href="{{ $viewAllHref }}" wire:navigate aria-label="{{ __('common.see_more_named', ['name' => $title]) }}" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                     </svg>

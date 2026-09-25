@@ -49,7 +49,7 @@
                                     <a
                                         href="{{ $card->learn_url }}"
                                         wire:navigate
-                                        class="relative z-20 inline-flex items-center rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                        class="relative z-20 inline-flex items-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                                     >
                                         Learn more
                                     </a>
@@ -58,7 +58,7 @@
                                     <a
                                         href="{{ $card->buy_url }}"
                                         wire:navigate
-                                        class="relative z-20 inline-flex items-center rounded-[12px] bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800"
+                                        class="relative z-20 inline-flex items-center rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800"
                                     >
                                         Buy now
                                     </a>

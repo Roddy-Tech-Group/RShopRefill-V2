@@ -112,7 +112,7 @@ class GiftCardPurchaseCardTest extends TestCase
         // The heading leads the page, and where the card can be redeemed is read
         // before any value is chosen, in place of the old kind badge.
         $this->assertLessThan($subGrid, strpos($html, '<h1 class="text-[24px]'));
-        $this->assertLessThan($subGrid, strpos($html, 'May only be redeemable in'));
+        $this->assertLessThan($subGrid, strpos($html, 'Redeemable only in'));
         $this->assertStringNotContainsString('bg-blue-600 px-3 py-1 text-xs font-bold uppercase', $html);
 
         // The tiles speak for themselves, so the field carries no label.
@@ -172,8 +172,13 @@ class GiftCardPurchaseCardTest extends TestCase
         $this->assertStringContainsString('aria-haspopup="listbox"', $card);
         $this->assertStringContainsString('<span x-text="quantity">1</span>', $card);
 
-        // One to ten, each setting the page's own quantity.
-        $this->assertSame(10, substr_count($card, 'role="option"'));
+        // One to ten, each setting the page's own quantity. Counted inside the
+        // quantity picker's own listbox: the card holds a second listbox, the
+        // pay currency, and its options carry the role too.
+        $quantityList = substr($card, strpos($card, 'id="gift-quantity"'));
+        $quantityList = substr($quantityList, 0, strpos($quantityList, '</div>', strpos($quantityList, 'role="listbox"')));
+
+        $this->assertSame(10, substr_count($quantityList, 'role="option"'));
         $this->assertStringContainsString('@click="quantity = 10; open = false"', $card);
     }
 
@@ -191,9 +196,39 @@ class GiftCardPurchaseCardTest extends TestCase
 
         // Above the estimated price, and one picker on the page (the locale modal
         // names the same thing, hence the label markup rather than the words).
-        $label = '<label class="mb-1.5 block text-xs font-semibold text-zinc-900 dark:text-zinc-200">Payment currency</label>';
+        $label = '<label class="mb-2 block text-base font-bold text-zinc-900 dark:text-zinc-200">Payment currency</label>';
         $this->assertSame(1, substr_count($html, $label));
         $this->assertLessThan(strpos($card, 'Estimated price'), strpos($card, $label));
+    }
+
+    /**
+     * The currency list opens because someone asked it to.
+     *
+     * It used to open on hover, which put it on screen unasked and, worse, made
+     * the button argue with itself: the hover had already opened it, so the
+     * click that followed read as a toggle and shut it again. Pointing at the
+     * control and clicking it did nothing at all.
+     *
+     * Asserted on the partial rather than the page because the listeners are
+     * what is being removed, and an absent attribute cannot be measured from
+     * rendered output.
+     */
+    public function test_the_pay_currency_list_opens_on_click_and_never_on_hover(): void
+    {
+        $picker = file_get_contents(resource_path('views/shop/_pay-currency-picker.blade.php'));
+
+        $this->assertStringNotContainsString('@mouseenter', $picker);
+        $this->assertStringNotContainsString('@mouseleave', $picker);
+
+        // Opens, closes the same way, and closes on the two escapes a menu owes.
+        $this->assertStringContainsString('@click="open = ! open"', $picker);
+        $this->assertStringContainsString('@click.outside="open = false"', $picker);
+        $this->assertStringContainsString('@keydown.escape="open = false"', $picker);
+
+        // And it says what it is, which the hover version never did.
+        $card = $this->card($this->page());
+        $this->assertStringContainsString('aria-haspopup="listbox"', $card);
+        $this->assertStringContainsString(':aria-expanded="open.toString()"', $card);
     }
 
     public function test_the_buy_actions_are_drawn_once_inside_the_card(): void

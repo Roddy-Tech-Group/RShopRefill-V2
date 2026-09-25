@@ -8,18 +8,35 @@
     in its buy rail, under the purchase card. Reads the product page's variables and
     its root Alpine state (amount, selectedVariantId, customMode, quantity, ttab).
 --}}
+@php
+    // A refill carries its own amount, so buying "two" of it is just a larger
+    // amount typed twice. Top-ups drop the quantity field and send 1, which is
+    // what the Alpine state already defaults to, so nothing downstream changes.
+    $showQuantity = ! $isGiftCard && ! $isTopup;
+
+    // The credit row's columns follow that: Amount + Quantity + Estimated price,
+    // or Amount + Estimated price when the quantity field is gone. Amount takes
+    // its own row on a phone either way.
+    $creditCols = $showQuantity
+        ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]'
+        : 'grid-cols-1 sm:grid-cols-[1fr_auto]';
+@endphp
+
 {{-- Amount / Quantity / Estimated price. Mobile: Amount on its own full
      row, Quantity + Estimated price share a 2-col row. sm+: one row. --}}
-<div class="grid gap-3 {{ $isGiftCard ? 'max-w-[400px] grid-cols-1' : (! ($isTopup && $topupHasPlans) ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : '') }}"
-    @if ($isTopup && $topupHasPlans) :class="ttab === 'credit' ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_1fr]'" @endif>
+<div class="grid gap-3 {{ $isGiftCard ? 'max-w-[400px] grid-cols-1' : (! ($isTopup && $topupHasPlans) ? $creditCols : '') }}"
+    @if ($isTopup && $topupHasPlans) :class="ttab === 'credit' ? '{{ $creditCols }}' : 'grid-cols-[auto_1fr]'" @endif>
 
     {{-- Amount field — plain typeable input with $ prefix. Suggested denominations
          render as small clickable chips below so users can one-tap a common value. --}}
-    <div class="{{ $isGiftCard ? '' : 'col-span-2 sm:col-span-1' }}" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
+    {{-- col-span-full, not col-span-2: without the quantity field the phone grid
+         is a single column, and spanning two of them would open an implicit
+         second column and pull the row out of shape. --}}
+    <div class="{{ $isGiftCard ? '' : 'col-span-full sm:col-span-1' }}" @if ($isTopup && $topupHasPlans) x-show="ttab === 'credit'" x-cloak @endif>
         {{-- A gift card's tiles say what they are on their face, so they carry no
              label; the other kinds' amount field still needs one. --}}
         @unless ($isGiftCard)
-            <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ $isTopup ? __('products.detail_credit_amount') : __('products.detail_amount') }}</label>
+            <label class="mb-2 block text-sm font-semibold text-zinc-900">{{ $isTopup ? __('products.detail_credit_amount') : __('products.detail_amount') }}</label>
         @endunless
         @if ($isGiftCard)
             {{-- Gift cards choose from a standing grid, not a dropdown: every
@@ -43,6 +60,22 @@
                         // nothing downstream of it changes. It does not price a
                         // fixed value: the variant id does.
                         $disp = round((float) $v->retail_price * $displayRate, 2);
+
+                        $denomFace = rtrim(rtrim(number_format($face, 2, '.', ','), '0'), '.');
+                        $denomCode = strtoupper($v->currency ?: $currency);
+
+                        // The tile is a ~94px square and the label wraps, so what has
+                        // to fit on one line is the longest word in it - the figure.
+                        // Most are short ("100") and take the full size; a catalogue
+                        // that runs to "5,000,000" steps down rather than spilling out
+                        // of the tile. Measured, not guessed: 16px overflowed a 94px
+                        // tile by 3px at nine characters.
+                        $denomLongest = max(strlen($denomFace), strlen($denomCode));
+                        $denomTextClass = match (true) {
+                            $denomLongest >= 10 => 'text-xs',
+                            $denomLongest >= 8 => 'text-sm',
+                            default => 'text-base',
+                        };
                     @endphp
                     <button
                         type="button"
@@ -58,8 +91,13 @@
                             <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                         </span>
                         {{-- The face value alone. What it costs is in the purchase card,
-                             which follows the chosen tile. --}}
-                        <span class="text-xs font-bold leading-tight tabular-nums text-zinc-900 dark:text-white">{{ rtrim(rtrim(number_format($face, 2, '.', ','), '0'), '.') }} {{ strtoupper($v->currency ?: $currency) }}</span>
+                             which follows the chosen tile.
+
+                             No whitespace-nowrap: most values are short ("25 USD") and
+                             sit on one line, but the catalogue runs up to "5,000,000
+                             VND", which wraps onto a second line inside the square
+                             rather than pushing out of it. --}}
+                        <span class="{{ $denomTextClass }} font-bold leading-tight tabular-nums text-zinc-900 dark:text-white">{{ $denomFace }} {{ $denomCode }}</span>
                     </button>
                 @endforeach
                 @if ($variable)
@@ -87,8 +125,16 @@
             <button
                 type="button"
                 @click="open = ! open; locked = open"
-                :class="open ? 'border-[color:var(--brand)] ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-700 dark:hover:border-blue-400/40'"
-                class="pure-card flex h-[50px] w-full items-center gap-2 rounded-[12px] border bg-[#eff6ff] px-3 text-base font-bold text-zinc-900 transition-colors"
+                {{-- Grey until it is opened, then the interactive edge, and grey
+                     again on a click outside (which @click.outside already
+                     clears). Swapped as whole classes rather than through a
+                     focus variant: the storefront pins .border-zinc-200 to the
+                     shared edge colour at a specificity no variant can reach,
+                     so the blue only lands once that class is off the element. --}}
+                :class="open
+                    ? 'border-edge ring-2 ring-edge/30 dark:border-edge'
+                    : 'border-zinc-200 dark:border-white/10'"
+                class="pure-card flex h-11 w-full items-center gap-2 rounded-full border-2 bg-[#eff6ff] px-4 text-base font-bold text-zinc-900 transition-colors"
             >
                 <span class="font-semibold text-zinc-600">{{ $variable ? $customSymbol : $displaySymbol }}</span>
                 <span
@@ -138,7 +184,7 @@
                                 type="button"
                                 @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
                                 :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                class="flex w-full items-center justify-between rounded-full px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                             >
                                 <span class="flex min-w-0 flex-col">
                                     <span class="font-bold">{{ $conv($plan['face']) }}</span>
@@ -155,7 +201,7 @@
                                 type="button"
                                 @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = {{ $pick['amount'] }}; open = false"
                                 :class="(customMode && Number(amount) === {{ $pick['amount'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                                class="flex w-full items-center justify-between rounded-full px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                             >
                                 <span class="font-bold">{{ $conv($pick['amount']) }}</span>
                             </button>
@@ -166,7 +212,7 @@
                             type="button"
                             @click="amount = {{ $plan['face'] }}; selectedVariantId = {{ $plan['id'] }}; customMode = false; open = false"
                             :class="(! customMode && selectedVariantId === {{ $plan['id'] }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                            class="flex w-full items-center justify-between rounded-full px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                         >
                             <span class="flex min-w-0 flex-col">
                                 <span class="font-bold">{{ $conv($plan['face']) }}</span>
@@ -186,7 +232,7 @@
                             type="button"
                             @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
                             :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                            class="flex w-full items-center justify-between rounded-[12px] {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                            class="flex w-full items-center justify-between rounded-full {{ $topupPicks->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                         >
                             <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
                             <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
@@ -202,7 +248,7 @@
                         type="button"
                         @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false; open = false"
                         :class="(! customMode && Number(amount) === {{ $disp }}) ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                        class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
+                        class="flex w-full items-center justify-between rounded-full px-3 py-2.5 text-left text-base font-medium tabular-nums transition-colors"
                     >
                         <span class="font-bold">{{ $conv($val) }}</span>
                         @if ($i === $fixedDenoms->count() - 1 && $fixedDenoms->count() > 1)
@@ -215,7 +261,7 @@
                         type="button"
                         @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''; open = false"
                         :class="customMode ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                        class="flex w-full items-center justify-between rounded-[12px] {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
+                        class="flex w-full items-center justify-between rounded-full {{ $fixedDenoms->isNotEmpty() ? 'border-t border-zinc-100' : '' }} px-3 py-2.5 text-left text-base font-medium transition-colors"
                     >
                         <span class="font-bold">{{ __('products.detail_custom_amount') }}</span>
                         <span class="text-xs text-zinc-500">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
@@ -242,7 +288,7 @@
                         max="{{ (float) $customDisplayMax }}"
                         step="any"
                         placeholder="{{ rtrim(rtrim(number_format((float) $customDisplayMin, 2), '0'), '.') }} - {{ rtrim(rtrim(number_format((float) $customDisplayMax, 2), '0'), '.') }}"
-                        class="w-full rounded-[12px] border bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full border-2 bg-[#eff6ff] py-2.5 pl-10 pr-3 text-base font-bold tabular-nums text-zinc-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/15 border-zinc-200 dark:border-white/10 focus:border-edge dark:focus:border-edge"
                         :class="(amount !== '' && (Number(amount) < customMin || Number(amount) > customMax)) ? 'border-red-400 focus:border-red-500' : 'border-zinc-200 focus:border-[color:var(--brand)]'"
                     />
                 </div>
@@ -259,7 +305,7 @@
         {{-- A gift card with fixed values only shows every value and its
              price as a tile, so a range line would say nothing new. --}}
         @if ($rangeMin !== null && $rangeMax !== null && ! ($isGiftCard && ! $variable))
-            <p class="mt-1.5 text-xs text-zinc-600">
+            <p class="mt-2.5 text-sm text-zinc-600">
                 {{ __('products.detail_range_hint', ['min' => $variable ? $customMoney($rangeMin) : $conv($rangeMin), 'max' => $variable ? $customMoney($rangeMax) : $conv($rangeMax)]) }}
             </p>
         @endif
@@ -268,9 +314,10 @@
     {{-- Gift cards hold the quantity, the pay currency and the price in their
          purchase card instead: here they are only values. --}}
     @unless ($isGiftCard)
+    @if ($showQuantity)
     {{-- Quantity — custom dropdown so it visually matches the Amount + Estimated price fields. --}}
     <div class="sm:min-w-[6rem]">
-        <label class="mb-1.5 block text-xs font-semibold text-zinc-900">{{ __('products.detail_quantity') }}</label>
+        <label class="mb-2 block text-sm font-semibold text-zinc-900">{{ __('products.detail_quantity') }}</label>
         <div
             x-data="{ open: false, locked: false }"
             @mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
@@ -304,7 +351,7 @@
                         type="button"
                         @click="quantity = {{ $n }}; open = false"
                         :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                        class="flex w-full items-center justify-center rounded-[12px] px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
+                        class="flex w-full items-center justify-center rounded-full px-2 py-2 text-center text-base font-medium tabular-nums transition-colors"
                     >
                         {{ $n }}
                     </button>
@@ -312,6 +359,8 @@
             </div>
         </div>
     </div>
+
+    @endif
 
     {{-- Estimated price — crypto currency selector. Each option shows the equivalent
          in that crypto using a placeholder rate (rate table lives in Alpine state). --}}

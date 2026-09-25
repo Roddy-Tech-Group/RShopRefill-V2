@@ -203,7 +203,7 @@
                         @click="addToCart()"
                         :disabled="cartState !== 'idle'"
                         :class="cartState === 'success' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:text-blue-300 dark:hover:text-white'"
-                        class="hidden h-11 items-center rounded-[12px] border-2 px-4 text-sm font-semibold transition-colors disabled:opacity-60 sm:inline-flex"
+                        class="hidden h-11 items-center rounded-full border-2 px-4 text-sm font-semibold transition-colors disabled:opacity-60 sm:inline-flex"
                     >
                         <span x-show="cartState !== 'success'">Add to cart</span>
                         <span x-show="cartState === 'success'" style="display:none;">Added</span>
@@ -212,7 +212,7 @@
                         type="button"
                         @click="buyNow()"
                         :disabled="$store.cart.loading"
-                        class="inline-flex h-11 items-center rounded-[12px] bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-60"
+                        class="inline-flex h-11 items-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-60"
                     >Buy now</button>
                 </div>
             </div>
@@ -304,7 +304,7 @@
                     {{-- Add to cart straight from the details modal. --}}
                     <div class="mt-6 flex items-center justify-between gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-700/60">
                         <p class="text-xl font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="detailsPlan()?.price_label"></p>
-                        <button type="button" @click="selectedId = detailsId; showDetails = false; addToCart()" class="inline-flex h-11 items-center rounded-[12px] bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:opacity-60" :disabled="$store.cart.loading">Add to cart</button>
+                        <button type="button" @click="selectedId = detailsId; showDetails = false; addToCart()" class="inline-flex h-11 items-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:opacity-60" :disabled="$store.cart.loading">Add to cart</button>
                     </div>
 
                     <p class="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">To complete your order, confirm your device is eSIM-compatible and network-unlocked.</p>

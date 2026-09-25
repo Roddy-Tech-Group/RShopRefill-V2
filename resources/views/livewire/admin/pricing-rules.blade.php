@@ -138,10 +138,10 @@ class extends Component {
 
         if ($this->editingId) {
             PricingRule::findOrFail($this->editingId)->update($payload);
-            session()->flash('status', 'Pricing rule updated.');
+            $this->dispatch('toast', message: 'Pricing rule updated.');
         } else {
             PricingRule::create($payload);
-            session()->flash('status', 'Pricing rule created.');
+            $this->dispatch('toast', message: 'Pricing rule created.');
         }
 
         $this->resetForm();
@@ -151,7 +151,7 @@ class extends Component {
     public function delete(int $id): void
     {
         PricingRule::findOrFail($id)->delete();
-        session()->flash('status', 'Rule deleted.');
+        $this->dispatch('toast', message: 'Rule deleted.');
         unset($this->pricingRules, $this->summary);
     }
 
@@ -189,13 +189,9 @@ class extends Component {
 
     <div class="flex flex-col gap-6">
 
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
-
         {{-- Cascade explanation — a quick rules-of-the-road for admins so
              they don't have to guess which rule wins. --}}
-        <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="flex items-start gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-600/15 dark:text-blue-300">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
@@ -236,7 +232,7 @@ class extends Component {
                 ['label' => 'Category rules',     'value' => $this->summary['categories'],   'dot' => 'bg-amber-500'],
                 ['label' => 'Subcategory rules',  'value' => $this->summary['subcategories'],'dot' => 'bg-purple-500'],
             ] as $stat)
-                <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -261,7 +257,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead>
@@ -313,7 +309,7 @@ class extends Component {
                                 <td class="whitespace-nowrap text-right">
                                     <div class="inline-flex items-center gap-1.5">
                                         <button wire:click="edit({{ $rule->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">Edit</button>
-                                        <button wire:click="delete({{ $rule->id }})" wire:confirm="Delete this pricing rule? This cannot be undone." type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
+                                        <button wire:click="delete({{ $rule->id }})" data-confirm="Delete this pricing rule? This cannot be undone." data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
                                     </div>
                                 </td>
                             </tr>

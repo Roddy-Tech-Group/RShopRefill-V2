@@ -185,7 +185,7 @@
             ['label' => 'Failed',    'value' => (int) $kpis->failed,    'dot' => 'bg-red-500'],
             ['label' => 'Refunded',  'value' => (int) $refundCount,     'dot' => 'bg-blue-500'],
         ] as $stat)
-            <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+            <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                 <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                     <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                     {{ $stat['label'] }}
@@ -275,14 +275,13 @@
             background-color: rgb(255 255 255 / 0.08);
         }
         .txn-body:hover::after { display: none; }
-        .txn-body:hover { border-radius: 12px; }
     </style>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
-        <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
+    <div class="overflow-hidden rounded-[12px] pb-3 bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
+        <div class="scroll-y-thin overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill --}}
-        <div class="txn-row grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+        <div class="txn-row grid mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
             <span class="col-customer">Customer</span>
             <span>Gateway</span>
             <span>Amount</span>
@@ -296,7 +295,7 @@
                  navigates. Wallet-refund rows have no detail page (yet). --}}
             <article
                 @if ($row['href']) x-data @click="Livewire.navigate(@js($row['href']))" @endif
-                class="txn-row txn-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400 {{ $row['href'] ? 'cursor-pointer' : '' }}">
+                class="txn-row txn-body group relative mx-3 bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] {{ $row['href'] ? 'cursor-pointer' : '' }}">
 
                 {{-- Customer — name + reference / order link stacked. The
                      reference line is a click-to-copy chip; clicking it puts

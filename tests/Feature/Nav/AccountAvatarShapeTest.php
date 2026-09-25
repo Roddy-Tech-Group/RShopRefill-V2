@@ -86,19 +86,21 @@ class AccountAvatarShapeTest extends TestCase
      * The outline is the dashboard avatar's, adapted to the light band. The
      * dashboard draws border-white/30 on navy; white on #f4f6f5 is invisible, so
      * here the ink is the navy itself at the same 30%, with the same 10% wash on
-     * hover and no fill. In dark both bars are black, so the dark classes are
-     * the dashboard's exactly.
+     * hover and no fill. Hover also turns the outline blue. In dark both bars
+     * are black, so the dark classes are the dashboard's exactly.
      */
     public function test_the_border_is_the_dashboards_adapted_to_the_light_bar(): void
     {
         $tag = $this->avatarButtonTag($this->home(User::factory()->create()));
 
-        foreach (['border-2', 'border-[#0c1337]/30', 'hover:bg-[#0c1337]/10', 'dark:border-white/10', 'dark:hover:bg-white/5'] as $class) {
+        foreach (['border-2 border-[#0c1337]/30', 'hover:border-edge', 'hover:bg-[#0c1337]/10', 'dark:border-white/10', 'dark:hover:bg-white/5'] as $class) {
             $this->assertStringContainsString($class, $tag, "Missing {$class}.");
         }
 
-        // The old kit: a grey fill, a thin zinc ring, and a blue ring on hover.
-        foreach (['bg-zinc-200', 'ring-1 ring-zinc-200', 'hover:ring-blue-400', 'hover:ring-2'] as $old) {
+        // The old kit: a grey fill, a thin zinc ring, a blue ring on hover, and
+        // the blue edge and pale blue wash that were tried at rest and
+        // reverted. The blue now shows on hover only.
+        foreach (['bg-zinc-200', 'ring-1 ring-zinc-200', 'hover:ring-blue-400', 'hover:ring-2', ' border-edge', 'dark:border-edge', 'hover:bg-edge/10'] as $old) {
             $this->assertStringNotContainsString($old, $tag, "{$old} is still on the avatar.");
         }
     }

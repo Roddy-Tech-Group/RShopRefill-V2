@@ -3,32 +3,48 @@
 namespace Tests\Feature\Storefront;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The branded reload loader renders on the storefront (not just the dashboard)
- * and follows the active theme, so a hard reload of the website matches the
- * theme in force instead of flashing unbranded.
+ * No page is covered by a full-screen loader.
+ *
+ * A branded overlay used to sit over the storefront, the dashboard and the
+ * admin on every hard reload. The page under it was already server-rendered,
+ * but the overlay only began to hide once the whole script bundle had run,
+ * then held for a fixed half second and faded for another 300ms. Content that
+ * was ready stayed hidden for no reason. The theme is resolved on the server,
+ * so there was no flash left for it to mask.
+ *
+ * Loading indicators now belong to genuinely asynchronous work: the
+ * navigation progress bar and the pull-to-refresh spinner.
  */
 class StorefrontLoaderTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_storefront_shows_theme_aware_reload_loader(): void
+    public function test_the_storefront_renders_without_a_covering_loader(): void
     {
-        $this->withoutVite();
+        $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $this->assertStringNotContainsString('id="app-loader"', $html);
+        $this->assertStringNotContainsString('app-loader--hidden', $html);
+    }
 
-        $this->assertStringContainsString('id="app-loader"', $html);
-        // Light + dark backgrounds are defined. Extra Dark rides on the same
-        // .dark rule - the theme engine applies .pure-dark alongside .dark, so
-        // a rule of its own could only restate it, which is how the two drifted
-        // apart before. See Tests\Feature\Nav\AppLoaderGroundTest.
-        $this->assertStringContainsString('.dark .app-loader', $html);
-        $this->assertStringNotContainsString('.dark.pure-dark .app-loader', $html);
-        // The spinner spins (rotate) and glows (halo).
-        $this->assertStringContainsString('app-loader-rotate', $html);
-        $this->assertStringContainsString('app-loader-glow', $html);
+    public function test_no_layout_mounts_the_loader(): void
+    {
+        foreach (['layouts/app/header', 'layouts/dashboard', 'layouts/admin'] as $layout) {
+            $blade = File::get(resource_path("views/components/{$layout}.blade.php"));
+
+            $this->assertStringNotContainsString('x-ui.app-loader', $blade, "{$layout} still mounts the loader");
+        }
+
+        $this->assertFileDoesNotExist(resource_path('views/components/ui/app-loader.blade.php'));
+    }
+
+    /** Navigation still says it is working, without covering the page. */
+    public function test_navigation_uses_the_progress_bar(): void
+    {
+        $this->assertTrue(config('livewire.navigate.show_progress_bar'));
     }
 }

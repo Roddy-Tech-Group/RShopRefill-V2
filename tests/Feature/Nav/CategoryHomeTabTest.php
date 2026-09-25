@@ -39,6 +39,9 @@ class CategoryHomeTabTest extends TestCase
 
     public function test_home_is_filled_on_the_home_page_and_not_elsewhere(): void
     {
+        // The page tone, as on a phone, where the tabs sit on the bar itself.
+        // Inside the desktop rail it lifts to white (NavGlassRailTest), but
+        // that is an md-scoped override of this same fill.
         $filled = 'bg-[#f4f6f5] px-3.5 font-bold';
 
         // On the home page it wears the open-page fill and says so.
@@ -56,7 +59,9 @@ class CategoryHomeTabTest extends TestCase
     {
         $french = $this->withoutVite()->withSession(['locale' => 'fr'])->get('/gift-cards')->assertOk()->getContent();
 
-        $start = strpos($french, 'aria-label="Product categories"');
+        // The row's own label is translated too, so it is found by its French name.
+        $start = strpos($french, 'aria-label="'.e(__('navigation.product_categories', [], 'fr')).'"');
+        $this->assertNotFalse($start, 'the category row was not found');
         $row = substr($french, $start, 8000);
 
         $this->assertStringContainsString(e(__('products.detail_crumb_home', [], 'fr')), $row);

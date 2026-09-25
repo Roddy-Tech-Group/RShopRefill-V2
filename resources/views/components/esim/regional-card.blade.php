@@ -49,18 +49,18 @@
 
 @php
     $categoryLabel = match ($type) {
-        'global' => 'GLOBAL eSIM',
-        'local' => 'LOCAL eSIM',
-        default => 'REGIONAL eSIM',
+        'global' => __('esim.card_label_global'),
+        'local' => __('esim.card_label_local'),
+        default => __('esim.card_label_regional'),
     };
 
     // Only what the package confirms. No network data means no chip, rather
     // than a generic "4G & 5G" every card wears whether or not it is true.
     $networkTypes = array_values(array_filter((array) $networkTypes));
     $networkLabel = match (true) {
-        in_array('4G', $networkTypes, true) && in_array('5G', $networkTypes, true) => '4G & 5G Available',
-        in_array('5G', $networkTypes, true) => '5G Available',
-        in_array('4G', $networkTypes, true) => '4G Available',
+        in_array('4G', $networkTypes, true) && in_array('5G', $networkTypes, true) => __('esim.card_network_available', ['network' => '4G & 5G']),
+        in_array('5G', $networkTypes, true) => __('esim.card_network_available', ['network' => '5G']),
+        in_array('4G', $networkTypes, true) => __('esim.card_network_available', ['network' => '4G']),
         default => null,
     };
 
@@ -151,7 +151,7 @@
     @php
         $accessibleName = str_contains(strtolower($name), 'esim') ? $name : $name.' eSIM';
     @endphp
-    aria-label="{{ $accessibleName }}{{ $fromPrice ? ', from $'.number_format($fromPrice, 2) : '' }}"
+    aria-label="{{ $fromPrice ? __('esim.card_aria_from', ['name' => $accessibleName, 'price' => '$'.number_format($fromPrice, 2)]) : $accessibleName }}"
     @class([
         'group flex h-full flex-col text-left focus:outline-none',
         'cursor-default' => ! $isAvailable,
@@ -297,7 +297,7 @@
                 <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
                 <path d="M14 14h3v3h-3zM20 14v.01M20 20v.01M17 20v.01"/>
             </svg>
-            Instant QR
+            {{ __('esim.card_instant_qr') }}
         </span>
 
         @if ($hotspotSupported === true)
@@ -305,7 +305,7 @@
                 <svg class="h-3 w-3 shrink-0 @min-[190px]:h-3.5 @min-[190px]:w-3.5" style="color: var(--esim-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M5 12.5a9 9 0 0114 0M8 16a5 5 0 018 0"/><circle cx="12" cy="19.5" r="1.1" fill="currentColor" stroke="none"/>
                 </svg>
-                Hotspot
+                {{ __('esim.card_hotspot') }}
             </span>
         @endif
 
@@ -327,14 +327,14 @@
              strip, and this is the treatment the rest of the storefront
              already trains people to read. --}}
         <span class="absolute bottom-2 right-2 z-10 inline-flex items-center rounded-full border border-white bg-zinc-900/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-            {{ $error ? 'Unavailable' : 'Currently unavailable' }}
+            {{ $error ? __('esim.card_unavailable') : __('esim.card_currently_unavailable') }}
         </span>
     @endif
 
     @if ($variant !== 'tile' && $error)
         <p class="esim-card__note esim-card__note--error border-t border-amber-200 px-3 py-2 text-[10px] font-semibold @min-[260px]:px-5 @min-[260px]:py-2.5 @min-[260px]:text-xs">{{ $error }}</p>
     @elseif ($variant !== 'tile' && ! $isAvailable)
-        <p class="esim-card__note border-t border-zinc-200 px-3 py-2 text-[10px] font-semibold @min-[260px]:px-5 @min-[260px]:py-2.5 @min-[260px]:text-xs">Currently unavailable</p>
+        <p class="esim-card__note border-t border-zinc-200 px-3 py-2 text-[10px] font-semibold @min-[260px]:px-5 @min-[260px]:py-2.5 @min-[260px]:text-xs">{{ __('esim.card_currently_unavailable') }}</p>
     @endif
     </div>
 
@@ -348,7 +348,7 @@
             <p translate="no" class="notranslate truncate text-[16px] font-bold leading-tight text-zinc-900 dark:text-white">{{ $name }}</p>
         @endif
         @if ($fromPrice)
-            <p translate="no" class="notranslate mt-0.5 truncate text-[14px] font-bold tabular-nums text-zinc-900 dark:text-white">From ${{ number_format($fromPrice, 2) }}</p>
+            <p translate="no" class="notranslate mt-0.5 truncate text-[14px] font-bold tabular-nums text-zinc-900 dark:text-white">{{ __('esim.card_from_price', ['price' => '$'.number_format($fromPrice, 2)]) }}</p>
         @endif
     </div>
 </a>

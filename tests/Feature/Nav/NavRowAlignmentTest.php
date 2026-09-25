@@ -66,7 +66,7 @@ class NavRowAlignmentTest extends TestCase
         $this->assertStringContainsString('flex items-center gap-3 py-2.5', $nav);
         // gap-5 below md: the tabs have no padding there, so the gap is all
         // that separates them.
-        $this->assertStringContainsString('flex min-w-0 flex-1 gap-5 md:gap-2 overflow-x-auto justify-start', $nav);
+        $this->assertStringContainsString('flex min-w-0 flex-1 md:flex-initial gap-5 md:gap-2 overflow-x-auto justify-start', $nav);
         $this->assertStringNotContainsString('md:justify-center', $nav);
     }
 
@@ -80,7 +80,7 @@ class NavRowAlignmentTest extends TestCase
         // Scoped to the rail itself: an unrelated centred component elsewhere
         // on the page must not be what makes or breaks this.
         $this->assertStringContainsString(
-            'flex min-w-0 flex-1 gap-5 md:gap-2 overflow-x-auto justify-start [scrollbar-width:none]',
+            'flex min-w-0 flex-1 md:flex-initial gap-5 md:gap-2 overflow-x-auto justify-start [scrollbar-width:none]',
             $html
         );
     }
@@ -119,16 +119,19 @@ class NavRowAlignmentTest extends TestCase
      * and the utilities that used to sit in a fourth row above the logo are
      * behind the menu button now.
      *
-     * The sheet has to be declared OUTSIDE the collapse-on-scroll wrapper: the
-     * button that opens it is inside, and a sheet that collapses with the row
-     * closes itself the moment the page scrolls under it.
+     * The sheet has to be declared OUTSIDE anything that folds on scroll: the
+     * button that opens it is in the pinned row, and a sheet that folded with
+     * the category strip would close itself the moment the page scrolled
+     * under it. The strip's fold is the grid-row collapse (NavFoldTest).
      */
     public function test_the_menu_sheet_sits_outside_the_collapsing_row(): void
     {
         $nav = $this->nav();
 
         $sheetAt = strpos($nav, 'x-data="{ menuOpen: false, sub: null }"');
-        $collapseAt = strpos($nav, 'max-h-0 opacity-0 overflow-hidden');
+        $collapseAt = strpos($nav, "[grid-template-rows:0fr] opacity-0'");
+
+        $this->assertNotFalse($collapseAt, 'The category strip no longer folds by grid row.');
 
         $this->assertNotFalse($sheetAt);
         $this->assertLessThan($collapseAt, $sheetAt);
@@ -168,11 +171,11 @@ class NavRowAlignmentTest extends TestCase
         $cluster = $this->accountCart();
 
         $this->assertStringContainsString("aria-label=\"{{ __('navigation.cart') }}\"", $cluster);
-        $this->assertStringContainsString('aria-label="Your account"', $cluster);
+        $this->assertStringContainsString("aria-label=\"{{ __('navigation.your_account') }}\"", $cluster);
 
         $navMarkup = preg_replace('/\{\{--.*?--\}\}/s', '', $this->nav());
         $this->assertStringNotContainsString("__('navigation.cart')", $navMarkup);
-        $this->assertStringNotContainsString('aria-label="Your account"', $navMarkup);
+        $this->assertStringNotContainsString("__('navigation.your_account')", $navMarkup);
 
         // Rendered once on the page, not twice.
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
@@ -202,7 +205,11 @@ class NavRowAlignmentTest extends TestCase
         // a relative wrapper when the pill grew a dropdown - the panel anchors
         // to it - but the display and shrink behaviour it is asserting here are
         // unchanged.
-        $this->assertStringContainsString('class="relative hidden shrink-0 md:flex"', $nav);
+        // The box holds two pills now, the Certified reseller badge and the
+        // invite (NavGlassRailTest), so it is a flex row with a gap.
+        // ml-auto holds it at the right end: the rail beside it stops at its
+        // last category now rather than filling the row (NavGlassRailTest).
+        $this->assertStringContainsString('class="relative ml-auto hidden shrink-0 items-center gap-2 md:flex"', $nav);
 
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $nav);
         $this->assertGreaterThan(
@@ -230,7 +237,10 @@ class NavRowAlignmentTest extends TestCase
         // Twice on the page: the category line and the sheet, each hidden at
         // the other's breakpoint.
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertSame(2, substr_count($html, 'Invite a Friend'));
+        // The two nav pills label themselves in a <span>; the footer's company
+        // column carries a third "Invite a Friend" as a plain link, which is
+        // not this row's concern.
+        $this->assertSame(2, substr_count($html, '>Invite a Friend</span>'));
 
         // The reference row also carried a "Download the app" link. It was
         // explicitly excluded, so it must not creep back in.

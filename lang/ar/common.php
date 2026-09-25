@@ -38,6 +38,20 @@ return [
     'theme_system' => 'النظام',
     'help' => 'المساعدة',
     'invite_a_friend' => 'دعوة صديق',
+    'certified_reseller' => 'موزّع معتمد',
     'change_country' => 'تغيير البلد',
     'shop_in' => 'التسوق بـ :currency',
+
+    // Carousel and theme controls shared by several rows.
+    'theme_auto' => 'تلقائي',
+    'theme_label' => 'المظهر:',
+    'see_more' => 'عرض المزيد',
+    'see_less' => 'عرض أقل',
+    'show_more' => 'إظهار المزيد',
+    'see_more_named' => 'عرض المزيد: :name',
+    'previous' => 'السابق',
+    'next' => 'التالي',
+    'appearance' => 'المظهر',
+    'appearance_intro' => 'اختر مظهر :site. يتبع الخيار التلقائي إعداد جهازك.',
+    'theme_hint' => 'بدّل بين الوضع الفاتح والداكن، أو اتبع إعداد نظامك.',
 ];

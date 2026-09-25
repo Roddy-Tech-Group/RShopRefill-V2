@@ -41,17 +41,17 @@ class CampaignsRadiusTest extends TestCase
 
         $html = $this->withoutVite()->get(route('admin.campaigns'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200', $html);
+        $this->assertStringContainsString('overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]', $html);
         $this->assertStringContainsString('<div class="overflow-x-auto p-3">', $html);
-        $this->assertStringContainsString('rounded-[12px] border border-zinc-200 bg-white p-5', $html);
+        $this->assertStringContainsString('rounded-[12px] bg-white p-5 shadow-sm', $html);
     }
 
     public function test_the_index_uses_the_house_12px_radius_not_the_20px_rounded_xl(): void
     {
         $index = file_get_contents(resource_path('views/livewire/admin/campaigns.blade.php'));
 
-        // KPI cards + the per-row icon tile.
-        $this->assertStringContainsString('rounded-[12px] border border-zinc-200 bg-white p-5', $index);
+        // KPI cards (shadow only, no border - the admin card rule) + the per-row icon tile.
+        $this->assertStringContainsString('rounded-[12px] bg-white p-5 shadow-sm', $index);
         $this->assertStringContainsString('h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-50', $index);
 
         // The stock-assumption classes are gone. rounded-lg would render the
@@ -65,8 +65,9 @@ class CampaignsRadiusTest extends TestCase
     {
         $index = file_get_contents(resource_path('views/livewire/admin/campaigns.blade.php'));
 
-        // Same wrapper as the other admin tables: ring, not a solid border.
-        $this->assertStringContainsString('overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10', $index);
+        // Same wrapper as the other admin tables: shadow only, no ring and no border.
+        $this->assertStringContainsString('overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]', $index);
+        $this->assertStringNotContainsString('ring-1 ring-zinc-200', $index);
 
         // The inner p-3 is load-bearing, not decoration: .admin-table carries
         // margin-top -6px to cancel it, so without the padding the header pill
@@ -113,7 +114,9 @@ class CampaignsRadiusTest extends TestCase
     {
         $editor = file_get_contents(resource_path('views/livewire/admin/campaign-editor.blade.php'));
 
-        $this->assertStringContainsString('p-4 rounded-[12px] border border-blue-100', $editor);
+        // A tinted callout, no border: the fill alone marks it, as on every admin card.
+        $this->assertStringContainsString('bg-blue-50 dark:bg-blue-500/10 p-4 rounded-[12px]"', $editor);
+        $this->assertStringNotContainsString('border border-blue-100', $editor);
         $this->assertStringNotContainsString('rounded-xl', $editor);
     }
 }

@@ -19,6 +19,21 @@ class CartPricingService
     /** Active pricing rules, loaded once and memoised for this instance. */
     private ?Collection $rules = null;
 
+    /**
+     * Active fiat rates (code => units per USD), loaded once for this instance
+     * by the gift-card face floor. A listing page prices hundreds of variants.
+     *
+     * @var array<string, float>|null
+     */
+    private ?array $activeRates = null;
+
+    /**
+     * Category slugs by id, for the same reason.
+     *
+     * @var array<int, string>
+     */
+    private array $categorySlugs = [];
+
     /** Forced floor mode for this instance (audits compare modes side by side). */
     private ?string $floorModeOverride = null;
 
@@ -221,6 +236,10 @@ class CartPricingService
      * override below supplier cost is clamped up to the floor unless the
      * variant is explicitly flagged `allow_below_cost` (deliberate loss-leader,
      * audited via the admin endpoint that sets it).
+     *
+     * A rule-derived gift card price is then held at the card's face value
+     * (see giftCardFaceFloorUsd). The override is not: an admin who typed a
+     * figure meant that figure.
      */
     public function resolveVariantRetailPrice(ProductVariant $variant, float $base): float
     {
@@ -231,7 +250,78 @@ class CartPricingService
             return $this->guardOverridePrice($variant, (float) $override, $costUsd);
         }
 
-        return $this->resolveRetailPrice($variant->product, $base, $costUsd);
+        $price = $this->resolveRetailPrice($variant->product, $base, $costUsd);
+
+        return max($price, $this->giftCardFaceFloorUsd($variant));
+    }
+
+    /**
+     * A gift card never sells under its face value.
+     *
+     * The supplier discounts some cards below face (a 100 MXN Apple card for
+     * $5.40, Colombian game cards by 10-20%), and cost + markup then lands
+     * under face in the card's own currency: 98 MXN for a 100 MXN card. That
+     * looks like a pricing fault to a customer and invites buying to resell,
+     * so the discount is kept as margin instead (decided 2026-09-20). Top-ups
+     * are left alone: discounted airtime is normal in those markets.
+     *
+     * Only a currency we hold a live rate for can set the floor. The inactive
+     * rows in currency_rates are official rates that can sit far from the
+     * street (SDG, VES, ARS); flooring a card at those would overprice it by
+     * multiples. USD cards floor at face exactly.
+     *
+     * The USD figure is rounded DOWN to the four decimals the cart snapshot
+     * keeps, so that figure times the rate lands a hair under face and the
+     * charm round-up (CharmPrice) settles on face itself, never one step
+     * above it. Zero when the floor does not apply.
+     */
+    private function giftCardFaceFloorUsd(ProductVariant $variant): float
+    {
+        $product = $variant->product;
+        $face = (float) $variant->face_value;
+        $currency = strtoupper(trim((string) $variant->currency));
+
+        if ($product === null || $face <= 0 || $currency === '' || $this->categorySlug($product) !== 'gift-cards') {
+            return 0.0;
+        }
+
+        if ($currency === 'USD') {
+            return $face;
+        }
+
+        $rate = $this->activeRatePerUsd($currency);
+
+        if ($rate === null || $rate <= 0) {
+            return 0.0;
+        }
+
+        return floor($face / $rate * 10000) / 10000;
+    }
+
+    private function categorySlug(Product $product): string
+    {
+        $categoryId = (int) $product->category_id;
+
+        if ($categoryId === 0) {
+            return '';
+        }
+
+        return $this->categorySlugs[$categoryId] ??= (string) (
+            $product->relationLoaded('category')
+                ? $product->category?->slug
+                : Category::query()->whereKey($categoryId)->value('slug')
+        );
+    }
+
+    private function activeRatePerUsd(string $code): ?float
+    {
+        $this->activeRates ??= CurrencyRate::query()
+            ->where('is_active', true)
+            ->pluck('rate_per_usd', 'code')
+            ->map(fn ($rate) => (float) $rate)
+            ->all();
+
+        return $this->activeRates[$code] ?? null;
     }
 
     /**

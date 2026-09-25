@@ -31,7 +31,7 @@
             <x-illo name="emptyCart" class="mx-auto w-full max-w-sm" />
             <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">{{ __('checkout.cart_empty') }}</p>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ __('checkout.cart_empty_hint') }}</p>
-            <a href="{{ $shopRoute('gift-cards') }}" wire:navigate class="mt-5 inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+            <a href="{{ $shopRoute('gift-cards') }}" wire:navigate class="mt-5 inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                 {{ __('checkout.visit_shop') }}
             </a>
         </div>
@@ -84,11 +84,11 @@
                                     {{-- Quantity stepper + remove --}}
                                     <div class="mt-2.5 flex items-center gap-3">
                                         <span class="inline-flex items-center gap-1.5">
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('checkout.decrease_quantity') }}">
+                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-full text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('checkout.decrease_quantity') }}">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
                                             </button>
                                             <span class="w-6 text-center text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="item.quantity"></span>
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('checkout.increase_quantity') }}">
+                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-full text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('checkout.increase_quantity') }}">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
                                             </button>
                                         </span>

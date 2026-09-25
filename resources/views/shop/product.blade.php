@@ -159,7 +159,7 @@
             ->map(function ($v) use ($pricing, $product) {
                 $v->setRelation('product', $product);
 
-                return round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
+                return round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 4);
             })
             ->filter();
         $rangeMin = $pricedRange->min();
@@ -207,6 +207,9 @@
             'icon'    => ($r->type === 'crypto' && $r->icon_path) ? asset('assets/' . $r->icon_path) : null,
             // Fiat currencies show a country flag instead of the letter circle.
             'flag'    => $r->type === 'fiat' ? $currencyFlag($r->code) : null,
+            // Handed to the rest of the site with the code when this currency
+            // is picked, the same pair the locale modal stores.
+            'symbol'  => $r->type === 'fiat' ? Product::currencySymbol($r->code) : null,
         ])
         ->values();
 
@@ -270,6 +273,15 @@
         ? $countryCurrency
         : ($cryptoRatesForJs->firstWhere('code', 'USD') ? 'USD' : ($cryptoRatesForJs->first()['code'] ?? 'USDT'));
 
+    // Picking one of these beside the price sets what checkout will charge in.
+    // The list is the currencies with a verified rail list AND a country that
+    // uses them, so a pick can never leave a customer on a checkout whose only
+    // method is a card we did not promise them.
+    $checkoutCurrencies = array_values(array_intersect(
+        \App\Domain\Payment\Support\SupportedPaymentMethods::knownCurrencies(),
+        array_values(config('country_currency.map', []))
+    ));
+
     // $pricing is resolved earlier (the denomination range needs it too).
     $markup = $pricing->markupDescriptor($product);
 
@@ -295,6 +307,11 @@
     // Compact variant payload for Alpine. `price_usd` is the marked-up USD price
     // for a FIXED denomination; variable variants are priced client-side from
     // the typed amount, so their price_usd is unused.
+    //
+    // Four decimals, the same as the cart snapshot, not two: the page converts
+    // this figure into the pay currency and rounds up to the charm step, and so
+    // does checkout from the snapshot. Rounded differently first, a gift card
+    // held at its face value read 101 MXN here and 100 MXN at checkout.
     $variantsForJs = $variants->map(function ($v) use ($pricing, $product) {
         $v->setRelation('product', $product);
 
@@ -305,7 +322,7 @@
             'retail_price' => (float) $v->retail_price,
             'min' => (float) ($v->min_amount ?? 0),
             'max' => (float) ($v->max_amount ?? 0),
-            'price_usd' => round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2),
+            'price_usd' => round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 4),
         ];
     })->values();
 
@@ -346,7 +363,7 @@
             // checkout then contradicted - a "$35" Straight Talk plan that rang
             // up at $40. The card and the cart must never disagree.
             $v->setRelation('product', $product);
-            $val = round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 2);
+            $val = round((float) $pricing->calculatePricing($v, 1)['unit_price_snapshot'], 4);
             $topupGroups[$topupKindOf($v)][] = [
                 'id' => $v->id,
                 // The denomination's printed face value, in the operator's own
@@ -677,6 +694,7 @@
             rangeText: @js($rangeText),
             cryptos: @js($cryptoRatesForJs),
             defaultCrypto: @js($defaultCrypto),
+            checkoutCurrencies: @js($checkoutCurrencies),
             markup: @js($markup),
             customRate: @js($customRate),
             customMin: @js($customDisplayMin),
@@ -690,12 +708,21 @@
                 'usd_rate' => (float) \App\Models\Setting::rcoinUsdRate(),
             ]),
             purchasable: @js($productBuyable),
+            {{-- The Credit / Data / Bundles tab. It lives on the page scope
+                 rather than on the switcher, because the assurance badges sit
+                 in the column beside it and have to follow it: the badge that
+                 says money lands on the number is wrong once a plan is being
+                 bought instead. --}}
+            topupTab: @js($isTopup && $topupHasPlans ? $topupDefaultTab : 'credit'),
         })"
         x-init="init()"
         style="--brand: {{ $brandColor }};"
         {{-- Narrower than the nav and the listing pages, which run the full 1550px:
-             a product page is one thing to read and buy, not a grid of many. --}}
-        class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+             a product page is one thing to read and buy, not a grid of many.
+             Inside the dashboard the frame already pads every page (16px on a
+             phone, as the overview gets), so the wrapper adds none of its own:
+             with both, the page ran 16px narrower than the overview each side. --}}
+        class="mx-auto w-full max-w-7xl {{ $inDashboard ? '' : 'px-4 py-6 sm:px-6 lg:px-8 lg:py-10' }}"
     >
 
         {{-- Two columns: the writing (with the art and values inside it for a gift
@@ -745,7 +772,8 @@
                                             :aria-expanded="open.toString()"
                                             aria-haspopup="listbox"
                                             aria-label="{{ __('products.detail_quantity') }}"
-                                            class="flex h-9 items-center gap-1.5 rounded-[12px] border border-zinc-200 bg-white pl-3 pr-2 text-sm font-semibold tabular-nums text-zinc-900 transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-blue-400/50"
+                                            :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                                            class="flex h-9 items-center gap-1.5 rounded-full border-2 bg-white pl-3.5 pr-2.5 text-sm tabular-nums text-zinc-900 transition-colors focus:outline-none dark:bg-white/5 dark:text-white"
                                         >
                                             <span x-text="quantity">1</span>
                                             <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -769,7 +797,7 @@
                                                     :aria-selected="(quantity === {{ $n }}).toString()"
                                                     @click="quantity = {{ $n }}; open = false"
                                                     :class="quantity === {{ $n }} ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"
-                                                    class="flex w-full items-center justify-center rounded-[12px] px-2 py-1.5 text-sm font-medium tabular-nums transition-colors"
+                                                    class="flex w-full items-center justify-center rounded-full px-2 py-1.5 text-sm font-medium tabular-nums transition-colors"
                                                 >{{ $n }}</button>
                                             @endfor
                                         </div>
@@ -779,7 +807,7 @@
                                 {{-- The pay currency, then what this many of the chosen value
                                      costs in it. --}}
                                 <div class="mt-4">
-                                    @include('shop._pay-currency-picker', ['pickerCodeOnly' => true, 'pickerLabelText' => __('common.payment_currency')])
+                                    @include('shop._pay-currency-picker', ['pickerCodeOnly' => true, 'pickerLabelText' => __('common.payment_currency'), 'pickerHeadingClass' => 'mb-2 block text-base font-bold', 'pickerTriggerClass' => 'h-9 rounded-full px-3.5 text-sm', 'pickerListMaxClass' => 'max-h-[232px]'])
                                 </div>
 
                                 {{-- The estimated price. The tiles carry face values only,
@@ -813,9 +841,16 @@
                         ? __('products.detail_badge_credited_to_number')
                         : ($isBill ? __('products.detail_badge_paid_to_account') : __('products.detail_badge_online_redeemable'));
 
+                    // On a network that sells plans as well as credit, the middle
+                    // badge follows the tab: money is credited to the number,
+                    // but a data or bundle plan is switched on for it.
+                    $redeemAltLabel = $isTopup && $topupHasPlans
+                        ? __('products.detail_badge_activated_on_number')
+                        : null;
+
                     $badges = [
                         ['label' => __('products.detail_badge_instant_delivery'), 'd' => 'M13 10V3L4 14h7v7l9-11h-7z'],
-                        ['label' => $redeemLabel,       'd' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                        ['label' => $redeemLabel, 'alt' => $redeemAltLabel, 'd' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                         ['label' => __('products.detail_badge_fair_refund'), 'd' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ];
                 @endphp
@@ -897,15 +932,22 @@
                      three as bullets in its heading. py-1 stops the overflow-x container
                      clipping the badge circles' ring on mobile (sm+ needs none). --}}
                 @unless ($isGiftCard)
-                <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto py-1 text-sm font-medium text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:py-0 dark:text-zinc-200">
+                <div class="flex items-center gap-x-6 gap-y-3 overflow-x-auto py-1 text-sm font-semibold text-zinc-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:py-0 dark:text-zinc-200">
                     @foreach ($badges as $badge)
                         <span class="flex shrink-0 items-center gap-2">
-                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/30">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $badge['d'] }}"/>
                                 </svg>
                             </span>
-                            {{ $badge['label'] }}
+                            @if (! empty($badge['alt']))
+                                {{-- The credit wording is printed, so the badge
+                                     still reads correctly before Alpine boots
+                                     and for anything that does not run it. --}}
+                                <span x-text="ttab === 'credit' ? @js($badge['label']) : @js($badge['alt'])">{{ $badge['label'] }}</span>
+                            @else
+                                {{ $badge['label'] }}
+                            @endif
                         </span>
                     @endforeach
                 </div>
@@ -943,7 +985,10 @@
                     {{-- This wrapper only carries the top-up tab state. Gift cards skip
                          it: it would span their region boundaries. --}}
                     @unless ($isGiftCard)
-                    <div @if ($isTopup && $topupHasPlans) x-data="{ ttab: '{{ $topupDefaultTab }}' }" @endif>
+                    {{-- No x-data here any more. A local scope would shadow the
+                         page's own ttab, and the assurance badges outside this
+                         column read it to stay in step with the tab. --}}
+                    <div>
                     @endunless
 
                     @if ($isTopup && $topupHasPlans)
@@ -958,7 +1003,7 @@
                                         @click="ttab = '{{ $key }}'"
                                         :aria-selected="ttab === '{{ $key }}'"
                                         :class="ttab === '{{ $key }}' ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:text-white dark:ring-[#24364f]' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
-                                        class="rounded-[10px] px-4 py-1.5 text-xs font-semibold transition-all"
+                                        class="rounded-full px-5 py-2.5 text-sm font-semibold transition-all"
                                     >{{ $label }}</button>
                                 @endforeach
                             </div>
@@ -1041,7 +1086,7 @@
                          metadata for the Zendit billing.accountId field. --}}
                     @if ($isBill)
                         <div>
-                            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                            <label class="mb-2 flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 {{ __('products.detail_account_label', ['brand' => $brandName]) }}
                             </label>
                             <div
@@ -1081,18 +1126,37 @@
                          enforces a valid number. Country flag + dial code are
                          locked to the product's country_code via dial_codes.php. --}}
                     @if ($isTopup)
-                        <div id="topup-recipient">
-                            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        {{-- Room above it: the amount block ends on its range
+                             line, which sat directly against this label. --}}
+                        <div id="topup-recipient" class="mt-5">
+                            <label class="mb-2 flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 @if (Product::flagUrl($product->country_code))
                                     <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-3.5 w-5 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
                                 @endif
                                 {{ __('products.detail_phone_label', ['country' => $countryName]) }}
                             </label>
                             <div
+                                {{-- Grey until the caret is in it, then the
+                                     interactive edge, and grey again once focus
+                                     leaves. Tracked in Alpine rather than with
+                                     focus-within, because the storefront pins
+                                     .border-zinc-200 to the shared edge colour
+                                     at a specificity no variant can reach, so
+                                     the blue only lands once that class is off
+                                     the element.
+
+                                     Validity still outranks both: a number the
+                                     operator will accept says so in green, and
+                                     a broken one in red. --}}
+                                x-data="{ focused: false }"
+                                @focusin="focused = true"
+                                @focusout="focused = false"
                                 :class="recipientPhoneValid()
                                     ? 'border-emerald-500 ring-2 ring-emerald-500/15'
-                                    : (recipientPhone.length > 0 ? 'border-red-300' : 'border-zinc-200')"
-                                class="flex h-[52px] w-full items-center gap-3 rounded-[12px] border bg-[#eff6ff] px-4 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                                    : (recipientPhone.length > 0
+                                        ? 'border-red-300'
+                                        : (focused ? 'border-edge ring-2 ring-edge/30 dark:border-edge' : 'border-zinc-200 dark:border-white/10'))"
+                                class="flex h-11 w-full items-center gap-3 rounded-full border-2 bg-[#eff6ff] px-4 transition-colors dark:bg-[#26416b]"
                             >
                                 <span class="shrink-0 text-sm font-semibold text-zinc-600 dark:text-zinc-200" x-text="recipientDialCode">{{ $dialCode }}</span>
                                 <input
@@ -1158,7 +1222,7 @@
                     href="{{ $redeemUrl }}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="mb-2 inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    class="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                     {{ __('products.detail_redeem_at', ['brand' => $brandName]) }}
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -1446,7 +1510,7 @@
 
 
     <script>
-        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig, purchasable }) {
+        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, checkoutCurrencies, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig, purchasable, topupTab }) {
             // `cryptos` is an array of {code, name, type, perUsd, decimals, icon} from the
             // admin currency_rates table. Reshape into a code-keyed object.
             const cryptoMap = {};
@@ -1465,8 +1529,12 @@
                 customMax,
                 selectedVariantId: null,
                 quantity: 1,
+                // Credit / Data / Bundles, read by the switcher and by the badges beside it.
+                ttab: topupTab || 'credit',
                 cryptos: cryptoMap,
                 selectedCrypto: cryptoMap[defaultCrypto] ? defaultCrypto : (cryptos[0]?.code ?? null),
+                checkoutCurrencies: checkoutCurrencies || [],
+                _payCurrencyWatched: false,
 
                 // Add-to-cart micro-interaction: idle -> loading -> success -> idle.
                 cartState: 'idle',
@@ -1484,7 +1552,29 @@
                 accountId: '',
 
                 init() {
-                    // Empty by default so the placeholder hint stays visible.
+                    // Alpine calls this itself and x-init calls it again, so the
+                    // watcher below is bound once or it would fire twice.
+                    if (this._payCurrencyWatched) { return; }
+                    this._payCurrencyWatched = true;
+
+                    this.$watch('selectedCrypto', (code) => this.handOffPayCurrency(code));
+                },
+
+                /**
+                 * Pick a currency beside the price and that is what checkout
+                 * charges in - for the currencies checkout has rails for. A coin,
+                 * or a fiat it does not, prices the card on this page and goes no
+                 * further, so a customer is never sent to a checkout that can only
+                 * offer them a card.
+                 */
+                handOffPayCurrency(code) {
+                    const picked = this.cryptos[code];
+
+                    if (! picked || picked.type !== 'fiat') {
+                        return;
+                    }
+
+                    window.rshopSetPayCurrency?.(code, picked.symbol, this.checkoutCurrencies);
                 },
 
                 // Validation: digits + spaces + optional dashes, 6-15 digits when

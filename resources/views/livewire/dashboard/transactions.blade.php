@@ -252,9 +252,9 @@ class extends Component {
     // Unified status pill tones — same recipe as the admin list pages (and the
     // customer orders page) so every status badge in the app reads the same.
     $depositStatusUi = [
-        'pending'    => ['Pending',    'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
-        'processing' => ['Processing', 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'failed'     => ['Failed',     'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
+        'pending'    => ['Pending',    'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'],
+        'processing' => ['Processing', 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!'],
+        'failed'     => ['Failed',     'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
     ];
 @endphp
 
@@ -327,7 +327,7 @@ class extends Component {
             <p class="text-sm font-bold text-zinc-900">Recent deposits</p>
             <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                 @foreach ($recentDeposits as $deposit)
-                    @php [$depLabel, $depClass] = $depositStatusUi[$deposit->status->value] ?? ['Pending', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30']; @endphp
+                    @php [$depLabel, $depClass] = $depositStatusUi[$deposit->status->value] ?? ['Pending', 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300']; @endphp
                     <div class="flex items-center gap-3 px-4 py-3" wire:key="dep-{{ $deposit->id }}">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#f4f6f5] text-blue-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -340,7 +340,7 @@ class extends Component {
                         </div>
                         <div class="flex shrink-0 flex-col items-end gap-1">
                             <p class="text-sm font-bold text-zinc-900">{{ $deposit->currency?->symbol() }}{{ number_format((float) $deposit->amount, 2) }}</p>
-                            <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $depClass }}">{{ $depLabel }}</span>
+                            <span class="inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $depClass }}">{{ $depLabel }}</span>
                         </div>
                     </div>
                 @endforeach

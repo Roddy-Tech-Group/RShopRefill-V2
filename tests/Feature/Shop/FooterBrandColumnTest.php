@@ -35,24 +35,24 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringNotContainsString('Your everyday digital marketplace', $footer);
 
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertStringContainsString('Your marketplace for gift cards, travel eSIMs, mobile top-ups and bill payments.', $html);
+        $this->assertStringContainsString('Your marketplace for gift cards, eSIMs, mobile top-ups and bill payments.', $html);
         $this->assertStringNotContainsString('Your everyday digital marketplace', $html);
     }
 
     /**
      * The logo still opens the brand column, directly above the link grid.
      *
-     * Both halves of what this used to measure moved. The asset is
-     * assets/logo.webp now, the retired Rshoprefillslogo.webp file having gone
-     * with the rename to RshopRefill, and the "Get the app" heading the logo was
-     * measured against left with the store badges. The first link column is what
-     * follows the brand now, so that is the marker: the claim is unchanged, that
-     * the logo opens the block rather than trailing the links.
+     * Both halves of what this used to measure moved. The footer wears the mark
+     * alone now, assets/PWAicon.webp, the wordmark staying in the header where
+     * the name is read, and the "Get the app" heading the logo was measured
+     * against left with the store badges. The first link column is what follows
+     * the brand now, so that is the marker: the claim is unchanged, that the logo
+     * opens the block rather than trailing the links.
      *
      * The search starts at the footer element rather than taking the last match
-     * on the page, because the same wordmark file is used in the nav and in
-     * several layouts, and "last occurrence" would quietly follow whichever
-     * component happens to render after the footer.
+     * on the page, because the same mark is the nav's phone logo, and "last
+     * occurrence" would quietly follow whichever component happens to render
+     * after the footer.
      */
     public function test_the_logo_still_opens_the_brand_column(): void
     {
@@ -61,7 +61,7 @@ class FooterBrandColumnTest extends TestCase
         $footerAt = strpos($html, 'footer-ground');
         $this->assertNotFalse($footerAt, 'The footer slab is missing.');
 
-        $logo = strpos($html, 'assets/logo.webp', $footerAt);
+        $logo = strpos($html, 'assets/PWAicon.webp', $footerAt);
         $shopCol = strpos($html, 'id="footer-col-shop"');
 
         $this->assertNotFalse($logo, 'The footer carries no logo.');
@@ -279,7 +279,7 @@ class FooterBrandColumnTest extends TestCase
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
         $footerAt = strpos($html, 'footer-ground');
-        $logo = strpos($html, 'assets/logo.webp', $footerAt);
+        $logo = strpos($html, 'assets/PWAicon.webp', $footerAt);
         $facebook = strpos($html, 'aria-label="Visit our Facebook page"');
         $shopCol = strpos($html, 'id="footer-col-shop"');
         $copyright = strpos($html, 'All rights reserved');
@@ -357,10 +357,14 @@ class FooterBrandColumnTest extends TestCase
         $this->assertStringContainsString('<span class="flex items-center h-11 md:h-12">', $nav);
         $this->assertStringNotContainsString('<span class="flex items-center h-8 md:h-9">', $nav);
 
-        // Both read the same replaced asset, so neither view can be pointed back
-        // at the retired file on its own and take its old band with it.
+        // The nav reads the wordmark and the footer the mark cut from it, so
+        // neither view can be pointed back at the retired file on its own and
+        // take its old band with it. The mark keeps the 48px band: it is the
+        // wordmark's own R, drawn at the height the wordmark draws it.
+        $this->assertStringContainsString("asset('assets/logo.webp')", $nav, 'nav does not use the current wordmark.');
+        $this->assertStringContainsString("asset('assets/PWAicon.webp')", $footer, 'footer does not use the current mark.');
+
         foreach (['footer' => $footer, 'nav' => $nav] as $name => $view) {
-            $this->assertStringContainsString("asset('assets/logo.webp')", $view, $name.' does not use the current wordmark.');
             $this->assertStringNotContainsString('Rshoprefillslogo', $view, $name.' still points at the retired wordmark.');
         }
     }
@@ -376,12 +380,13 @@ class FooterBrandColumnTest extends TestCase
      * the reasoning for the removal - in short, there is no app, so a pair of
      * "coming soon" store pills advertised a download nobody could get.
      *
-     * The left edge is the fiddly part and still worth pinning. The wordmark file
-     * carries transparent margin down its left side, 12px of a 419px canvas,
-     * which lands at about 4px once the image is drawn in the footer's 48px band.
+     * The left edge is the fiddly part and still worth pinning. The mark's file
+     * carries transparent margin down its left side, 18px of a 186x167 canvas,
+     * which lands at about 5px once the image is drawn in the footer's 48px band.
      * So the anchor pulls -ml-1 (4px) to put the ink itself on the headings'
-     * edge. The -ml-3 (12px) it used to pull overshot that and hung the logo
-     * clear of every heading beside it.
+     * edge, the same pull the wordmark needed for its own 4px. The -ml-3 (12px)
+     * it used to pull overshot that and hung the logo clear of every heading
+     * beside it.
      */
     public function test_the_brand_column_is_the_logo_alone_on_the_heading_edge(): void
     {
@@ -404,7 +409,7 @@ class FooterBrandColumnTest extends TestCase
         $footerAt = strpos($html, 'footer-ground');
         $this->assertNotFalse($footerAt, 'The footer slab is missing.');
 
-        $logo = strpos($html, 'assets/logo.webp', $footerAt);
+        $logo = strpos($html, 'assets/PWAicon.webp', $footerAt);
         $shopCol = strpos($html, 'id="footer-col-shop"');
 
         $this->assertNotFalse($logo, 'The footer carries no logo.');
@@ -457,7 +462,7 @@ class FooterBrandColumnTest extends TestCase
         $footerAt = strpos($html, 'footer-ground');
         $this->assertNotFalse($footerAt, 'The footer slab is missing.');
 
-        $logo = strpos($html, 'assets/logo.webp', $footerAt);
+        $logo = strpos($html, 'assets/PWAicon.webp', $footerAt);
         $shop = strpos($html, 'id="footer-col-shop"');
         $legal = strpos($html, 'id="footer-col-legal"');
 
@@ -505,7 +510,7 @@ class FooterBrandColumnTest extends TestCase
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $this->assertLinksInOrder($this->column($html, 'shop'), ['Gift Cards', 'Travel eSIMs', 'Mobile Top-Ups', 'Data Bundles', 'Bill Payments']);
+        $this->assertLinksInOrder($this->column($html, 'shop'), ['Gift Cards', 'eSIMs', 'Mobile Top-Ups', 'Data Bundles', 'Bill Payments']);
         $this->assertLinksInOrder($this->column($html, 'company'), ['About Us', 'Blog', 'Customer Reviews', 'Influencers and Affiliates', 'Press &amp; Media']);
         $this->assertLinksInOrder($this->column($html, 'legal'), ['Terms of Service', 'Privacy Policy', 'Cookie Policy', 'Compliance', 'Security', 'Accessibility']);
 

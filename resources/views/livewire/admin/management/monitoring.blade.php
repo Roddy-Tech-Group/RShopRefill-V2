@@ -20,14 +20,14 @@ class extends Component {
 <x-slot:heading>Monitoring</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
     $sectionTitle = 'text-sm font-bold text-zinc-900 dark:text-white';
     $label = 'text-[13px] font-medium text-zinc-500 dark:text-zinc-400';
     $value = 'mt-1 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white tabular-nums';
-    $ok = 'inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30';
-    $bad = 'inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30';
-    $warn = 'inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30';
-    $muted = 'inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-500 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10';
+    $ok = 'inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
+    $bad = 'inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300';
+    $warn = 'inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+    $muted = 'inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-700 dark:bg-zinc-500/15! dark:text-zinc-300! dark:ring-white/10';
 
     $health = $snapshot['health'];
     $backup = $snapshot['backup'];
@@ -82,7 +82,7 @@ class extends Component {
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             @foreach ($componentLabels as $key => $componentLabel)
                 @php $component = $health['components'][$key] ?? null; @endphp
-                <div class="rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+                <div class="rounded-[12px] bg-zinc-50 p-3 dark:bg-white/5">
                     <p class="{{ $label }}">{{ $componentLabel }}</p>
                     <p class="mt-1.5">
                         @if ($component === null)
@@ -98,7 +98,7 @@ class extends Component {
 
             {{-- Backups --}}
             @php $backupHealthy = (bool) ($backup['healthy'] ?? false); @endphp
-            <div class="rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-3 dark:bg-white/5">
                 <p class="{{ $label }}">Backups</p>
                 <p class="mt-1.5">
                     <span class="{{ $backupHealthy ? $ok : $bad }}">{{ $backupHealthy ? 'OK' : 'CHECK' }}</span>
@@ -107,7 +107,7 @@ class extends Component {
 
             {{-- Disk space: logs, backups and MySQL share this partition; a
                  full disk stops all three at once, usually silently. --}}
-            <div class="rounded-[10px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-3 dark:bg-white/5">
                 <p class="{{ $label }}">Disk</p>
                 <p class="mt-1.5">
                     @if ($disk === null)
@@ -139,7 +139,7 @@ class extends Component {
             <h2 class="{{ $sectionTitle }}">Money integrity</h2>
         </header>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Ledger integrity</p>
                 <p class="mt-1.5">
                     @if (($ledger['status'] ?? '') === 'passed')
@@ -151,7 +151,7 @@ class extends Component {
                 <p class="mt-2 text-[11px] text-zinc-400">Nightly <code>ledger:verify</code> · recomputed live every 5 min</p>
             </div>
 
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Wallet reconciliation</p>
                 <p class="mt-1.5">
                     @if ($recon === null)
@@ -167,13 +167,13 @@ class extends Component {
                 </p>
             </div>
 
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Stuck paid orders</p>
                 <p class="{{ $value }}">{{ number_format($orders['stuck']) }}</p>
                 <p class="mt-1 text-[11px] text-zinc-400">Paid &gt; 15 min, fulfilment never started; each one is a missing dispatch</p>
             </div>
 
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Requires attention</p>
                 <p class="{{ $value }}">{{ number_format($orders['requires_attention']) }}</p>
                 <p class="mt-1 text-[11px] text-zinc-400">Orders flagged for a human decision</p>
@@ -209,7 +209,7 @@ class extends Component {
         <div class="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 sm:grid-cols-2 dark:border-white/10">
             {{-- Failed jobs are work that died; a long wait is work that is
                  quietly late, with zero errors anywhere. --}}
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Worst queue wait</p>
                 <p class="mt-1.5">
                     @if ($worstWait === null)
@@ -223,7 +223,7 @@ class extends Component {
                 <p class="mt-2 text-[11px] text-zinc-400">How long the oldest waiting job has stood in line; long waits mean customers are waiting too</p>
             </div>
 
-            <div class="rounded-[10px] bg-zinc-50 p-4 ring-1 ring-zinc-100 dark:bg-white/5 dark:ring-white/10">
+            <div class="rounded-[12px] bg-zinc-50 p-4 dark:bg-white/5">
                 <p class="{{ $label }}">Sweeper pickups (24h)</p>
                 <p class="mt-1.5">
                     <span class="{{ $sweeper['pickups_24h'] === 0 ? $ok : ($sweeper['pickups_24h'] >= 3 ? $bad : $warn) }}">

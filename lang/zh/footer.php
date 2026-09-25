@@ -17,11 +17,11 @@ return [
     'legal' => '法律与信任',
 
     // Brand column
-    'tagline' => '您的礼品卡、旅行 eSIM、手机充值和账单缴费一站式平台。',
+    'tagline' => '您的礼品卡、eSIM、手机充值和账单缴费一站式平台。',
 
     // Shop column
     'gift_cards' => '礼品卡',
-    'travel_esims' => '旅行 eSIM',
+    'esims' => 'eSIM',
     'mobile_topups' => '手机充值',
     'data_bundles' => '流量套餐',
     'bill_payments' => '账单缴费',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => '版权所有。',
     'legal_line' => '由 :company 拥有并运营，RC :rc，注册地址为 :address。',
     'verify_company' => '核实公司',
+
+    'newsletter_pitch' => '礼品卡、eSIM 和话费充值优惠，直接发送到您的邮箱',
+    'newsletter_label' => '电子邮箱地址',
+    'newsletter_placeholder' => 'you@example.com',
+    'newsletter_cta' => '订阅',
+    'newsletter_sending' => '正在订阅',
+    'newsletter_done' => '您已加入名单，谢谢！',
 ];

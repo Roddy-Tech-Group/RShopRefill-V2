@@ -29,12 +29,6 @@
         Actions the fraud/risk engine held for a human. SLA target: {{ $slaHours }}h.
     </x-slot:subheading>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">
-            {{ session('status') }}
-        </div>
-    @endif
-
     <div class="mb-6 inline-flex overflow-x-auto rounded-[12px] bg-zinc-100 p-1 font-medium text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
         @foreach ($tabs as $key => $label)
             <a href="{{ route('admin.risk.reviews', ['status' => $key]) }}"
@@ -47,23 +41,23 @@
         @endforeach
     </div>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[820px] text-left text-sm">
-                <thead class="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
+        <div class="overflow-x-auto p-3">
+            <table class="w-full min-w-[820px] text-left text-sm admin-table">
+                <thead class="">
                     <tr>
-                        <th class="px-6 py-3">Customer</th>
-                        <th class="px-6 py-3">Context</th>
-                        <th class="px-6 py-3">Score / Band</th>
-                        <th class="px-6 py-3">Reasons</th>
-                        <th class="px-6 py-3">Status</th>
-                        <th class="px-6 py-3">Age</th>
-                        <th class="px-6 py-3"></th>
+                        <th class="">Customer</th>
+                        <th class="">Context</th>
+                        <th class="">Score / Band</th>
+                        <th class="">Reasons</th>
+                        <th class="">Status</th>
+                        <th class="">Age</th>
+                        <th class=""></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-white/5">
+                <tbody class="">
                     @forelse ($reviews as $review)
-                        <tr class="hover:bg-zinc-50/70 dark:hover:bg-white/5">
+                        <tr class="hover:bg-blue-50">
                             <td class="px-6 py-4">
                                 <div class="font-medium text-zinc-900 dark:text-white">{{ $review->user?->name ?? 'Guest' }}</div>
                                 <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $review->user?->email }}</div>

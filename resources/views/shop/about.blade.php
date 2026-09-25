@@ -38,11 +38,11 @@
 <x-layouts.app.header :title="'About Us | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">About {{ $siteName }}</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-blue-600 sm:text-4xl lg:text-5xl">The Global Digital Ecosystem</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">About {{ $siteName }}</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">The Global Digital Ecosystem</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                 One unified platform where commerce, travel, connectivity and payments work seamlessly together, for everyone, everywhere.
             </p>
         </div>
@@ -50,7 +50,7 @@
 
     {{-- ── Trust banner ──────────────────────────────────────── --}}
     <section class="px-4 py-8 sm:px-6 sm:py-10">
-        <div class="relative mx-auto w-full overflow-hidden bg-white ring-1 ring-zinc-100" style="max-width: 1400px; border-radius: 10px;">
+        <div class="relative mx-auto w-full overflow-hidden bg-white" style="max-width: 1400px; border-radius: 12px;">
             {{-- Slanted translucent-blue divider (matches the story card). --}}
             <div class="absolute inset-0" style="clip-path: polygon(0 60%, 100% 30%, 100% 100%, 0 100%); background-color: rgba(37, 99, 235, 0.12);" aria-hidden="true"></div>
 
@@ -96,7 +96,7 @@
 
     {{-- ── Story card ────────────────────────────────────────── --}}
     <section class="mx-auto w-full max-w-[1140px] px-4 py-12 sm:px-6 sm:py-16">
-        <div class="overflow-hidden rounded-[28px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="overflow-hidden rounded-[28px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="grid grid-cols-1 lg:grid-cols-2">
 
                 {{-- Left: about text with a slanting white/blue divider --}}
@@ -112,7 +112,7 @@
 
                         <p>Today, {{ $siteName }} connects users to digital products and essential services across multiple countries and regions. From gift cards purchased directly from global brands, to instant eSIM activation that keeps travelers connected anywhere in the world, to airtime and utility top-ups that remove dependence on physical stores, the platform is designed around convenience, accessibility, and speed. Beyond digital products, {{ $siteName }} continues expanding its ecosystem to include flights, global stays, and modern financial accessibility tools that help users move, shop, travel, and live without borders. By supporting crypto and multiple payment methods, the platform empowers users to spend value in the way most convenient to them, whether paying bills, sending gifts, purchasing services, or managing everyday digital needs. {{ $siteName }} is more than a marketplace. It is infrastructure for a connected generation. The company's mission is to eliminate the stress of failed payments, region limitations, and fragmented digital services by creating one unified platform where technology, commerce, travel, and connectivity work seamlessly together.</p>
 
-                        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5">
                             <p class="text-base font-bold text-blue-700">Built for speed.</p>
                             <p class="text-base font-bold text-blue-700">Designed for convenience.</p>
                             <p class="text-base font-bold text-blue-700">Powered by innovation.</p>

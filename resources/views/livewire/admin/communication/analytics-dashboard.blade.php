@@ -5,7 +5,7 @@
             <p class="text-sm text-gray-500">Monitor all outgoing messages and delivery rates.</p>
         </div>
         <div>
-            <select wire:model.live="dateRange" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+            <select wire:model.live="dateRange" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-[12px] focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
                 <option value="1">Last 24 Hours</option>
                 <option value="7">Last 7 Days</option>
                 <option value="30">Last 30 Days</option>
@@ -15,43 +15,43 @@
 
     <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-[12px] shadow-sm">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Sent</p>
             <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2">{{ number_format($stats['total_sent']) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-[12px] shadow-sm">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Failed Deliveries</p>
             <p class="text-3xl font-bold text-red-600 mt-2">{{ number_format($stats['failed']) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-[12px] shadow-sm">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Emails Sent</p>
             <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2">{{ number_format($stats['email_count']) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-[12px] shadow-sm">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Push Sent</p>
             <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2">{{ number_format($stats['push_count']) }}</p>
         </div>
     </div>
 
     <!-- Data Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-[12px] shadow-sm">
         <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Communication Logs</h3>
             <div class="w-64">
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search by email, name or title..." class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search by email, name or title..." class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-[12px] focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
             </div>
         </div>
         
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+        <div class="overflow-x-auto p-3">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400 admin-table">
+                <thead class="">
                     <tr>
-                        <th class="px-4 py-3">Timestamp</th>
-                        <th class="px-4 py-3">Recipient</th>
-                        <th class="px-4 py-3">Channel</th>
-                        <th class="px-4 py-3">Category</th>
-                        <th class="px-4 py-3">Title</th>
-                        <th class="px-4 py-3">Status</th>
+                        <th class="">Timestamp</th>
+                        <th class="">Recipient</th>
+                        <th class="">Channel</th>
+                        <th class="">Category</th>
+                        <th class="">Title</th>
+                        <th class="">Status</th>
                     </tr>
                 </thead>
                 <tbody>

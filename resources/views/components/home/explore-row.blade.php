@@ -43,12 +43,12 @@
     // The eSIM heading is this row's own advert copy, not a label naming
     // whatever is switched on, so Flights and Stays take their own heading
     // above their teaser row. Neither set can leave a dangling title.
-    $esimHeading = 'Stay Connected in 190+ Countries with Travel eSIMs';
+    $esimHeading = __('home.esim_row_heading', ['count' => 190]);
 
     $teaserHeading = match (true) {
-        $showFlights && $showStays => 'Flights & stays',
-        $showFlights => 'Flights',
-        $showStays => 'Stays',
+        $showFlights && $showStays => __('home.teaser_flights_and_stays'),
+        $showFlights => __('navigation.flights'),
+        $showStays => __('navigation.stays'),
         default => null,
     };
 @endphp
@@ -155,8 +155,8 @@
                 next="nudge(1)"
                 prev-disabled="! canPrev"
                 next-disabled="! canNext"
-                prev-label="Previous eSIMs"
-                next-label="More eSIMs"
+                :prev-label="__('home.esim_row_prev')"
+                :next-label="__('home.esim_row_next')"
             />
         </div>
 
@@ -255,7 +255,7 @@
             <template x-for="(src, i) in images" :key="src">
                 <img
                     :src="src"
-                    alt="Flights"
+                    alt="{{ __('navigation.flights') }}"
                     :class="current === i ? 'opacity-100' : 'opacity-0'"
                     class="absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out group-hover:scale-105"
                     loading="lazy"
@@ -265,9 +265,9 @@
             <div class="absolute inset-x-0 bottom-0 p-5 text-white">
                 <div class="flex items-center gap-2">
                     <img src="{{ asset('assets/' . rawurlencode('flight 2.svg')) }}" alt="" class="h-5 w-5 shrink-0 brightness-0 invert" loading="lazy">
-                    <h3 class="text-xl font-bold leading-tight">Flights</h3>
+                    <h3 class="text-xl font-bold leading-tight">{{ __('navigation.flights') }}</h3>
                 </div>
-                <p class="mt-1 text-sm leading-snug text-white/90">Travel smarter with secure bookings, fast confirmations, and global access from anywhere in the world.</p>
+                <p class="mt-1 text-sm leading-snug text-white/90">{{ __('home.teaser_flights_body') }}</p>
             </div>
         </article>
         @endif
@@ -293,7 +293,7 @@
             <template x-for="(src, i) in images" :key="src">
                 <img
                     :src="src"
-                    alt="Stays"
+                    alt="{{ __('navigation.stays') }}"
                     :class="current === i ? 'opacity-100' : 'opacity-0'"
                     class="absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out group-hover:scale-105"
                     loading="lazy"
@@ -303,9 +303,9 @@
             <div class="absolute inset-x-0 bottom-0 p-5 text-white">
                 <div class="flex items-center gap-2">
                     <img src="{{ asset('assets/' . rawurlencode('stay 2.svg')) }}" alt="" class="h-5 w-5 shrink-0 brightness-0 invert" loading="lazy">
-                    <h3 class="text-xl font-bold leading-tight">Stays</h3>
+                    <h3 class="text-xl font-bold leading-tight">{{ __('navigation.stays') }}</h3>
                 </div>
-                <p class="mt-1 text-sm leading-snug text-white/90">Turn digital currency into real-world travel, comfort, and unforgettable experiences.</p>
+                <p class="mt-1 text-sm leading-snug text-white/90">{{ __('home.teaser_stays_body') }}</p>
             </div>
         </article>
         @endif

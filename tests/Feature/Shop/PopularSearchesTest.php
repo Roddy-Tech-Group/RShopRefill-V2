@@ -156,7 +156,7 @@ class PopularSearchesTest extends TestCase
             $blade = File::get(resource_path('views/'.$view));
 
             $this->assertStringContainsString(
-                'rounded-[12px] border border-zinc-200 bg-white shadow-2xl',
+                'rounded-[20px] border border-zinc-200 bg-white shadow-2xl',
                 $blade,
                 $view.' should use a solid panel.'
             );
@@ -183,7 +183,7 @@ class PopularSearchesTest extends TestCase
     {
         $body = File::get(resource_path('views/components/nav/search-panel.blade.php'));
 
-        $this->assertStringContainsString('rounded-[10px] px-3.5 py-2.5', $body);
+        $this->assertStringContainsString('rounded-full px-3.5 py-2.5', $body);
 
         // No single-side radius may creep back in on these rows.
         foreach (['rounded-l-', 'rounded-r-', 'rounded-t-[10px]', 'rounded-b-[10px]'] as $oneSided) {
@@ -208,7 +208,15 @@ class PopularSearchesTest extends TestCase
         // instances (plus any modal) hold it at once without fighting.
         $partial = File::get(resource_path('views/partials/scroll-lock.blade.php'));
         $this->assertStringContainsString('let counter = 0;', $partial);
-        $this->assertStringContainsString('counter = Math.max(0, counter - 1);', $partial);
+        $this->assertStringContainsString('counter++;', $partial);
+
+        // The release used to clamp with Math.max(0, counter - 1), which let an
+        // unbalanced unlock() run the restore branch at zero and throw the page
+        // to the top. It now returns early instead, so the decrement behind
+        // that guard cannot underflow and needs no clamp. ScrollLockTest covers
+        // the guard itself.
+        $this->assertStringContainsString('counter -= 1;', $partial);
+        $this->assertStringNotContainsString('Math.max(0, counter - 1)', $partial);
     }
 
     /** The mobile sheet opens its result box for Popular too, not only typed queries. */
@@ -368,17 +376,26 @@ class PopularSearchesTest extends TestCase
     }
 
     /**
-     * Result rows carry a small square mark, not a wide card thumbnail.
+     * Result rows carry a square mark, not a wide card thumbnail.
      *
-     * object-contain rather than cover: at 36px a cover crop cuts a wide
-     * wordmark in half, which is exactly what these marks mostly are.
+     * 44px, up from 36px, and with no hairline around it. The brands these
+     * rows list are mostly wordmarks, and at 36px inside a ring the artwork
+     * had very little of the row to be read in.
+     *
+     * object-contain rather than cover: a cover crop cuts a wide wordmark in
+     * half, which is exactly what these marks mostly are.
      */
     public function test_result_marks_are_small_squares(): void
     {
         $body = File::get(resource_path('views/components/nav/search-panel.blade.php'));
 
-        $this->assertSame(3, substr_count($body, 'h-9 w-9 shrink-0'));
+        $this->assertSame(3, substr_count($body, 'h-11 w-11 shrink-0'));
         $this->assertStringContainsString('object-contain', $body);
+
+        // No hairline around the mark. A brand logo is already a mark on its own
+        // plate, and a ring drew a second box inside the row that made the
+        // artwork read smaller than the space it was given.
+        $this->assertStringNotContainsString('ring-1 ring-zinc-200 dark:bg-white/5', $body);
 
         $this->assertStringNotContainsString('aspect-[16/10] w-20', $body);
         $this->assertStringNotContainsString('object-cover', $body);

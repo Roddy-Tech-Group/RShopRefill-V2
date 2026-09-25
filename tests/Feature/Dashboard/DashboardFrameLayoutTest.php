@@ -86,7 +86,7 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('<div class="w-full min-w-0 lg:mx-auto lg:max-w-[1400px] lg:flex-1">', $this->layout());
     }
 
-    public function test_the_sidebar_is_a_grey_pane_with_white_active_rows(): void
+    public function test_the_sidebar_is_a_grey_pane_with_compact_rows(): void
     {
         $layout = $this->layout();
 
@@ -97,7 +97,13 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringNotContainsString('shadow-md', $m[0]);
         $this->assertStringNotContainsString('style=', $m[0]);
         // Compact rows (~32px, 14px labels, 18px icons, 8px corners).
-        $this->assertStringContainsString('rounded-[8px] bg-[#ffffff] px-2.5 py-2 text-sm font-medium text-black dark:bg-black!', $layout);
+        //
+        // The active row carried `bg-[#ffffff] … dark:bg-black!` here until the
+        // active and hover states were merged into one treatment. Both now take
+        // their fill from `.nav-item-active` / `.nav-item:hover` in app.css, so
+        // the geometry is asserted and the colour is left to the stylesheet.
+        $this->assertStringContainsString('rounded-[8px] px-2.5 py-2 text-sm font-medium', $layout);
+        $this->assertStringNotContainsString('bg-[#ffffff] px-2.5 py-2', $layout);
         $this->assertStringContainsString('<x-ui.anim-icon file="order.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />', $layout);
         $this->assertStringContainsString('w-[256px]', $m[0]);
     }
@@ -289,7 +295,7 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('menu.person@example.com', $menu);
 
         $last = -1;
-        foreach (['>Profile<', '>Verify Identity<', '>For Partners<', '>Security<', '>Notifications<', '>Appearance<', '>Language<', 'Help &amp; support', '>Back to store<', '>Dark mode<', '>Hide balances<', '>Compact mode<', 'Log out'] as $row) {
+        foreach (['>Profile<', '>Verify Identity<', '>For Partners<', '>Security<', '>Notifications<', '>Appearance<', '>Language<', 'Help &amp; support', '>Back to store<', '>Dark mode<', 'Log out'] as $row) {
             $at = strpos($menu, $row);
             $this->assertNotFalse($at, $row.' is missing from the account menu.');
             $this->assertGreaterThan($last, $at, $row.' is out of order.');
@@ -297,13 +303,14 @@ class DashboardFrameLayoutTest extends TestCase
         }
 
         $this->assertStringContainsString("window.rshopThemeReveal(\$event, dark ? 'light' : 'dark')", $menu);
-        $this->assertStringContainsString('$store.dashPrefs.setHideBalance(', $menu);
-        $this->assertStringContainsString('$store.dashPrefs.setCompactMode(', $menu);
-        $this->assertSame(5, substr_count($menu, 'mx-4 border-t border-zinc-200/80'), 'Five inset dividers split the six groups.');
+        // Hide balances and Compact mode left the menu on request (2026-09-23).
+        $this->assertStringNotContainsString('$store.dashPrefs.setHideBalance(', $menu);
+        $this->assertStringNotContainsString('$store.dashPrefs.setCompactMode(', $menu);
+        $this->assertSame(5, substr_count($menu, '<div class="border-t border-zinc-200/80'), 'Five edge-to-edge dividers split the six groups.');
 
         // The identity and grouped rows retain their original order and links.
-        $this->assertStringContainsString('<div class="px-4 pb-3.5 pt-4">', $menu);
-        $this->assertSame(5, substr_count($menu, '<div class="p-2">'));
+        $this->assertStringContainsString('<div class="px-4 pb-3 pt-4">', $menu);
+        $this->assertSame(5, substr_count($menu, '<div class="py-1.5">'));
         $this->assertStringContainsString('dashboard-account-row flex w-full items-center justify-between', $menu);
     }
 
@@ -316,9 +323,9 @@ class DashboardFrameLayoutTest extends TestCase
             $this->assertStringContainsString('<x-ui.anim-icon file="'.$file.'" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />', $layout, $file.' is not dark blue in the sidebar.');
         }
 
-        $this->assertStringContainsString("\$menuIcon = 'dashboard-account-row-icon flex items-center gap-4 text-[#0c1337] dark:text-zinc-300';", $layout);
+        $this->assertStringContainsString("\$menuIcon = 'dashboard-account-row-icon flex items-center gap-3 text-[#0c1337] dark:text-zinc-300';", $layout);
         $this->assertStringContainsString("? 'h-[18px] w-[18px] shrink-0 text-[#0c1337] dark:text-white'", $layout);
-        $this->assertStringContainsString('<x-ui.anim-icon file="support.svg" tone="inherit" class="h-5 w-5" />', $layout);
+        $this->assertStringContainsString('<x-ui.anim-icon file="support.svg" tone="inherit" class="h-[18px] w-[18px]" />', $layout);
     }
 
     /**
@@ -340,7 +347,8 @@ class DashboardFrameLayoutTest extends TestCase
 
         // The swap is a slow, smooth swipe up inside the clipped pill: the old
         // message leaves through the top, the next rises from below.
-        $this->assertStringContainsString('dash-promo-pill relative ml-4 grid h-8 items-center overflow-hidden rounded-full', $header);
+        // hidden below lg: phones show the gift chip instead of the rotating pill.
+        $this->assertStringContainsString('dash-promo-pill relative hidden h-8 items-center overflow-hidden rounded-full lg:grid', $header);
         $this->assertStringContainsString('x-transition:enter="transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"', $header);
         $this->assertStringContainsString('x-transition:enter-start="translate-y-full opacity-0"', $header);
 

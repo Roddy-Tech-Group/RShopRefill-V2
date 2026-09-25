@@ -17,11 +17,11 @@ return [
     'legal' => 'Note legali e fiducia',
 
     // Brand column
-    'tagline' => 'Il suo marketplace per carte regalo, eSIM da viaggio, ricariche mobili e pagamento bollette.',
+    'tagline' => 'Il suo marketplace per carte regalo, eSIM, ricariche mobili e pagamento bollette.',
 
     // Shop column
     'gift_cards' => 'Carte regalo',
-    'travel_esims' => 'eSIM da viaggio',
+    'esims' => 'eSIM',
     'mobile_topups' => 'Ricariche mobili',
     'data_bundles' => 'Pacchetti dati',
     'bill_payments' => 'Pagamento bollette',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Tutti i diritti riservati.',
     'legal_line' => 'Di proprietà di :company, che lo gestisce, RC :rc, con sede legale in :address.',
     'verify_company' => 'Verifica azienda',
+
+    'newsletter_pitch' => 'Ricevi offerte su carte regalo, eSIM e ricariche via e-mail',
+    'newsletter_label' => 'Indirizzo e-mail',
+    'newsletter_placeholder' => 'tu@esempio.com',
+    'newsletter_cta' => 'Iscriviti',
+    'newsletter_sending' => 'Iscrizione in corso',
+    'newsletter_done' => 'Sei iscritto. Grazie!',
 ];

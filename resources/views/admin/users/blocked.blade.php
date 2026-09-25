@@ -26,7 +26,7 @@
         {{ $blocked->count() }} account(s) currently banned, suspended or in Protected Mode.
     </x-slot:subheading>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
         @forelse ($blocked as $user)
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 last:border-0 dark:border-white/10">
                 <div class="min-w-0">
@@ -46,7 +46,7 @@
                     @if ($user->restricted_at)
                         <x-admin.badge tone="amber">Protected Mode {{ $fmtDate($user->restricted_at) }}</x-admin.badge>
                     @endif
-                    <a href="{{ route('admin.customer', $user) }}" wire:navigate class="rounded-[10px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#2d4a7a]">
+                    <a href="{{ route('admin.customer', $user) }}" wire:navigate class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-zinc-200 dark:hover:bg-[#2d4a7a]">
                         Review
                     </a>
                 </div>

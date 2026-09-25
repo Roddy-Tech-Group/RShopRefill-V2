@@ -133,7 +133,7 @@ class extends Component {
 <x-slot:heading>Runbooks</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
 @endphp
 
 <div class="max-w-7xl mx-auto -mt-2">

@@ -6,7 +6,7 @@
     Single root element (Livewire placeholder requirement).
 
     Keep it in step with overview.blade.php. It had drifted: it still drew a trust
-    strip, a Shop by Category grid and an Rcoin card on mobile that the page no
+    strip, a category grid and an Rcoin card on mobile that the page no
     longer has, a three-card row where the page has two, and blue bordered cards
     where the page's are white.
 --}}
@@ -18,37 +18,17 @@
     {{-- ── MOBILE (< lg) ───────────────────────────────────────── --}}
     <div class="flex flex-col gap-5 lg:hidden">
 
-        {{-- Quick Actions: 4 columns, 2 rows, "+" circle in the header --}}
-        <div class="{{ $card }}">
-            <div class="flex items-center justify-between">
-                <x-skeleton class="h-5 w-32" />
-                <x-skeleton shape="circle" class="h-8 w-8" />
-            </div>
-            <div class="skeleton-stagger-fast mt-4 grid grid-cols-4 gap-3">
-                @for ($i = 0; $i < 8; $i++)
-                    <div class="flex flex-col items-center gap-2" style="--i: {{ $i }}">
-                        <x-skeleton shape="circle" class="h-12 w-12" />
-                        <x-skeleton class="h-3 w-12" />
-                    </div>
-                @endfor
-            </div>
-        </div>
-
-        {{-- Popular Gift Cards: brand-row, three deep on a phone, two cards across --}}
-        <div class="{{ $card }}">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 flex-1 space-y-2">
-                    <x-skeleton class="h-5 w-44" />
-                    <x-skeleton class="h-3.5 w-36" />
-                </div>
-                <x-skeleton shape="circle" class="h-8 w-8 shrink-0" />
-            </div>
-            <div class="skeleton-stagger-fast mt-4 grid grid-cols-2 gap-4">
-                @for ($i = 0; $i < 6; $i++)
-                    <div style="--i: {{ $i }}">
-                        <x-skeleton class="aspect-[16/10] w-full" rounded="rounded-[15px]" />
-                        <x-skeleton class="mt-2 h-4 w-3/4" />
-                        <x-skeleton class="mt-1.5 h-3.5 w-1/2" />
+        {{-- PURCHASE: a heading and four cards, two across --}}
+        <div>
+            <x-skeleton class="h-3 w-20" />
+            <div class="skeleton-stagger-fast mt-3 grid grid-cols-2 gap-4">
+                @for ($i = 0; $i < 4; $i++)
+                    <div class="{{ $card }} rounded-[10px]" style="--i: {{ $i }}">
+                        <x-skeleton class="h-10 w-10" />
+                        <x-skeleton class="mt-5 h-4 w-24" />
+                        <x-skeleton class="mt-2 h-4 w-full" />
+                        <x-skeleton class="mt-1 h-4 w-2/3" />
+                        <x-skeleton shape="circle" class="mt-5 h-9 w-9" />
                     </div>
                 @endfor
             </div>

@@ -3,15 +3,16 @@
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.dashboard')]
 #[Title('Order history')]
 class extends Component {
-    use WithPagination;
+    /** How many more orders each scroll to the bottom brings in. */
+    private const CHUNK = 10;
 
     /** Search by order id / order number. */
     public string $search = '';
@@ -19,14 +20,29 @@ class extends Component {
     /** Show terminal (failed / cancelled) orders instead of active ones. */
     public bool $expired = false;
 
+    /**
+     * How many orders are on the page right now. The list has no page
+     * numbers: reaching the bottom grows this figure and the next chunk
+     * renders under the rows already there, so a customer with thousands
+     * of orders scrolls one list rather than paging through it. Locked so
+     * the browser cannot ask for the whole history in one request.
+     */
+    #[Locked]
+    public int $visible = self::CHUNK;
+
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     public function updatedExpired(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
+    }
+
+    public function loadMore(): void
+    {
+        $this->visible += self::CHUNK;
     }
 
     public function with(): array
@@ -34,7 +50,7 @@ class extends Component {
         // orderByDesc('id') breaks created_at ties - two orders placed in the same
         // second would otherwise be free to swap between page loads, showing the
         // customer one order twice and hiding another.
-        $query = Auth::user()->orders()->with('items')->latest()->orderByDesc('id');
+        $query = Auth::user()->orders()->with(['items', 'paymentAttempts'])->latest()->orderByDesc('id');
 
         if (($term = trim($this->search)) !== '') {
             $query->where(fn ($q) => $q->where('id', 'like', "%{$term}%")
@@ -49,7 +65,10 @@ class extends Component {
             $query->whereNotIn('order_status', ['failed', 'cancelled']);
         }
 
-        return ['orders' => $query->paginate(10)];
+        // A single page sized to what is on screen. The simple paginator
+        // fetches one row past it, so hasMorePages() says whether another
+        // chunk exists without counting the customer's whole history.
+        return ['orders' => $query->simplePaginate($this->visible, ['*'], 'page', 1)];
     }
 }; ?>
 
@@ -135,8 +154,11 @@ class extends Component {
     @if ($orders->isNotEmpty())
         {{-- All orders live in ONE card; each order is a drop-down row.
              Opening one auto-closes the previously-opened one
-             (single-expanded accordion behaviour). --}}
-        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:shadow-none">
+             (single-expanded accordion behaviour). The newest order starts
+             open. The card's key follows the filter, not the loaded count:
+             a new search swaps the card and opens its own first order, while
+             loading more morphs it and leaves whatever is open alone. --}}
+        <div wire:key="orders-{{ md5(trim($search).'|'.(int) $expired) }}" x-data="{ openId: @js((string) $orders->first()->id) }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:shadow-none">
             @foreach ($orders as $order)
                 @php
                     [$lineLabel, $lineTone, $lineIcon] = $statusLine[$order->order_status->value] ?? ['Placed', 'text-amber-600 dark:text-amber-400', 'clock'];
@@ -234,6 +256,14 @@ class extends Component {
                             <div class="flex items-center justify-between gap-4">
                                 <dt class="text-zinc-500">Payment method</dt>
                                 <dd class="font-semibold text-zinc-900">{{ $methodLabels[$order->payment_method] ?? 'Card' }}</dd>
+                            </div>
+                            {{-- The channel the money actually travelled. The order's own
+                                 method folds card and mobile money together; the paid
+                                 attempt tells them apart. Customer words only, never the
+                                 provider's name. --}}
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-500">Payment gateway</dt>
+                                <dd class="font-semibold text-zinc-900">{{ $order->customerGatewayLabel() }}</dd>
                             </div>
                             <div class="flex items-center justify-between gap-4">
                                 <dt class="text-zinc-500">Earned points</dt>
@@ -720,10 +750,23 @@ class extends Component {
         @endif
     @endif
 
-    @if ($orders->hasPages())
-        {{-- Matches the admin products page paginator (vendor/pagination/circles). --}}
-        <div class="mt-2 rounded-[12px] bg-[#ffffff] px-5 py-3 shadow-md shadow-zinc-900/[0.06] dark:ring-zinc-700/60 dark:shadow-none">
-            {{ $orders->onEachSide(1)->links('vendor.pagination.circles-livewire') }}
+    @if ($orders->hasMorePages())
+        {{-- Scroll sentinel. As it nears the viewport (a good screen early,
+             via the margin) it asks for the next chunk. Its key carries the
+             loaded count, so every response hands the browser a fresh
+             element: if the new rows still leave it on screen it fires
+             again at once instead of waiting for a scroll that never needs
+             to happen. It leaves with the last order. --}}
+        <div
+            wire:key="orders-more-{{ $visible }}"
+            wire:intersect.margin.400px="loadMore"
+            class="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+        >
+            <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
+                <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
+            </svg>
+            Loading more orders
         </div>
     @endif
 </div>

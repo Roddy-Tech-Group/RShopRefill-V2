@@ -422,12 +422,15 @@
 
 @endphp
 
-<x-shop.layout title="Gift Cards | {{ $siteName }}">
+<x-shop.layout :title="__('giftcards.page_title', ['site' => $siteName])">
 
     {{-- No radius: this is the page slab, edge to edge, not a card. Rounded
          corners on it left the page ground showing through above and below. --}}
     <section class="min-h-full bg-[#eff6ff]">
-        <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
+        {{-- Inside the dashboard the frame pads the page itself (16px a side on a
+             phone, what the overview gets), so the wrapper adds none of its own:
+             with both, the listing ran 16px narrower than the overview each side. --}}
+        <div class="mx-auto w-full max-w-[1550px] {{ $inDash ? '' : 'px-4 py-8 sm:px-6 lg:px-8' }}">
 
             {{-- The category filter scope wraps BOTH menus and the sections: the
                  sidebar and the mobile sheet are siblings of the main column, so
@@ -511,7 +514,7 @@
                                         class="{{ $pillBase }} {{ $sub === '' ? $pillOn : $pillOff }}"
                                     @endif
                                 >
-                                    All gift cards
+                                    {{ __('products.all_gift_cards') }}
                                 </a>
                                 @foreach ($subcategories as $s)
                                     <a
@@ -539,7 +542,7 @@
                             </svg>
                             <div>
                                 <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('products.category_unavailable') }}</p>
-                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">You can browse the catalog, but purchases are paused right now. Please check back soon.</p>
+                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">{{ __('giftcards.purchases_paused_hint') }}</p>
                             </div>
                         </div>
                     @endunless
@@ -717,10 +720,13 @@
                                             ></span>
                                         </div>
 
+                                        {{-- The request-a-product form, not the contact page:
+                                             it files the ask as a product request, which is
+                                             what a shopper who reached the end of the list has. --}}
                                         <p class="text-[14px] text-zinc-700 dark:text-zinc-300">
                                             {{ __('products.didnt_find') }}
                                             <a
-                                                href="{{ route('shop.contact') }}"
+                                                href="{{ route('shop.request-product') }}"
                                                 wire:navigate
                                                 class="font-semibold text-zinc-900 underline decoration-1 underline-offset-4 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
                                             >{{ __('products.request_a_product') }}</a>

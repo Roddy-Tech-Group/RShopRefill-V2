@@ -16,7 +16,10 @@
     which rendered one enormous card per screen the first time this was built.
 
     Since a screenful is exactly one page of columns, the arrows can still
-    scroll by `clientWidth` and land square on the next set.
+    scroll by the track's content width and land square on the next set. The
+    track wears 4px of padding on every side (see the note on it below), so
+    both the column arithmetic and that scroll read the width INSIDE the
+    padding, never clientWidth alone.
 
     Native overflow-x-auto keeps trackpad and touch momentum, and scroll-snap
     stops a flick halfway between two columns. The arrows are the desktop
@@ -90,6 +93,17 @@
         },
 
         /*
+         * The track's width inside its padding: what the columns must fill
+         * and what one page scrolls by. Read from the computed style so the
+         * CSS (p-1 on the track) and this arithmetic cannot disagree.
+         */
+        innerWidth(track) {
+            const style = getComputedStyle(track);
+
+            return track.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+        },
+
+        /*
          * Column width = (track - gaps) / columns, so `columns` of them exactly
          * fill one screenful. Re-measured on resize, which is when both the
          * breakpoint and the track width can change.
@@ -115,7 +129,7 @@
                leave the grid wrong once it is shown. */
             if (track.clientWidth < 1) { return; }
 
-            const available = Math.min(track.clientWidth, window.innerWidth);
+            const available = Math.min(this.innerWidth(track), window.innerWidth);
             const width = (available - gap * (columns - 1)) / columns;
 
             /* On the TRACK, not the list: the skeleton grid is the track's
@@ -154,8 +168,10 @@
             const track = this.$refs.track;
             if (! track) { return; }
 
-            /* Exactly one trackful, which is exactly one page of columns. */
-            track.scrollBy({ left: direction * track.clientWidth, behavior: 'smooth' });
+            /* Exactly one trackful inside the padding, which is exactly one
+               page of columns. clientWidth alone would overshoot by the
+               padding on every page. */
+            track.scrollBy({ left: direction * this.innerWidth(track), behavior: 'smooth' });
         },
     }"
     {{-- measure() divides this section's own width, so it has to re-run when
@@ -221,10 +237,20 @@
         </div>
     </div>
 
+    {{-- px-1 py-1 / -mx-1 -my-1: a tile's ring is a box-shadow drawn OUTSIDE its box, and
+         so is the shadow under it. With the grid flush against this track's
+         edges, the overflow clip cut the top hairline off every first-row
+         tile, the shadow off every third-row one, and the left hairline off
+         the first column, so the cards along the top and left of the page
+         read as missing their border. The padding is room for those on every
+         side; the negative margin gives the same 4px back so the heading, the
+         section below and the cards' left edge sit exactly where they did.
+         measure() and page() read the width inside this padding. The home
+         rows make the same room (brand-row py-4, explore-row py-2). --}}
     <div
         x-ref="track"
         @scroll.debounce.100ms="refresh()"
-        class="overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] snap-x snap-mandatory"
+        class="-mx-1 -my-1 overflow-x-auto overflow-y-hidden px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] snap-x snap-mandatory"
     >
         {{-- grid-rows-3 + grid-flow-col fills top-to-bottom then starts a new
              column, so the row count is fixed and the catalogue grows sideways.

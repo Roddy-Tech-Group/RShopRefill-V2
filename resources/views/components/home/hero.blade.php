@@ -11,33 +11,48 @@
 
 <section class="relative w-full overflow-hidden">
 
-    {{-- Static dotted backdrop. Pure CSS, no JS: a single element paints the
-         whole grey dot grid via a repeating radial-gradient, so it renders
-         instantly with the page and never blocks interaction. A soft vignette
-         fades the dots out on all four edges, and a centre scrim keeps the
-         headline readable over the texture. --}}
+    {{-- Static dotted world map backdrop. Pure CSS, no JS, so it renders with
+         the page and never blocks interaction. The outer layer fades the map
+         out at the top and bottom only, so it runs the full width of the page;
+         the inner layer paints the dots. --}}
+    @php
+        // Versioned by mtime so a replaced map is not served from a stale cache.
+        $worldMapUrl = asset('assets/dotted-world-map.svg').'?v='.filemtime(public_path('assets/dotted-world-map.svg'));
+    @endphp
     <style>
         .roddy-dots-bg {
             position: absolute;
             inset: 0;
             pointer-events: none;
-            /* Larger, soft blue-200 dots in light mode. The feathered edge
-               (colour stop at 5px, transparent at 6px) keeps them gentle
-               rather than a sharp, eye-catching grid. Dark mode swaps to grey. */
-            background-image: radial-gradient(circle, rgb(191 219 254) 5px, transparent 6px);
-            background-size: 38px 38px;
-            background-position: center;
-            -webkit-mask-image:
-                linear-gradient(to right,  transparent 0%, #000 12%, #000 88%, transparent 100%),
-                linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-            -webkit-mask-composite: source-in;
-            mask-image:
-                linear-gradient(to right,  transparent 0%, #000 12%, #000 88%, transparent 100%),
-                linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-            mask-composite: intersect;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
         }
-        .dark .roddy-dots-bg {
-            background-image: radial-gradient(circle, rgba(161, 161, 170, 0.20) 5px, transparent 6px);
+        /* The SVG's own dots are a dark navy, so it is used as a mask rather
+           than an image: only its shape is kept, and the colour comes from
+           background-color. That keeps the soft blue-200 in light mode and
+           the faint grey in dark, both at full strength.
+
+           The file's 1600-wide viewBox carries blank margin around the dots
+           (they run from x 127 to 1517.5), so the layer overhangs the hero by
+           that margin, scaled: 127/1390.5 of the width on the left and
+           82.5/1390.5 on the right. The map is then pushed 4% to the left and
+           grown 4% so its right edge still meets the page: both margins scale
+           by 1.04 and the left one takes the extra 4%. On wide screens `cover`
+           fits the map to the layer's width, so the rightmost dots land on the
+           page edge and the leftmost sit 4% past it. Narrow screens stay
+           height-bound and crop to the middle of the map, as before. */
+        .roddy-world-map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: -13.50%;
+            right: -6.17%;
+            background-color: rgb(191 219 254);
+            -webkit-mask: url('{{ $worldMapUrl }}') center / cover no-repeat;
+            mask: url('{{ $worldMapUrl }}') center / cover no-repeat;
+        }
+        .dark .roddy-world-map {
+            background-color: rgba(161, 161, 170, 0.30);
         }
         /* The readability scrim (radial gradient wash) was removed per request -
            the hero now shows the dotted backdrop with no gradient over it. */
@@ -52,7 +67,9 @@
         {{-- Light scrim so the dark headline stays readable over any footage --}}
         <div class="absolute inset-0 bg-white/60" aria-hidden="true"></div>
     @else
-        <div class="roddy-dots-bg" aria-hidden="true"></div>
+        <div class="roddy-dots-bg" aria-hidden="true">
+            <div class="roddy-world-map"></div>
+        </div>
     @endif
 
     {{-- Content over the dots (constrained to 1200px, dots stay full-width) --}}
@@ -104,7 +121,7 @@
         <div data-anim="hero-ctas" class="mt-8 flex flex-wrap items-center justify-center gap-4">
 
             {{-- Shop Gift Cards (primary) --}}
-            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
+            <a href="{{ route('shop.gift-cards') }}" wire:navigate class="group inline-flex h-12 items-center gap-2 rounded-full bg-blue-600 px-6 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
                 {{ __('home.hero_cta_gift_cards') }}
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3z"/>
@@ -117,7 +134,7 @@
                  dark text + the storefront's #dee3e1 ring on the light hero,
                  white text + white ring on the dark one. Backdrop blur stays the
                  same; only the visible contrast pieces flip. --}}
-            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex items-center gap-2 rounded-[12px] bg-transparent backdrop-blur-md px-5 py-3 text-base font-semibold text-zinc-900 ring-1 ring-[#dee3e1] transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-[#c9d0cd] dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
+            <a href="{{ route('shop.esims') }}" wire:navigate class="group inline-flex h-12 items-center gap-2 rounded-full bg-transparent backdrop-blur-md px-6 text-base font-semibold text-zinc-900 ring-1 ring-[#dee3e1] transition-all hover:-translate-y-0.5 hover:bg-zinc-900/5 hover:ring-[#c9d0cd] dark:text-white dark:ring-white/30 dark:hover:bg-white/10 dark:hover:ring-white/50">
                 {{ __('home.hero_cta_esims') }}
                 <svg viewBox="0 0 24 24" class="h-5 w-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M6 3h8.5L19 7.5V20a1 1 0 0 1 -1 1H6a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1z"/>
@@ -311,7 +328,7 @@
                                 :class="(current === {{ $i }} && hovered) ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 pointer-events-none'"
                                 class="inline-flex items-center pr-2 text-[15px] font-semibold text-zinc-900 transition-all duration-300 ease-out dark:text-white"
                             >
-                                <span class="whitespace-nowrap">Show more</span>
+                                <span class="whitespace-nowrap">{{ __('common.show_more') }}</span>
                                 <svg class="ml-1.5 h-[18px] w-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M9 6l6 6-6 6"/>
                                 </svg>

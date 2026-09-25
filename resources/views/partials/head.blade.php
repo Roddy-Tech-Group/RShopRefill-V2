@@ -134,7 +134,7 @@
     $defaultDescription = \App\Models\SiteSetting::get('seo.default_description')
         ?: 'Buy gift cards, eSIMs, mobile top-ups and bill payments worldwide - instantly. '.$siteName.' removes the friction of regional restrictions, slow delivery and limited payment options, with instant digital delivery, great prices, crypto and mobile-money checkout, and 24/7 support.';
     $defaultKeywords = \App\Models\SiteSetting::get('seo.default_keywords')
-        ?: $siteName.', gift cards, buy gift cards online, eSIM, travel eSIM, mobile top up, airtime recharge, bill payments, crypto gift cards, Amazon gift card, Apple gift card, Google Play, Steam, Netflix, PlayStation, Xbox, Cameroon, Africa fintech, Divine Ofeh, Johnpaul';
+        ?: $siteName.', gift cards, buy gift cards online, eSIM, mobile top up, airtime recharge, bill payments, crypto gift cards, Amazon gift card, Apple gift card, Google Play, Steam, Netflix, PlayStation, Xbox, Cameroon, Africa fintech, Divine Ofeh, Johnpaul';
     $defaultTitle = \App\Models\SiteSetting::get('seo.default_title')
         ?: $siteName.' - Gift Cards, eSIMs, Top-ups & Bill Payments';
 
@@ -355,32 +355,17 @@
      Ctrl+P profile). Site-wide, customer side only. --}}
 @include('partials.shortcuts')
 
-{{-- Page transition - the incoming page slides up from the bottom on every
-     navigation (full page load + wire:navigate SPA swap). Driven entirely
-     by JS class-swap so initial load and SPA swaps use the same single
-     mechanism (previous mix of CSS keyframe + JS was racing on `transform`
-     and producing a blink). Lives in the shared head partial so storefront,
-     dashboard, admin, and auth layouts all get the same motion treatment. --}}
-<style>
-    /* Pure-CSS slide-in. Runs automatically whenever a <main> element is
-       inserted into the DOM (initial page load AND every wire:navigate
-       morph - Livewire replaces the <main> on navigation so the animation
-       re-fires naturally). No JS class-swap means no snap-down-then-up
-       jitter and no race between the keyframe and the JS handler. This is
-       the same pattern the user dashboard uses smoothly. `backwards` so
-       the starting state is held before the first frame paints. */
-    @keyframes pageSlideIn {
-        from { transform: translateY(32px); }
-        to   { transform: translateY(0); }
-    }
-    main {
-        animation: pageSlideIn 500ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-        /* NOTE: no `will-change: transform` here. It would make <main> a permanent
-           containing block for position:fixed descendants, trapping fixed buy bars
-           and modals inside <main> instead of pinning them to the viewport. The
-           500ms slide runs fine without the hint. */
-    }
+{{-- Page transitions. There is no default one: an arriving page is simply
+     there. A layout opts in by setting data-page-transition on <body>, which
+     is what admin does below - its dense tables looked like they were dropping
+     into place on every navigation, and a short fade reads better there than a
+     slide.
 
+     The default used to be a 500ms upward slide on every <main> insertion, on
+     every layout. Nothing waited for it, but half a second of movement on
+     arrival is not distinguishable from half a second of loading, and it ran
+     on every wire:navigate swap the site made. --}}
+<style>
     /* Micro-Fade Shift: scoped to layouts that opt in via
        <body data-page-transition="micro-fade-shift">. Replaces the slide
        with a very short opacity DIP + tiny upward nudge. Admin uses this

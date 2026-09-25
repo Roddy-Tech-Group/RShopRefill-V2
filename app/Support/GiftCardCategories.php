@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Subcategory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Lang;
 
 /**
  * The one place that decides what a gift-card category is.
@@ -46,7 +47,7 @@ class GiftCardCategories
         return collect(config('gift_card_categories', []))
             ->map(fn (array $category, string $slug) => [
                 'slug' => $slug,
-                'name' => $category['label'],
+                'name' => self::label($slug, $category['label']),
                 'icon' => $category['icon'] ?? 'default',
                 'products' => collect($category['brands'] ?? [])
                     ->map(fn ($brand) => $byBrand[strtolower($brand)] ?? null)
@@ -134,41 +135,101 @@ class GiftCardCategories
         $region = strtoupper((string) ($region ?: 'US'));
 
         return once(function () use ($region): array {
-            $giftCards = Category::where('slug', 'gift-cards')->first();
+            $menu = TaggedCache::for(['catalog'])->remember(
+                "gift_card_nav_menu_{$region}",
+                3600,
+                fn (): array => self::buildNavMenu($region)
+            );
 
-            $brandProducts = $giftCards
-                ? Product::query()
-                    ->where('category_id', $giftCards->id)
-                    ->where('is_active', true)
-                    ->whereNotNull('brand_key')
-                    ->whereHas('variants', fn ($variant) => $variant->where('is_available', true))
-                    ->select('id', 'brand_key', 'logo_url', 'country_code')
-                    ->get()
-                    ->unique('brand_key')
-                    ->values()
-                : collect();
+            // The cache is keyed by region, not language, so whatever name it
+            // holds was written in the language of the request that built it.
+            // The name is resolved again from the slug on every read.
+            $menu['categories'] = collect($menu['categories'])
+                ->map(fn (array $category) => [...$category, 'name' => self::label($category['slug'], $category['name'])])
+                ->values();
 
-            $inRegion = $giftCards
-                ? Product::query()
-                    ->where('category_id', $giftCards->id)
-                    ->where('is_active', true)
-                    ->where('country_code', $region)
-                    ->whereNotNull('brand_key')
-                    ->pluck('brand_key')
-                    ->map(fn ($key) => strtolower($key))
-                    ->flip()
-                : collect();
-
-            $countryNames = array_flip(config('countries.codes', []));
-
-            return [
-                'categories' => self::menu($brandProducts, $giftCards),
-                'popular' => collect(config('popular_brands.featured', []))
-                    ->filter(fn ($key) => $inRegion->has(strtolower($key)))
-                    ->take(7)
-                    ->values(),
-                'regionName' => $countryNames[$region] ?? $region,
-            ];
+            return $menu;
         });
+    }
+
+    /**
+     * A curated category's name in the active language.
+     *
+     * The config label is the English source. A language without a
+     * translation for the slug falls back to it rather than printing the key.
+     */
+    public static function label(string $slug, string $fallback): string
+    {
+        $key = "giftcards.categories.{$slug}";
+
+        return Lang::has($key) ? __($key) : $fallback;
+    }
+
+    /**
+     * Forget every region's cached menu.
+     *
+     * For stores that cannot hold tags, where flushing the tag would flush the
+     * whole cache. The menu is keyed by the visitor's region, so every country
+     * the site knows gets its key dropped, plus the US default a visitor with
+     * no region resolved falls back to.
+     */
+    public static function forgetNavMenus(): void
+    {
+        $regions = array_merge(['US'], array_values(config('countries.codes', [])));
+
+        foreach (array_unique($regions) as $region) {
+            TaggedCache::for(['catalog'])->forget('gift_card_nav_menu_'.strtoupper((string) $region));
+        }
+    }
+
+    /**
+     * The uncached build behind navMenu().
+     *
+     * Held apart because it is the expensive half: it reads every stocked gift
+     * card to work out which curated categories have anything in them, which is
+     * over a thousand rows hydrated to produce a list of about twenty names.
+     * That ran on every storefront request, for a menu that changes when the
+     * catalogue does - so it is cached against the catalogue's own tag and the
+     * sync's flush clears it, the same arrangement the brand pages use.
+     *
+     * @return array{categories: Collection<int, array{slug: string, name: string, icon: string}>, popular: Collection<int, string>, regionName: string}
+     */
+    private static function buildNavMenu(string $region): array
+    {
+        $giftCards = Category::where('slug', 'gift-cards')->first();
+
+        $brandProducts = $giftCards
+            ? Product::query()
+                ->where('category_id', $giftCards->id)
+                ->where('is_active', true)
+                ->whereNotNull('brand_key')
+                ->whereHas('variants', fn ($variant) => $variant->where('is_available', true))
+                ->select('id', 'brand_key', 'logo_url', 'country_code')
+                ->get()
+                ->unique('brand_key')
+                ->values()
+            : collect();
+
+        $inRegion = $giftCards
+            ? Product::query()
+                ->where('category_id', $giftCards->id)
+                ->where('is_active', true)
+                ->where('country_code', $region)
+                ->whereNotNull('brand_key')
+                ->pluck('brand_key')
+                ->map(fn ($key) => strtolower($key))
+                ->flip()
+            : collect();
+
+        $countryNames = array_flip(config('countries.codes', []));
+
+        return [
+            'categories' => self::menu($brandProducts, $giftCards),
+            'popular' => collect(config('popular_brands.featured', []))
+                ->filter(fn ($key) => $inRegion->has(strtolower($key)))
+                ->take(7)
+                ->values(),
+            'regionName' => $countryNames[$region] ?? $region,
+        ];
     }
 }

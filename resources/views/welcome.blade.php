@@ -226,15 +226,25 @@
          Each subcategory row's `href` deep-links to the filtered gift-cards
          page so "View all" goes straight to that category's full brand list. --}}
     @php
+        // Subcategory rows are titled by the subcategory's own name, so they
+        // pick up its translation. One query for the four rows; the literal is
+        // the fallback for a database that lacks the row.
+        $subcategoryNames = \App\Models\Subcategory::query()
+            ->whereIn('slug', ['gaming-entertainment', 'digital-apps', 'clothing-accessories', 'food-beverage'])
+            ->withTranslations()
+            ->get()
+            ->mapWithKeys(fn ($subcategory) => [$subcategory->slug => $subcategory->name]);
+        $subcategoryTitle = fn (string $slug, string $fallback): string => $subcategoryNames[$slug] ?? $fallback;
+
         // 5 columns on desktop (lg) for larger, less cramped cards. Each row's
         // brand list is capped at 5 above so the desktop row stays clean.
         $renderRow = [
-            ['title' => 'Featured Gift Cards',        'cols' => 5, 'carousel' => true, 'brands' => $featuredBrands, 'href' => route('shop.gift-cards')],
-            ['title' => 'Popular Gift Cards',         'cols' => 5, 'carousel' => true, 'brands' => $popularBrands],
-            ['title' => 'Gaming & Entertainment', 'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('gaming-entertainment', 20), 'href' => route('shop.gift-cards', ['subcategory' => 'gaming-entertainment'])],
-            ['title' => 'Digital Apps',    'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('digital-apps', 20),         'href' => route('shop.gift-cards', ['subcategory' => 'digital-apps'])],
-            ['title' => 'Clothing & Accessories',                'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('clothing-accessories', 20), 'href' => route('shop.gift-cards', ['subcategory' => 'clothing-accessories'])],
-            ['title' => 'Food & Beverage',       'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('food-beverage', 20),        'href' => route('shop.gift-cards', ['subcategory' => 'food-beverage'])],
+            ['title' => __('home.row_featured_gift_cards'),        'cols' => 5, 'carousel' => true, 'brands' => $featuredBrands, 'href' => route('shop.gift-cards')],
+            ['title' => __('home.row_popular_gift_cards'),         'cols' => 5, 'carousel' => true, 'brands' => $popularBrands],
+            ['title' => $subcategoryTitle('gaming-entertainment', 'Gaming & Entertainment'), 'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('gaming-entertainment', 20), 'href' => route('shop.gift-cards', ['subcategory' => 'gaming-entertainment'])],
+            ['title' => $subcategoryTitle('digital-apps', 'Digital Apps'), 'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('digital-apps', 20),         'href' => route('shop.gift-cards', ['subcategory' => 'digital-apps'])],
+            ['title' => $subcategoryTitle('clothing-accessories', 'Clothing & Accessories'), 'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('clothing-accessories', 20), 'href' => route('shop.gift-cards', ['subcategory' => 'clothing-accessories'])],
+            ['title' => $subcategoryTitle('food-beverage', 'Food & Beverage'), 'cols' => 5, 'carousel' => true, 'brands' => $brandPicksBySubcategory('food-beverage', 20),        'href' => route('shop.gift-cards', ['subcategory' => 'food-beverage'])],
         ];
     @endphp
 
@@ -285,7 +295,7 @@
                             :style="! $logo && $brandColor ? 'background-color: ' . $brandColor . ';' : false"
                         >
                             @if ($logo)
-                                <img src="{{ $logo }}" alt="{{ $label }} gift card" class="h-full w-full object-cover" loading="lazy">
+                                <img src="{{ $logo }}" alt="{{ __('home.alt_gift_card', ['name' => $label]) }}" class="h-full w-full object-cover" loading="lazy">
                             @else
                                 <span class="px-3 text-center text-xl font-black uppercase leading-tight tracking-tight sm:text-2xl {{ $brandColor ? 'text-white' : 'text-zinc-700' }}">{{ $label }}</span>
                             @endif
@@ -308,7 +318,7 @@
     @if ($topupBrands->isNotEmpty())
         <div class="mt-12">
             <x-home.brand-row
-                title="Instant Mobile Top-Ups"
+                :title="__('home.row_instant_topups')"
                 title-size="text-lg sm:text-[30px] sm:tracking-tight"
                 :view-all-href="route('shop.topups')"
                 :cols="5"
@@ -335,7 +345,7 @@
                         :style="! $logo ? 'background-color: '.$tileColor.';' : false"
                     >
                         @if ($logo)
-                            <img src="{{ $logo }}" alt="{{ $label }} top-up" class="h-full w-full object-cover" loading="lazy">
+                            <img src="{{ $logo }}" alt="{{ __('home.alt_top_up', ['name' => $label]) }}" class="h-full w-full object-cover" loading="lazy">
                         @else
                             <span class="px-3 text-center text-xl font-black uppercase leading-tight tracking-tight text-white sm:text-2xl">{{ $label }}</span>
                         @endif

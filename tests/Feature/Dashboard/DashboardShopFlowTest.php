@@ -33,7 +33,13 @@ class DashboardShopFlowTest extends TestCase
 
         $response->assertSee('eSIMs are region-based and only work inside their coverage area', false);
         $response->assertDontSee('Gift cards are region-locked', false);
-        $response->assertSee("i.category_slug === 'esims'", false);
+
+        // Every eSIM except a Global one: the notice tells the buyer to pick
+        // the plan for their destination or else choose a Global plan, which is
+        // advice about a decision a Global buyer has already made. A mixed
+        // basket still shows it - the country plan beside it still needs
+        // checking - which is what `some` rather than `every` buys.
+        $response->assertSee("i.category_slug === 'esims' && ! i.is_global", false);
     }
 
     public function test_dashboard_cart_keeps_its_links_inside_the_dashboard(): void

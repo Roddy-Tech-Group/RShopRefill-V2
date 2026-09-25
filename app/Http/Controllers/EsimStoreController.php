@@ -53,8 +53,8 @@ class EsimStoreController extends Controller
         // Cache key carries the Zendit-eSIM flag so toggling it doesn't serve a
         // stale catalog (the summary is cached for an hour). v6 added the per-card
         // data-size label; v7 pins the Discover Global USA card first + drops US
-        // from Popular.
-        $cacheKey = 'esim-catalog-summary-v15-z'.(FeatureFlag::on('zendit_esims') ? '1' : '0');
+        // from Popular; v16 drops the English " days" suffix from days_range.
+        $cacheKey = 'esim-catalog-summary-v16-z'.(FeatureFlag::on('zendit_esims') ? '1' : '0');
 
         return Cache::remember($cacheKey, now()->addHour(), function () use ($popularIso) {
             $pricing = app(CartPricingService::class);
@@ -145,9 +145,11 @@ class EsimStoreController extends Controller
                         'days_range' => self::spanLabel(
                             $days,
                             // Plain integer. Trimming trailing zeros here, as the
-                            // data formatter does, turned 30 days into 3.
+                            // data formatter does, turned 30 days into 3. The
+                            // unit is left to the card, which says it in the
+                            // visitor's language: this summary is cached once
+                            // for every locale.
                             fn (float $d) => (string) (int) $d,
-                            ' days',
                         ),
                         'plan_count' => $group->sum(fn ($p) => $p->variants->count()),
                         // "Data only" unless some package includes calls or texts,

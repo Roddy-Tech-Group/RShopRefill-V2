@@ -646,7 +646,7 @@
                         x-show="@js($referCounts)[filter] === 0"
                         x-cloak
                         x-text="@js($referEmpty)[filter]"
-                        class="mt-5 text-[13px] text-[#0c1337]/70 dark:text-zinc-400"
+                        class="mt-5 text-[13px] text-[#0c1337]/90 dark:text-zinc-400"
                     ></p>
 
                     <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -733,7 +733,7 @@
                                      falling back to the supplier's description. A product
                                      with neither shows no line at all. --}}
                                 @if ($product['description'])
-                                    <p class="mb-4 mt-2 text-[13px] leading-[1.45] text-[#0c1337]/70 dark:text-zinc-400">{{ \Illuminate\Support\Str::limit(strip_tags($product['description']), 130) }}</p>
+                                    <p class="mb-4 mt-2 text-[13px] leading-[1.45] text-[#0c1337]/90 dark:text-zinc-400">{{ \Illuminate\Support\Str::limit(strip_tags($product['description']), 130) }}</p>
                                 @endif
 
                                 @if ($reward > 0)
@@ -788,7 +788,7 @@
                         <div class="rounded-[16px] bg-[#ffffff] p-5 shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                             <span class="grid h-9 w-9 place-items-center rounded-full bg-[#0c1337]/10 text-[15px] font-semibold text-[#0c1337] dark:bg-white/10 dark:text-white">{{ $i + 1 }}</span>
                             <p class="mt-4 text-[15px] font-semibold text-[#0c1337] dark:text-white">{{ $step['title'] }}</p>
-                            <p class="mt-2 text-[13px] leading-[1.5] text-[#0c1337]/70 dark:text-zinc-400">{{ $step['body'] }}</p>
+                            <p class="mt-2 text-[13px] leading-[1.5] text-[#0c1337]/90 dark:text-zinc-400">{{ $step['body'] }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -1186,6 +1186,9 @@
                     @include('shop._inquiry-form-body', [
                         'kind' => 'affiliate',
                         'title' => 'Partnership program',
+                        'icon' => 'for-partners.svg',
+                        'formTitle' => 'Join us today',
+                        'submitLabel' => 'Submit application',
                         'intro' => 'Tell us about your channel, who follows you and the kind of collaboration you have in mind, and our team will review it and get back to you.',
                         'postRoute' => 'affiliates.send',
                         'steps' => [

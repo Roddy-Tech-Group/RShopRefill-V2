@@ -194,7 +194,14 @@ new #[Lazy] class extends Component
             }
         }
 
+        // What the four PURCHASE cards can truthfully say: live counts from the
+        // catalogue (countries and operators / brands / billers per store),
+        // cached for an hour. Never a figure typed into the template. The
+        // storefront's partner page reads the same figures, so both agree.
+        $purchaseStats = \App\Support\CatalogFigures::purchaseStats();
+
         return [
+            'purchaseStats' => $purchaseStats,
             'user' => $user,
             'rcoinBalance' => $rcoinBalance,
             'currentTier' => $currentTier,
@@ -220,13 +227,13 @@ new #[Lazy] class extends Component
     // identically. Light tint bg + bold text + 1px ring; dark-mode variants
     // included. Pairs with the rounded-[5px] wrapper at render time.
     $orderStatusUi = [
-        'completed'           => ['Completed',  'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30'],
-        'partially_completed' => ['Partial',    'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'processing'          => ['Processing', 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'pending'             => ['Pending',    'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
-        'failed'              => ['Failed',     'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
-        'cancelled'           => ['Cancelled',  'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-zinc-700/60'],
-        'requires_attention'  => ['Review',     'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
+        'completed'           => ['Completed',  'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'],
+        'partially_completed' => ['Partial',    'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!'],
+        'processing'          => ['Processing', 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!'],
+        'pending'             => ['Pending',    'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'],
+        'failed'              => ['Failed',     'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
+        'cancelled'           => ['Cancelled',  'bg-zinc-100 text-zinc-700 dark:bg-white/5! dark:text-zinc-300!'],
+        'requires_attention'  => ['Review',     'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
     ];
 @endphp
 
@@ -238,91 +245,47 @@ new #[Lazy] class extends Component
     {{-- ─────────────────────────────────────────────────────── --}}
     <div class="flex flex-col gap-5 lg:hidden">
 
-        {{-- Quick Actions - 4-col grid (2 rows of 4). --}}
-        <div class="rounded-[15px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
-            <div class="flex items-center justify-between">
-                <h3 class="text-base font-bold text-zinc-900">Quick Actions</h3>
-                <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate aria-label="See more categories" class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#f4f6f5] text-blue-700 transition hover:bg-[#ffffff] hover:shadow-md hover:shadow-zinc-900/[0.10] dark:hover:border-zinc-500">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
-                    </svg>
-                </a>
-            </div>
-            <div class="mt-4 grid grid-cols-4 gap-3">
-                {{-- A hidden travel tile is REPLACED, not removed: the grid is
-                     sized 2x4, and a 6-tile render leaves a visible hole. Fund
-                     Wallet takes the Flights slot; Electronics steps in next to
-                     Gaming (before More) when Stays is hidden. --}}
-                @foreach (array_values(array_filter([
-                    ['Gift Cards', 'gift cards.svg',   'bg-pink-500',    route('dashboard.shop.gift-cards')],
-                    ['eSIMs',      'esim.svg',         'bg-sky-500',     route('dashboard.shop.esims')],
-                    \App\Support\FeatureFlag::categoryVisible('flights')
-                        ? ['Flights', 'flight 2.svg', 'bg-indigo-500', route('dashboard.shop.flights')]
-                        : ['Fund Wallet', 'Wallet.svg', 'bg-indigo-500', route('dashboard.wallet')],
-                    \App\Support\FeatureFlag::categoryVisible('stays')
-                        ? ['Stays', 'stay 2.svg', 'bg-orange-500', route('dashboard.shop.stays')]
-                        : null,
-                    ['Topups',     'topup1.svg',       'bg-emerald-500', route('dashboard.shop.topups')],
-                    ['Bills',      'bill payment.svg', 'bg-teal-500',    route('dashboard.shop.bills')],
-                    ['Gaming',     'Gaming.svg',       'bg-fuchsia-500', route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment'])],
-                    \App\Support\FeatureFlag::categoryVisible('stays')
-                        ? null
-                        : ['Electronics', 'mobile.svg', 'bg-orange-500', route('dashboard.shop.gift-cards', ['subcategory' => 'electronics'])],
-                    ['More',       'More.svg',         'bg-blue-500',    route('dashboard.shop.gift-cards')],
-                ])) as [$label, $icon, $bg, $href])
-                    <a href="{{ $href }}" wire:navigate class="group flex flex-col items-center gap-2 text-center">
-                        <span class="flex h-12 w-12 items-center justify-center rounded-full {{ $bg }} transition-transform group-hover:scale-105 group-active:scale-95">
-                            <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+        {{-- PURCHASE - the four stores as cards, straight on the page (no
+             wrapping card): icon, name, what it does, and a round arrow. This
+             replaces the old tile grid on phones; the desktop keeps its own
+             grid below. --}}
+        <section aria-labelledby="purchase-heading">
+            {{-- font-[499] is a literal weight: the weight utilities all resolve to 399 (see @theme in app.css), and this one heading is asked to sit a step heavier. --}}
+            <h3 id="purchase-heading" class="px-1 text-[14px] font-[499] uppercase tracking-[0.16em] text-black dark:text-zinc-400">Purchase</h3>
+            @php
+                // Each line is the catalogue's own figure; with an empty store
+                // (a fresh install) it falls back to a plain description.
+                $stat = fn (string $slug, string $key): int => (int) ($purchaseStats[$slug][$key] ?? 0);
+                $countries = fn (int $n): string => $n.' '.\Illuminate\Support\Str::plural('country', $n);
+                // Each card carries the illustration drawn for it (assets/purchase).
+                $purchaseCards = [
+                    ['Bills', $stat('bill-payments', 'brands') > 0
+                        ? $stat('bill-payments', 'brands').' '.\Illuminate\Support\Str::plural('biller', $stat('bill-payments', 'brands')).' in '.$countries($stat('bill-payments', 'countries'))
+                        : 'Pay your bills', 'purchase/bills.svg', route('dashboard.shop.bills')],
+                    ['Airtime & data', $stat('mobile-airtime', 'brands') > 0
+                        ? $stat('mobile-airtime', 'brands').' '.\Illuminate\Support\Str::plural('network', $stat('mobile-airtime', 'brands')).' in '.$countries($stat('mobile-airtime', 'countries'))
+                        : 'Top up airtime & data', 'purchase/airtime.svg', route('dashboard.shop.topups')],
+                    ['eSIM', $stat('esims', 'countries') > 0
+                        ? 'Data plans for '.$countries($stat('esims', 'countries'))
+                        : 'Travel data plans', 'purchase/esim.svg', route('dashboard.shop.esims')],
+                    ['Gift Cards', $stat('gift-cards', 'brands') > 0
+                        ? $stat('gift-cards', 'brands').' '.\Illuminate\Support\Str::plural('brand', $stat('gift-cards', 'brands')).' to choose from'
+                        : 'Shop gift cards', 'purchase/giftcards.svg', route('dashboard.shop.gift-cards')],
+                ];
+            @endphp
+            <div class="mt-3 grid grid-cols-2 gap-4">
+                @foreach ($purchaseCards as [$label, $blurb, $icon, $href])
+                    <a href="{{ $href }}" wire:navigate class="group flex flex-col rounded-[10px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-[0.98] dark:shadow-none">
+                        <img src="{{ asset('assets/' . $icon) }}" alt="" class="no-dark-invert h-10 w-10 object-contain" loading="lazy">
+                        <span class="mt-5 block text-[14px] font-bold leading-tight text-zinc-900 dark:text-white">{{ $label }}</span>
+                        <span class="mt-1.5 block text-[14px] leading-snug text-zinc-500 dark:text-zinc-400">{{ $blurb }}</span>
+                        <span class="mt-4 flex h-7 w-7 items-center justify-center rounded-full bg-[#0c1337] text-white dark:bg-zinc-100! dark:text-[#0c1337]" aria-hidden="true">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"/></svg>
                         </span>
-                        <span class="text-[11px] font-medium text-zinc-700">{{ $label }}</span>
                     </a>
                 @endforeach
             </div>
-        </div>
-
-        {{-- Popular Gift Cards - same curated source as desktop. brand-row auto-scrolls on mobile.
-             See-more "+" sends the user to the dashboard gift-cards page so they stay
-             inside the dashboard chrome instead of bouncing out to the storefront. --}}
-        @if ($popularProducts->isNotEmpty())
-            <div class="rounded-[15px] bg-[#ffffff] p-5 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
-                <x-home.brand-row
-                    title="Popular Gift Cards"
-                    subtitle="Top-rated in your region"
-                    :view-all-href="route('dashboard.shop.gift-cards')"
-                    view-all-variant="plus"
-                    :cols="5"
-                    {{-- The storefront row, not the wrapping grid this used to
-                         be - same control, same depth, same paging. --}}
-                    :carousel="true"
-                    :rows="2"
-                    :mobile-rows="3"
-                    {{-- The track would span 100vw and overrun this column. --}}
-                    :bleed="false"
-                >
-                    @foreach ($popularProducts as $p)
-                        @php
-                            $logo = Product::brandLogoUrl($p->brand_key, $p->logo_url);
-                            $label = Product::brandDisplayName($p->brand_key);
-                            $brandColor = Product::brandColor($p->brand_key, $p->brand_color);
-                        @endphp
-                        <x-home.brand-card
-                            :name="$label"
-                            :price-range="$p->priceRangeLabel()"
-                            :rating="$brandRatings[$p->brand_key] ?? null"
-                            :href="route('dashboard.shop.brand', ['brandSlug' => Product::brandSlug($p->brand_key)])"
-                            :card-class="$logo ? 'bg-[#ffffff]' : ($brandColor ? '' : 'bg-zinc-100')"
-                            :style="! $logo && $brandColor ? 'background-color: ' . $brandColor . ';' : false"
-                        >
-                            @if ($logo)
-                                <img src="{{ $logo }}" alt="{{ $label }} gift card" class="h-full w-full object-cover" loading="lazy">
-                            @else
-                                <span class="px-3 text-center text-xl font-black uppercase leading-tight tracking-tight {{ $brandColor ? 'text-white' : 'text-zinc-700' }}">{{ $label }}</span>
-                            @endif
-                        </x-home.brand-card>
-                    @endforeach
-                </x-home.brand-row>
-            </div>
-        @endif
+        </section>
 
         {{-- Give the Perfect Gift promo - placed here on mobile (desktop keeps its own copy in the right rail). --}}
         <div class="relative overflow-hidden rounded-[12px] bg-blue-950 p-5 text-white">
@@ -367,7 +330,7 @@ new #[Lazy] class extends Component
                         $itemName = $brandKey ? Product::brandDisplayName($brandKey) : ($snap['name'] ?? 'Order');
                         $extraVariants = max(0, $groupedItems->count() - 1);
                         $logo = Product::brandLogoUrl($brandKey, $snap['logo_url'] ?? null);
-                        [$statusLabel, $statusTone] = $orderStatusUi[$order->order_status?->value] ?? ['Pending', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'];
+                        [$statusLabel, $statusTone] = $orderStatusUi[$order->order_status?->value] ?? ['Pending', 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'];
                     @endphp
                     <li>
                         <a href="{{ route('dashboard.orders') }}" wire:navigate class="flex items-center gap-3">
@@ -383,7 +346,7 @@ new #[Lazy] class extends Component
                                     <p class="truncate text-sm font-semibold text-zinc-900">
                                         @if ($firstItemQty > 1){{ $firstItemQty }}x @endif{{ $itemName }}@if ($extraVariants > 0) <span class="font-normal text-zinc-500">+{{ $extraVariants }}</span>@endif
                                     </p>
-                                    <span class="inline-flex w-fit shrink-0 items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $statusTone }}">{{ $statusLabel }}</span>
+                                    <span class="inline-flex w-fit shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusTone }}">{{ $statusLabel }}</span>
                                 </div>
                                 <div class="mt-0.5 flex items-center justify-between gap-2">
                                     <p class="truncate text-xs text-zinc-600">@moneyCode((float) $order->total_amount, $order->settlement_currency)</p>
@@ -635,7 +598,7 @@ new #[Lazy] class extends Component
                                     $itemName = $brandKey ? Product::brandDisplayName($brandKey) : ($snap['name'] ?? 'Order');
                                     $extraVariants = max(0, $groupedItems->count() - 1);
                                     $logo = Product::brandLogoUrl($brandKey, $snap['logo_url'] ?? null);
-                                    [$statusLabel, $statusTone] = $orderStatusUi[$order->order_status?->value] ?? ['Pending', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'];
+                                    [$statusLabel, $statusTone] = $orderStatusUi[$order->order_status?->value] ?? ['Pending', 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'];
                                 @endphp
                                 <li>
                                     <a href="{{ route('dashboard.orders') }}" wire:navigate class="flex items-center gap-3">
@@ -651,7 +614,7 @@ new #[Lazy] class extends Component
                                                 <p class="truncate text-sm font-semibold text-zinc-900">
                                                     @if ($firstItemQty > 1){{ $firstItemQty }}x @endif{{ $itemName }}@if ($extraVariants > 0) <span class="font-normal text-zinc-500">+{{ $extraVariants }}</span>@endif
                                                 </p>
-                                                <span class="inline-flex w-fit shrink-0 items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $statusTone }}">{{ $statusLabel }}</span>
+                                                <span class="inline-flex w-fit shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusTone }}">{{ $statusLabel }}</span>
                                             </div>
                                             <div class="mt-0.5 flex items-center justify-between gap-2">
                                                 <p class="truncate text-xs text-zinc-600">@moneyCode((float) $order->total_amount, $order->settlement_currency)</p>

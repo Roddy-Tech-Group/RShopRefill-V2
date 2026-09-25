@@ -24,16 +24,6 @@
                 </p>
             </div>
 
-            @if (session('status'))
-                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
-                     x-transition:leave="transition ease-in duration-300"
-                     x-transition:leave-start="opacity-100 transform translate-y-0"
-                     x-transition:leave-end="opacity-0 transform -translate-y-2"
-                     class="mt-4 rounded-lg bg-green-50 p-4 text-sm text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                    {{ session('status') }}
-                </div>
-            @endif
-
             @foreach (['resend' => 'amber', 'data_export' => 'red'] as $field => $tone)
                 @error($field)
                     <div class="mt-4 rounded-lg bg-{{ $tone }}-50 p-4 text-sm text-{{ $tone }}-800 dark:bg-{{ $tone }}-900/30 dark:text-{{ $tone }}-400">

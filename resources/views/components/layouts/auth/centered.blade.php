@@ -51,7 +51,6 @@
                                 class="h-full w-auto object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />
                         </span>
-                        <span class="mt-0.5 text-[10px] font-medium leading-none text-zinc-600">Digital Marketplace</span>
                     </a>
 
                     {{ $slot }}

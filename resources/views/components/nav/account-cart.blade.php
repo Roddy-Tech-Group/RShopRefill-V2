@@ -43,9 +43,19 @@
      the thing a shopper reaches for mid-purchase, and the avatar reads
      as the end of the row. --}}
 {{-- Cart. State lives in the global Alpine cart store ($store.cart): the popup
-     drops open automatically when an item is added (store.add sets open = true). --}}
+     drops open automatically when an item is added (store.add sets open = true).
+
+     x-init hands the store its unit-label templates in the page's language,
+     so a line reads "Carte de $25.00" on a French page rather than the
+     English suffixes the store would otherwise append. --}}
 <div
     x-data="{ locked: false }"
+    x-init="$store.cart.labels = @js([
+        'card' => __('navigation.cart_unit_card'),
+        'esim' => __('navigation.cart_unit_esim'),
+        'topup' => __('navigation.cart_unit_topup'),
+        'bill' => __('navigation.cart_unit_bill'),
+    ])"
     @keydown.escape.window="$store.cart.open = false; locked = false"
     class="relative"
 >
@@ -60,7 +70,7 @@
              bar; this band is #f4f6f5, so the ink is the navy itself. In dark
              both bars are black and the dark classes are the dashboard's own.
              The aria-label still names it: the glyph is the whole control. --}}
-        class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+        class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:border-edge hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
         aria-label="{{ __('navigation.cart') }}"
     >
         {{-- The shared cart glyph (x-icons.cart) inside the wrapper x-ui.anim-icon
@@ -127,7 +137,7 @@
         <div x-show="$store.cart.count > 0" x-cloak>
             <div class="flex items-center justify-between px-3 pt-3">
                 <h3 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('checkout.your_cart') }}</h3>
-                <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="$store.cart.count + ' item' + ($store.cart.count === 1 ? '' : 's')"></span>
+                <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="($store.cart.count === 1 ? @js(__('checkout.cart_item_count_one', ['count' => '__COUNT__'])) : @js(__('checkout.cart_item_count_other', ['count' => '__COUNT__']))).replace('__COUNT__', $store.cart.count)"></span>
             </div>
 
             <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -147,11 +157,11 @@
                         </span>
                         {{-- Quantity counter --}}
                         <span class="flex shrink-0 items-center gap-1.5">
-                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Decrease">
+                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-full text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('navigation.cart_decrease') }}">
                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
                             </button>
                             <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="item.quantity"></span>
-                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Increase">
+                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-full text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="{{ __('navigation.cart_increase') }}">
                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
                             </button>
                         </span>
@@ -170,7 +180,7 @@
                     {{ __('checkout.view_cart') }}
                 </a>
                 <a :href="'{{ route('shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
-                    Checkout
+                    {{ __('checkout.checkout') }}
                 </a>
             </div>
         </div>
@@ -208,11 +218,11 @@
                  the ink is the navy itself. In dark both bars are black and the
                  dark classes are the dashboard's own. The text colour is for the
                  glyph fallback, which inherits it. --}}
-            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
-            aria-label="Your account"
+            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:border-edge hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+            aria-label="{{ __('navigation.your_account') }}"
         >
             @if ($authUser?->avatar_url)
-                <img src="{{ $authUser->avatar_url }}" alt="{{ $authUser->name ?? 'Account' }}" class="h-full w-full object-cover" loading="lazy">
+                <img src="{{ $authUser->avatar_url }}" alt="{{ $authUser->name ?? __('navigation.account') }}" class="h-full w-full object-cover" loading="lazy">
             @else
                 <flux:icon.user class="h-6 w-6" />
             @endif
@@ -236,32 +246,32 @@
             role="menu"
         >
             <div class="p-1.5">
-                <a href="{{ route('dashboard') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
+                <a href="{{ route('dashboard') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
                     <svg class="h-5 w-5 shrink-0 text-zinc-700 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
                     </svg>
                     {{ __('navigation.account') }}
                 </a>
-                <a href="{{ route('dashboard.orders') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
+                <a href="{{ route('dashboard.orders') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
                     <svg class="h-5 w-5 shrink-0 text-zinc-700 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     {{ __('navigation.my_orders') }}
                 </a>
-                <a href="{{ route('dashboard.rewards') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
+                <a href="{{ route('dashboard.rewards') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
                     <svg class="h-5 w-5 shrink-0 text-zinc-700 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
                     </svg>
                     {{ __('navigation.rcoin_rewards') }}
                 </a>
-                <a href="{{ route('dashboard.profile') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
+                <a href="{{ route('dashboard.profile') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
                     <svg class="h-5 w-5 shrink-0 text-zinc-700 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a6.759 6.759 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     {{ __('navigation.settings') }}
                 </a>
-                <a href="{{ route('dashboard.kyc') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
+                <a href="{{ route('dashboard.kyc') }}" wire:navigate role="menuitem" class="group flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-blue-100 dark:text-zinc-200 dark:hover:bg-white/10 dark:hover:text-white">
                     <svg class="h-5 w-5 shrink-0 text-zinc-700 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/>
                     </svg>
@@ -272,7 +282,7 @@
             <div class="border-t border-zinc-100 p-1.5">
                 <form method="POST" action="{{ route('logout') }}" class="w-full">
                     @csrf
-                    <button type="submit" class="flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15">
+                    <button type="submit" class="flex w-full items-center gap-3 rounded-full px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15">
                         <x-ui.logout-icon class="h-5 w-5" />
                         {{ __('navigation.logout') }}
                     </button>
@@ -291,7 +301,10 @@
     <a
         href="{{ route('login') }}"
         wire:navigate
-        class="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full nav-text text-zinc-900 transition-colors duration-150 bg-[#f4f6f5] hover:bg-[#e8ecea] md:h-auto md:w-auto md:rounded-[10px] md:bg-transparent md:px-3 md:py-2 md:hover:bg-[#f4f6f5] dark:bg-white/8 md:dark:bg-transparent dark:hover:bg-white/15 md:dark:hover:bg-white/10 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-zinc-200"
+        {{-- A pill at every width now. It was the last control on this row with a
+             corner radius: round on a phone, a 10px rectangle from md up, sitting
+             between the cart and the theme toggle which are both round. --}}
+        class="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full nav-text text-zinc-900 transition-colors duration-150 bg-[#f4f6f5] hover:bg-[#e8ecea] md:w-auto md:bg-transparent md:px-3 md:hover:bg-[#f4f6f5] dark:bg-white/8 md:dark:bg-transparent dark:hover:bg-white/15 md:dark:hover:bg-white/10 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-zinc-200"
         aria-label="{{ __('navigation.sign_in') }}"
     >
         {{-- Inline, not the Login.svg file it replaced: an <img> cannot take

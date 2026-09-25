@@ -219,7 +219,7 @@ class ForPartnersTabsTest extends TestCase
         Setting::set('referral_reward_percentage', 0.5);
 
         $giftCards = Category::create(['name' => 'Gift Cards', 'slug' => 'gift-cards', 'type' => 'digital']);
-        $esims = Category::create(['name' => 'Travel eSIMs', 'slug' => 'esims', 'type' => 'digital']);
+        $esims = Category::create(['name' => 'eSIMs', 'slug' => 'esims', 'type' => 'digital']);
         $airtime = Category::create(['name' => 'Mobile Airtime', 'slug' => 'mobile-airtime', 'type' => 'digital']);
 
         $apple = Product::factory()->create([

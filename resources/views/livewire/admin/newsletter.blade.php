@@ -84,7 +84,7 @@ class extends Component {
             'status'            => 'unsubscribed',
             'unsubscribed_at'   => now(),
         ]);
-        session()->flash('status', 'Subscriber removed from list.');
+        $this->dispatch('toast', message: 'Subscriber removed from list.');
         unset($this->counts);
     }
 
@@ -94,7 +94,7 @@ class extends Component {
             'status'            => 'active',
             'unsubscribed_at'   => null,
         ]);
-        session()->flash('status', 'Subscriber re-activated.');
+        $this->dispatch('toast', message: 'Subscriber re-activated.');
         unset($this->counts);
     }
 
@@ -187,9 +187,9 @@ class extends Component {
                 isHtml: $this->isHtml,
                 imageUrl: $this->imageUrl,
             ));
-            session()->flash('status', 'Test email sent to '.$this->testEmail);
+            $this->dispatch('toast', message: 'Test email sent to '.$this->testEmail);
         } catch (\Throwable $e) {
-            session()->flash('error', 'Test send failed: '.$e->getMessage());
+            $this->dispatch('toast', message: 'Test send failed: '.$e->getMessage(), isError: true);
         }
     }
 
@@ -252,7 +252,7 @@ class extends Component {
 
         $recipients = NewsletterSubscriber::where('status', 'active')->count();
         if ($recipients === 0) {
-            session()->flash('error', 'No active subscribers to send to.');
+            $this->dispatch('toast', message: 'No active subscribers to send to.', isError: true);
             return;
         }
 
@@ -263,7 +263,7 @@ class extends Component {
             imageUrl: $this->imageUrl,
         );
 
-        session()->flash('status', 'Broadcast queued. Sending to '.number_format($recipients).' active subscribers in the background.');
+        $this->dispatch('toast', message: 'Broadcast queued. Sending to '.number_format($recipients).' active subscribers in the background.');
         $this->closeCompose();
     }
 
@@ -290,13 +290,6 @@ class extends Component {
     <x-slot:subheading>Manage email subscribers and broadcast campaigns to your list.</x-slot:subheading>
 
     <div class="flex flex-col gap-6">
-
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
-        @if (session('error'))
-            <div class="rounded-[12px] bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">{{ session('error') }}</div>
-        @endif
 
         {{-- Compose button — primary action above the KPI strip. --}}
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -338,7 +331,7 @@ class extends Component {
                 ['label' => 'Active',        'value' => $this->counts['active'],       'dot' => 'bg-emerald-500'],
                 ['label' => 'Unsubscribed', 'value' => $this->counts['unsubscribed'], 'dot' => 'bg-zinc-400'],
             ] as $stat)
-                <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -378,7 +371,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm" style="border-spacing: 0 6px;">
                     <thead>
@@ -413,7 +406,7 @@ class extends Component {
                                     @if ($sub->status === 'active')
                                         <button
                                             wire:click="unsubscribe({{ $sub->id }})"
-                                            wire:confirm="Remove this subscriber from the list?"
+                                            data-confirm="Remove this subscriber from the list?" data-confirm-tone="danger" data-confirm-text="Remove"
                                             type="button"
                                             class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25"
                                         >Unsubscribe</button>
@@ -617,7 +610,7 @@ class extends Component {
                             type="submit"
                             wire:loading.attr="disabled"
                             wire:target="broadcast"
-                            wire:confirm="Broadcast this newsletter to {{ $this->counts['active'] }} active subscribers? This cannot be undone."
+                            data-confirm="Broadcast this newsletter to {{ $this->counts['active'] }} active subscribers? This cannot be undone." data-confirm-title="Send newsletter" data-confirm-tone="warning" data-confirm-text="Send"
                             class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                         >
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

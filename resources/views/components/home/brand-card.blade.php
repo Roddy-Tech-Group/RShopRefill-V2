@@ -20,7 +20,12 @@
     card-grey in dark and any brand logo drawn in dark linework is lost on it.
 --}}
 <li data-reveal-item class="w-32 shrink-0 sm:w-auto">
-    <a href="{{ $href }}" class="group block focus:outline-none">
+    {{-- wire:navigate, which this was missing. Without it these tiles were the
+         slowest links on the site: a full document load that re-downloads and
+         re-runs the bundles and holds the branded loader for its half-second
+         minimum, started from the thing on the home page people tap most. Every
+         other brand link on the site already swapped the page instead. --}}
+    <a href="{{ $href }}" wire:navigate class="group block focus:outline-none">
         <div
             {{ $attributes->merge(['class' => 'relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] ring-1 ring-zinc-200 shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-blue-500/40 keep-light '.$cardClass]) }}
         >

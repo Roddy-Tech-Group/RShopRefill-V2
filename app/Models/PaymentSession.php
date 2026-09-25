@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Domain\Payment\Support\MobileMoneyRail;
+use App\Domain\Payment\Support\SupportedPaymentMethods;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -269,14 +271,17 @@ class PaymentSession extends Model
             ];
         }
 
-        // 4. XAF, GHS specific payment methods (Mobile Money)
-        if (in_array($currency, ['XAF', 'XOF', 'GHS'])) {
+        // 4. Mobile money, wherever the currency accepts it. Networks come
+        //    from the rail map so the order page offers exactly what the
+        //    charge takes: USD rides the Francophone rail (MTN, Orange) in
+        //    francs, and the rails that take the number alone list none.
+        if (SupportedPaymentMethods::allows($currency, 'mobile_money')) {
             $methods[] = [
                 'type' => 'mobile_money',
                 'provider' => 'flutterwave',
                 'label' => 'Mobile Money',
-                'description' => $currency === 'GHS' ? 'MTN, Vodafone, AirtelTigo Mobile Money' : 'MTN Mobile Money or Orange Money',
-                'supported_networks' => $currency === 'GHS' ? ['MTN', 'Vodafone', 'AirtelTigo'] : ['MTN', 'Orange'],
+                'description' => MobileMoneyRail::description($currency),
+                'supported_networks' => MobileMoneyRail::networkOptions($currency),
             ];
         }
 

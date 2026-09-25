@@ -68,7 +68,14 @@
 
         let startY = 0, pulling = false, pull = 0, refreshing = false, raf = null, nextPx = 0;
 
-        const scroller = () => document.scrollingElement || document.documentElement;
+        // The phone dashboard scrolls inside its rounded panel, not the window,
+        // so "at the top" has to be read off the panel there; anywhere else the
+        // document scrolls as usual.
+        const scroller = () => {
+            const panel = document.querySelector('.dash-mobile-panel');
+            if (panel && getComputedStyle(panel).overflowY === 'auto') { return panel; }
+            return document.scrollingElement || document.documentElement;
+        };
         const isLocked = () => document.body.style.position === 'fixed';
         const el = () => document.getElementById('rshop-ptr');
 

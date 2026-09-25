@@ -30,7 +30,17 @@
                 counter++;
             },
             unlock() {
-                counter = Math.max(0, counter - 1);
+                // Nothing holds a lock, so there is nothing to restore. Without
+                // this, an unlock() with the counter already at 0 still ran the
+                // restore branch below and called scrollTo(0, savedY) with
+                // savedY at its initial 0 - which threw the page to the top.
+                // Consumers use x-effect, and an effect runs once on init with
+                // its flag false, so every overlay on a page fired exactly that
+                // call at boot. Use reset() for unconditional cleanup.
+                if (counter === 0) {
+                    return;
+                }
+                counter -= 1;
                 if (counter === 0) {
                     const body = document.body;
                     const html = document.documentElement;

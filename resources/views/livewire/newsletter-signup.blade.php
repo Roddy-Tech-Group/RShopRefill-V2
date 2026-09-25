@@ -128,7 +128,7 @@ new class extends Component {
                     type="email"
                     autocomplete="email"
                     placeholder="{{ __('footer.newsletter_placeholder') }}"
-                    class="h-11 w-full rounded-[12px] bg-[#ffffff] px-4 text-[15px] text-zinc-900 outline-none ring-1 ring-zinc-200 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/10 dark:text-white dark:ring-white/15"
+                    class="h-11 w-full rounded-full bg-[#ffffff] px-4 text-[15px] text-zinc-900 outline-none ring-1 ring-zinc-200 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/40 dark:bg-white/10 dark:text-white dark:ring-white/15 border-2 border-zinc-200 dark:border-white/10 focus:border-edge dark:focus:border-edge transition-colors"
                 >
             </div>
 

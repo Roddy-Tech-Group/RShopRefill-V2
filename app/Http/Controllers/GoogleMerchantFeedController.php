@@ -96,7 +96,7 @@ class GoogleMerchantFeedController extends Controller
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>{$name} - Travel eSIMs</title>
+    <title>{$name} - eSIMs</title>
     <link>{$home}</link>
     <description>Travel data eSIMs with instant delivery, from {$name}.</description>
 {$items}  </channel>

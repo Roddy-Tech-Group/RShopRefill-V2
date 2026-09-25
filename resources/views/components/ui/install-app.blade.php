@@ -99,7 +99,7 @@
             <button
                 type="button"
                 @click="install()"
-                class="shrink-0 rounded-[12px] bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="shrink-0 rounded-full bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
                 Install
             </button>
@@ -180,7 +180,7 @@
         <button
             type="button"
             @click="dismiss()"
-            class="mt-6 w-full rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            class="mt-6 w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
         >
             Got it
         </button>

@@ -11,11 +11,11 @@
 <x-layouts.app.header :title="'Privacy Policy | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Privacy</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Privacy Policy</h1>
-            <p class="mt-3 text-sm text-zinc-600">Last updated: {{ $lastUpdated }}</p>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Privacy</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">Privacy Policy</h1>
+            <p class="mt-3 text-sm text-white/75">Last updated: {{ $lastUpdated }}</p>
         </div>
     </section>
 
@@ -32,7 +32,7 @@
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#collect" class="font-medium text-blue-600 hover:underline">1. Information we collect</a></li>
@@ -53,7 +53,7 @@
             </p>
 
             <div class="mt-5 space-y-4">
-                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5">
                     <h3 class="text-base font-bold text-zinc-900">Account information</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Your name, email address and phone number.</li>
@@ -62,7 +62,7 @@
                     </ul>
                 </div>
 
-                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5">
                     <h3 class="text-base font-bold text-zinc-900">Identity verification (KYC)</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>A government-issued identity document, such as a national ID card or passport.</li>
@@ -71,13 +71,13 @@
                     </ul>
                 </div>
 
-                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5">
                     <h3 class="text-base font-bold text-zinc-900">Transaction and payment data</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>The payment methods you use, your transaction history and your billing address.</li>
                         <li>Records of purchases, refunds and wallet top-ups.</li>
                     </ul>
-                    <div class="mt-4 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+                    <div class="mt-4 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4">
                         <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                         <div>
                             <p class="text-sm font-bold text-blue-700">We do not store full card numbers</p>
@@ -86,7 +86,7 @@
                     </div>
                 </div>
 
-                <div class="rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-zinc-50 p-5">
                     <h3 class="text-base font-bold text-zinc-900">Technical and location data</h3>
                     <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-zinc-600 marker:text-blue-500">
                         <li>Your IP address and device identifiers.</li>
@@ -108,7 +108,7 @@
                 <li>To keep the platform secure, reliable and improving over time.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Fraud prevention keeps your money safe</p>
@@ -169,7 +169,7 @@
                 <li><span class="font-semibold text-zinc-900">Complain</span> to your data-protection authority, including the Nigeria Data Protection Commission (NDPC).</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Some records must be kept by law</p>
@@ -198,14 +198,13 @@
                 <li><span class="font-semibold text-zinc-900">Email</span>, at <a href="mailto:{{ $supportEmail }}" class="font-medium text-blue-600 hover:underline">{{ $supportEmail }}</a>, which is best for data-deletion requests so there is a clear written record.</li>
             </ul>
 
-            <div class="mt-8 border-t border-zinc-100 pt-8">
+            <div class="mt-8 pt-8">
                 <p class="text-sm leading-relaxed text-zinc-600">
                     We may update this policy from time to time. The date at the top of this page shows the latest version. If
                     you have any questions, please <a href="{{ route('shop.contact') }}" wire:navigate class="font-medium text-blue-600 hover:underline">contact our team</a>.
                 </p>
             </div>
         </section>
-        <x-legal-footer />
     </div>
 
 </x-layouts.app.header>

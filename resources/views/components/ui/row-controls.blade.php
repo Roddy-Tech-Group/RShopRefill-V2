@@ -48,19 +48,26 @@
 @props([
     'href' => null,
     'action' => null,
-    'label' => 'See more',
+    'label' => null,
     'navigate' => true,
     'arrows' => true,
     'prev' => null,
     'next' => null,
     'prevDisabled' => null,
     'nextDisabled' => null,
-    'prevLabel' => 'Previous',
-    'nextLabel' => 'Next',
+    'prevLabel' => null,
+    'nextLabel' => null,
     'arrowsOnMobile' => false,
 ])
 
 @php
+    // Defaults resolve here rather than in @props so they follow the active
+    // locale: @props defaults are plain literals, evaluated before __() could
+    // pick a language.
+    $label ??= __('common.see_more');
+    $prevLabel ??= __('common.previous');
+    $nextLabel ??= __('common.next');
+
     $pillClasses = 'flex h-8 shrink-0 items-center rounded-full bg-white px-4 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-[#1d3252] dark:text-zinc-200 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]';
 
     // The arrows are the same control as the pill, squared off to h-8 w-8. The

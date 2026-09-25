@@ -49,11 +49,11 @@
 
     {{-- ── Hero (matches About / FAQ / Help pattern: soft blue-50 bg,
          blue-600 headline, blue-100 eyebrow chip) ─────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">How it works</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-blue-600 sm:text-4xl lg:text-5xl">Shopping made simple</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">How it works</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">Shopping made simple</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                 From gift cards to eSIMs, buying digital products on {{ $siteName }} takes just a few taps. Here is how it all comes together.
             </p>
         </div>
@@ -73,17 +73,17 @@
                 <p class="mt-5 text-base font-bold text-blue-600">Fast. Secure. Borderless.</p>
                 <p class="mt-1 text-sm font-semibold text-zinc-900">Digital access without limits.</p>
                 <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
-                    <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                         Start shopping
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                     </a>
-                    <a href="{{ route('shop.help') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
+                    <a href="{{ route('shop.help') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
                         Visit Help Center
                     </a>
                 </div>
             </div>
             <div class="relative mx-auto w-full max-w-md lg:max-w-none">
-                <div class="overflow-hidden rounded-[24px] ring-1 ring-zinc-100">
+                <div class="overflow-hidden rounded-[24px]">
                     <img src="{{ $img('How it work 11.webp') }}" alt="How shopping works on {{ $siteName }}" class="h-full w-full object-cover" loading="lazy">
                 </div>
             </div>
@@ -91,7 +91,7 @@
     </section>
 
     {{-- ── Easy and convenient: 3-up feature grid ────────────── --}}
-    <section class="border-y border-zinc-100 bg-zinc-50">
+    <section class="bg-zinc-50">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 sm:px-6 sm:py-16">
             <div class="text-center">
                 <h2 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Easy and convenient</h2>
@@ -99,7 +99,7 @@
             </div>
             <div class="mt-9 grid grid-cols-1 gap-5 sm:grid-cols-3">
                 @foreach ($features as $feature)
-                    <div class="rounded-[12px] bg-white p-6 text-center ring-1 ring-zinc-100">
+                    <div class="rounded-[12px] bg-white p-6 text-center">
                         <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50">
                             <img src="{{ $img($feature['icon']) }}" alt="" class="h-7 w-7 object-contain" loading="lazy">
                         </span>
@@ -119,7 +119,7 @@
             <div
                 x-data="{ cards: @js($giftLogos), i: 0 }"
                 x-init="setInterval(() => i = (i + 1) % cards.length, 3000)"
-                class="order-1 rounded-[24px] bg-blue-50 p-6 ring-1 ring-zinc-100 sm:p-8"
+                class="order-1 rounded-[24px] bg-blue-50 p-6 sm:p-8"
             >
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Popular gift cards</p>
 
@@ -135,7 +135,7 @@
                             x-transition:leave="transition ease-in duration-300"
                             x-transition:leave-start="opacity-100"
                             x-transition:leave-end="opacity-0"
-                            class="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[12px] bg-[#f5f5f7] p-6 shadow-lg shadow-zinc-900/15 ring-1 ring-black/5"
+                            class="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[12px] bg-[#f5f5f7] p-6 shadow-lg shadow-zinc-900/15"
                         >
                             <img :src="card.src" :alt="card.name" class="h-20 max-w-[65%] object-contain sm:h-24">
                             <p class="text-center text-lg font-bold text-[#18181b] sm:text-xl" x-text="card.tagline"></p>
@@ -163,7 +163,7 @@
                 </p>
             </div>
             <div class="order-1 lg:order-2">
-                <div class="mx-auto w-full max-w-sm rounded-[24px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                <div class="mx-auto w-full max-w-sm rounded-[24px] bg-white p-6 shadow-sm shadow-zinc-900/5">
                     <div class="flex items-center gap-3">
                         <span class="flex h-12 w-12 items-center justify-center rounded-[12px] bg-zinc-50 ring-1 ring-zinc-100">
                             <img src="{{ $img('amazon.webp') }}" alt="" class="h-7 w-7 object-contain" loading="lazy">
@@ -195,13 +195,13 @@
     </section>
 
     {{-- ── We accept: payment carousel ───────────────────────── --}}
-    <section class="border-y border-zinc-100 bg-zinc-50">
+    <section class="bg-zinc-50">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-12 sm:px-6 sm:py-14">
             <p class="text-center text-xs font-semibold uppercase tracking-wider text-zinc-500">We accept</p>
             <div class="relative mt-6 overflow-hidden">
                 <div class="hiw-marquee flex w-max items-center gap-4">
                     @foreach (array_merge($payments, $payments) as $pay)
-                        <div class="flex shrink-0 items-center gap-2.5 rounded-[12px] bg-white px-4 py-3 ring-1 ring-zinc-100">
+                        <div class="flex shrink-0 items-center gap-2.5 rounded-[12px] bg-white px-4 py-3">
                             <img src="{{ $img($pay['src']) }}" alt="" @class(['h-6 w-6 object-contain', 'brightness-0 dark:invert' => ! empty($pay['mono'])]) loading="lazy">
                             <span class="whitespace-nowrap text-sm font-semibold text-zinc-800">{{ $pay['name'] }}</span>
                         </div>
@@ -217,10 +217,10 @@
         {{-- Step 3: payment-methods image (left) + text (right) --}}
         <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
             <div class="order-1">
-                <div class="rounded-[24px] bg-blue-50 p-7 ring-1 ring-zinc-100">
+                <div class="rounded-[24px] bg-blue-50 p-7">
                     <div class="grid grid-cols-2 gap-3">
                         @foreach (array_slice($payments, 0, 6) as $pay)
-                            <div class="flex items-center gap-2.5 rounded-[12px] bg-white px-3 py-3 ring-1 ring-zinc-100">
+                            <div class="flex items-center gap-2.5 rounded-[12px] bg-white px-3 py-3">
                                 <img src="{{ $img($pay['src']) }}" alt="" @class(['h-6 w-6 shrink-0 object-contain', 'brightness-0 dark:invert' => ! empty($pay['mono'])]) loading="lazy">
                                 <span class="truncate text-xs font-semibold text-zinc-800">{{ $pay['name'] }}</span>
                             </div>
@@ -247,7 +247,7 @@
                 </p>
             </div>
             <div class="order-1 lg:order-2">
-                <div class="mx-auto w-full max-w-md overflow-hidden rounded-[24px] bg-blue-50 p-6 ring-1 ring-zinc-100">
+                <div class="mx-auto w-full max-w-md overflow-hidden rounded-[24px] bg-blue-50 p-6">
                     <img src="{{ $img('step 3.webp') }}" alt="Enjoy your product instantly" class="mx-auto h-auto w-full max-w-sm object-contain" loading="lazy">
                 </div>
             </div>
@@ -262,12 +262,12 @@
                 Join thousands buying digital products the smarter way. It only takes a minute to get started.
             </p>
             <div class="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
+                <a href="{{ route('shop.gift-cards') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
                     Start shopping
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </a>
                 @guest
-                    <a href="{{ route('register') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-[6px] border border-white/40 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
+                    <a href="{{ route('register') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
                         Create an account
                     </a>
                 @endguest

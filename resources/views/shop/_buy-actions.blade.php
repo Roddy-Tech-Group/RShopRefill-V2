@@ -45,7 +45,7 @@
         :class="cartState === 'success'
             ? 'border-emerald-500 bg-emerald-500 text-white animate-cart-pop'
             : '{{ $isGiftCard ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700 hover:border-blue-700' : 'border-blue-600 bg-white text-blue-600 hover:bg-blue-600 hover:text-white' }}'"
-        class="relative flex items-center justify-center border-2 font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 {{ $isGiftCard ? 'h-11 rounded-full px-4 text-sm' : 'h-[52px] rounded-[12px] px-4 text-base' }}"
+        class="relative flex items-center justify-center border-2 font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 {{ $isGiftCard ? 'h-11 rounded-full px-4 text-sm' : 'h-[52px] rounded-full px-4 text-base' }}"
     >
         <span
             x-show="cartState === 'idle'"
@@ -98,7 +98,7 @@
         type="button"
         @click="buyNow()"
         :disabled="! canAddToCart() || $store.cart.loading"
-        class="flex items-center justify-center font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 {{ $isGiftCard ? 'h-11 rounded-full px-4 text-sm ' : 'h-[52px] rounded-[12px] px-4 text-base ' }}{{ $isGiftCard ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200 disabled:hover:bg-zinc-100 dark:bg-white/10 dark:text-white dark:hover:bg-white/15' : 'bg-blue-600 text-white hover:bg-blue-700 disabled:hover:bg-blue-600' }}"
+        class="flex items-center justify-center font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 {{ $isGiftCard ? 'h-11 rounded-full px-4 text-sm ' : 'h-[52px] rounded-full px-4 text-base ' }}{{ $isGiftCard ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200 disabled:hover:bg-zinc-100 dark:bg-white/10 dark:text-white dark:hover:bg-white/15' : 'bg-blue-600 text-white hover:bg-blue-700 disabled:hover:bg-blue-600' }}"
     >
         {{ __('products.buy_now') }}
     </button>

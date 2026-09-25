@@ -750,6 +750,9 @@ document.addEventListener('alpine:init', () => {
         open: false,         // nav popup visibility
         loading: false,
         hydrated: false,     // true once the first /cart/data fetch resolves
+        // Unit-label templates in the page's language (":amount card"), set by
+        // x-nav.account-cart from the lang files. Empty means the English below.
+        labels: {},
 
         _csrf() {
             return document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -794,11 +797,16 @@ document.addEventListener('alpine:init', () => {
             if (!item || !item.face_label) {
                 return '';
             }
-            const suffix = {
-                'esims': ' eSIM',
-                'mobile-airtime': ' top-up',
-                'bill-payments': ' bill payment',
-            }[item.category_slug] ?? ' card';
+            const kind = {
+                'esims': 'esim',
+                'mobile-airtime': 'topup',
+                'bill-payments': 'bill',
+            }[item.category_slug] ?? 'card';
+            const template = this.labels[kind];
+            if (template) {
+                return template.replace(':amount', item.face_label);
+            }
+            const suffix = { esim: ' eSIM', topup: ' top-up', bill: ' bill payment', card: ' card' }[kind];
             return item.face_label + suffix;
         },
 
@@ -808,7 +816,14 @@ document.addEventListener('alpine:init', () => {
             if (this.currency === 'USD') {
                 return this.usd(n);
             }
-            return this.currencySymbol + ' ' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            // CFA francs do not use minor units in customer-facing prices.
+            // Rounding here keeps checkout totals from displaying values such
+            // as "XAF 3,109.6" while leaving two-decimal currencies untouched.
+            const zeroDecimal = ['XAF', 'XOF'].includes(this.currency);
+            return this.currencySymbol + ' ' + n.toLocaleString('en-US', {
+                minimumFractionDigits: zeroDecimal ? 0 : 2,
+                maximumFractionDigits: zeroDecimal ? 0 : 2,
+            });
         },
 
         // Format a USD amount.
@@ -975,6 +990,45 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
+ * Hand a pay-currency choice made on a product page to the rest of the site.
+ *
+ * These are the two statements the locale modal's Save makes for currency, and
+ * the ones checkout's own currency control used to make before it was removed:
+ * write the choice, then announce it so the cart re-prices. Checkout reads
+ * locale.currency through the cart store, so this is what carries "pay in
+ * naira", chosen beside a card's price, through to the page that charges for
+ * it.
+ *
+ * Returns false and writes nothing for a code outside `supported`. That guard
+ * is why a coin can never land here: coin codes are three letters like a
+ * currency, the display-currency middleware would take one, and the nav pill
+ * would end up reading EN / BTC.
+ *
+ * @param {string} code      Three-letter currency code.
+ * @param {?string} symbol   Its symbol, for the pill and the cart's own labels.
+ * @param {string[]} supported Codes checkout can actually charge in.
+ * @returns {boolean} Whether the choice was taken.
+ */
+window.rshopSetPayCurrency = function (code, symbol, supported) {
+    code = String(code || '').toUpperCase();
+
+    if (! Array.isArray(supported) || ! supported.includes(code)) {
+        return false;
+    }
+
+    try {
+        localStorage.setItem('locale.currency', code);
+        localStorage.setItem('locale.currencySymbol', symbol || code);
+    } catch (_) {
+        // Storage blocked: checkout opens in whatever it opened in before.
+    }
+
+    window.dispatchEvent(new CustomEvent('currency-changed', { detail: { currency: code } }));
+
+    return true;
+};
+
+/**
  * Open Google OAuth in a centred popup window instead of full-page redirect.
  * The popup lands on /auth/popup-complete after sign-in (success or failure);
  * that page postMessages back here and closes itself. We listen for the
@@ -1046,18 +1100,27 @@ window.navBrandSearch = function () {
         recent: [],
         _debounce: null,
         _aborter: null,
+        // Section headings and row types in the page's language, keyed by the
+        // API's type names. x-nav.search-panel fills this from the lang files;
+        // the English here is only what shows if a mount never passes them.
+        labels: {},
+
+        /** The translated name for a result row's type. */
+        typeLabel(type) {
+            return (this.labels.types && this.labels.types[type]) || type;
+        },
 
         /** Result rows in display order, split into labelled sections. */
         get groups() {
             const order = ['Gift card', 'Mobile top-up', 'Bill payment', 'eSIM', 'Page', 'Country'];
-            const heading = {
+            const heading = Object.assign({
                 'Gift card': 'Gift Cards',
                 'Mobile top-up': 'Mobile Refill',
                 'Bill payment': 'Bill Payments',
                 'eSIM': 'eSIMs',
                 'Page': 'Suggestions',
                 'Country': 'Change Country',
-            };
+            }, this.labels.groups || {});
 
             return order
                 .map((type) => ({
@@ -1603,22 +1666,6 @@ window.storefrontLocale = function () {
         },
     };
 };
-
-/**
- * Smooth SPA page transitions. On every Livewire navigation the new page's main
- * content slides in from the right (see `.page-enter` in app.css), giving the
- * app-like feel of the menu modal opening rather than a hard reload. We restart
- * the CSS animation by removing the class, forcing a reflow, then re-adding it.
- */
-document.addEventListener('livewire:navigated', () => {
-    document.querySelectorAll('[data-page-content]').forEach((el) => {
-        el.classList.remove('page-enter');
-        void el.offsetWidth; // reflow so the animation replays on every navigation
-        el.classList.add('page-enter');
-        // Drop the class once it finishes so no transform lingers on the content.
-        el.addEventListener('animationend', () => el.classList.remove('page-enter'), { once: true });
-    });
-});
 
 /**
  * Mobile-instant navigation. Livewire prefetches `wire:navigate.hover` links on

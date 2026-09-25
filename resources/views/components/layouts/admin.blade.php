@@ -3,6 +3,17 @@
     <head>
         @include('partials.head')
     </head>
+    {{-- Fold the rail before first paint, so a reload never shows the full
+         sidebar snapping shut. Mirrors the customer dashboard, which reads its
+         own key the same way; the store in app.js takes over once Alpine
+         starts and owns every write to this key. --}}
+    <script>
+        (function () {
+            var saved = false;
+            try { saved = localStorage.getItem('admin.sidebar.collapsed') === '1'; } catch (e) {}
+            if (saved) { document.documentElement.classList.add('admin-sidebar-collapsed'); }
+        })();
+    </script>
     {{-- Desktop sidebar-collapse styling. The 'admin-sidebar-collapsed' class
          on <html> is toggled by the round chevron in the header — when set,
          the Flux sidebar shrinks to an icon-only rail and every text label
@@ -227,15 +238,19 @@
                 overflow: visible !important;
             }
         }
+
     </style>
-    <body data-page-transition="micro-fade-shift" class="min-h-screen bg-[#eff6ff] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
+    {{-- The `admin` class is the hook the light-mode ink scale hangs off, the
+         way `storefront` and `dashboard` mark their own surfaces. Without it
+         admin was the only area still painting Tailwind's stock zinc greys
+         while the rest of the product used the brand navy. --}}
+    <body data-page-transition="micro-fade-shift" class="admin min-h-screen bg-[#eff6ff] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
 
-        <x-ui.app-loader />
-
-        {{-- Floating "Install app" dock (PWA). iOS-aware; hides when installed. --}}
-        <x-ui.install-app />
-
-        <flux:sidebar sticky stashable class="relative bg-white dark:bg-[#0c1a36]">
+        {{-- Same shell as the customer dashboard: the warm grey rail, a fixed
+             256px, and desktop-only. Mobile never sees this one - the hamburger
+             in the header opens the card-grid sheet lower down instead, which
+             is why hiding it here costs nothing. --}}
+        <flux:sidebar sticky stashable class="relative hidden w-[256px] bg-[#eaeeec] dark:bg-[#0c1a36] lg:flex">
 
             {{-- Collapse toggle attached to the right edge of the sidebar.
                  Was previously in the header — moved here so the toggle lives
@@ -285,7 +300,7 @@
                 Admin navigation — plain HTML so it's guaranteed to render without Flux Pro.
 
                 Wired:
-                  - Overview, Products (All Products), Orders, Customers, Transactions, Wallets
+                  - Overview, Catalogue, Orders, Customers, Transactions, Wallets
 
                 Pending (no view shipped yet):
                   - admin.gift-cards, admin.esims, admin.mobile-topups, admin.bill-payments,
@@ -299,8 +314,8 @@
                 $adminUser = auth('admin')->user();
                 $can = fn (string $routeName) => $adminUser?->canAccessAdminRoute($routeName) ?? false;
                 $navItemClass = fn (bool $active) => $active
-                    ? 'group flex items-center gap-3 rounded-[12px] bg-zinc-200 px-3 py-3 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                    : 'group flex items-center gap-3 rounded-[12px] px-3 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                    ? 'group flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
+                    : 'nav-item group flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors dark:text-zinc-300';
                 $iconClass = fn (bool $active) => $active
                     ? 'h-5 w-5 shrink-0 text-black dark:text-white'
                     : 'h-5 w-5 shrink-0 text-zinc-600 transition-colors';
@@ -310,7 +325,17 @@
                 $imgIconClass = fn (bool $active) => 'h-5 w-5 shrink-0 transition';
             @endphp
 
-            <nav class="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-[12px] [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10" aria-label="Admin">
+            {{-- px-1 is load-bearing. The active row's ring is a box-shadow,
+                 which paints OUTSIDE the element's box, and `overflow-y-auto`
+                 forces overflow-x to compute to `auto` as well - so a row that
+                 ran the full content width had the left and right sides of its
+                 ring clipped away while the top and bottom survived. The gutter
+                 gives that 1px somewhere to land, and does the same for any
+                 focus ring these rows take. --}}
+            {{-- Scrolls without a bar: the site-wide hide applies, the rail is
+                 short enough to wheel through and a bar down the rail read as
+                 clutter. --}}
+            <nav class="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto px-1 pb-4" aria-label="Admin">
                 {{-- Overview --}}
                 @if ($can('admin.dashboard'))
                     @php $active = $isCurrent('admin.dashboard'); @endphp
@@ -334,68 +359,16 @@
                     </a>
                 @endif
 
-                {{-- Products (expandable group — SoC for product/service categories) --}}
+                {{-- Catalogue: one link. It used to be an expandable "Products"
+                     group with a sub-link per product category, but the catalogue
+                     page carries its own category picker, so the group only
+                     repeated it one level up. --}}
                 @if ($can('admin.products'))
-                @php
-                    $productPatterns = ['admin.products*', 'admin.gift-cards*', 'admin.esims*', 'admin.mobile-topups*', 'admin.bill-payments*', 'admin.flights*', 'admin.stays*'];
-                    $productActive = $isCurrent(...$productPatterns);
-                    $subItemClass = fn (bool $active) => $active
-                        ? 'flex items-center rounded-[12px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                        : 'flex items-center rounded-[12px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
-                @endphp
-                <div
-                    x-data="{
-                        open: {{ $productActive ? 'true' : 'false' }},
-                        active() { return window.location.pathname.includes('/admin/products'); },
-                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
-                    }"
-                    x-effect="sync()"
-                    x-on:livewire:navigated.window="sync()"
-                    @click.outside="if (! $store.adminSidebar?.collapsed) { open = false }"
-                    class="nav-group flex flex-col gap-1"
-                >
-                    <button
-                        type="button"
-                        @click.stop="open = ! open"
-                        :aria-expanded="open.toString()"
-                        class="{{ $navItemClass($productActive) }} w-full justify-between"
-                    >
-                        <span class="flex items-center gap-3">
-                            <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $imgIconClass($productActive) }}" loading="lazy">
-                            Products
-                        </span>
-                        <svg :class="open && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform {{ $productActive ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    {{-- All product sub-links route to /admin/products with the
-                         matching category query param so the admin stays inside
-                         the admin surface (not the storefront). The active flag
-                         compares the current route + ?category= so the right
-                         child highlights. --}}
-                    @php
-                        $currentCategory = (string) request()->query('category', '');
-                        $isProductsRoot  = $isCurrent('admin.products') && $currentCategory === '';
-                        $isCategory      = fn (string $slug) => $isCurrent('admin.products') && $currentCategory === $slug;
-                    @endphp
-                    <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
-                        <a href="{{ route('admin.products') }}" wire:navigate class="{{ $subItemClass($isProductsRoot) }}">All Products</a>
-                        <a href="{{ route('admin.products', ['category' => 'gift-cards']) }}" wire:navigate class="{{ $subItemClass($isCategory('gift-cards')) }}">Gift Cards</a>
-                        <a href="{{ route('admin.products', ['category' => 'esims']) }}" wire:navigate class="{{ $subItemClass($isCategory('esims')) }}">eSIMs</a>
-                        <a href="{{ route('admin.products', ['category' => 'mobile-airtime']) }}" wire:navigate class="{{ $subItemClass($isCategory('mobile-airtime')) }}">Mobile Top-ups</a>
-                        <a href="{{ route('admin.products', ['category' => 'bill-payments']) }}" wire:navigate class="{{ $subItemClass($isCategory('bill-payments')) }}">Bill Payments</a>
-                        {{-- Coming-soon categories: no category row exists for either
-                             yet, so these land on an empty product list. Behind their
-                             flags so they can be hidden until there is stock to show. --}}
-                        @if (\App\Support\FeatureFlag::on('flights', false))
-                            <a href="{{ route('admin.products', ['category' => 'flights']) }}" wire:navigate class="{{ $subItemClass($isCategory('flights')) }}">Flights</a>
-                        @endif
-                        @if (\App\Support\FeatureFlag::on('stays', false))
-                            <a href="{{ route('admin.products', ['category' => 'stays']) }}" wire:navigate class="{{ $subItemClass($isCategory('stays')) }}">Stays</a>
-                        @endif
-                    </div>
-                </div>
+                @php $active = $isCurrent('admin.products*', 'admin.gift-cards*', 'admin.esims*', 'admin.mobile-topups*', 'admin.bill-payments*', 'admin.flights*', 'admin.stays*'); @endphp
+                <a href="{{ route('admin.products') }}" wire:navigate data-tip="Catalogue" class="{{ $navItemClass($active) }}">
+                    <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
+                    Catalogue
+                </a>
                 @endif
 
                 {{-- Orders --}}
@@ -442,8 +415,8 @@
 
                     @php
                         $usersSubItemClass = fn (bool $subActive) => $subActive
-                            ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                            ? 'flex items-center rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
+                            : 'nav-item flex items-center rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors dark:text-zinc-300';
                     @endphp
                     <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.customers') }}" wire:navigate class="{{ $usersSubItemClass($isCurrent('admin.customers*')) }}">Customers</a>
@@ -544,8 +517,8 @@
 
                     @php
                         $mgmtSubItemClass = fn (bool $active) => $active
-                            ? 'flex items-center rounded-[10px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                            : 'flex items-center rounded-[10px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                            ? 'flex items-center rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
+                            : 'nav-item flex items-center rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors dark:text-zinc-300';
                     @endphp
                     <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.management.monitoring') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.monitoring')) }}">Monitoring</a>
@@ -624,11 +597,10 @@
                     <div x-show="open" x-collapse class="nav-submenu mt-1 ml-3 flex flex-col gap-0.5 border-l border-zinc-200 pl-3">
                         @php
                             $subItem = fn (bool $active) => $active
-                                ? 'block rounded-[12px] bg-zinc-200 px-3 py-2 text-xs font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                                : 'block rounded-[12px] px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-150 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-[#26416b] dark:hover:text-blue-400 dark:hover:font-semibold';
+                                ? 'block rounded-[8px] px-2.5 py-2 text-xs font-medium nav-item-active'
+                                : 'nav-item block rounded-[8px] px-2.5 py-2 text-xs font-medium text-zinc-700 transition-colors dark:text-zinc-300';
                         @endphp
                         <a href="{{ route('admin.content.hero-sections') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.hero-sections')) }}">Hero Sections</a>
-                        <a href="{{ route('admin.content.hero-cards') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.hero-cards')) }}">Hero Cards</a>
                         <a href="{{ route('admin.content.blog') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.blog')) }}">Blog Posts</a>
                         <a href="{{ route('admin.content.press') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.press')) }}">Press Articles</a>
                         <a href="{{ route('admin.content.reviews') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.reviews')) }}">Reviews</a>
@@ -955,7 +927,7 @@
 
             {{-- Theme toggle — admin's own light/dark/system control, saved per
                  admin account and kept separate from the customer side. --}}
-            <x-theme-toggle class="h-10 w-10 rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white" />
+            <x-theme-toggle class="h-10 w-10 rounded-[12px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white" />
 
             {{-- Extra Dark now lives inside the theme toggle's popup (the
                  component renders an "Extra dark" row), so no separate admin
@@ -983,7 +955,7 @@
                     @click="locked = !locked; open = locked"
                     :aria-expanded="open.toString()"
                     aria-label="{{ $admin?->name ?? 'Admin' }}"
-                    class="ml-1 relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-200 ring-1 ring-zinc-200 transition-all duration-150 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:ring-zinc-700/60"
+                    class="ml-1 relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-200 ring-1 ring-zinc-200 transition-all duration-150 hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:ring-zinc-700/60"
                 >
                     <img src="{{ $admin?->avatar_url ?: $adminDefaultAvatar }}" alt="{{ $admin?->name ?? 'Admin' }}" class="h-full w-full object-cover" loading="lazy">
                 </button>
@@ -997,7 +969,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-2xl bg-white shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200"
+                    class="absolute right-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-[12px] bg-white shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-white/10"
                     role="menu"
                 >
                     {{-- Admin info card --}}
@@ -1081,7 +1053,7 @@
             // their own tiles since the sheet has no expandable groups.
             $adminMenuItems = collect([
                 ['label' => 'Home',          'route' => 'admin.dashboard',               'icon' => 'Home.svg',                    'tone' => 'bg-blue-500'],
-                ['label' => 'Products',      'route' => 'admin.products',                'icon' => 'Shop.svg',                    'tone' => 'bg-pink-500'],
+                ['label' => 'Catalogue',     'route' => 'admin.products',                'icon' => 'Shop.svg',                    'tone' => 'bg-pink-500'],
                 ['label' => 'Orders',        'route' => 'admin.orders',                  'icon' => 'order.svg',                   'tone' => 'bg-sky-500'],
                 ['label' => 'Customers',     'route' => 'admin.customers',               'icon' => 'customer.svg',                'tone' => 'bg-emerald-500'],
                 ['label' => 'Transactions',  'route' => 'admin.transactions',            'icon' => 'transactions.svg',            'tone' => 'bg-teal-500'],
@@ -1091,7 +1063,6 @@
                 ['label' => 'Campaigns',     'route' => 'admin.campaigns',               'icon' => 'notification 2.svg',          'tone' => 'bg-purple-500'],
                 ['label' => 'Pricing Rules', 'route' => 'admin.pricing-rules',           'icon' => 'total revenue.svg',           'tone' => 'bg-orange-600'],
                 ['label' => 'Hero Sections', 'route' => 'admin.content.hero-sections',   'icon' => 'Appearance.svg',              'tone' => 'bg-sky-600'],
-                ['label' => 'Hero Cards',    'route' => 'admin.content.hero-cards',      'icon' => 'savedcard.svg',               'tone' => 'bg-pink-600'],
                 ['label' => 'Blog Posts',    'route' => 'admin.content.blog',            'icon' => 'new info.svg',                'tone' => 'bg-blue-600'],
                 ['label' => 'Press',         'route' => 'admin.content.press',           'icon' => 'About svg 1.svg',             'tone' => 'bg-slate-500'],
                 ['label' => 'Reviews',       'route' => 'admin.content.reviews',         'icon' => 'trusted by millions.svg',     'tone' => 'bg-yellow-500'],
@@ -1203,7 +1174,7 @@
             }
         @endphp
         @if ($needsSecurityQuestion)
-            <div x-data="{ show: true }" x-show="show" class="fixed bottom-6 right-6 z-[100] flex max-w-sm items-start gap-4 rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-zinc-900/10 dark:bg-[#0c1a36] dark:ring-white/10" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4">
+            <div x-data="{ show: true }" x-show="show" class="fixed bottom-6 right-6 z-[100] flex max-w-sm items-start gap-4 rounded-[12px] bg-white p-4 shadow-2xl dark:bg-[#0c1a36]" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4">
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>

@@ -31,12 +31,14 @@ class RegionPillChipTest extends TestCase
     {
         $pill = $this->pill();
 
-        foreach (['h-9', 'rounded-full border-2 border-[#0c1337]/30', 'text-[13px] font-semibold text-zinc-700', 'hover:bg-[#0c1337]/10', self::DARK] as $class) {
+        foreach (['h-9', 'rounded-full border-2 border-[#0c1337]/30', 'text-[13px] font-semibold text-zinc-700', 'hover:border-edge', 'hover:bg-[#0c1337]/10', self::DARK] as $class) {
             $this->assertStringContainsString($class, $pill, "Missing {$class}.");
         }
 
-        // The old kit: the nav face, a page-tone hover fill, a 24px flag.
-        foreach (['nav-text', 'hover:bg-[#f4f6f5]', 'dark:hover:bg-white/10', 'h-6 w-6 shrink-0 rounded-full object-cover'] as $old) {
+        // The old kit: the nav face, a page-tone hover fill, a 24px flag, and
+        // the blue edge and pale blue wash that were tried at rest and
+        // reverted. The blue now shows on hover only.
+        foreach (['nav-text', 'hover:bg-[#f4f6f5]', 'dark:hover:bg-white/10', 'h-6 w-6 shrink-0 rounded-full object-cover', ' border-edge', 'dark:border-edge', 'hover:bg-edge/10'] as $old) {
             $this->assertStringNotContainsString($old, $pill, "{$old} is still on the pill.");
         }
     }
@@ -46,16 +48,23 @@ class RegionPillChipTest extends TestCase
         $pill = $this->pill();
         $dashboard = $this->dashboard();
 
+        // Shape only. The two bars are different colours - the dashboard's is
+        // navy, so its pill is white-edged; the storefront's is pale, so its
+        // pill keeps a navy hairline that turns blue on hover. What has to
+        // stay in step is the geometry, which is what a change to either
+        // would break.
         foreach ([
             'h-7 w-7 shrink-0 rounded-full object-cover ring-1',
             'pl-1 pr-3',
             'text-[13px] font-semibold',
             'rounded-full border-2',
-            self::DARK,
         ] as $shared) {
             $this->assertStringContainsString($shared, $pill);
             $this->assertStringContainsString($shared, $dashboard, 'The dashboard pill changed; the storefront copy must follow.');
         }
+
+        $this->assertStringContainsString(self::DARK, $pill);
+        $this->assertStringContainsString('border-white/30', $dashboard, 'The dashboard pill is white-edged on its navy bar.');
     }
 
     /** On the phone row the label hides and the padding closes, so the flag sits in a round chip. */
@@ -75,8 +84,8 @@ class RegionPillChipTest extends TestCase
         // paints language and currency from the same state with the same
         // server fallback (all pinned in detail by UtilityLinksLocaleTest).
         $this->assertStringContainsString('@click="localeModalOpen = true"', $pill);
-        $this->assertStringContainsString(":aria-label=\"'Region and currency: ' + country + ', ' + (language || 'English') + ', ' + currency + '. Change'\"", $pill);
-        $this->assertStringContainsString("x-text=\"(language || 'English').slice(0, 2).toUpperCase()\"", $pill);
+        $this->assertStringContainsString("__('navigation.region_pill_label', ['language' => \$activeLanguageNative, 'country' => '__COUNTRY__', 'currency' => '__CURRENCY__'])", $pill);
+        $this->assertStringContainsString('<span>{{ $activeLanguageShort }}</span>', $pill);
         $this->assertStringContainsString("x-text=\"currency || 'USD'\"", $pill);
         $this->assertStringContainsString('<div class="relative flex shrink-0 items-center">', $pill);
     }

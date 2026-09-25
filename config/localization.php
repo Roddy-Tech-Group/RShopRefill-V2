@@ -47,6 +47,49 @@ return [
             'native_name' => 'Français',
             'short' => 'FR',
         ],
+        'es' => [
+            'name' => 'Spanish',
+            'native_name' => 'Español',
+            'short' => 'ES',
+        ],
+        'pt' => [
+            'name' => 'Portuguese',
+            'native_name' => 'Português',
+            'short' => 'PT',
+        ],
+        'de' => [
+            'name' => 'German',
+            'native_name' => 'Deutsch',
+            'short' => 'DE',
+        ],
+        'it' => [
+            'name' => 'Italian',
+            'native_name' => 'Italiano',
+            'short' => 'IT',
+        ],
+        'sw' => [
+            'name' => 'Swahili',
+            'native_name' => 'Kiswahili',
+            'short' => 'SW',
+        ],
+        'ha' => [
+            'name' => 'Hausa',
+            'native_name' => 'Hausa',
+            'short' => 'HA',
+        ],
+        'zh' => [
+            'name' => 'Chinese',
+            'native_name' => '中文',
+            'short' => 'ZH',
+        ],
+        // Right to left. The layouts already read this through
+        // Languages::direction() for the <html dir> attribute.
+        'ar' => [
+            'name' => 'Arabic',
+            'native_name' => 'العربية',
+            'short' => 'AR',
+            'rtl' => true,
+        ],
     ],
 
     /**
@@ -56,7 +99,7 @@ return [
      * the grounds that a forgotten entry is a typo and hiding it silently
      * would be the worse failure.
      */
-    'picker_order' => ['en', 'fr'],
+    'picker_order' => ['en', 'fr', 'es', 'pt', 'de', 'it', 'sw', 'ha', 'zh', 'ar'],
 
     /**
      * How long the guest's choice is remembered. A year: the preference is a

@@ -25,13 +25,13 @@
     // The single source of truth for the storefront category list. Categories
     // without a live page render as disabled "Soon" entries until one ships.
     $categories = [
-        ['slug' => 'gift-cards',      'label' => 'Gift Cards',       'url' => $r('gift-cards')],
+        ['slug' => 'gift-cards',      'label' => __('navigation.gift_cards'), 'url' => $r('gift-cards')],
         ['slug' => 'gomarket',        'label' => 'GoMarket',             'url' => $r('gomarket')],
-        ['slug' => 'mobile-airtime',  'label' => 'Mobile top up & data', 'url' => $r('topups')],
-        ['slug' => 'esims',           'label' => 'eSIMs',                'url' => $r('esims')],
-        ['slug' => 'bill-payments',   'label' => 'Bill payments',        'url' => $r('bills')],
-        ['slug' => 'flights',         'label' => 'Flights',              'url' => $r('flights')],
-        ['slug' => 'stays',           'label' => 'Stays',                'url' => $r('stays')],
+        ['slug' => 'mobile-airtime',  'label' => __('giftcards.category_mobile_topup_data'), 'url' => $r('topups')],
+        ['slug' => 'esims',           'label' => __('navigation.esims'), 'url' => $r('esims')],
+        ['slug' => 'bill-payments',   'label' => __('giftcards.category_bill_payments'), 'url' => $r('bills')],
+        ['slug' => 'flights',         'label' => __('navigation.flights'), 'url' => $r('flights')],
+        ['slug' => 'stays',           'label' => __('navigation.stays'), 'url' => $r('stays')],
     ];
 
     // Coming-soon categories stay hidden until their feature flag is switched

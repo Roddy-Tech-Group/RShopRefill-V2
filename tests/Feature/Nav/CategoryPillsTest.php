@@ -69,16 +69,28 @@ class CategoryPillsTest extends TestCase
     }
 
     /**
-     * The wash is the invite pill's, to the shade. They sit on the same line,
-     * so drifting apart is the regression worth catching.
+     * The tabs and the invite pill share one material. Both are glass now -
+     * frosted white on a hairline (NavGlassRailTest) - and the wash inside the
+     * rail is white rather than the page tone it used to be: a #f4f6f5 fill on
+     * a white-over-#f4f6f5 rail was a shade nobody could see. They sit on the
+     * same line, so drifting apart is still the regression worth catching.
      */
-    public function test_the_hover_wash_is_the_invite_pills_own_fill(): void
+    public function test_the_hover_wash_is_the_invite_pills_own_material(): void
     {
         $invite = File::get(resource_path('views/components/nav/invite-link.blade.php'));
 
-        $this->assertStringContainsString('bg-[#f4f6f5]', $invite);
-        $this->assertStringContainsString('dark:bg-white/8', $invite);
-        $this->assertStringContainsString('hover:bg-[#f4f6f5]', $this->nav());
+        $this->assertStringContainsString('bg-white/50', $invite);
+        $this->assertStringContainsString('dark:bg-white/5', $invite);
+
+        // The tabs' own state string. The white wash is md-scoped: on a phone
+        // the tabs sit on the bar rather than in the rail and keep the page
+        // tone they had before it (NavGlassRailTest).
+        preg_match('/\$catLinkState = fn.*?;\n/s', $this->nav(), $state);
+        $this->assertNotEmpty($state, 'The category tabs no longer carry a state string.');
+        $this->assertStringContainsString('md:hover:bg-white/70', $state[0]);
+
+        // The page-tone fill the invite pill used to wear.
+        $this->assertStringNotContainsString('bg-[#f4f6f5]', $invite);
     }
 
     /**
@@ -92,6 +104,17 @@ class CategoryPillsTest extends TestCase
 
         $this->assertStringContainsString('rounded-full px-0 py-2 nav-text', $nav);
         $this->assertStringContainsString('md:px-4', $nav);
+    }
+
+    public function test_primary_navigation_uses_one_request_per_click(): void
+    {
+        $nav = $this->nav();
+
+        foreach (['home', 'shop.gift-cards', 'shop.esims', 'shop.topups', 'shop.bills'] as $route) {
+            $this->assertStringContainsString("route('{$route}') }}\" wire:navigate", $nav);
+        }
+
+        $this->assertStringNotContainsString('wire:navigate.hover', $nav);
     }
 
     public function test_the_rail_no_longer_fixes_a_height(): void
@@ -154,14 +177,16 @@ class CategoryPillsTest extends TestCase
     }
 
     /**
-     * Invite a Friend is the one standing pill on the bar - the exception the
-     * hover-only rule is measured against.
+     * Invite a Friend stands on the bar as a filled pill - the exception the
+     * hover-only rule is measured against. It is glass now, and it is no
+     * longer alone: the Certified reseller badge beside it wears the same
+     * (NavGlassRailTest).
      */
-    public function test_invite_a_friend_is_the_only_standing_pill(): void
+    public function test_invite_a_friend_stands_as_a_filled_pill(): void
     {
         $invite = File::get(resource_path('views/components/nav/invite-link.blade.php'));
 
         $this->assertStringContainsString('rounded-full', $invite);
-        $this->assertStringContainsString('bg-[#f4f6f5]', $invite);
+        $this->assertStringContainsString('bg-white/50 backdrop-blur-md', $invite);
     }
 }

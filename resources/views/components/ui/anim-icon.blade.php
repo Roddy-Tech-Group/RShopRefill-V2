@@ -48,9 +48,19 @@
     // A bare filename only: this reads from disk, so no path may climb out of assets/.
     $iconPath = basename($file) === $file ? public_path('assets/'.$file) : null;
 
-    $iconSvg = $iconPath && is_file($iconPath)
-        ? \Illuminate\Support\Facades\Cache::rememberForever(
-            'anim-icon:v1:'.md5($file).':'.filemtime($iconPath),
+    $iconSvg = '';
+
+    if ($iconPath && is_file($iconPath)) {
+        // One cache read per icon per REQUEST, not per render. The dashboard
+        // paints this component ~40 times, and on the database cache store a
+        // rememberForever() hit is still a SELECT each time, so the icons alone
+        // were 40 of the shell's 101 queries. The container holds the memo for
+        // the life of the request.
+        $iconKey = 'anim-icon:v1:'.md5($file).':'.filemtime($iconPath);
+        $iconMemo = app()->bound('anim-icon.memo') ? app('anim-icon.memo') : app()->instance('anim-icon.memo', new \ArrayObject);
+
+        $iconSvg = $iconMemo[$iconKey] ??= \Illuminate\Support\Facades\Cache::rememberForever(
+            $iconKey,
             function () use ($iconPath) {
                 $svg = (string) file_get_contents($iconPath);
                 $svg = preg_replace('/<\?xml.*?\?>|<!--.*?-->|<desc>.*?<\/desc>|<title>.*?<\/title>/s', '', $svg);
@@ -63,8 +73,8 @@
                     $root[0]
                 ), $svg, 1));
             }
-        )
-        : '';
+        );
+    }
 
     $toneClass = match ($tone) {
         'inherit' => '',

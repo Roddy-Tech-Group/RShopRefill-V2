@@ -114,7 +114,7 @@ class extends Component {
             {{-- Editor Form --}}
             <div class="lg:col-span-2 space-y-8">
                 
-                <flux:card>
+                <flux:card class="border-0! shadow-sm shadow-zinc-900/[0.04]">
                     <flux:heading size="lg" class="mb-4">Campaign Settings</flux:heading>
                     <div class="space-y-5">
                         <flux:field>
@@ -144,7 +144,7 @@ class extends Component {
                     </div>
                 </flux:card>
 
-                <flux:card>
+                <flux:card class="border-0! shadow-sm shadow-zinc-900/[0.04]">
                     <flux:heading size="lg" class="mb-4">Message Content</flux:heading>
                     <div class="space-y-5">
                         <flux:field>
@@ -167,7 +167,7 @@ class extends Component {
                     </div>
                 </flux:card>
 
-                <flux:card>
+                <flux:card class="border-0! shadow-sm shadow-zinc-900/[0.04]">
                     <flux:heading size="lg" class="mb-4">Scheduling</flux:heading>
                     <div class="space-y-5">
                         <flux:radio.group wire:model.live="scheduleType" label="When should this send?">
@@ -220,7 +220,7 @@ class extends Component {
                         </div>
                     </div>
                     
-                    <div class="mt-6 text-sm text-zinc-500 dark:text-zinc-400 bg-blue-50 dark:bg-blue-500/10 p-4 rounded-[12px] border border-blue-100 dark:border-blue-500/20">
+                    <div class="mt-6 text-sm text-zinc-500 dark:text-zinc-400 bg-blue-50 dark:bg-blue-500/10 p-4 rounded-[12px]">
                         <p class="font-medium text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-2">
                             <flux:icon.information-circle class="w-4 h-4" /> Preview Note
                         </p>

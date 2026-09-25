@@ -74,6 +74,21 @@ class RequestProductPageTest extends TestCase
         $this->assertStringContainsString("__('footer.request_a_product')", $markup);
     }
 
+    /**
+     * The end of the gift-card listing says "Didn't find it? Request a product".
+     * That link went to the contact page, whose form files a general message;
+     * it belongs on this form, which files a product request.
+     */
+    public function test_the_gift_card_listing_links_to_it_not_the_contact_page(): void
+    {
+        $markup = file_get_contents(resource_path('views/shop/gift-cards.blade.php'));
+
+        preg_match('/<a\s+href="([^"]+)"[^>]*>\{\{ __\(\'products\.request_a_product\'\) \}\}<\/a>/s', $markup, $link);
+
+        $this->assertNotEmpty($link, 'The listing no longer offers a request-a-product link.');
+        $this->assertSame("{{ route('shop.request-product') }}", $link[1]);
+    }
+
     public function test_every_locale_carries_the_label(): void
     {
         // The footer ships in ten languages; a key that exists only in English

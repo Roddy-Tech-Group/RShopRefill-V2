@@ -10,8 +10,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 <div class="mx-auto flex max-w-3xl flex-col gap-6">
     {{-- Page heading --}}
     <div class="text-center sm:text-left">
-        <h1 class="text-2xl font-bold tracking-tight text-black sm:text-3xl">Appearance</h1>
-        <p class="mt-1 text-sm text-zinc-600">Choose how {{ $siteName }} looks for you. System matches your device setting.</p>
+        <h1 class="text-2xl font-bold tracking-tight text-black sm:text-3xl">{{ __('common.appearance') }}</h1>
+        <p class="mt-1 text-sm text-zinc-600">{{ __('common.appearance_intro', ['site' => $siteName]) }}</p>
     </div>
 
     {{-- Theme picker. Hand-rolled segmented control instead of flux:radio.group
@@ -27,8 +27,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none"
     >
         <div class="mb-5">
-            <h2 class="text-base font-semibold text-black">Theme</h2>
-            <p class="mt-0.5 text-xs text-zinc-600">Switch between light and dark mode, or follow your system.</p>
+            <h2 class="text-base font-semibold text-black">{{ __('common.theme') }}</h2>
+            <p class="mt-0.5 text-xs text-zinc-600">{{ __('common.theme_hint') }}</p>
         </div>
 
         {{-- The chosen option is a solid tile, not an outline, and it is styled
@@ -44,13 +44,13 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         </style>
         <div
             role="radiogroup"
-            aria-label="Theme"
+            aria-label="{{ __('common.theme') }}"
             class="grid grid-cols-3 gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-white/5"
         >
             @foreach ([
-                ['value' => 'light',  'label' => 'Light', 'icon' => 'icons.theme-light'],
-                ['value' => 'dark',   'label' => 'Dark',  'icon' => 'icons.theme-dark'],
-                ['value' => 'system', 'label' => 'Auto',  'icon' => 'icons.theme-auto'],
+                ['value' => 'light',  'label' => __('common.theme_light'), 'icon' => 'icons.theme-light'],
+                ['value' => 'dark',   'label' => __('common.theme_dark'), 'icon' => 'icons.theme-dark'],
+                ['value' => 'system', 'label' => __('common.theme_auto'), 'icon' => 'icons.theme-auto'],
             ] as $opt)
                 <button
                     type="button"

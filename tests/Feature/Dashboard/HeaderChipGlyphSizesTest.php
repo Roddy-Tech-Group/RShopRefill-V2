@@ -52,11 +52,13 @@ class HeaderChipGlyphSizesTest extends TestCase
         $storefront = $this->storefront();
 
         // Cart: the header chip and the phone bar on the dashboard, and the storefront chip.
-        $this->assertSame(2, substr_count($dashboard, 'anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0'));
+        // One header serves desktop and phone alike since the 2026-09-23 mobile
+        // redesign, so the dashboard carries a single cart mark and avatar mark.
+        $this->assertSame(1, substr_count($dashboard, 'anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0'));
         $this->assertSame(1, substr_count($storefront, 'anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0'));
 
         // Avatar fallback: the header and the phone bar on the dashboard, and the storefront.
-        $this->assertSame(2, substr_count($dashboard, '<flux:icon.user class="h-6 w-6" />'));
+        $this->assertSame(1, substr_count($dashboard, '<flux:icon.user class="h-6 w-6" />'));
         $this->assertSame(1, substr_count($storefront, '<flux:icon.user class="h-6 w-6" />'));
 
         foreach ([$dashboard, $storefront] as $source) {
@@ -83,6 +85,8 @@ class HeaderChipGlyphSizesTest extends TestCase
     /** The dropdown's list-item marks are not chips and keep their own size. */
     public function test_the_list_item_marks_were_not_swept_up(): void
     {
-        $this->assertStringContainsString('<svg class="h-4.5 w-4.5 text-white" style="height:1.125rem;width:1.125rem;"', $this->bell());
+        // A 20px glyph in each row's 40px tile (the card-list rows of 2026-09-23).
+        $this->assertStringContainsString('rounded-[10px] {{ $tileTone($n->priority) }}">', $this->bell());
+        $this->assertStringContainsString('<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">', $this->bell());
     }
 }

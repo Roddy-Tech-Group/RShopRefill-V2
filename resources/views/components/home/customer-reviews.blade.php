@@ -13,10 +13,20 @@
     // card with nothing to say has nothing to show here.
     $reviews = \App\Models\Review::published()->ownCollected()->withText()->with('user:id,kyc_status,avatar_url')->ordered()->get();
     $trustpilotProfileUrl = config('services.trustpilot.profile_url');
+    // The Review Collector TrustBox (same widget as /reviews and /contact):
+    // Trustpilot's own button, which opens the review form with the business
+    // already selected, in place of a plain link to the profile page.
+    $tp = config('services.trustpilot');
 @endphp
+{{-- TrustBox bootstrap: renders the widget div in the collector card below.
+     Loaded once, async, so it neither blocks the page nor doubles up when the
+     row is rendered more than once. --}}
+@once
+    <script type="text/javascript" src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>
+@endonce
 <section
     data-reveal
-    aria-label="What our customers say"
+    aria-label="{{ __('reviews.heading') }}"
     class="w-full"
     x-data="customerReviewsCarousel()"
     x-init="$nextTick(() => { setup(); })"
@@ -30,7 +40,7 @@
              is the actual content column start — that's the line the first
              review card needs to align to in setup(). --}}
         <div x-ref="header" class="mb-4 flex items-center justify-between gap-4">
-            <h2 class="text-lg font-bold text-zinc-900 sm:text-xl">What our customers say</h2>
+            <h2 class="text-lg font-bold text-zinc-900 sm:text-xl">{{ __('reviews.heading') }}</h2>
             {{-- Pill + arrows come from the shared row-controls component, which
                  every other row header on the site uses too. The reviews
                  carousel loops rather than stopping at an end, so no disabled
@@ -39,8 +49,8 @@
                 :href="route('shop.reviews')"
                 prev="prev()"
                 next="next()"
-                prev-label="Show previous reviews"
-                next-label="Show more reviews"
+                :prev-label="__('reviews.row_prev')"
+                :next-label="__('reviews.row_next')"
                 :arrows-on-mobile="true"
             />
         </div>
@@ -70,26 +80,24 @@
                      now sends the customer there to leave one instead of
                      re-rendering their content here. --}}
                 @if ($trustpilotProfileUrl)
-                    <article class="flex w-72 shrink-0 flex-col rounded-[12px] bg-[#eff6ff] p-5 ring-1 ring-zinc-200 dark:ring-[#24364f]">
-                        <div class="flex items-center gap-1.5">
-                            <svg class="h-5 w-5 text-emerald-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M12 .587l3.668 7.568L24 9.423l-6 5.951L19.336 24 12 19.897 4.664 24 6 15.374 0 9.423l8.332-1.268z"/>
-                            </svg>
-                            <span class="text-base font-bold text-zinc-900">Trustpilot</span>
-                        </div>
-
-                        <h3 class="mt-4 text-lg font-bold leading-tight text-zinc-900">Bought from us recently?</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-zinc-700">Share your experience on Trustpilot. It takes a minute, and it helps other customers shop with confidence.</p>
+                    <article class="flex w-72 shrink-0 flex-col rounded-[12px] bg-white p-5 shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
+                        {{-- No hand-drawn star or wordmark here: the TrustBox below is the only
+                             Trustpilot branding on the site, as their guidelines ask. --}}
+                        <h3 class="text-lg font-bold leading-tight text-zinc-900">{{ __('reviews.review_us') }}</h3>
+                        <p class="mt-2 text-sm leading-relaxed text-zinc-700">{{ __('reviews.collector_body') }}</p>
 
                         <div class="mt-auto pt-6">
-                            <a
-                                href="{{ $trustpilotProfileUrl }}"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex h-10 items-center justify-center rounded-[12px] bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                            >
-                                Review us on Trustpilot
-                            </a>
+                            <div class="inline-flex overflow-hidden rounded-[12px] bg-white shadow-md shadow-zinc-900/20">
+                                <div class="trustpilot-widget"
+                                    data-locale="{{ $tp['locale'] }}"
+                                    data-template-id="{{ $tp['review_collector_template_id'] }}"
+                                    data-businessunit-id="{{ $tp['business_unit_id'] }}"
+                                    data-style-height="52px"
+                                    data-style-width="240px"
+                                    data-token="{{ $tp['review_collector_token'] }}">
+                                    <a href="{{ $trustpilotProfileUrl }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline">{{ __('reviews.review_fallback') }}</a>
+                                </div>
+                            </div>
                         </div>
                     </article>
                 @endif

@@ -19,6 +19,41 @@
     $availabilityCanSwitch = ($isGiftCard ?? false) && $availabilityCountries->count() > 1;
     $availabilityCurrencies = (array) config('country_currency.map', []);
     $availabilityNames = array_flip((array) config('countries.codes', []));
+
+    // Countries this CATEGORY actually sells in, read the same way the listing
+    // reads them: distinct country codes on active products in the synced
+    // catalog. A top-up brand is one network in one country, so the only useful
+    // move is to another country that has networks at all - the global locale
+    // modal offered every country on earth, most of which have no refill and
+    // land the buyer on an empty list.
+    $availabilityRefillCountries = collect();
+
+    if (! ($isGiftCard ?? false) && $product->category_id) {
+        $availabilityRefillCountries = \Illuminate\Support\Facades\Cache::remember(
+            'availability.countries.'.$product->category_id,
+            now()->addHours(6),
+            fn () => \App\Models\Product::query()
+                ->where('category_id', $product->category_id)
+                ->where('is_active', true)
+                ->distinct()
+                ->pluck('country_code')
+                ->filter()
+                ->values()
+                ->all(),
+        );
+
+        $availabilityRefillCountries = collect($availabilityRefillCountries)
+            ->map(fn ($c) => strtoupper((string) $c))
+            ->reject(fn ($c) => $c === strtoupper((string) $product->country_code))
+            ->map(fn ($c) => ['code' => $c, 'name' => $availabilityNames[$c] ?? $c])
+            ->sortBy('name')
+            ->values();
+    }
+
+    // Where a chosen country lands: this category's own listing, filtered.
+    $availabilityListing = ($isTopup ?? false)
+        ? (($inDashboard ?? false) ? 'dashboard.shop.topups' : 'shop.topups')
+        : (($inDashboard ?? false) ? 'dashboard.shop.bills' : 'shop.bills');
 @endphp
 
 <div class="{{ $availabilityClass ?? 'mt-4 mb-2' }}">
@@ -37,7 +72,8 @@
                 @click="open = ! open"
                 :aria-expanded="open.toString()"
                 aria-haspopup="listbox"
-                class="flex h-9 items-center gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-900 transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-blue-400/50"
+                :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                class="flex h-9 items-center gap-2 rounded-full border-2 bg-white px-3.5 text-sm text-zinc-900 transition-colors focus:outline-none dark:bg-white/5 dark:text-white"
             >
                 {{ __('products.detail_choose_region') }}
                 <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -84,14 +120,63 @@
                 @endforeach
             </div>
         </div>
-    @elseif (! ($isGiftCard ?? false))
-        {{-- Top-ups and bills keep the global locale modal: their brands are not
-             a set of interchangeable regions, they are a network in one country. --}}
-        <p class="mt-0.5 text-sm text-zinc-600">
-            {{ __('products.detail_not_in_country', ['country' => $countryName]) }}
-            <button type="button" @click="$dispatch('open-locale-modal'); localeModalOpen = true" class="font-semibold text-zinc-900 underline underline-offset-2 transition-colors hover:text-blue-700">
+    @elseif (! ($isGiftCard ?? false) && $availabilityRefillCountries->isNotEmpty())
+        {{-- Only the countries this category actually carries. The link used to
+             open the global locale modal, which listed every country on earth:
+             picking one with no networks landed the buyer on an empty list. --}}
+        <p class="mt-2 text-sm text-zinc-600">{{ __('products.detail_not_in_country', ['country' => $countryName]) }}</p>
+
+        <div x-data="{ open: false, q: '' }" @click.outside="open = false; q = ''" @keydown.escape="open = false; q = ''" class="relative mt-1.5 inline-block">
+            <button
+                type="button"
+                @click="open = ! open"
+                :aria-expanded="open.toString()"
+                aria-haspopup="listbox"
+                :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                class="flex h-9 items-center gap-2 rounded-full border-2 bg-white px-3.5 text-sm font-semibold text-zinc-900 transition-colors focus:outline-none dark:bg-white/5 dark:text-white"
+            >
                 {{ __('products.detail_find_your_country') }}
+                <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
             </button>
-        </p>
+
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                role="listbox"
+                class="absolute left-0 top-full z-20 mt-1 w-64 rounded-[12px] border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 dark:border-zinc-700 dark:bg-[#1d3252]"
+            >
+                {{-- A long list needs a filter. Below three characters it would
+                     match most of the list, so it only narrows from there. --}}
+                @if ($availabilityRefillCountries->count() > 8)
+                    <input
+                        type="text"
+                        x-model="q"
+                        placeholder="{{ __('products.detail_find_your_country') }}"
+                        class="mb-1 w-full rounded-full border-2 border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none transition-colors focus:border-edge focus:ring-2 focus:ring-edge/30 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    >
+                @endif
+
+                <div class="max-h-64 overflow-y-auto">
+                    @foreach ($availabilityRefillCountries as $availabilityOption)
+                        <a
+                            href="{{ route($availabilityListing, ['country' => $availabilityOption['code']]) }}"
+                            wire:navigate
+                            x-show="q.trim().length < 3 || @js(strtolower($availabilityOption['name'])).includes(q.trim().toLowerCase())"
+                            class="flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-sm font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200 dark:hover:bg-[#26416b]"
+                        >
+                            @if (\App\Models\Product::flagUrl($availabilityOption['code']))
+                                <img src="{{ \App\Models\Product::flagUrl($availabilityOption['code']) }}" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
+                            @endif
+                            <span class="truncate">{{ $availabilityOption['name'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
     @endif
 </div>

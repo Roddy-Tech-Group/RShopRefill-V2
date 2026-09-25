@@ -17,11 +17,11 @@ return [
     'legal' => 'Doka da amana',
 
     // Brand column
-    'tagline' => 'Kasuwarka ta katunan kyauta, eSIM na tafiya, cajin waya da biyan bili.',
+    'tagline' => 'Kasuwarka ta katunan kyauta, eSIM, cajin waya da biyan bili.',
 
     // Shop column
     'gift_cards' => 'Katunan kyauta',
-    'travel_esims' => 'eSIM na tafiya',
+    'esims' => 'eSIM',
     'mobile_topups' => 'Cajin waya',
     'data_bundles' => 'Fakitin data',
     'bill_payments' => 'Biyan bili',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'Duk haƙƙoƙi na kiyaye.',
     'legal_line' => ':company ce ke mallaka da gudanarwa, RC :rc, adireshin rajista a :address.',
     'verify_company' => 'Tabbatar da kamfani',
+
+    'newsletter_pitch' => 'Karɓi tayin katunan kyauta, eSIM da caji a imel ɗinka',
+    'newsletter_label' => 'Adireshin imel',
+    'newsletter_placeholder' => 'kai@misali.com',
+    'newsletter_cta' => 'Yi rajista',
+    'newsletter_sending' => 'Ana rajista',
+    'newsletter_done' => 'Kana cikin jerin. Na gode!',
 ];

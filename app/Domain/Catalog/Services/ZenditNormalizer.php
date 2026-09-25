@@ -3,12 +3,14 @@
 namespace App\Domain\Catalog\Services;
 
 use App\Domain\Catalog\Support\BrandBlocklist;
+use App\Domain\Catalog\Support\FaceValueCheck;
 use App\Enums\PricingBasis;
 use App\Jobs\MediaProcessorJob;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Subcategory;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ZenditNormalizer implements CatalogNormalizerInterface
@@ -64,8 +66,9 @@ class ZenditNormalizer implements CatalogNormalizerInterface
         // The card's currency is the SEND block — the value loaded onto the recipient's
         // account, in the card's own currency (e.g. a UK Amazon card is GBP). The price
         // block is Zendit's USD price; the cost block is our USD cost. Don't use those
-        // for the card currency, or a £-card shows as a $-card.
-        $currencyCode = strtoupper($sendBlock['currency'] ?? $priceBlock['currency'] ?? $rawItem['currency'] ?? 'USD');
+        // for the card currency, or a £-card shows as a $-card. An EMPTY send label
+        // (US Amazon cards) falls through to the price block instead of being stored.
+        $currencyCode = FaceValueCheck::currency($sendBlock, $priceBlock, $rawItem);
 
         // Products are grouped by Brand + Country
         $productSlug = Str::slug("{$brandKey}-{$countryCode}-{$providerName}");
@@ -133,6 +136,21 @@ class ZenditNormalizer implements CatalogNormalizerInterface
         $isVariable = $priceType === 'VARIABLE'
             || ($minAmount !== null && $maxAmount !== null && $minAmount !== $maxAmount);
 
+        // A face the supplier labelled or sized wrongly (a "10 AED" card that
+        // costs $9.79, a "500 EUR" card for $116) is kept but not offered, with
+        // the reading on the row, until the offer is corrected.
+        $faceCheck = FaceValueCheck::verdict($faceValue, $currencyCode, $costPrice, $isVariable);
+
+        if (FaceValueCheck::isSuspect($faceCheck)) {
+            Log::warning('Catalog offer hidden: face value out of line with its cost', [
+                'offer' => $offerId,
+                'brand' => $brandKey,
+                'country' => $countryCode,
+                'face' => $faceValue,
+                'currency' => $currencyCode,
+            ] + $faceCheck);
+        }
+
         ProductVariant::updateOrCreate(
             ['provider_offer_id' => $offerId],
             [
@@ -149,8 +167,8 @@ class ZenditNormalizer implements CatalogNormalizerInterface
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
                 'is_variable' => $isVariable,
-                'is_available' => (bool) ($rawItem['enabled'] ?? true),
-                'metadata' => $rawItem,
+                'is_available' => (bool) ($rawItem['enabled'] ?? true) && ! FaceValueCheck::isSuspect($faceCheck),
+                'metadata' => array_merge($rawItem, ['face_check' => $faceCheck]),
             ]
         );
 

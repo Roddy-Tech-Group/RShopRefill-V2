@@ -85,6 +85,33 @@ class MobileNavSheetTest extends TestCase
         return substr($html, $start, strpos($html, 'open-mobile-menu.window', $start) - $start);
     }
 
+    /**
+     * On a phone the bar shows the menu button and nothing else of the brand:
+     * the R moved off the bar and into the sheet, at the top of its root page,
+     * where a tap goes home.
+     */
+    public function test_the_sheet_opens_with_the_mark_linking_home(): void
+    {
+        $html = $this->get('/')->assertOk()->getContent();
+
+        $start = strpos($html, 'role="dialog"');
+        $this->assertNotFalse($start, 'The menu sheet did not render.');
+        $end = strpos($html, 'aria-controls="mobile-gift-cards-menu"', $start);
+        $this->assertNotFalse($end);
+        $head = substr($html, $start, $end - $start);
+
+        // The mark, as a link home, before the first category row.
+        $this->assertMatchesRegularExpression(
+            '/<a\s+href="'.preg_quote(e(route('home')), '/').'"[^>]*>\s*<img src="[^"]*PWAicon\.webp"/s',
+            $head
+        );
+        $this->assertStringContainsString('class="site-logo h-9 w-auto object-contain"', $head);
+
+        // And the bar's own logo link is gone below md: hidden there, flex from md.
+        $nav = file_get_contents(resource_path('views/components/nav/main-nav.blade.php'));
+        $this->assertStringContainsString('justify-self-start -ml-1 relative hidden md:flex items-center', $nav);
+    }
+
     public function test_gift_cards_and_mobile_refill_rows_open_their_own_pages(): void
     {
         $html = $this->get('/')->assertOk()->getContent();

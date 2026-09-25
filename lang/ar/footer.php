@@ -17,11 +17,11 @@ return [
     'legal' => 'الشؤون القانونية والثقة',
 
     // Brand column
-    'tagline' => 'سوقك لبطاقات الهدايا وشرائح eSIM للسفر وشحن رصيد الجوال ودفع الفواتير.',
+    'tagline' => 'سوقك لبطاقات الهدايا وشرائح eSIM وشحن رصيد الجوال ودفع الفواتير.',
 
     // Shop column
     'gift_cards' => 'بطاقات الهدايا',
-    'travel_esims' => 'شرائح eSIM للسفر',
+    'esims' => 'شرائح eSIM',
     'mobile_topups' => 'شحن رصيد الجوال',
     'data_bundles' => 'باقات البيانات',
     'bill_payments' => 'دفع الفواتير',
@@ -68,4 +68,11 @@ return [
     'all_rights_reserved' => 'جميع الحقوق محفوظة.',
     'legal_line' => 'مملوك ومُدار من قبل :company، RC :rc، ومقره المسجل في :address.',
     'verify_company' => 'التحقق من الشركة',
+
+    'newsletter_pitch' => 'احصل على عروض بطاقات الهدايا وشرائح eSIM وشحن الرصيد على بريدك',
+    'newsletter_label' => 'عنوان البريد الإلكتروني',
+    'newsletter_placeholder' => 'you@example.com',
+    'newsletter_cta' => 'اشترك',
+    'newsletter_sending' => 'جارٍ الاشتراك',
+    'newsletter_done' => 'أنت على القائمة. شكرًا لك!',
 ];

@@ -40,7 +40,7 @@
                     href="{{ route('shop.gomarket') }}" wire:navigate
                     @mouseenter="active = 2"
                     :class="active === 2 ? 'bg-zinc-900 ring-zinc-900 dark:bg-blue-600 dark:ring-blue-600' : 'bg-transparent ring-zinc-200 hover:ring-zinc-300 dark:ring-zinc-700/60'"
-                    class="inline-flex items-center gap-3 rounded-[25px] px-6 py-2 ring-1 transition-all duration-300 ease-out will-change-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    class="inline-flex items-center gap-3 rounded-full px-6 py-2 ring-1 transition-all duration-300 ease-out will-change-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                     <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" :class="active === 2 ? 'brightness-0 invert' : ''" class="h-6 w-6 shrink-0 object-contain transition-all duration-300 ease-out dark:brightness-0 dark:invert" loading="lazy">
                     <span :class="active === 2 ? 'text-white' : 'text-zinc-800 dark:text-white'" class="text-base font-semibold transition-colors duration-300 ease-out">GoMarket</span>
