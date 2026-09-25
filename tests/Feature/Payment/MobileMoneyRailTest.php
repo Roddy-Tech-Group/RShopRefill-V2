@@ -3,6 +3,7 @@
 namespace Tests\Feature\Payment;
 
 use App\Domain\Order\Services\CheckoutService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Support\FundingMethodCatalog;
 use App\Domain\Payment\Support\MobileMoneyRail;
@@ -12,6 +13,7 @@ use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\CurrencyRate;
 use App\Models\Order;
+use App\Models\PaymentSession;
 use App\Models\PricingRule;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -268,7 +270,10 @@ class MobileMoneyRailTest extends TestCase
             }
         }
 
-        $this->assertFalse(MobileMoneyRail::supports('USD'));
+        // USD has no rail of its own and borrows the Francophone one (charged
+        // in CFA francs); a currency with neither is still refused.
+        $this->assertTrue(MobileMoneyRail::supports('USD'));
+        $this->assertFalse(MobileMoneyRail::supports('EUR'));
     }
 
     public function test_the_provider_refuses_a_currency_without_a_rail_instead_of_calling_the_gateway(): void
@@ -277,12 +282,12 @@ class MobileMoneyRailTest extends TestCase
 
         $order = $this->checkout('GHS');
         $attempt = $order->paymentAttempts->first();
-        $attempt->forceFill(['currency' => 'USD'])->save();
+        $attempt->forceFill(['currency' => 'EUR'])->save();
 
         $result = app(FlutterwavePaymentProvider::class)->chargeMobileMoney($attempt->fresh(), '0244000000', 'MTN');
 
         $this->assertSame('failed', $result['status']);
-        $this->assertSame('Mobile money is not available in USD.', $result['message']);
+        $this->assertSame('Mobile money is not available in EUR.', $result['message']);
         Http::assertNothingSent();
     }
 
@@ -295,5 +300,156 @@ class MobileMoneyRailTest extends TestCase
         $this->assertSame([], $momo('KES')['supported_networks'], 'M-Pesa takes the phone number alone, so the picker hides');
         $this->assertSame(['MTN', 'Orange'], $momo('XAF')['supported_networks']);
         $this->assertSame(['MTN', 'Airtel'], $momo('UGX')['supported_networks']);
+    }
+
+    /**
+     * A dollar order over MTN or Orange. No rail takes dollars, so the total
+     * is converted into CFA francs (rounded up to whole francs) and sent to
+     * the Francophone rail; the order itself stays in dollars, and the franc
+     * figure is on the attempt before the gateway is called.
+     */
+    public function test_a_usd_order_is_charged_in_cfa_francs_on_the_francophone_rail(): void
+    {
+        $this->fakePushRail();
+
+        $order = $this->checkout('USD');
+        $attempt = $order->paymentAttempts->first();
+        $francs = (float) ceil((float) $attempt->amount * 600);
+
+        $response = $this->pay($order, ['phone_number' => '+237 6 70 00 00 00', 'network' => 'Orange']);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $response->json('data.status'));
+
+        $request = $this->sentCharge();
+        $this->assertStringContainsString('/charges?type=mobile_money_franco', $request->url());
+        $this->assertSame('XAF', $request['currency'], 'the rail takes no dollars');
+        $this->assertSame($francs, (float) $request['amount']);
+        $this->assertSame('CM', $request['country']);
+        $this->assertSame('ORANGE', $request['network']);
+
+        $attempt = $attempt->fresh();
+        $this->assertSame('USD', $attempt->currency, 'the order is still priced in dollars');
+        $this->assertSame('XAF', $attempt->pay_currency);
+        $this->assertSame($francs, (float) $attempt->pay_amount);
+        $this->assertSame(600.0, (float) data_get($attempt->metadata, 'mobile_money.rate'));
+        $this->assertSame('USD', data_get($attempt->metadata, 'mobile_money.converted_from'));
+    }
+
+    /** The dialling prefix picks the franc: a Senegalese number is charged XOF, on Senegal. */
+    public function test_a_west_african_number_on_a_usd_order_is_charged_in_xof(): void
+    {
+        $this->fakePushRail();
+
+        $order = $this->checkout('USD');
+        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'MTN'])->assertOk();
+
+        $request = $this->sentCharge();
+        $this->assertSame('XOF', $request['currency']);
+        $this->assertSame('SN', $request['country']);
+        $this->assertSame('XOF', $order->paymentAttempts->first()->fresh()->pay_currency);
+
+        // A local-format number, and a prefix outside the franc zone, keep the
+        // default; a market with its own rail is never converted.
+        $this->assertSame('XAF', MobileMoneyRail::chargeCurrency('USD', '670000000'));
+        $this->assertSame('XAF', MobileMoneyRail::chargeCurrency('USD', '+233 24 400 0000'));
+        $this->assertSame('GHS', MobileMoneyRail::chargeCurrency('GHS', '+221 77 000 0000'));
+    }
+
+    /** The gateway answers in francs, and francs are what was asked for, so the attempt verifies. */
+    public function test_a_converted_charge_verifies_against_the_franc_figure(): void
+    {
+        $order = $this->checkout('USD');
+        $attempt = $order->paymentAttempts->first();
+        $francs = (float) ceil((float) $attempt->amount * 600);
+
+        Http::fake([
+            'api.flutterwave.com/v3/charges*' => Http::response([
+                'status' => 'success',
+                'message' => 'Charge initiated',
+                'data' => ['status' => 'pending'],
+            ]),
+            'api.flutterwave.com/v3/transactions/*' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'id' => 987654,
+                    'status' => 'successful',
+                    'amount' => $francs,
+                    'currency' => 'XAF',
+                    'tx_ref' => $attempt->idempotency_key,
+                ],
+            ]),
+        ]);
+
+        $this->pay($order, ['phone_number' => '237670000000', 'network' => 'MTN'])->assertOk();
+
+        $this->assertTrue(app(FlutterwavePaymentProvider::class)->verifyPayment($attempt->fresh()));
+        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+    }
+
+    /**
+     * No rate, no charge. CurrencyRate::resolve() answers a missing code with
+     * the USD row, which would quietly ask the rail for 11 francs on an
+     * 11-dollar order, so the conversion refuses before anything is sent.
+     */
+    public function test_a_usd_order_is_refused_before_the_gateway_when_the_rail_currency_has_no_rate(): void
+    {
+        Http::fake();
+        CurrencyRate::query()->where('code', 'XAF')->update(['is_active' => false]);
+
+        $order = $this->checkout('USD');
+        $response = $this->pay($order, ['phone_number' => '237670000000', 'network' => 'MTN']);
+
+        $response->assertOk();
+        $this->assertSame('failed', $response->json('data.status'));
+        $this->assertStringContainsString('temporarily unavailable', (string) $response->json('data.payment_payload.failure_reason'));
+        Http::assertNothingSent();
+        $this->assertNull($order->paymentAttempts->first()->fresh()->pay_currency, 'nothing is recorded as charged');
+    }
+
+    /**
+     * The gateway holds the charge in francs, so a refund stated in dollars
+     * (the whole attempt for a duplicate payment, an item's share for a
+     * failed delivery) is sent as the same share of the franc figure.
+     */
+    public function test_a_converted_payment_is_refunded_in_francs(): void
+    {
+        $this->fakePushRail();
+
+        $order = $this->checkout('USD');
+        $this->pay($order, ['phone_number' => '237670000000', 'network' => 'MTN'])->assertOk();
+
+        $attempt = $order->paymentAttempts->first()->fresh();
+        $attempt->forceFill(['gateway_reference' => '987654'])->save();
+        $francs = (float) $attempt->pay_amount;
+
+        Http::fake(['api.flutterwave.com/v3/refunds' => Http::response(['status' => 'success'])]);
+
+        $provider = app(FlutterwavePaymentProvider::class);
+        $this->assertTrue($provider->refundPayment($attempt, (float) $attempt->amount, 'duplicate-payment'));
+        $this->assertTrue($provider->refundPayment($attempt, round((float) $attempt->amount / 2, 2), 'item-1'));
+
+        $sent = Http::recorded(fn (Request $request) => str_contains($request->url(), '/refunds'))
+            ->map(fn (array $pair) => (float) $pair[0]['amount'])
+            ->all();
+
+        $this->assertSame([$francs, round($francs / 2)], $sent);
+    }
+
+    /** The funding sheet and the order page both offer a dollar customer the Francophone networks. */
+    public function test_a_dollar_customer_is_offered_mtn_and_orange_on_every_surface(): void
+    {
+        $sheet = collect(FundingMethodCatalog::forCurrency('USD'))->firstWhere('type', 'mobile_money');
+        $this->assertSame(['MTN', 'Orange'], $sheet['supported_networks']);
+        $this->assertSame('MTN Mobile Money or Orange Money', $sheet['description']);
+
+        // The order page reads the session's own list, which used to name
+        // three currencies by hand and so offered nothing to the rest.
+        $onOrderPage = fn (string $currency) => collect((new PaymentSession(['session_type' => 'card', 'currency' => $currency]))->getAvailableMethods())
+            ->firstWhere('type', 'mobile_money');
+
+        $this->assertSame(['MTN', 'Orange'], $onOrderPage('USD')['supported_networks']);
+        $this->assertSame([], $onOrderPage('KES')['supported_networks'], 'M-Pesa takes the number alone');
+        $this->assertNull($onOrderPage('EUR'), 'no rail, no tile');
     }
 }

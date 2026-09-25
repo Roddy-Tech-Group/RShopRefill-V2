@@ -34,7 +34,7 @@
     <div class="flex flex-1 flex-col gap-4">
 
         {{-- Amount hero --}}
-        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Amount</p>
@@ -47,7 +47,7 @@
 
         <div class="grid gap-4 lg:grid-cols-2">
             {{-- Payment details --}}
-            <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                 <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                     <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Payment details</h3>
                 </div>
@@ -76,7 +76,7 @@
 
             {{-- Customer + context --}}
             <div class="flex flex-col gap-4">
-                <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+                <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                     <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Customer</h3>
                     </div>
@@ -92,7 +92,7 @@
 
                 {{-- What this payment is for: a pointer, never a copy - the
                      order page carries the full order story. --}}
-                <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+                <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                     <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Payment for</h3>
                     </div>
@@ -107,7 +107,7 @@
 
                 {{-- Crypto settlement, when present --}}
                 @if ($attempt->pay_currency)
-                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                         <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Crypto settlement</h3>
                         </div>
@@ -183,7 +183,7 @@
                         $note = $manual ?? $dust;
                         $fmtShort = fn ($v) => $v === null ? null : rtrim(rtrim(number_format((float) $v, 8, '.', ''), '0'), '.');
                     @endphp
-                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+                    <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                         <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Settled short</h3>
                         </div>
@@ -209,21 +209,53 @@
             </div>
         </div>
 
+        {{-- Why it failed: who the verdict points at (the customer, the
+             gateway, us, or their browser), the gateway's own words, and the
+             sentence the customer was shown. Answers the question every
+             refused payment raises: was it them, or was it us? --}}
+        @if ($verdict)
+            <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10" data-failure-verdict>
+                <div class="flex items-center justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-white/10">
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Why it failed</h3>
+                    <x-admin.badge :tone="$verdict['tone']">{{ $verdict['owner'] }}</x-admin.badge>
+                </div>
+                <dl class="px-5 py-4 text-xs">
+                    @foreach ([
+                        'Reason' => $verdict['reason'].' ('.$verdict['code'].')',
+                        'Gateway said' => $verdict['gateway_said'],
+                        'HTTP status' => $verdict['http_status'],
+                        'Customer was at' => $verdict['stage'] ? str_replace('_', ' ', (string) $verdict['stage']) : null,
+                        'Worth a retry' => $verdict['retryable'] ? 'Yes' : 'No',
+                        'Customer saw' => $verdict['customer_saw'],
+                        'Mobile money' => $verdict['mobile_money'],
+                        'Verdict seen' => $verdict['seen_at'] ? $fmtDate(\Illuminate\Support\Carbon::parse($verdict['seen_at'])) : null,
+                    ] as $label => $value)
+                        @if ($value !== null && $value !== '')
+                            <div class="flex items-start justify-between gap-4 border-b border-zinc-50 py-2 last:border-0 dark:border-white/5">
+                                <dt class="shrink-0 text-zinc-500 dark:text-zinc-400">{{ $label }}</dt>
+                                <dd class="text-right font-medium text-zinc-800 dark:text-zinc-200">{{ $value }}</dd>
+                            </div>
+                        @endif
+                    @endforeach
+                </dl>
+            </div>
+        @endif
+
         {{-- Webhook deliveries --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
             <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                 <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Webhook deliveries ({{ $webhooks->count() }})</h3>
             </div>
             @if ($webhooks->isNotEmpty())
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800 dark:bg-white/5 dark:text-zinc-300">
+                <div class="overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">Received</th>
-                                <th class="px-5 py-3 font-semibold">Event</th>
-                                <th class="px-5 py-3 font-semibold">Processing</th>
-                                <th class="px-5 py-3 font-semibold">Attempts</th>
-                                <th class="px-5 py-3 font-semibold">Processed at</th>
+                                <th class="">Received</th>
+                                <th class="">Event</th>
+                                <th class="">Processing</th>
+                                <th class="">Attempts</th>
+                                <th class="">Processed at</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -246,7 +278,7 @@
 
         {{-- Other attempts on the same order --}}
         @if ($siblings->isNotEmpty())
-            <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:ring-white/10">
                 <div class="border-b border-zinc-100 px-5 py-4 dark:border-white/10">
                     <h3 class="text-sm font-bold text-zinc-900 dark:text-white">Other attempts on this order ({{ $siblings->count() }})</h3>
                 </div>
@@ -262,7 +294,7 @@
                                 default => 'amber',
                             };
                         @endphp
-                        <a href="{{ route('admin.transaction', $sibling) }}" wire:navigate class="flex items-center justify-between gap-3 px-5 py-3 text-xs transition-colors hover:bg-blue-50 dark:hover:bg-blue-600/10">
+                        <a href="{{ route('admin.transaction', $sibling) }}" wire:navigate class="flex items-center justify-between gap-3 px-5 py-3 text-xs transition-colors hover:bg-blue-50">
                             <span class="font-mono text-zinc-700 dark:text-zinc-300">#{{ $sibling->id }} · <span class="capitalize">{{ $sibling->gateway }}</span> · {{ $fmtDate($sibling->created_at) }}</span>
                             <x-admin.badge :tone="$st">{{ $sibling->payment_status?->label() ?? 'Pending' }}</x-admin.badge>
                         </a>

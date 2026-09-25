@@ -3,6 +3,7 @@
 namespace App\Domain\PaymentInsights\Services;
 
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
+use App\Domain\Payment\Support\CustomerFailureCopy;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Support\DeclineVerdict;
 use App\Domain\Shared\Services\OperationalAlerter;
@@ -145,9 +146,13 @@ class RefusedCardRecorder
         $user = $session->paymentAttempt?->user;
         $suspected = $this->backoff->suspectedTesting($user, $session->customer_ip, $session->device_uuid);
 
-        $reason = $latest->verdict_class === DeclineVerdict::CLASS_FRAUD
-            ? 'Your card was declined. Please try a different card or payment method.'
-            : 'Your bank declined this payment. Please check with your bank or try another card.';
+        // The sentence for the verdict's reason code (not enough funds, an
+        // expired card, a wrong PIN), so the customer learns what to change.
+        // A fraud-class refusal is told as a plain bank decline: what was
+        // detected is never said.
+        $reason = CustomerFailureCopy::sentence(
+            $latest->verdict_class === DeclineVerdict::CLASS_FRAUD ? 'bank_declined' : (string) $latest->reason_code
+        ) ?? (string) CustomerFailureCopy::sentence('bank_declined');
 
         return [
             'reason' => $reason,

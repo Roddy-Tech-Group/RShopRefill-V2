@@ -5,9 +5,14 @@ namespace App\Jobs;
 use App\Domain\Order\Events\PaymentConfirmed;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Interfaces\PaymentProviderInterface;
+use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\CustomerFailureCopy;
+use App\Domain\Payment\Support\GatewayFailure;
 use App\Domain\Payment\Support\NowPaymentsStatus;
+use App\Domain\PaymentInsights\Services\FailureReasonClassifier;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Models\Order;
@@ -29,6 +34,17 @@ class VerifyPaymentJob implements ShouldQueue
     public int $tries = 5;
 
     public int $backoff = 10;
+
+    /**
+     * Session statuses where one reference is one charge, so the gateway's
+     * "failed" on that reference is the end of the story. The inline popup
+     * (awaiting_payment) and the hosted page (awaiting_redirect) let a
+     * customer try again under the same reference, and a stale refusal there
+     * must not close a session a later card may still pay.
+     *
+     * @var list<string>
+     */
+    private const SINGLE_CHARGE_SESSION_STATUSES = ['awaiting_confirmation', 'awaiting_customer_action'];
 
     public function __construct(protected PaymentAttempt $attempt)
     {
@@ -76,8 +92,8 @@ class VerifyPaymentJob implements ShouldQueue
             // Already-Paid attempts were verified by whoever stamped them
             // (gateway verify or webhook signature); re-enter the chain
             // without a second gateway round-trip.
-            $isPaid = $alreadyPaid
-                || $gatewayFactory->getProvider($attempt->gateway)->verifyPayment($attempt);
+            $provider = $alreadyPaid ? null : $gatewayFactory->getProvider($attempt->gateway);
+            $isPaid = $alreadyPaid || $provider->verifyPayment($attempt);
 
             if ($isPaid) {
                 // If this is a WalletFunding attempt, process it via WalletFundingService
@@ -158,8 +174,83 @@ class VerifyPaymentJob implements ShouldQueue
                 }
             } else {
                 Log::warning("VerifyPaymentJob: payment verification returned unpaid/pending for attempt {$attempt->id}");
+
+                if ($provider !== null) {
+                    $this->recordGatewayRefusal($attempt, $provider, $orderService);
+                }
             }
         });
+    }
+
+    /**
+     * The gateway said no. A refused mobile money prompt (no balance, over
+     * the daily limit, declined on the handset) used to leave the session
+     * open: the verification returned false, nothing failed the session, and
+     * the customer watched a spinner until the sweeper expired it half an
+     * hour later with no reason at all. The verdict is graded and the session
+     * failed with a sentence the customer can act on; the operator's own
+     * words stay on the session for the admin page and the classifier.
+     */
+    private function recordGatewayRefusal(PaymentAttempt $attempt, PaymentProviderInterface $provider, OrderService $orderService): void
+    {
+        if (! $provider instanceof FlutterwavePaymentProvider) {
+            return;
+        }
+
+        $attempt->refresh();
+        $verdict = $provider->terminalFailure($attempt);
+
+        if ($verdict === null) {
+            return;
+        }
+
+        $attempt->load('paymentSession');
+        $session = $attempt->paymentSession;
+
+        if ($session === null || ! in_array($session->status, self::SINGLE_CHARGE_SESSION_STATUSES, true)) {
+            return;
+        }
+
+        $failure = GatewayFailure::fromFlutterwave(['data' => ['status' => 'failed', 'processor_response' => $verdict['processor_response']]]);
+        $mobileMoney = $session->status === 'awaiting_confirmation';
+        $classification = app(FailureReasonClassifier::class)->classify(
+            'flutterwave',
+            (string) ($verdict['processor_response'] ?? 'declined'),
+            $session->status,
+            $failure,
+        );
+        $reason = CustomerFailureCopy::forVerdict($classification, $mobileMoney);
+        $payload = [
+            'provider' => 'flutterwave',
+            'failure' => $failure,
+            'gateway_verdict' => $verdict,
+            'client_reason' => 'gateway_refused',
+        ];
+
+        Log::info("VerifyPaymentJob: gateway refused attempt {$attempt->id}; session {$session->id} failed with the verdict", [
+            'processor_response' => $verdict['processor_response'],
+            'reason_code' => $classification['code'],
+        ]);
+
+        if ($attempt->payable_type === WalletFunding::class) {
+            $funding = $attempt->payable;
+
+            // failFunding fails the attempt and the session as well.
+            if ($funding && ! in_array($funding->status, [FundingStatus::Completed, FundingStatus::Failed, FundingStatus::Cancelled], true)) {
+                app(WalletFundingService::class)->failFunding($funding, $reason, $payload);
+            }
+
+            return;
+        }
+
+        app(PaymentSessionService::class)->failSession($session, $reason, $payload);
+
+        $attempt->forceFill(['payment_status' => PaymentStatus::Failed, 'failed_at' => now()])->save();
+
+        $order = $attempt->order;
+        if ($order && in_array($order->payment_status, [PaymentStatus::Unpaid, PaymentStatus::Pending], true)) {
+            $orderService->transitionPaymentStatus($order, PaymentStatus::Failed, $payload);
+        }
     }
 
     /**

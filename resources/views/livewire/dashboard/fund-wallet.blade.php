@@ -421,6 +421,11 @@ new class extends Component
         paymentState: 'idle', // idle, select_method, card_input, action_pin, action_otp, action_3ds, awaiting_transfer, awaiting_confirmation, momo_input, processing, success, error
         errorMessage: '',
         actionMessage: '',
+        // The mobile money waiting panel's dial code and steps, and why a
+        // payment failed by reason code, both as on the checkout wizard.
+        momoApproval: null,
+        failureCopy: @js(\App\Domain\Payment\Support\CustomerFailureCopy::map()),
+        failureCode: null,
         bankDetails: null,
         pollInterval: null,
         verifying: false,
@@ -455,16 +460,33 @@ new class extends Component
                 this.startBackoff(this.initialHold.wait_seconds);
             }
 
-            if (!document.getElementById('flutterwave-v3')) {
-                let script = document.createElement('script');
-                script.id = 'flutterwave-v3';
-                script.src = 'https://checkout.flutterwave.com/v3.js';
-                // Blocked/failed SDK loads are reported when the customer
-                // actually tries to pay (no session exists yet at page load).
-                script.onerror = () => { window.__flwSdkLoadFailed = true; };
-                document.head.appendChild(script);
-            }
+            // The checkout SDK loads when the funding panel opens, not with the
+            // page: it pulls a script and a checkout frame from the gateway on
+            // every dashboard visit, and this component is mounted once per
+            // wallet, on a page most visits never fund from.
+            this.$watch('open', (isOpen) => { if (isOpen) { this.loadCheckoutSdk(); } });
             this.detectApplePay();
+        },
+
+        // Resolves once the SDK is on the page (or has failed to load: the pay
+        // path checks for the global and reports that case itself). One shared
+        // promise for every mounted wallet, so the script is fetched once.
+        loadCheckoutSdk() {
+            if (! window.__flwSdkReady) {
+                window.__flwSdkReady = new Promise((resolve) => {
+                    if (typeof FlutterwaveCheckout !== 'undefined') { resolve(); return; }
+                    let script = document.getElementById('flutterwave-v3');
+                    if (! script) {
+                        script = document.createElement('script');
+                        script.id = 'flutterwave-v3';
+                        script.src = 'https://checkout.flutterwave.com/v3.js';
+                        document.head.appendChild(script);
+                    }
+                    script.addEventListener('load', () => resolve());
+                    script.addEventListener('error', () => { window.__flwSdkLoadFailed = true; resolve(); });
+                });
+            }
+            return window.__flwSdkReady;
         },
 
         startBackoff(seconds) {
@@ -744,6 +766,7 @@ new class extends Component
         async paySession(method, dataPayload = {}) {
             this.paymentState = 'processing';
             this.errorMessage = '';
+            this.failureCode = null;
             try {
                 let body = {
                     method: method,
@@ -799,7 +822,8 @@ new class extends Component
                 setTimeout(() => { window.location.reload(); }, 2000);
             } else if (status === 'failed') {
                 this.paymentState = 'error';
-                this.errorMessage = sessionData.payment_payload?.failure_reason || 'Transaction could not be completed.';
+                this.failureCode = sessionData.payment_payload?.failure_code || null;
+                this.errorMessage = this.failureCopy[sessionData.payment_payload?.failure_code] || sessionData.payment_payload?.failure_reason || @js(__('checkout.transaction_not_completed'));
             } else if (status === 'awaiting_payment') {
                 const inlineData = sessionData.payment_payload?.inline;
                 if (inlineData) {
@@ -835,13 +859,18 @@ new class extends Component
                 this.startStatusPolling();
             } else if (status === 'awaiting_confirmation') {
                 this.paymentState = 'awaiting_confirmation';
-                this.actionMessage = sessionData.payment_payload?.message || 'Please accept the billing prompt on your device.';
+                this.actionMessage = sessionData.payment_payload?.message || @js(__('checkout.momo_accept_prompt'));
+                this.momoApproval = sessionData.payment_payload?.approval || null;
                 this.startStatusPolling();
             }
         },
 
-        openFlutterwaveInline(data) {
+        async openFlutterwaveInline(data) {
             const self = this;
+
+            // The SDK starts loading when the panel opens; a quick customer can
+            // reach this before it has landed, so wait for it here.
+            await this.loadCheckoutSdk();
 
             // Ad blockers / CDN failures leave the SDK undefined — report a
             // terminal frontend failure instead of throwing.
@@ -938,7 +967,8 @@ new class extends Component
                     } else if (data.status === 'failed') {
                         clearInterval(this.pollInterval);
                         this.paymentState = 'error';
-                        this.errorMessage = data.payment_payload?.failure_reason || 'Transaction failed.';
+                        this.failureCode = data.payment_payload?.failure_code || null;
+                        this.errorMessage = this.failureCopy[data.payment_payload?.failure_code] || data.payment_payload?.failure_reason || @js(__('checkout.transaction_failed'));
                     }
                 } catch (e) {}
             }, 4500);
@@ -1173,8 +1203,21 @@ new class extends Component
     @email-verification-required.window="if (open) onEmailNotice($event.detail)"
     class="shrink-0"
 >
-    {{-- Trigger. `full` = desktop wallet-card button; `compact` = mobile hero "Top Up". --}}
-    @if ($variant === 'compact')
+    {{-- Trigger. `full` = desktop wallet-card button; `compact` = the white
+         pill for a blue card; `sheet` = the small blue pill on the mobile
+         wallet sheet's white rows. --}}
+    @if ($variant === 'sheet')
+        <button
+            type="button"
+            @click="open = true"
+            class="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors active:bg-blue-700"
+        >
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+            </svg>
+            Top Up
+        </button>
+    @elseif ($variant === 'compact')
         <button
             type="button"
             @click="open = true"
@@ -1750,10 +1793,10 @@ new class extends Component
 
                 <!-- Mobile money push prompt -->
                 <div x-show="paymentState === 'awaiting_confirmation'">
-                    <h3 class="text-sm font-bold text-zinc-900 mb-2">Authorize on Phone</h3>
-                    <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
+                    <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('checkout.momo_authorize_title') }}</h3>
+                    <p class="text-xs leading-relaxed text-zinc-600 mb-4" x-text="actionMessage"></p>
 
-                    <div class="flex flex-col items-center py-6 text-center">
+                    <div class="flex flex-col items-center py-4 text-center">
                         <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#f4f6f5] ring-8 ring-blue-100/50 mb-4">
                             <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -1763,8 +1806,21 @@ new class extends Component
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                         </svg>
-                        <p class="text-xs font-semibold text-zinc-800 mt-3">Verifying payment authorization...</p>
+                        <p class="text-xs font-semibold text-zinc-800 mt-3">{{ __('checkout.momo_verifying') }}</p>
                     </div>
+
+                    {{-- No prompt? The operator's dial code and steps, as on the checkout wizard. --}}
+                    <div x-show="momoApproval" x-cloak class="mt-2 rounded-[12px] bg-[#f4f6f5] p-4 text-left" data-momo-approval>
+                        <p class="text-xs font-bold text-zinc-900">{{ __('checkout.momo_no_prompt_title') }}</p>
+                        <p class="mt-1 text-xs leading-relaxed text-zinc-600" x-text="@js(__('checkout.momo_no_prompt_dial')).replace(':code', momoApproval?.code || '').replace(':network', momoApproval?.network || '')"></p>
+                        <p class="mt-2 font-mono text-2xl font-black tracking-[0.2em] text-blue-600" x-text="momoApproval?.code"></p>
+                        <ol class="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-600">
+                            <template x-for="step in (momoApproval?.steps || [])" :key="step">
+                                <li x-text="step"></li>
+                            </template>
+                        </ol>
+                    </div>
+                    <p class="mt-3 text-center text-[11px] text-zinc-500">{{ __('checkout.momo_keep_open') }}</p>
                 </div>
 
                 <!-- Processing state -->
@@ -1790,6 +1846,8 @@ new class extends Component
                     <x-error-cross />
                     <h3 class="mt-4 text-sm font-bold text-zinc-900">Payment Failed</h3>
                     <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
+
+                    @include('shop._payment-failure-help', ['methodVar' => 'selectedMethod'])
 
                     <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-[#f4f6f5] px-5 py-2.5 text-xs font-semibold text-zinc-800 transition-colors hover:bg-zinc-200">
                         Try Another Method

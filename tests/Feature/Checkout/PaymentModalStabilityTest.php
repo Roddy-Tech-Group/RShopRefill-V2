@@ -48,9 +48,9 @@ class PaymentModalStabilityTest extends TestCase
     public function test_payment_wizard_ignores_synthetic_escape_events(): void
     {
         $this->assertStringContainsString(
-            'x-on:keydown.escape.window="$event.isTrusted && open && closeModal()"',
+            'x-on:keydown.escape.window="$event.isTrusted && open && requestClose()"',
             $this->checkoutBlade(),
-            'app.js fires an untrusted Escape on page scroll; only a real keypress may close the wizard.'
+            'app.js fires an untrusted Escape on page scroll; only a real keypress may close the wizard (through the cancel guard).'
         );
     }
 

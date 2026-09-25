@@ -41,6 +41,28 @@
     // network the market's rail will refuse.
     $momoNetworksByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::networksByCurrency();
 
+    // Currencies whose mobile-money charge is taken in another currency (USD
+    // rides the Francophone rail in CFA francs), with the rate the total is
+    // converted at, so the panel can say what the account will be debited
+    // before the customer commits. The charge converts server-side at the
+    // live rate, so the figure is an estimate and is worded as one. A rail
+    // currency with no active rate is left out: the charge would refuse it
+    // and a made-up figure would be worse than none.
+    $momoChargeByCurrency = [];
+    foreach (\App\Domain\Payment\Support\MobileMoneyRail::chargeCurrencyByCurrency() as $priced => $charged) {
+        $chargedPerUsd = CurrencyRate::query()->active()->where('code', $charged)->value('rate_per_usd');
+        $pricedPerUsd = CurrencyRate::query()->active()->where('code', $priced)->value('rate_per_usd');
+        if ($chargedPerUsd === null || $pricedPerUsd === null || (float) $pricedPerUsd <= 0) {
+            continue;
+        }
+        $momoChargeByCurrency[$priced] = [
+            'currency' => $charged,
+            'symbol' => \App\Domain\Shared\Services\Money::symbol($charged),
+            'rate' => (float) $chargedPerUsd / (float) $pricedPerUsd,
+            'precision' => \App\Domain\Payment\Support\MobileMoneyRail::precision($charged),
+        ];
+    }
+
     // Customer's wallet balances keyed by currency code. The wallet panel reads
     // the balance for the active display currency directly from this array.
     // (Method tabs themselves are driven by the JS `allMethods` array in
@@ -59,7 +81,10 @@
     // payment and only then refusing it. Null when nothing is being served.
     $paymentHold = app(\App\Domain\Payment\Services\PaymentSessionService::class)->currentHold($user, 'checkout');
 
-    $fieldClass = 'mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-base text-zinc-900 dark:text-white outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-zinc-500';
+    // See contact.blade.php: a pill with a 2px edge, recoloured on focus. No
+    // ring - a ring is drawn outside the box and pushed the field's neighbours
+    // on every click.
+    $fieldClass = 'mt-1.5 w-full rounded-full border-2 border-zinc-200 bg-white px-4 py-2 text-base text-zinc-900 dark:text-white outline-none transition-colors focus:border-edge dark:border-white/15 dark:bg-white/5 dark:placeholder:text-zinc-500 dark:focus:border-edge';
 
     $rcoinConfig = [
         // Master kill-switch. When off the buyer sees no Rcoin earn lines and
@@ -116,12 +141,70 @@
 
         <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees), @js($paymentHold))">
 
-            {{-- Loading — until the cart store's first fetch resolves --}}
-            <div x-show="!$store.cart.hydrated" class="pure-card flex items-center justify-center rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 py-24 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10">
-                <svg class="h-7 w-7 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
+            {{-- Loading — until the cart store's first fetch resolves.
+                 The page is rendered from the Alpine cart store, so the server
+                 sends none of this: a shopper who has just committed to paying
+                 met an empty card with a spinner in it.
+
+                 A skeleton of the page it stands in for, not a generic box.
+                 It repeats the real grid and both cards - the same column
+                 spans, the same card classes, the same 16:10 tile, the same
+                 74px method tiles and 44px action - so the swap into real
+                 content lands on the boxes the skeleton already drew instead
+                 of resizing the page under the cursor. Same discipline as the
+                 gift-card listing's skeleton, which shares its grid classes
+                 with the content for exactly this reason.
+
+                 No x-cloak, deliberately: this is the one block that must
+                 paint before Alpine boots. The two states below carry it, so
+                 they stay hidden until the store can say which is true.
+
+                 aria-hidden: it is a picture of content that is not there
+                 yet, and the live region that matters is what replaces it. --}}
+            <div x-show="!$store.cart.hydrated" class="grid grid-cols-1 gap-5 lg:grid-cols-5 lg:items-start" aria-hidden="true">
+
+                {{-- Order details, mirroring the section below. --}}
+                <section class="pure-card self-start rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6 lg:sticky lg:top-6 lg:col-span-2">
+                    <x-skeleton class="h-5 w-40" />
+
+                    {{-- Two rows: enough to read as a list without inventing a
+                         basket size we do not know yet. --}}
+                    <ul class="mt-4 divide-y divide-zinc-100 dark:divide-white/10">
+                        @for ($row = 0; $row < 2; $row++)
+                            <li class="flex items-start gap-3 py-4">
+                                <x-skeleton rounded="rounded-[12px]" class="aspect-[16/10] w-28 shrink-0 sm:w-32" />
+                                <div class="min-w-0 flex-1">
+                                    <x-skeleton class="h-4 w-3/4" />
+                                    <x-skeleton class="mt-2 h-3 w-2/5" />
+                                    <x-skeleton class="mt-2 h-3 w-1/2" />
+                                </div>
+                            </li>
+                        @endfor
+                    </ul>
+
+                    {{-- The totals that close the column. --}}
+                    <div class="mt-2 space-y-2.5 border-t border-zinc-100 pt-4 dark:border-white/10">
+                        <x-skeleton class="h-4 w-full" />
+                        <x-skeleton class="h-4 w-3/5" />
+                        <x-skeleton class="h-5 w-2/5" />
+                    </div>
+                </section>
+
+                {{-- Payment, mirroring the form below: a heading, the method
+                     tiles at their real size in their real grid, and the
+                     action. --}}
+                <div class="pure-card rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6 lg:col-span-3">
+                    <x-skeleton class="h-5 w-44" />
+
+                    <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        @for ($tile = 0; $tile < 6; $tile++)
+                            <x-skeleton rounded="rounded-[12px]" class="h-[74px] w-full" />
+                        @endfor
+                    </div>
+
+                    <x-skeleton class="mt-6 h-4 w-1/3" />
+                    <x-skeleton rounded="rounded-full" class="mt-4 h-11 w-full" />
+                </div>
             </div>
 
             {{-- Empty cart - same animated inline illustration as the cart
@@ -130,16 +213,16 @@
                 <x-illo name="emptyCart" class="mx-auto w-full max-w-[280px]" />
                 <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">{{ __('checkout.cart_empty') }}</p>
                 <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ __('checkout.checkout_empty_hint') }}</p>
-                <a href="{{ request()->routeIs('dashboard.*') ? route('dashboard.shop.gift-cards') : route('shop.gift-cards') }}" wire:navigate class="mt-5 inline-flex items-center gap-1.5 rounded-[12px] bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                <a href="{{ request()->routeIs('dashboard.*') ? route('dashboard.shop.gift-cards') : route('shop.gift-cards') }}" wire:navigate class="mt-5 inline-flex h-11 items-center gap-1.5 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                     {{ __('checkout.visit_shop') }}
                 </a>
             </div>
 
             {{-- Checkout --}}
-            <div x-show="$store.cart.hydrated && $store.cart.count > 0" x-cloak class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-6">
+            <div x-show="$store.cart.hydrated && $store.cart.count > 0" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-5 lg:items-start">
 
                 {{-- ─── LEFT: Order details ─── --}}
-                <section class="pure-card self-start rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6">
+                <section class="pure-card self-start rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6 lg:sticky lg:top-6 lg:col-span-2">
                     <h2 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('checkout.order_details') }}</h2>
 
                     <ul class="mt-4 divide-y divide-zinc-100">
@@ -170,6 +253,10 @@
                                     <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
                                         <span x-show="item.face_label" x-text="$store.cart.unitLabel(item)"></span>
                                     </p>
+                                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ __('checkout.item_price') }}
+                                        <span class="font-bold tabular-nums text-zinc-900 dark:text-white" x-text="$store.cart.pay(item.line_total)"></span>
+                                    </p>
                                     {{-- Top-up: show the recipient phone the buyer entered. --}}
                                     <p
                                         x-show="item.category_slug === 'mobile-airtime' && item.recipient_phone"
@@ -181,17 +268,24 @@
                                         </svg>
                                         <span x-text="item.recipient_phone"></span>
                                     </p>
-                                    <p x-show="rcoinConfig.enabled" class="mt-1 inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                    <p x-show="rcoinConfig.enabled" class="mt-1 inline-flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
                                         <span x-text="item.quantity"></span> x
                                         <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-3.5 w-3.5 object-contain">
                                         <span class="font-semibold text-zinc-900 dark:text-white" x-text="Math.floor(((item.line_total_usd || 0) * (rcoinConfig.cashback_percentage / 100)) / rcoinConfig.usd_rate)"></span> {{ __('checkout.points') }}
                                     </p>
                                 </div>
 
-                                <div class="flex shrink-0 flex-col items-end gap-2">
+                                {{-- Remove is a plain X: the word in red was the loudest thing
+                                     in the order. It sits beside the quantity only where the card
+                                     is wide enough for both: from sm while the order is the page's
+                                     only column, and again from xl once the page has split in two.
+                                     Between them it stacks, because the dashboard renders this same
+                                     card beside its rail, and there the pair side by side left the
+                                     brand name, country and value no width at all. --}}
+                                <div class="flex shrink-0 flex-col items-end gap-1 self-start sm:flex-row sm:items-center sm:gap-1.5 lg:flex-col lg:items-end lg:gap-1 xl:flex-row xl:items-center xl:gap-1.5">
                                     {{-- Quantity dropdown --}}
                                     <div x-data="{ qtyOpen: false }" @click.outside="qtyOpen = false" class="relative">
-                                        <button type="button" @click="qtyOpen = !qtyOpen" class="flex h-9 w-16 items-center justify-between rounded-[12px] border border-zinc-200 bg-white px-2.5 text-sm font-bold text-zinc-900 dark:text-white transition-colors hover:border-zinc-400">
+                                        <button type="button" @click="qtyOpen = !qtyOpen" class="flex h-9 w-16 items-center justify-between rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-bold text-zinc-900 dark:text-white transition-colors hover:border-zinc-400">
                                             <span x-text="item.quantity"></span>
                                             <svg class="h-4 w-4 text-zinc-500" :class="qtyOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
@@ -199,13 +293,21 @@
                                             <template x-for="n in 10" :key="n">
                                                 <button type="button" @click="$store.cart.setQty(item.id, n); qtyOpen = false"
                                                     :class="n === item.quantity ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                                    class="flex w-full items-center justify-center rounded-[12px] px-2 py-1.5 text-sm font-medium tabular-nums transition-colors"
+                                                    class="flex w-full items-center justify-center rounded-full px-2 py-1.5 text-sm font-medium tabular-nums transition-colors"
                                                     x-text="n"></button>
                                             </template>
                                         </div>
                                     </div>
-                                    <button type="button" @click="$store.cart.remove(item.id)" class="text-xs font-semibold text-red-600 transition-colors hover:text-red-700">
-                                        {{ __('checkout.remove') }}
+                                    <button
+                                        type="button"
+                                        @click="$store.cart.remove(item.id)"
+                                        aria-label="{{ __('checkout.remove') }}"
+                                        title="{{ __('checkout.remove') }}"
+                                        class="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+                                    >
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
                                     </button>
                                 </div>
                             </li>
@@ -214,10 +316,20 @@
 
                     {{-- eSIM coverage notice — eSIMs only have service inside
                          their coverage area, and "US Data eSIM" bought from home
-                         is the classic blind-buy mistake. Shown whenever the
-                         cart contains an eSIM, mirroring the gift-card notice. --}}
+                         is the classic blind-buy mistake.
+
+                         Every eSIM EXCEPT a Global one. The notice tells a buyer
+                         to pick the plan for the country they are travelling to,
+                         or else to choose a Global plan - which reads as a warning
+                         about a decision they have already made, and made well. A
+                         worldwide plan has no coverage area to check against.
+
+                         Still shown for a mixed basket: a Global plan sitting
+                         beside a country plan does not make the country plan any
+                         less worth checking. is_global is the cart payload's own
+                         flag (CartWebController), set from country_code === 'WW'. --}}
                     <div
-                        x-show="$store.cart.items.some((i) => i.category_slug === 'esims')"
+                        x-show="$store.cart.items.some((i) => i.category_slug === 'esims' && ! i.is_global)"
                         x-cloak
                         class="mt-3 flex items-start gap-2.5 rounded-[12px] bg-blue-50 px-4 py-3.5 dark:bg-blue-500/10"
                     >
@@ -229,12 +341,12 @@
 
                     {{-- Points + total --}}
                     <div class="mt-4 space-y-2 border-t border-zinc-100 dark:border-white/10 pt-4 text-sm">
-                        <div x-show="rcoinConfig.enabled" class="flex items-center justify-between">
-                            <span class="inline-flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
+                        <div x-show="rcoinConfig.enabled" class="flex items-center justify-between text-xs">
+                            <span class="inline-flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
                                 {{ __('checkout.points_you_earn') }}
                                 <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-4 w-4 object-contain">
                             </span>
-                            <span x-data="valueFlip()" x-effect="points(); flash()" class="inline-block font-bold text-zinc-900 dark:text-white" x-text="points()">0</span>
+                            <span x-data="valueFlip()" x-effect="points(); flash()" class="inline-block font-semibold text-zinc-700 dark:text-zinc-200" x-text="points()">0</span>
                         </div>
 
                         {{-- Rcoin redemption — three states (off / partial / full).
@@ -251,13 +363,21 @@
                                  Backend reads apply_rcoin === 'full' for the full path. --}}
                             <input type="hidden" name="apply_rcoin" :value="applyRcoin" form="checkout-form">
 
+                            {{-- A switch rather than a tick box, drawn over the same
+                                 checkbox: the input, its binding and what it posts are
+                                 untouched, so only what the customer sees has changed. --}}
                             <label class="flex cursor-pointer items-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    :checked="applyRcoin !== ''"
-                                    @change="applyRcoin = $event.target.checked ? '1' : ''"
-                                    class="mt-0.5 h-4 w-4 shrink-0 rounded text-blue-600 focus:ring-blue-500"
-                                >
+                                <span class="relative order-last mt-0.5 inline-flex h-6 w-11 shrink-0 items-center">
+                                    <input
+                                        type="checkbox"
+                                        role="switch"
+                                        :checked="applyRcoin !== ''"
+                                        @change="applyRcoin = $event.target.checked ? '1' : ''"
+                                        class="peer sr-only"
+                                    >
+                                    <span class="absolute inset-0 rounded-full bg-zinc-200 transition-colors peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500/40 dark:bg-zinc-700" aria-hidden="true"></span>
+                                    <span class="theme-static absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" aria-hidden="true"></span>
+                                </span>
                                 <span class="min-w-0 flex-1">
                                     <span class="flex flex-wrap items-baseline justify-between gap-x-3">
                                         <span class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.use_my_rcoin') }}</span>
@@ -282,10 +402,10 @@
                                 x-cloak
                                 class="mt-3 flex items-center gap-1 rounded-[12px] bg-white/70 p-1 dark:bg-white/5"
                             >
-                                <button type="button" @click="applyRcoin = '1'" :class="applyRcoin === '1' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors">
+                                <button type="button" @click="applyRcoin = '1'" :class="applyRcoin === '1' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors">
                                     {!! __('checkout.rcoin_apply_up_to', ['percent' => '<span x-text="rcoinConfig.redemption_max_pct + \'%\'"></span>']) !!}
                                 </button>
-                                <button type="button" @click="applyRcoin = 'full'" :class="applyRcoin === 'full' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors">
+                                <button type="button" @click="applyRcoin = 'full'" :class="applyRcoin === 'full' ? 'bg-blue-600 text-white' : 'text-zinc-700 dark:text-zinc-300'" class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors">
                                     {{ __('checkout.rcoin_pay_full_bill') }}
                                 </button>
                             </div>
@@ -305,84 +425,49 @@
                      `id="checkout-form"` so the Rcoin redemption checkbox in
                      the left column can post into this form via its
                      `form="checkout-form"` attribute. --}}
-                <form id="checkout-form" method="POST" action="{{ $checkoutProcessUrl }}" @submit.prevent="submitCheckout($event)" class="pure-card rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6">
+                <form id="checkout-form" method="POST" action="{{ $checkoutProcessUrl }}" @submit.prevent="submitCheckout($event)" class="pure-card rounded-[20px] bg-white/70 dark:bg-[#0c1a36]/60 p-5 ring-1 ring-zinc-200 backdrop-blur-xl dark:ring-white/10 sm:p-6 lg:col-span-3">
                     @csrf
                     <input type="hidden" name="payment_method" :value="method">
                     <input type="hidden" name="crypto_coin" :value="crypto">
                     <input type="hidden" name="currency" :value="$store.cart.currency">
 
-                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('checkout.select_payment_method') }}</h2>
-
-                    {{-- Checkout Currency Selector --}}
-                    <div class="mt-4" x-data="{ ccyOpen: false }">
-                        <label class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.checkout_currency') }}</label>
-                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.checkout_currency_hint') }}</p>
-                        <div class="relative mt-1.5" @click.outside="ccyOpen = false">
-                            <button
-                                type="button"
-                                @click="ccyOpen = !ccyOpen"
-                                class="flex w-full items-center justify-between gap-2 rounded-[12px] border border-zinc-200 bg-white px-3 py-2.5 text-base font-medium text-zinc-900 dark:text-white outline-none transition-colors hover:border-zinc-300 focus:outline-none"
-                            >
-                                <span class="flex items-center gap-2">
-                                    <span class="font-bold" x-text="$store.cart.currency"></span>
-                                    <span class="text-zinc-600 dark:text-zinc-400">&middot;</span>
-                                    <span x-text="$store.cart.currency === 'USD' ? @js(__('checkout.currency_usd_long')) : ($store.cart.currency === 'EUR' ? @js(__('checkout.currency_eur')) : ($store.cart.currency === 'GBP' ? @js(__('checkout.currency_gbp')) : ($store.cart.currency === 'NGN' ? @js(__('checkout.currency_ngn')) : ($store.cart.currency === 'XAF' ? @js(__('checkout.currency_xaf')) : ''))))"></span>
-                                </span>
-                                <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-150" :class="ccyOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </button>
-
-                            <div
-                                x-show="ccyOpen"
-                                x-cloak
-                                x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0 -translate-y-1"
-                                x-transition:enter-end="opacity-100 translate-y-0"
-                                x-transition:leave="transition ease-in duration-100"
-                                x-transition:leave-start="opacity-100 translate-y-0"
-                                x-transition:leave-end="opacity-0 -translate-y-1"
-                                class="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-[12px] border border-zinc-200 bg-white/80 p-1 shadow-xl shadow-zinc-900/10 backdrop-blur-xl"
-                                role="listbox"
-                            >
-                                @foreach (array_filter(\App\Domain\Shared\Enums\Currency::cases(), fn ($c) => $c->value !== 'RCOIN') as $c)
-                                    @php
-                                        // The enum's label() is English; a currency added
-                                        // without a translation keeps showing that label.
-                                        $currencyKey = 'checkout.currency_'.strtolower($c->value);
-                                    @endphp
-                                    <button
-                                        type="button"
-                                        @click="
-                                            localStorage.setItem('locale.currency', '{{ $c->value }}');
-                                            window.dispatchEvent(new Event('currency-changed'));
-                                            ccyOpen = false;
-                                        "
-                                        class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-colors"
-                                        :class="$store.cart.currency === '{{ $c->value }}' ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100'"
-                                    >
-                                        <span>{{ $c->value }} &middot; {{ \Illuminate\Support\Facades\Lang::has($currencyKey) ? __($currencyKey) : $c->label() }}</span>
-                                        <template x-if="$store.cart.currency === '{{ $c->value }}'">
-                                            <svg class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                            </svg>
-                                        </template>
-                                    </button>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
+                    <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">{{ __('checkout.select_payment_method') }}</h2>
 
                     {{-- Delivery email - doubles as a gifting field: drop a
                          friend's email here to send the redemption codes
                          straight to them instead of yourself. --}}
-                    <div class="mt-4">
-                        <label for="delivery_email" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.delivery_email_label') }}</label>
-                        <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.delivery_email_hint') }}</p>
+                    <section class="mt-5 border-b border-t border-zinc-100 py-5 dark:border-white/10" aria-labelledby="delivery-section-title">
+                        <h3 id="delivery-section-title" class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.delivery_section') }}</h3>
+                        <div class="relative mt-2 inline-grid grid-cols-2 rounded-full bg-zinc-100 p-1 dark:bg-white/5" role="group" aria-label="{{ __('checkout.delivery_section') }}">
+                            <span
+                                aria-hidden="true"
+                                class="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm ring-1 ring-zinc-950/5 transition-transform duration-300 ease-out will-change-transform motion-reduce:transition-none dark:bg-white/15 dark:ring-white/10"
+                                :class="deliveryMode === 'gift' ? 'translate-x-full' : 'translate-x-0'"
+                            ></span>
+                            <button type="button" @click="deliveryMode = 'self'" :aria-pressed="(deliveryMode === 'self').toString()"
+                                :class="deliveryMode === 'self' ? 'text-zinc-950 dark:text-white' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'"
+                                class="relative z-10 h-8 rounded-full px-4 text-xs font-bold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                                {{ __('checkout.delivery_for_me') }}
+                            </button>
+                            <button type="button" @click="deliveryMode = 'gift'" :aria-pressed="(deliveryMode === 'gift').toString()"
+                                :class="deliveryMode === 'gift' ? 'text-zinc-950 dark:text-white' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white'"
+                                class="relative z-10 h-8 rounded-full px-4 text-xs font-bold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                                {{ __('checkout.delivery_as_gift') }}
+                            </button>
+                        </div>
+                        <label for="delivery_email" class="mt-3 block text-sm font-semibold text-zinc-900 dark:text-white"
+                            x-text="deliveryMode === 'gift' ? @js(__('checkout.recipient_email_label')) : @js(__('checkout.your_delivery_email_label'))"></label>
+                        <p id="delivery-email-hint" class="mt-0.5 text-[13px] text-zinc-600 dark:text-zinc-400"
+                            x-text="deliveryMode === 'gift' ? @js(__('checkout.recipient_email_hint')) : @js(__('checkout.your_delivery_email_hint'))"></p>
                         <input id="delivery_email" name="delivery_email" type="email" required
                             value="{{ old('delivery_email', auth()->user()?->email) }}"
-                            placeholder="{{ __('checkout.delivery_email_placeholder') }}" class="{{ $fieldClass }}">
+                            :placeholder="deliveryMode === 'gift' ? @js(__('checkout.recipient_email_placeholder')) : @js(__('checkout.delivery_email_placeholder'))"
+                            aria-describedby="delivery-email-hint" autocomplete="email" class="{{ $fieldClass }}">
                         @error('delivery_email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </section>
+
+                    <div class="mt-5">
+                        <h3 class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.payment_method') }}</h3>
                     </div>
 
                     {{-- Gateway outage notice. Server-rendered from the same
@@ -425,29 +510,38 @@
                     @endif
 
                     {{-- Method tabs --}}
-                    <div class="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                         <template x-for="m in getFilteredMethods()" :key="m.key">
                             <button type="button" @click="if (! isMethodDisabled(m.key)) method = m.key"
                                 :disabled="isMethodDisabled(m.key)"
                                 :aria-disabled="isMethodDisabled(m.key)"
+                                :aria-pressed="(method === m.key).toString()"
                                 :class="isMethodDisabled(m.key)
                                     ? 'border-zinc-200 opacity-45 grayscale cursor-not-allowed'
-                                    : (method === m.key ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300')"
-                                class="flex items-start gap-2.5 rounded-[12px] border bg-white px-3 py-2.5 text-left transition duration-150 active:scale-[0.98] disabled:active:scale-100">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
+                                    : (method === m.key ? 'border-blue-600 bg-blue-50/60 ring-1 ring-blue-600 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500' : 'border-zinc-200 hover:border-zinc-300')"
+                                {{-- rounded-[12px], not rounded-full: this tile is 74px tall
+                                     and holds two lines, so a full radius resolves to half
+                                     its height and draws an ellipse rather than a pill - the
+                                     label wraps against the curve and the tick floats off
+                                     the corner. It is the same radius as the coin tiles in
+                                     the crypto panel below, which is the selector it sits
+                                     beside, and the storefront's card default. --}}
+                                class="relative flex min-h-[74px] items-start gap-2.5 rounded-[12px] border bg-white px-3 py-3 text-left transition duration-150 active:scale-[0.98] disabled:active:scale-100 dark:bg-white/5">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
                                     <template x-if="m.icon">
-                                        {{-- Card + Apple Pay icons are monochrome glyphs: force them
-                                             black in light mode, white in dark mode. The other payment
-                                             icons (MoMo, crypto, wallet, bank) keep their brand colors. --}}
-                                        <img :src="m.icon" alt=""
-                                             :class="['h-5 w-5 object-contain', (m.key === 'card' || m.key === 'apple_pay') ? 'brightness-0 dark:invert' : '']"
-                                             loading="lazy">
+                                        {{-- Every method uses a reusable SVG asset now. Monochrome
+                                             artwork follows the global dark-mode SVG treatment;
+                                             branded coin artwork keeps its own colour via app.css. --}}
+                                        <img :src="m.icon" alt="" class="h-5 w-5 object-contain" width="20" height="20" loading="lazy">
                                     </template>
                                 </span>
                                 <span class="min-w-0 flex-1">
                                     <span class="block text-sm font-bold text-zinc-900 dark:text-white" x-text="m.label"></span>
-                                    <span class="mt-0.5 block text-[11px] leading-tight text-zinc-500" x-text="m.desc"></span>
+                                    <span class="mt-0.5 block text-xs leading-tight text-zinc-500 dark:text-zinc-400" x-text="m.desc"></span>
                                 </span>
+                                <svg x-show="method === m.key" x-cloak class="absolute right-2 top-2 h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                </svg>
                             </button>
                         </template>
                     </div>
@@ -544,54 +638,57 @@
                         x-show="method === 'mobile_money'"
                         x-collapse
                         x-cloak
-                        x-data="{ networksByCurrency: @js($momoNetworksByCurrency), get momoNetworks() { return this.networksByCurrency[this.$store.cart.currency] ?? []; } }"
+                        x-data="{
+                            networksByCurrency: @js($momoNetworksByCurrency),
+                            chargeByCurrency: @js($momoChargeByCurrency),
+                            networkIcons: { MTN: '/assets/mtn.svg', Orange: '/assets/orange.svg' },
+                            get momoNetworks() { return this.networksByCurrency[this.$store.cart.currency] ?? []; },
+                            networkIcon(network) { return this.networkIcons[network] ?? null; },
+                            // The rail currency and rate when the charge is not in the
+                            // page's own currency; null wherever it is.
+                            get momoCharge() { return this.chargeByCurrency[this.$store.cart.currency] ?? null; },
+                            // Rounded up to whole francs, the way the charge is.
+                            momoChargeLabel() {
+                                const charge = this.momoCharge;
+                                if (! charge) return '';
+                                const factor = Math.pow(10, charge.precision);
+                                const amount = Math.ceil(this.totalDue() * charge.rate * factor) / factor;
+                                return charge.symbol + amount.toLocaleString('en-US', { minimumFractionDigits: charge.precision, maximumFractionDigits: charge.precision });
+                            }
+                        }"
                         class="mt-5 space-y-3"
                     >
-                        {{-- Network — custom glass dropdown (replaces the native <select>).
-                             Hidden for rails that take the phone number alone (M-Pesa, Rwanda). --}}
+                        {{-- Network chips. There are only a few choices per market, so
+                             keeping every option visible is faster to scan than opening
+                             a dropdown. Hidden for rails that take the phone number alone
+                             (M-Pesa, Rwanda). The hidden input remains the submitted value. --}}
                         <div x-show="momoNetworks.length > 0">
-                            <label class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_network_label') }}</label>
+                            <p id="momo-network-label" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_network_label') }}</p>
                             <div
-                                x-data="{ open: false, value: '' }"
+                                x-data="{ value: '' }"
                                 x-init="value = momoNetworks[0] ?? ''; $watch('momoNetworks', list => value = list[0] ?? '')"
-                                @click.outside="open = false"
-                                @keydown.escape="open = false"
-                                class="relative mt-1.5"
+                                class="mt-2"
                             >
                                 <input type="hidden" name="momo_network" :value="value">
-                                <button
-                                    type="button"
-                                    @click="open = !open"
-                                    :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-200 hover:border-zinc-400'"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2.5 text-base text-zinc-900 dark:text-white transition-colors"
-                                >
-                                    <span x-text="value"></span>
-                                    <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                    </svg>
-                                </button>
-                                <div
-                                    x-show="open"
-                                    x-cloak
-                                    x-transition:enter="transition ease-out duration-150"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    x-transition:leave="transition ease-in duration-100"
-                                    x-transition:leave-end="opacity-0"
-                                    class="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-[12px] border border-zinc-200 bg-white/80 p-1 shadow-xl shadow-zinc-900/10 backdrop-blur-xl"
-                                    role="listbox"
-                                >
+                                <div class="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="momo-network-label">
                                     <template x-for="net in momoNetworks" :key="net">
                                         <button
                                             type="button"
-                                            @click="value = net; open = false"
-                                            :class="value === net ? 'bg-blue-50 text-blue-700' : 'text-zinc-800 hover:bg-zinc-200'"
-                                            class="flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-base font-medium transition-colors"
+                                            role="radio"
+                                            :aria-checked="(value === net).toString()"
+                                            @click="value = net"
+                                            :class="value === net
+                                                ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500'
+                                                : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                                            class="flex h-11 items-center gap-2.5 rounded-full border bg-white pl-2 pr-4 text-sm font-bold text-zinc-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white"
                                         >
+                                            <template x-if="networkIcon(net)">
+                                                <img :src="networkIcon(net)" alt="" class="no-dark-invert h-7 w-7 shrink-0 rounded-[6px] object-contain" width="28" height="28" loading="lazy">
+                                            </template>
+                                            <template x-if="! networkIcon(net)">
+                                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-black text-zinc-600 dark:bg-white/10 dark:text-zinc-200" x-text="net.charAt(0)"></span>
+                                            </template>
                                             <span x-text="net"></span>
-                                            <svg x-show="value === net" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                            </svg>
                                         </button>
                                     </template>
                                 </div>
@@ -601,6 +698,12 @@
                             <label for="momo_phone" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_number_label') }}</label>
                             <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ $fieldClass }}">
                         </div>
+                        {{-- The rail takes CFA francs, not dollars: a USD order is
+                             converted at charge time. Said here, beside the number
+                             that will be debited, so the figure on the phone is never
+                             a surprise. Hidden wherever the charge is in the page's
+                             own currency. --}}
+                        <p x-show="momoCharge" x-cloak class="text-[13px] text-zinc-600 dark:text-zinc-400" x-text="@js(__('checkout.momo_charge_hint')).replace(':amount', momoChargeLabel())"></p>
                     </div>
 
                     {{-- Crypto --}}
@@ -624,12 +727,12 @@
                                     :title="coinUsable('{{ $coin->code }}') ? '' : coinMinLabel('{{ $coin->code }}')"
                                     :class="!coinUsable('{{ $coin->code }}')
                                         ? 'cursor-not-allowed border-zinc-200 opacity-40'
-                                        : (crypto === '{{ $coin->code }}' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-500/20' : 'border-zinc-200 hover:border-zinc-300')"
+                                        : (crypto === '{{ $coin->code }}' ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-zinc-300')"
                                     class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 text-center transition-colors">
                                     @if ($coin->iconUrl())
-                                        <img src="{{ $coin->iconUrl() }}" alt="" class="h-6 w-6 rounded-[12px]">
+                                        <img src="{{ $coin->iconUrl() }}" alt="" class="h-8 w-8 rounded-full">
                                     @else
-                                        <span class="flex h-6 w-6 items-center justify-center rounded-[12px] bg-amber-500 text-[10px] font-black text-white">{{ substr($coin->code, 0, 1) }}</span>
+                                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">{{ substr($coin->code, 0, 1) }}</span>
                                     @endif
                                     <span class="text-xs font-bold leading-tight text-zinc-900 dark:text-white">{{ $asset }}</span>
                                     @if ($network)
@@ -673,8 +776,20 @@
                          shows the discount on the total before payment; the same
                          code submits with the form so the server re-applies it. --}}
                     <div class="mt-5" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" class="text-sm font-semibold text-zinc-900 dark:text-white underline underline-offset-2 transition-colors hover:text-blue-700">
-                            {{ __('checkout.coupon_toggle') }}
+                        <button
+                            type="button"
+                            @click="open = !open"
+                            :aria-expanded="open.toString()"
+                            class="flex w-full items-center gap-2.5 rounded-full border border-zinc-200 bg-transparent px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition-colors hover:border-zinc-300 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/5"
+                        >
+                            <svg class="h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z"/>
+                            </svg>
+                            <span class="flex-1">{{ __('checkout.coupon_toggle') }}</span>
+                            <svg class="h-4 w-4 shrink-0 text-zinc-600 dark:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                                <path d="M5 12h14"/>
+                                <path d="M12 5v14" class="origin-center transition-transform duration-200" :class="open && 'scale-y-0'"/>
+                            </svg>
                         </button>
                         <div x-show="open" x-collapse x-cloak class="mt-2">
                             <div class="flex items-stretch gap-2">
@@ -691,7 +806,7 @@
                                     type="button"
                                     @click="couponApplied ? removeCoupon() : applyCoupon()"
                                     :disabled="couponLoading || (! couponApplied && ! couponCode)"
-                                    class="shrink-0 rounded-[12px] px-4 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="h-11 shrink-0 rounded-full px-5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                     :class="couponApplied ? 'bg-zinc-600 hover:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'"
                                 >
                                     <span x-show="! couponLoading" x-text="couponApplied ? @js(__('checkout.remove')) : @js(__('checkout.coupon_apply'))"></span>
@@ -738,8 +853,11 @@
                             <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.subtotal') }}</span>
                             <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="$store.cart.pay($store.cart.subtotal)"></span>
                         </div>
-                        <div class="mt-2 flex items-center justify-between text-sm">
-                            <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.processing_fee') }}</span>
+                        <div class="mt-2 flex items-center justify-between gap-4 text-sm">
+                            <span class="inline-flex min-w-0 items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-400">
+                                <span x-text="feeLabel()"></span>
+                                <span class="text-xs text-zinc-400" x-text="'(' + feeRate() + '%)'" :title="@js(__('checkout.fee_rate_note')).replace(':rate', () => feeRate())"></span>
+                            </span>
                             <span class="font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="$store.cart.pay(processingFee())"></span>
                         </div>
                         <div x-show="couponApplied" x-cloak class="mt-2 flex items-center justify-between text-sm">
@@ -764,13 +882,20 @@
                          estimate on top would charge the customer for the same fees
                          twice. The order total below is the price of the goods; the
                          exact crypto amount is quoted once, on the payment screen. --}}
-                    <div class="mt-5 flex items-center justify-between border-t border-zinc-100 dark:border-white/10 pt-5" :class="processingFee() > 0 && 'mt-3 border-t-0 pt-0'">
+                    <div class="mt-5 flex items-start justify-between gap-4 border-t border-zinc-100 dark:border-white/10 pt-5" :class="processingFee() > 0 && 'mt-3 border-t-0 pt-0'">
                         {{-- "Total amount", not "Total amount to pay": for crypto the
                              figure actually payable is quoted on the next screen, straight
                              from the gateway, and promising this is the amount to pay would
                              recreate the two-numbers problem in words. --}}
-                        <span class="text-base font-bold text-zinc-900 dark:text-white">{{ __('checkout.total_amount') }}</span>
-                        <span x-data="valueFlip()" x-effect="totalLabel(); flash()" class="inline-block text-lg font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="totalLabel()">0.00</span>
+                        <span class="text-base font-bold text-zinc-900 dark:text-white">
+                            {{ __('checkout.total_amount') }}
+                            {{-- The charge currency, stated where the figure is. It used to
+                                 be the chooser's hint; with the chooser gone this is the
+                                 only place on the page that says it, and on a phone the
+                                 nav's region pill shows a flag with no code beside it. --}}
+                            <span class="mt-0.5 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{{ __('checkout.checkout_currency_hint') }}</span>
+                        </span>
+                        <span x-data="valueFlip()" x-effect="totalLabel(); flash()" class="inline-block text-lg font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="totalLabel()" aria-live="polite">0.00</span>
                     </div>
 
                     {{-- The "exact amount is confirmed on the next step" notice that used to
@@ -797,6 +922,7 @@
                          A guest hits the sign-in wall instead; their cart
                          merges into the account at sign-in and the modal
                          returns them right here to pay. --}}
+                    <div class="mt-4">
                     @auth
                         {{-- A pause disables the button while it counts down. A lock
                              leaves it tappable: tapping reopens the lock notice, the
@@ -804,14 +930,12 @@
                              from wallet balance is never held, so choosing wallet
                              shows the ordinary button whatever is being served. --}}
                         <button type="submit" :disabled="!canContinue() || submitting || (backoffApplies() && ! backoffLocked)"
-                            class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
+                            class="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600">
                             <template x-if="backoffApplies()">
                                 <span class="flex items-center gap-2" x-text="backoffLabel()"></span>
                             </template>
                             <template x-if="!submitting && ! backoffApplies()">
-                                <span class="flex items-center gap-2">
-                                    {{ __('checkout.continue_to_payment') }}
-                                </span>
+                                <span class="flex items-center gap-2" x-text="@js(__('checkout.continue_with_method')).replace(':method', () => methodLabel()).replace(':amount', () => totalLabel())"></span>
                             </template>
                             <template x-if="submitting && ! backoffApplies()">
                                 <span class="flex items-center gap-2">
@@ -824,10 +948,15 @@
                             </template>
                         </button>
                     @else
-                        <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login', returnTo: window.location.pathname + window.location.search })" class="mt-4 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-base font-bold text-white shadow-md transition-colors hover:bg-blue-700">
-                            {{ __('checkout.sign_in_to_pay') }}
+                        <button type="button" @click="$dispatch('open-auth-modal', { mode: 'login', returnTo: window.location.pathname + window.location.search })" class="flex h-11 w-full items-center justify-center rounded-full bg-blue-600 px-4 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            x-text="@js(__('checkout.sign_in_to_continue_amount')).replace(':amount', () => totalLabel())">
                         </button>
-                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">{{ __('checkout.sign_in_required_note') }}</p>
+                        <p class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">
+                            {{ __('checkout.sign_in_required_note') }}
+                            <button type="button" @click="$dispatch('open-auth-modal', { mode: 'register', returnTo: window.location.pathname + window.location.search })" class="ml-1 font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                                {{ __('checkout.create_account') }}
+                            </button>
+                        </p>
                     @endauth
 
                     <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
@@ -836,6 +965,7 @@
                         </svg>
                         {{ __('checkout.secure_checkout_note') }}
                     </p>
+                    </div>
                 </form>
 
             </div>
@@ -847,7 +977,11 @@
                 {{-- Only a real Escape keypress closes the wizard. app.js fires a
                      synthetic Escape on page scroll to collapse dropdowns, and an
                      untrusted one must never abort a payment in flight. --}}
-                x-on:keydown.escape.window="$event.isTrusted && open && closeModal()"
+                x-on:keydown.escape.window="$event.isTrusted && open && requestClose()"
+                {{-- Closing the tab or reloading mid-payment gets the browser's
+                     own "leave this page?" check, the one guard a page can put
+                     on that path. --}}
+                x-on:beforeunload.window="if (paymentInFlight()) { $event.preventDefault(); $event.returnValue = '' }"
                 class="fixed inset-0 z-[80] flex items-center justify-center p-4"
             >
                 <!-- Backdrop -->
@@ -860,7 +994,7 @@
                     x-transition:leave-start="opacity-100"
                     x-transition:leave-end="opacity-0"
                     class="fixed inset-0 bg-zinc-950/40 backdrop-blur-md"
-                    @click="closeModal()"
+                    @click="requestClose()"
                 ></div>
 
                 <!-- Modal Content Wrapper. Widens during 3DS so the bank's authentication
@@ -879,13 +1013,51 @@
                     aria-modal="true"
                 >
                     <!-- Close button -->
-                    <x-close-button @click="closeModal()" class="absolute right-4 top-4" :aria-label="__('common.close')" />
+                    <x-close-button @click="requestClose()" class="absolute right-4 top-4" :aria-label="__('common.close')" />
+
+                    {{-- Cancel guard. A backdrop click, Escape or the close button
+                         while a payment is in flight lands here rather than closing:
+                         a prompt over the wizard, with staying as the easy choice
+                         (the blue button, and the one that takes focus) and the
+                         cancel a quiet red text button beneath it. Nothing is charged
+                         until a payment completes, so the copy says so. It replaces a
+                         browser confirm, which was easy to dismiss without reading. --}}
+                    <div
+                        x-show="cancelPrompt"
+                        x-cloak
+                        x-transition.opacity.duration.150ms
+                        @click.stop
+                        @keydown.escape.stop="cancelPrompt = false"
+                        class="absolute inset-0 z-10 flex items-center justify-center rounded-[24px] bg-white/95 p-6 backdrop-blur-sm"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="checkout-cancel-title"
+                        aria-describedby="checkout-cancel-body"
+                    >
+                        <div class="w-full max-w-sm text-center">
+                            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-500/15">
+                                <svg class="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                                </svg>
+                            </div>
+                            <h3 id="checkout-cancel-title" class="mt-4 text-base font-bold text-zinc-900 dark:text-white">{{ __('checkout.cancel_prompt_title') }}</h3>
+                            <p id="checkout-cancel-body" class="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{{ __('checkout.cancel_prompt_body') }}</p>
+                            <div class="mt-6 flex flex-col gap-2.5">
+                                <button type="button" x-ref="keepPayingButton" @click="cancelPrompt = false" class="inline-flex h-11 w-full items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700">
+                                    {{ __('checkout.cancel_prompt_keep') }}
+                                </button>
+                                <button type="button" @click="cancelPayment()" :disabled="cancelling" class="inline-flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60 dark:hover:bg-red-500/10">
+                                    <span x-text="cancelling ? @js(__('checkout.cancel_prompt_cancelling')) : @js(__('checkout.cancel_prompt_cancel'))"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Active Payment Session Details & Wizard -->
                     {{-- Every panel that can open without a payment session must be
                          listed here, or the modal opens empty. backoff_notice (the
                          card-testing lock) never has a session. --}}
-                    <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice' || paymentState === 'backoff_notice'" class="mt-2">
+                    <div x-show="session || paymentState === 'error' || paymentState === 'kyc_required' || paymentState === 'email_notice' || paymentState === 'backoff_notice' || paymentState === 'wallet_pin_setup'" class="mt-2">
                         <!-- Countdown timer banner -->
                         <div x-show="['awaiting_transfer', 'awaiting_confirmation', 'action_pin', 'action_otp', 'action_3ds'].includes(paymentState)" 
                              class="mb-5 flex items-center justify-between rounded-[12px] bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
@@ -903,8 +1075,8 @@
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.card_pin_title') }}</h3>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{{ __('checkout.card_pin_hint') }}</p>
                             <div class="space-y-4">
-                                <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
-                                <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                                <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge transition-colors">
+                                <button type="button" @click="paySession('card', cardDetails)" class="flex h-11 w-full items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700">
                                     {{ __('checkout.card_pin_confirm') }}
                                 </button>
                             </div>
@@ -917,10 +1089,10 @@
                             <div class="space-y-4">
                                 <input type="password" inputmode="numeric" x-ref="walletPinInput" x-model="walletPin" maxlength="4" placeholder="••••"
                                     @keydown.enter.prevent="authorizeWalletPayment()"
-                                    class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                                    class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge transition-colors">
                                 <p x-show="errorMessage" x-cloak class="text-center text-xs text-red-600" x-text="errorMessage"></p>
                                 <button type="button" @click="authorizeWalletPayment()" :disabled="authorizingWallet"
-                                    class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                                    class="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
                                     <svg x-show="authorizingWallet" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -931,13 +1103,48 @@
                             </div>
                         </div>
 
+                        {{-- Wallet: no PIN yet. Setting one here keeps the customer in
+                             the checkout: the PIN is saved through the same endpoint the
+                             security page uses, then the kept submission is sent again
+                             and the modal moves on to the PIN step. A calm blue lock,
+                             not the red failure state: nothing failed, something is
+                             missing. --}}
+                        <div x-show="paymentState === 'wallet_pin_setup'" x-cloak class="flex flex-col items-center py-4 text-center">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/15">
+                                <svg class="h-6 w-6 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+                                </svg>
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.wallet_pin_setup_title') }}</h3>
+                            <p class="mt-1.5 px-4 text-xs text-zinc-600 dark:text-zinc-300">{{ __('checkout.wallet_pin_setup_hint') }}</p>
+                            <div class="mt-5 w-full space-y-3 px-2">
+                                <label class="sr-only" for="checkout-new-pin">{{ __('checkout.wallet_pin_setup_new') }}</label>
+                                <input id="checkout-new-pin" type="password" inputmode="numeric" autocomplete="new-password" x-ref="newPinInput" x-model="newPin" maxlength="4" placeholder="{{ __('checkout.wallet_pin_setup_new') }}"
+                                    class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:text-white">
+                                <label class="sr-only" for="checkout-new-pin-confirmation">{{ __('checkout.wallet_pin_setup_confirm') }}</label>
+                                <input id="checkout-new-pin-confirmation" type="password" inputmode="numeric" autocomplete="new-password" x-model="newPinConfirmation" maxlength="4" placeholder="{{ __('checkout.wallet_pin_setup_confirm') }}"
+                                    @keydown.enter.prevent="savePinAndContinue()"
+                                    class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:text-white">
+                                <p x-show="pinSetupError" x-cloak role="alert" class="text-center text-xs text-red-600" x-text="pinSetupError"></p>
+                                <button type="button" @click="savePinAndContinue()" :disabled="settingUpPin"
+                                    class="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                                    <svg x-show="settingUpPin" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                    <span x-text="settingUpPin ? @js(__('checkout.wallet_pin_setup_saving')) : @js(__('checkout.wallet_pin_setup_save'))"></span>
+                                </button>
+                                <button type="button" @click="closeModal()" class="block w-full text-center text-[11px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">{{ __('checkout.wallet_pin_setup_later') }}</button>
+                            </div>
+                        </div>
+
                         <!-- Card Auth: OTP Challenge -->
                         <div x-show="paymentState === 'action_otp'">
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.otp_title') }}</h3>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4" x-text="actionMessage"></p>
                             <div class="space-y-4">
-                                <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
-                                <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                                <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge transition-colors">
+                                <button type="button" @click="paySession('card', cardDetails)" class="flex h-11 w-full items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700">
                                     {{ __('checkout.otp_verify') }}
                                 </button>
                             </div>
@@ -952,7 +1159,7 @@
                                 <iframe :src="session?.payment_payload?.redirect_url" class="h-full w-full border-0" allow="payment"></iframe>
                             </div>
 
-                            <button type="button" @click="verifyPayment()" :disabled="verifying" class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                            <button type="button" @click="verifyPayment()" :disabled="verifying" class="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
                                 <svg x-show="verifying" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -979,7 +1186,7 @@
                                             <span class="text-zinc-500 font-medium">{{ __('checkout.account_number') }}</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="font-extrabold text-zinc-900 dark:text-white text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[12px] border border-zinc-150" x-text="bankDetails?.account_number"></span>
-                                                <button type="button" @click="copyToClipboard(bankDetails?.account_number, 'account')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[12px] transition-all">
+                                                <button type="button" @click="copyToClipboard(bankDetails?.account_number, 'account')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-full transition-all">
                                                     <span x-show="!copiedStates['account']">{{ __('common.copy') }}</span>
                                                     <span x-show="copiedStates['account']" class="text-emerald-600 font-bold">{{ __('checkout.copied') }}</span>
                                                 </button>
@@ -1011,7 +1218,7 @@
                                         <div class="mt-1 flex items-center justify-center gap-2">
                                             <span class="text-xl font-extrabold tabular-nums tracking-tight text-blue-900 dark:text-blue-100" x-text="session?.payment_payload?.pay_amount"></span>
                                             <span class="text-sm font-bold uppercase text-blue-700 dark:text-blue-300" x-text="session?.payment_payload?.pay_currency"></span>
-                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="rounded-[12px] bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 transition-all hover:bg-white">
+                                            <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 transition-all hover:bg-white">
                                                 <span x-show="!copiedStates['amount_crypto']">{{ __('common.copy') }}</span>
                                                 <span x-show="copiedStates['amount_crypto']" class="font-bold text-emerald-600">{{ __('checkout.copied') }}</span>
                                             </button>
@@ -1042,8 +1249,8 @@
                                             <div>
                                                 <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">{{ __('checkout.crypto_deposit_address') }}</span>
                                                 <div class="mt-1 flex items-center gap-1.5">
-                                                    <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-white px-2.5 py-1.5 rounded-[12px] border border-zinc-200 text-[10px] text-zinc-800 font-mono select-all outline-none">
-                                                    <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address, 'address')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold shrink-0 bg-blue-50 px-2.5 py-1.5 rounded-[12px] transition-all border border-blue-100">
+                                                    <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-white px-2.5 py-1.5 rounded-full border-2 border-zinc-200 text-[10px] text-zinc-800 font-mono select-all outline-none focus:border-edge dark:focus:border-edge transition-colors">
+                                                    <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address, 'address')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold shrink-0 bg-blue-50 px-2.5 py-1.5 rounded-full transition-all border border-blue-100">
                                                         <span x-show="!copiedStates['address']">{{ __('common.copy') }}</span>
                                                         <span x-show="copiedStates['address']" class="text-emerald-600 font-bold">{{ __('checkout.copied') }}</span>
                                                     </button>
@@ -1057,8 +1264,8 @@
                                                 <div class="rounded-[12px] border border-amber-300 bg-amber-50 p-2.5 dark:border-amber-500/30 dark:bg-amber-900/20">
                                                     <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">{{ __('checkout.crypto_memo_label') }} — {{ __('checkout.crypto_memo_required') }}</span>
                                                     <div class="mt-1 flex items-center gap-1.5">
-                                                        <input type="text" readonly :value="session?.payment_payload?.payin_extra_id" class="w-full rounded-[12px] border border-amber-200 bg-white px-2.5 py-1.5 font-mono text-[10px] text-zinc-800 outline-none select-all">
-                                                        <button type="button" @click="copyToClipboard(session?.payment_payload?.payin_extra_id, 'memo')" class="shrink-0 rounded-[12px] border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-[10px] font-bold text-amber-800 transition-all">
+                                                        <input type="text" readonly :value="session?.payment_payload?.payin_extra_id" class="w-full rounded-full border-2 border-amber-200 bg-white px-2.5 py-1.5 font-mono text-[10px] text-zinc-800 outline-none select-all border-zinc-200 dark:border-white/10 focus:border-edge dark:focus:border-edge transition-colors">
+                                                        <button type="button" @click="copyToClipboard(session?.payment_payload?.payin_extra_id, 'memo')" class="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-2.5 py-1.5 text-[10px] font-bold text-amber-800 transition-all">
                                                             <span x-show="!copiedStates['memo']">{{ __('common.copy') }}</span>
                                                             <span x-show="copiedStates['memo']" class="font-bold text-emerald-600">{{ __('checkout.copied') }}</span>
                                                         </button>
@@ -1099,7 +1306,7 @@
 
                                     <template x-if="session.underpayment.can_top_up">
                                         <button type="button" @click="requestTopUp()" :disabled="topUpLoading"
-                                            class="mt-3 w-full rounded-[12px] bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60">
+                                            class="mt-3 w-full rounded-full bg-amber-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60">
                                             <span x-show="!topUpLoading">{{ __('checkout.underpaid_pay_balance') }}</span>
                                             <span x-show="topUpLoading">{{ __('checkout.underpaid_creating') }}</span>
                                         </button>
@@ -1137,9 +1344,9 @@
                         <!-- Mobile money push prompt -->
                         <div x-show="paymentState === 'awaiting_confirmation'">
                             <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-2">{{ __('checkout.momo_authorize_title') }}</h3>
-                            <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4" x-text="actionMessage"></p>
+                            <p class="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400 mb-4" x-text="actionMessage"></p>
 
-                            <div class="flex flex-col items-center py-6 text-center">
+                            <div class="flex flex-col items-center py-4 text-center">
                                 <span class="flex h-16 w-16 items-center justify-center rounded-[12px] bg-blue-50 ring-8 ring-blue-100/50 mb-5">
                                     <svg class="h-8 w-8 text-blue-600 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -1149,8 +1356,24 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                 </svg>
-                                <p class="text-xs font-semibold text-zinc-800 mt-3">{{ __('checkout.momo_verifying') }}</p>
+                                <p class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 mt-3">{{ __('checkout.momo_verifying') }}</p>
                             </div>
+
+                            {{-- No prompt? The operator's own way to approve the
+                                 pending payment: the dial code large enough to
+                                 read off the screen, the steps beneath it. Hidden
+                                 for a market with no code on file. --}}
+                            <div x-show="momoApproval" x-cloak class="mt-2 rounded-[12px] bg-[#f4f6f5] p-4 text-left dark:bg-white/5" data-momo-approval>
+                                <p class="text-xs font-bold text-zinc-900 dark:text-white">{{ __('checkout.momo_no_prompt_title') }}</p>
+                                <p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300" x-text="@js(__('checkout.momo_no_prompt_dial')).replace(':code', momoApproval?.code || '').replace(':network', momoApproval?.network || '')"></p>
+                                <p class="mt-2 font-mono text-2xl font-black tracking-[0.2em] text-blue-600 dark:text-blue-300" x-text="momoApproval?.code"></p>
+                                <ol class="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+                                    <template x-for="step in (momoApproval?.steps || [])" :key="step">
+                                        <li x-text="step"></li>
+                                    </template>
+                                </ol>
+                            </div>
+                            <p class="mt-3 text-center text-[11px] text-zinc-500 dark:text-zinc-400">{{ __('checkout.momo_keep_open') }}</p>
                         </div>
 
                         <!-- Processing state -->
@@ -1175,9 +1398,11 @@
                         <div x-show="paymentState === 'error'" class="flex flex-col items-center py-6 text-center">
                             <x-error-cross />
                             <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.payment_failed_title') }}</h3>
-                            <p class="mt-1.5 text-xs text-red-600 px-4" x-html="errorMessage"></p>
+                            <p class="mt-1.5 text-xs text-red-600 px-4" x-html="errorMessage" @click="if ($event.target.closest('[data-pin-setup]')) { startPinSetup() }"></p>
 
-                            <button type="button" @click="closeModal()" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                            @include('shop._payment-failure-help')
+
+                            <button type="button" @click="closeModal()" class="mt-6 rounded-full bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                                 {{ __('checkout.close_modify_details') }}
                             </button>
                         </div>
@@ -1201,10 +1426,10 @@
                                     type="button"
                                     @click="resendVerification()"
                                     :disabled="resendRemaining > 0 || resendBusy"
-                                    class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5"
+                                    class="rounded-full px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5"
                                     x-text="resendBusy ? @js(__('checkout.resend_sending')) : (resendRemaining > 0 ? @js(__('checkout.resend_in')).replace(':time', () => resendLabel(resendRemaining)) : @js(__('checkout.resend_email')))"
                                 ></button>
-                                <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                <button type="button" @click="closeModal()" class="inline-flex h-10 items-center rounded-full bg-blue-600 px-8 text-xs font-semibold text-white hover:bg-blue-700">
                                     {{ __('checkout.got_it') }}
                                 </button>
                             </div>
@@ -1230,10 +1455,10 @@
                             <p x-show="backoffRemaining > 0" x-cloak class="mt-3 rounded-[10px] bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300" x-text="'Try again in ' + backoffCountdown()"></p>
 
                             <div class="mt-6 flex items-center justify-center gap-2.5">
-                                <a href="{{ route('shop.contact') }}" class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5">
+                                <a href="{{ route('shop.contact') }}" class="rounded-full px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:ring-white/15 dark:hover:bg-white/5">
                                     Contact support
                                 </a>
-                                <button type="button" @click="closeModal()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                <button type="button" @click="closeModal()" class="inline-flex h-10 items-center rounded-full bg-blue-600 px-8 text-xs font-semibold text-white hover:bg-blue-700">
                                     Got it
                                 </button>
                             </div>
@@ -1252,7 +1477,7 @@
                             <h3 class="mt-4 text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.kyc_title') }}</h3>
                             <p class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 px-4" x-text="kycMessage"></p>
 
-                            <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                            <button type="button" @click="verifyIdentity()" class="mt-6 inline-flex h-10 items-center rounded-full bg-blue-600 px-8 text-xs font-semibold text-white hover:bg-blue-700">
                                 {{ __('checkout.kyc_verify') }}
                             </button>
                             <button type="button" @click="closeModal()" class="mt-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
@@ -1278,6 +1503,7 @@
                 isLoggedIn: isLoggedIn || false,
                 hasTransactionPin: hasTransactionPin || false,
                 paymentFees: paymentFees || { fee_free: [], methods: {}, default: { transaction: 0, international: 0 } },
+                deliveryMode: 'self',
 
                 // Coupon live-preview state. couponApplied holds the validated
                 // code once Apply succeeds; the discount is shown on the total
@@ -1392,22 +1618,22 @@
                 // network and brand names (Visa, MTN, Apple Pay) and the USSD
                 // scheme name read the same in every language, so they stay literal.
                 allMethods: [
-                    { key: 'card',          label: @js(__('checkout.method_card')),          desc: 'Visa, Mastercard',           icon: '/assets/credit%20card%20payment.webp' },
-                    { key: 'mobile_money',  label: @js(__('checkout.method_mobile_money')),  desc: 'MTN, Orange, Vodafone, M-Pesa', icon: '/assets/MOMO.svg' },
-                    { key: 'bank_transfer', label: @js(__('checkout.method_bank_transfer')), desc: @js(__('checkout.method_bank_transfer_desc')), icon: '/assets/Bank%20transfer.webp' },
+                    { key: 'card',          label: @js(__('checkout.method_card')),          desc: 'Visa, Mastercard',           icon: '/assets/payment-card.svg' },
+                    { key: 'mobile_money',  label: @js(__('checkout.method_mobile_money')),  desc: 'MTN, Orange, Vodafone, M-Pesa', icon: '/assets/payment-mobile-money.svg' },
+                    { key: 'bank_transfer', label: @js(__('checkout.method_bank_transfer')), desc: @js(__('checkout.method_bank_transfer_desc')), icon: '/assets/payment-bank-transfer.svg' },
                     // New: covers Flutterwave's "Pay With Bank" (internet banking
                     // redirect) for NGN / GBP / EUR.
-                    { key: 'pay_with_bank', label: @js(__('checkout.method_pay_with_bank')), desc: @js(__('checkout.method_pay_with_bank_desc')), icon: '/assets/Bank%20transfer.webp' },
+                    { key: 'pay_with_bank', label: @js(__('checkout.method_pay_with_bank')), desc: @js(__('checkout.method_pay_with_bank_desc')), icon: '/assets/payment-pay-with-bank.svg' },
                     // New: USSD dial codes (Nigeria). Customer dials a code on
                     // their phone to authorise the payment.
-                    { key: 'ussd',          label: 'USSD',                                   desc: @js(__('checkout.method_ussd_desc')), icon: '/assets/credit%20card%20payment.webp' },
+                    { key: 'ussd',          label: 'USSD',                                   desc: @js(__('checkout.method_ussd_desc')), icon: '/assets/payment-ussd.svg' },
                     // New: scan-to-pay QR (Nigerian banks).
-                    { key: 'bank_qr',       label: @js(__('checkout.method_bank_qr')),       desc: @js(__('checkout.method_bank_qr_desc')), icon: '/assets/credit%20card%20payment.webp' },
+                    { key: 'bank_qr',       label: @js(__('checkout.method_bank_qr')),       desc: @js(__('checkout.method_bank_qr_desc')), icon: '/assets/payment-bank-qr.svg' },
                     // New: NGN digital wallets (OPay / eNaira). Provider name
                     // hidden per project convention; admin reconciliation still
                     // sees the specific provider on the order.
-                    { key: 'mobile_wallet', label: @js(__('checkout.method_mobile_wallet')), desc: @js(__('checkout.method_mobile_wallet_desc')), icon: '/assets/Wallet.svg' },
-                    { key: 'apple_pay',     label: 'Apple Pay',                              desc: @js(__('checkout.method_apple_pay_desc')), icon: '/assets/apply%20pay.webp' },
+                    { key: 'mobile_wallet', label: @js(__('checkout.method_mobile_wallet')), desc: @js(__('checkout.method_mobile_wallet_desc')), icon: '/assets/payment-mobile-wallet.svg' },
+                    { key: 'apple_pay',     label: 'Apple Pay',                              desc: @js(__('checkout.method_apple_pay_desc')), icon: '/assets/payment-apple-pay.svg' },
                     { key: 'crypto',        label: @js(__('checkout.method_crypto')),        desc: @js(__('checkout.method_crypto_desc')), icon: '/assets/USDT.svg' },
                     { key: 'wallet',        label: @js(__('checkout.method_wallet')),        desc: @js(__('checkout.method_wallet_desc')), icon: '/assets/Wallet.svg' }
                 ],
@@ -1427,8 +1653,11 @@
                     // Apple Pay only in USD, GBP and NGN: the gateway refuses
                     // it in every other currency before looking at anything
                     // else (mirrors SupportedPaymentMethods).
+                    // USD also carries mobile money: it rides the Francophone
+                    // rail in CFA francs (MobileMoneyRail), second in the grid
+                    // so a card-first market keeps its card first.
                     const mapping = {
-                        'USD': ['card', 'crypto', 'apple_pay', 'wallet'],
+                        'USD': ['card', 'mobile_money', 'crypto', 'apple_pay', 'wallet'],
                         'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
                         'GBP': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
                         'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'apple_pay', 'crypto', 'wallet'],
@@ -1439,7 +1668,11 @@
                         'UGX': ['mobile_money', 'card', 'crypto', 'wallet'],
                         'RWF': ['mobile_money', 'card', 'crypto', 'wallet'],
                     };
-                    const allowedKeys = mapping[currency] || ['card', 'crypto'];
+                    // A currency with no list of its own gets card only, matching
+                    // SupportedPaymentMethods::FALLBACK. Offering Crypto here drew a
+                    // 422 from the pay step, and with no currency chooser on this
+                    // page there is no longer any way out of it.
+                    const allowedKeys = mapping[currency] || ['card'];
                     return this.allMethods.filter(m => {
                         if (m.key === 'wallet' && !this.isLoggedIn) {
                             return false;
@@ -1466,12 +1699,32 @@
                 otpValue: '',
                 walletPin: '',
                 authorizingWallet: false,
+                // The PIN setup step, for a wallet payment with no PIN yet.
+                newPin: '',
+                newPinConfirmation: '',
+                settingUpPin: false,
+                pinSetupError: '',
                 momoDetails: {
                     phone_number: '',
                     network: ''
                 },
                 paymentState: 'idle',
                 errorMessage: '',
+                // The mobile money waiting panel: the operator's dial code and
+                // steps when no prompt arrives, and the number and amount the
+                // prompt was sent to.
+                momoApproval: null,
+                momoMeta: null,
+                // The failed session's customer-safe reason code, read by the
+                // "Having trouble?" help under the failed state.
+                failureCode: null,
+                // Why a payment failed, by the session's customer-safe reason
+                // code, in this customer's language. The server's own sentence
+                // is the fallback for a code without copy.
+                failureCopy: @js(\App\Domain\Payment\Support\CustomerFailureCopy::map()),
+                // The cancel guard over the wizard, and its in-flight request.
+                cancelPrompt: false,
+                cancelling: false,
                 actionMessage: '',
                 // Whether the current hold is the six hour device lock rather
                 // than a short pause. Drives the heading only; the sentence
@@ -1806,6 +2059,24 @@
                     return Math.round(amount * pct) / 100;
                 },
 
+                methodLabel() {
+                    return this.allMethods.find((candidate) => candidate.key === this.method)?.label || @js(__('checkout.payment_method'));
+                },
+
+                feeRate() {
+                    if (this.method === 'crypto' || (this.paymentFees.fee_free || []).includes(this.method)) {
+                        return 0;
+                    }
+                    const rates = (this.paymentFees.methods || {})[this.method] || this.paymentFees.default || { transaction: 0, international: 0 };
+                    const international = (this.$store.cart.currency || 'NGN') !== 'NGN';
+                    const rate = Number(rates.transaction || 0) + (international ? Number(rates.international || 0) : 0);
+                    return Number(rate.toFixed(1));
+                },
+
+                feeLabel() {
+                    return @js(__('checkout.method_processing_fee')).replace(':method', () => this.methodLabel());
+                },
+
                 // The order total, in the customer's display currency, for every
                 // method including crypto.
                 //
@@ -1817,9 +2088,13 @@
                 // be read back from the payment it creates. Quoting the order total in
                 // fiat and the crypto amount exactly once — on the payment screen,
                 // straight from the gateway — is the only way both screens can agree.
+                // The figure the order is charged for, in the display currency.
+                totalDue() {
+                    return Math.max(0, Number(this.$store.cart.subtotal || 0) + this.processingFee() - Number(this.couponDiscountDisplay || 0));
+                },
+
                 totalLabel() {
-                    const display = Math.max(0, Number(this.$store.cart.subtotal || 0) + this.processingFee() - Number(this.couponDiscountDisplay || 0));
-                    return this.$store.cart.pay(display);
+                    return this.$store.cart.pay(this.totalDue());
                 },
 
                 points() {
@@ -1928,8 +2203,13 @@
 
                     if (this.method === 'wallet' && !this.hasTransactionPin) {
                         this.submitting = false;
+                        // The link in the message is a button: it opens the PIN
+                        // setup step in this modal rather than sending the customer
+                        // to their settings, and the submission is kept so it can
+                        // be sent again once the PIN exists.
+                        this.pendingForm = e.target;
                         this.paymentState = 'error';
-                        this.errorMessage = @js(__('checkout.wallet_pin_missing', ['link' => '<a href="/dashboard/password" class="underline font-bold text-blue-600 hover:text-blue-700">'.e(__('checkout.wallet_pin_missing_link')).'</a>']));
+                        this.errorMessage = @js(__('checkout.wallet_pin_missing', ['link' => '<button type="button" data-pin-setup class="underline font-bold text-blue-600 hover:text-blue-700">'.e(__('checkout.wallet_pin_missing_link')).'</button>']));
                         this.open = true;
                         return;
                     }
@@ -2141,6 +2421,7 @@
                 async paySession(method, dataPayload = {}) {
                     this.paymentState = 'processing';
                     this.errorMessage = '';
+                    this.failureCode = null;
                     try {
                         let body = {
                             method: method,
@@ -2248,7 +2529,7 @@
                         this.errorMessage = @js(__('checkout.payment_start_failed'));
                     } else if (status === 'failed') {
                         this.paymentState = 'error';
-                        this.errorMessage = sessionData.payment_payload?.failure_reason || @js(__('checkout.transaction_not_completed'));
+                        this.errorMessage = this.failureMessage(sessionData.payment_payload, @js(__('checkout.transaction_not_completed')));
                     } else if (status === 'awaiting_payment') {
                         const inlineData = sessionData.payment_payload?.inline;
                         if (inlineData) {
@@ -2281,6 +2562,8 @@
                     } else if (status === 'awaiting_confirmation') {
                         this.paymentState = 'awaiting_confirmation';
                         this.actionMessage = sessionData.payment_payload?.message || @js(__('checkout.momo_accept_prompt'));
+                        this.momoApproval = sessionData.payment_payload?.approval || null;
+                        this.momoMeta = sessionData.payment_payload?.mobile_money || null;
                         this.startStatusPolling();
                         this.startCountdown();
                     }
@@ -2397,7 +2680,7 @@
                             } else if (data.status === 'failed') {
                                 clearInterval(this.pollInterval);
                                 this.paymentState = 'error';
-                                this.errorMessage = data.payment_payload?.failure_reason || @js(__('checkout.transaction_failed'));
+                                this.errorMessage = this.failureMessage(data.payment_payload, @js(__('checkout.transaction_failed')));
                             }
                         } catch (e) {}
                     }, 4500);
@@ -2454,27 +2737,71 @@
                 },
 
                 /**
-                 * Close the wizard. Confirms first if a payment is mid-flight —
-                 * the customer may have already entered a card / PIN / OTP, started
-                 * a 3DS challenge, or is awaiting a bank/momo confirmation. Closing
-                 * mid-flight aborts the attempt but the backend session remains
-                 * authoritative (webhooks still settle if the bank completes).
+                 * What to tell the customer about a failed session: the sentence
+                 * for its reason code in their language, else the reason the
+                 * server failed it with, else the page's generic line.
                  */
-                closeModal() {
-                    const inFlight = [
-                        'action_pin',
-                        'action_otp',
-                        'action_3ds',
-                        'awaiting_transfer',
-                        'awaiting_confirmation',
-                        'processing',
-                    ];
-                    if (this.session && inFlight.includes(this.paymentState)) {
-                        const ok = window.confirm(@js(__('checkout.close_in_flight_confirm')));
-                        if (! ok) {
-                            return;
-                        }
+                failureMessage(payload, fallback) {
+                    this.failureCode = payload?.failure_code || null;
+
+                    return this.failureCopy[payload?.failure_code] || payload?.failure_reason || fallback;
+                },
+
+                /**
+                 * A live session in any step short of a verdict. Success and the
+                 * notices (email, identity, the card-testing hold) carry no
+                 * attempt worth guarding; a failure is already over.
+                 */
+                paymentInFlight() {
+                    return !! this.session && ! ['idle', 'success', 'error', 'backoff_notice', 'email_notice', 'kyc_required'].includes(this.paymentState);
+                },
+
+                /**
+                 * Every casual way out of the wizard (backdrop, Escape, the close
+                 * button) comes through here. Mid-payment it raises the prompt
+                 * and puts focus on "keep paying"; otherwise it simply closes.
+                 */
+                requestClose() {
+                    if (this.cancelPrompt) {
+                        return;
                     }
+                    if (this.paymentInFlight()) {
+                        this.cancelPrompt = true;
+                        this.$nextTick(() => this.$refs.keepPayingButton?.focus());
+                        return;
+                    }
+                    this.closeModal();
+                },
+
+                /**
+                 * The deliberate cancel. Tells the server so the attempt is filed
+                 * as cancelled (or as the decline it really was), then closes.
+                 * The server's answer never blocks the close: the customer asked
+                 * to leave and the session expires on its own regardless.
+                 */
+                async cancelPayment() {
+                    const id = this.session?.id;
+                    this.cancelling = true;
+                    try {
+                        if (id) {
+                            await fetch(`/api/payment-sessions/${id}/cancel`, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                                },
+                            });
+                        }
+                    } catch (e) {
+                        // Nothing to do: see above.
+                    } finally {
+                        this.cancelling = false;
+                        this.closeModal();
+                    }
+                },
+
+                closeModal() {
+                    this.cancelPrompt = false;
                     this.open = false;
                     this.submitting = false;
                     this.session = null;
@@ -2488,6 +2815,73 @@
                     if (this.resendTimerId) {
                         clearInterval(this.resendTimerId);
                         this.resendTimerId = null;
+                    }
+                },
+
+                // --- Wallet PIN setup, inside the checkout ---
+                startPinSetup() {
+                    this.newPin = '';
+                    this.newPinConfirmation = '';
+                    this.pinSetupError = '';
+                    this.settingUpPin = false;
+                    this.paymentState = 'wallet_pin_setup';
+                    this.open = true;
+                    this.$nextTick(() => this.$refs.newPinInput?.focus());
+                },
+
+                /**
+                 * Save the PIN through the same endpoint the security page uses,
+                 * then send the kept submission again: the server opens the wallet
+                 * session and the modal moves on to the PIN step, where the
+                 * customer types the PIN they just chose. Nothing about the order
+                 * changed, so the same form is simply submitted once more.
+                 */
+                async savePinAndContinue() {
+                    const pin = (this.newPin || '').trim();
+                    const confirmation = (this.newPinConfirmation || '').trim();
+                    if (!/^\d{4}$/.test(pin)) {
+                        this.pinSetupError = @js(__('checkout.wallet_pin_setup_format'));
+                        return;
+                    }
+                    if (pin !== confirmation) {
+                        this.pinSetupError = @js(__('checkout.wallet_pin_setup_mismatch'));
+                        return;
+                    }
+                    this.settingUpPin = true;
+                    this.pinSetupError = '';
+                    try {
+                        const res = await fetch('/api/wallets/pin/setup', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
+                            },
+                            body: JSON.stringify({ pin, pin_confirmation: confirmation })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            this.settingUpPin = false;
+                            // 422 returns { message, errors: { pin: [...] } }.
+                            this.pinSetupError = (data.errors?.pin?.[0]) || data.message || @js(__('checkout.wallet_pin_setup_failed'));
+                            return;
+                        }
+                        this.hasTransactionPin = true;
+                        this.newPin = '';
+                        this.newPinConfirmation = '';
+                        const form = this.pendingForm || document.getElementById('checkout-form');
+                        this.pendingForm = null;
+                        if (form) {
+                            // The button stays in its saving state until the new
+                            // submission replaces this step with the next one.
+                            form.requestSubmit();
+                        } else {
+                            this.settingUpPin = false;
+                            this.closeModal();
+                        }
+                    } catch (err) {
+                        this.settingUpPin = false;
+                        this.pinSetupError = @js(__('checkout.wallet_pin_network_error'));
                     }
                 },
 

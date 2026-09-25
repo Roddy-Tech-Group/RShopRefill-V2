@@ -72,11 +72,15 @@ class CheckoutPageTranslationTest extends TestCase
         $html = $this->french('/checkout');
 
         $this->assertStringContainsString(__('checkout.select_payment_method', [], 'fr'), $html);
-        $this->assertStringContainsString(__('checkout.delivery_email_label', [], 'fr'), $html);
-        $this->assertStringContainsString(__('checkout.delivery_email_hint', [], 'fr'), $html);
-        $this->assertStringContainsString(__('checkout.sign_in_to_pay', [], 'fr'), $html);
+        $this->assertStringContainsString(__('checkout.delivery_section', [], 'fr'), $html);
+        $this->assertStringContainsString(__('checkout.delivery_as_gift', [], 'fr'), $html);
         $this->assertStringContainsString(__('checkout.secure_checkout_note', [], 'fr'), $html);
-        $this->assertStringContainsString(__('checkout.currency_usd', [], 'fr'), $html);
+
+        // Delivery asks whose address it is, and the labels reach the page
+        // through @js() into Alpine, so they are matched as they are encoded.
+        $this->assertStringContainsString($this->js('checkout.your_delivery_email_label'), $html);
+        $this->assertStringContainsString($this->js('checkout.recipient_email_label'), $html);
+        $this->assertStringContainsString($this->js('checkout.sign_in_to_continue_amount'), $html);
     }
 
     /** The wizard is hidden until payment starts, but its copy ships with the page. */
@@ -90,7 +94,8 @@ class CheckoutPageTranslationTest extends TestCase
         $this->assertStringContainsString(__('checkout.payment_failed_title', [], 'fr'), $html);
 
         // Messages the page script assigns, and the method tile labels.
-        $this->assertStringContainsString($this->js('checkout.close_in_flight_confirm'), $html);
+        $this->assertStringContainsString(__('checkout.cancel_prompt_title', [], 'fr'), $html);
+        $this->assertStringContainsString($this->js('checkout.cancel_prompt_cancelling'), $html);
         $this->assertStringContainsString($this->js('checkout.network_failed'), $html);
         $this->assertStringContainsString($this->js('checkout.method_bank_transfer'), $html);
     }
@@ -118,11 +123,12 @@ class CheckoutPageTranslationTest extends TestCase
         $html = $this->french('/checkout');
 
         $this->assertStringNotContainsString('Select payment method', $html);
-        $this->assertStringNotContainsString('Delivery email or send as a gift', $html);
-        $this->assertStringNotContainsString('Use a friend&#039;s email', $html);
-        $this->assertStringNotContainsString('Sign in to pay', $html);
+        $this->assertStringNotContainsString('Send as a gift', $html);
+        $this->assertStringNotContainsString('Your delivery email', $html);
+        $this->assertStringNotContainsString('Recipient email', $html);
+        $this->assertStringNotContainsString('Sign in to continue', $html);
         $this->assertStringNotContainsString('Card PIN Required', $html);
-        $this->assertStringNotContainsString('A payment is in progress. Closing this window', $html);
+        $this->assertStringNotContainsString('Cancel this payment?', $html);
         $this->assertStringNotContainsString("label: 'Bank Transfer'", $html);
     }
 
@@ -134,8 +140,8 @@ class CheckoutPageTranslationTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString(__('checkout.continue_to_payment', [], 'fr'), $html);
-        $this->assertStringNotContainsString('Continue to payment', $html);
+        $this->assertStringContainsString($this->js('checkout.continue_with_method'), $html);
+        $this->assertStringNotContainsString('Continue with', $html);
     }
 
     /** The outage notice is assembled from rail names, so each piece is translated. */
@@ -168,13 +174,20 @@ class CheckoutPageTranslationTest extends TestCase
     {
         $html = $this->get('/checkout')->assertOk()->getContent();
 
-        $this->assertStringContainsString('Select payment method', $html);
-        $this->assertStringContainsString('Delivery email or send as a gift', $html);
-        $this->assertStringContainsString('Codes are emailed to this address right after payment. Use a friend&#039;s email to send it as a gift.', $html);
-        $this->assertStringContainsString('Sign in to pay', $html);
+        $this->assertStringContainsString('Checkout', $html);
+        $this->assertStringContainsString('Delivery', $html);
+        $this->assertStringContainsString('Send as a gift', $html);
+        $this->assertStringContainsString('Order subtotal', $html);
+        $this->assertStringContainsString('Total due today', $html);
+        $this->assertStringContainsString(Js::from('Your delivery email')->toHtml(), $html);
+        $this->assertStringContainsString(Js::from('The gift codes will be sent directly to this address after payment.')->toHtml(), $html);
+        $this->assertStringContainsString(Js::from('Sign in to continue · :amount')->toHtml(), $html);
         $this->assertStringContainsString('Card PIN Required', $html);
-        $this->assertStringContainsString('US Dollar', $html);
-        $this->assertStringContainsString("'A payment is in progress. Closing this window will cancel the attempt. Continue?'", $html);
+
+        // The currency chooser left this page; CheckoutCurrencyHandoffTest
+        // holds that claim and the handoff that replaces it.
+        $this->assertStringNotContainsString('checkout_currency_choice', $html);
+        $this->assertStringContainsString('Cancel this payment?', $html);
         $this->assertStringContainsString(
             'Apply up to <span class="font-semibold" x-text="rcoinConfig.redemption_max_pct + \'%\'"></span> of your order',
             $html

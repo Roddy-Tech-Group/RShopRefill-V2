@@ -1,4 +1,5 @@
 @php
+    use App\Domain\Payment\Support\CustomerFailureCopy;
     use App\Models\Product;
 
     /** @var \App\Models\Order $order */
@@ -21,6 +22,12 @@
     // to say "you can try checking out again" and offer no way to do it, which
     // is where the recovery email's retry link landed.
     $declinedUnpaid = $status->value === 'failed' && $paymentValue !== 'paid';
+    // Why the last payment was refused, in this reader's language, when the
+    // session recorded a reason. Read at render time so a customer who paid
+    // in one language and reads the order in another gets the latter.
+    $failureLine = $declinedUnpaid
+        ? CustomerFailureCopy::forSessionPayload($heroAttempt?->paymentSession?->payment_payload)
+        : null;
 
     // Status-driven hero copy + colour. The order is `pending` straight after
     // checkout while payment is verified, then moves through the fulfillment engine.
@@ -148,6 +155,10 @@
          the original detailed view only for non-completed states below. --}}
     @php
         $tpProfileUrl = config('services.trustpilot.profile_url');
+        // The review collector widget's public ids, and the platform name as
+        // the reviews page labels it (a setting, never a literal).
+        $tp = config('services.trustpilot');
+        $reviewPlatform = (string) \App\Models\SiteSetting::get('reviews.aggregate.source', 'Trustpilot');
         $groupedItemsSuccess = $order->items->groupBy('product_variant_id');
 
         // Supplier-issued redemption steps captured at fulfillment (plain text
@@ -172,6 +183,11 @@
             ->unique(fn ($row) => $row['brand'].'|'.$row['steps'])
             ->values();
     @endphp
+
+    {{-- TrustBox bootstrap. Loaded once; the collector widget below renders into it. --}}
+    @if ($tpProfileUrl)
+        <script type="text/javascript" src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>
+    @endif
 
     <div class="min-h-full bg-zinc-50 dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-sm px-4 py-8 sm:py-10">
@@ -403,6 +419,35 @@
                 </div>
             </div>
 
+            {{-- Review collector for the platform that hosts our public reviews,
+                 right under the delivered card while the purchase is fresh. The
+                 TrustBox is the only branding of theirs on the page, as their
+                 guidelines ask; the native form beneath collects for our own wall. --}}
+            @if ($tpProfileUrl)
+                <div class="mt-10 rounded-[12px] bg-white p-5 text-center shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:shadow-none sm:p-6" data-trustbox>
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] bg-emerald-100 dark:bg-emerald-500/15">
+                        <svg class="h-6 w-6 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+                        </svg>
+                    </div>
+                    <h2 class="mt-4 text-lg font-bold text-zinc-900 dark:text-white">{{ __('reviews.review_us') }}</h2>
+                    <p class="mx-auto mt-1 max-w-xs text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{{ __('reviews.collector_body') }}</p>
+                    <div class="mt-5 flex justify-center">
+                        <div class="inline-flex overflow-hidden rounded-[12px] bg-white shadow-md shadow-zinc-900/20">
+                            <div class="trustpilot-widget"
+                                data-locale="{{ $tp['locale'] }}"
+                                data-template-id="{{ $tp['review_collector_template_id'] }}"
+                                data-businessunit-id="{{ $tp['business_unit_id'] }}"
+                                data-style-height="52px"
+                                data-style-width="240px"
+                                data-token="{{ $tp['review_collector_token'] }}">
+                                <a href="{{ $tpProfileUrl }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline">{{ __('reviews.review_fallback') }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Native review prompt, tied to this order so the rating rolls up
                  under every gift card bought in it. Shared with the public
                  reviews page (which renders it without an order). --}}
@@ -412,7 +457,7 @@
 
             {{-- Back to dashboard --}}
             <div class="mt-10 text-center">
-                <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">{{ __('orders.view_all_orders') }}</a>
+                <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">{{ __('orders.view_all_orders') }}</a>
             </div>
 
             {{-- Reviews for the brand(s) just bought - the same per-brand
@@ -442,7 +487,7 @@
 <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-10">
 
     {{-- Status hero --}}
-    <section class="rounded-[12px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
+    <section class="rounded-[12px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 sm:p-8">
         <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] {{ $tone['bg'] }} ring-8 {{ $tone['ring'] }}">
             <svg class="h-8 w-8 {{ $tone['fg'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
                 @if ($ui['icon'] === 'check')
@@ -457,13 +502,16 @@
 
         <h1 class="mt-5 text-2xl font-bold text-zinc-900">{{ $ui['title'] }}</h1>
         <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">{{ $ui['line'] }}</p>
+        @if ($failureLine)
+            <p class="mx-auto mt-2 max-w-md text-sm font-semibold leading-relaxed text-red-600" data-failure-line>{{ $failureLine }}</p>
+        @endif
 
         {{-- The unpaid checkout's way back in. The cart survives until payment
              confirms and checkout re-entry is idempotent, so this lands the
              customer on the same live session rather than a duplicate order. --}}
         @if ($awaitingPayment || $expiredCheckout || $declinedUnpaid)
             <a href="{{ $shopRoute('checkout') }}"
-                class="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
+                class="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
                 {{ $awaitingPayment ? __('orders.complete_payment') : __('common.try_again') }}
             </a>
         @endif
@@ -507,6 +555,10 @@
                 paymentState: 'select_method', // select_method, card_input, action_pin, action_otp, action_3ds, awaiting_transfer, awaiting_confirmation, momo_input, processing, success, error
                 errorMessage: '',
                 actionMessage: '',
+                // Why a payment failed, by the session's reason code, in this
+                // customer's language (see the checkout wizard).
+                failureCopy: @js(CustomerFailureCopy::map()),
+                failureCode: null,
                 bankDetails: null,
                 pollInterval: null,
 
@@ -584,6 +636,7 @@
                 async paySession(method, dataPayload = {}) {
                     this.paymentState = 'processing';
                     this.errorMessage = '';
+                    this.failureCode = null;
                     try {
                         let body = {
                             method: method,
@@ -636,7 +689,8 @@
                         setTimeout(() => { window.location.reload(); }, 2000);
                     } else if (status === 'failed') {
                         this.paymentState = 'error';
-                        this.errorMessage = sessionData.payment_payload?.failure_reason || @js(__('orders.pay_error_incomplete'));
+                        this.failureCode = sessionData.payment_payload?.failure_code || null;
+                        this.errorMessage = this.failureCopy[sessionData.payment_payload?.failure_code] || sessionData.payment_payload?.failure_reason || @js(__('orders.pay_error_incomplete'));
                     } else if (status === 'awaiting_customer_action') {
                         const action = sessionData.payment_payload?.action;
                         if (action === 'pin') {
@@ -674,7 +728,8 @@
                             } else if (data.status === 'failed') {
                                 clearInterval(this.pollInterval);
                                 this.paymentState = 'error';
-                                this.errorMessage = data.payment_payload?.failure_reason || @js(__('orders.pay_error_failed'));
+                                this.failureCode = data.payment_payload?.failure_code || null;
+                                this.errorMessage = this.failureCopy[data.payment_payload?.failure_code] || data.payment_payload?.failure_reason || @js(__('orders.pay_error_failed'));
                             }
                         } catch (e) {}
                     }, 4500);
@@ -685,7 +740,7 @@
                     alert(@js(__('orders.pay_copied_alert')));
                 }
             }"
-            class="mt-6 rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8"
+            class="mt-6 rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 sm:p-8"
         >
             <!-- Select Method -->
             <div x-show="paymentState === 'select_method'">
@@ -724,29 +779,29 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_cardholder_name') }}</label>
-                        <input type="text" x-model="cardDetails.card_holder" placeholder="{{ __('orders.pay_cardholder_placeholder') }}" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" x-model="cardDetails.card_holder" placeholder="{{ __('orders.pay_cardholder_placeholder') }}" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_card_number') }}</label>
-                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div class="grid grid-cols-3 gap-3">
                         <div class="col-span-2">
                             <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_expiry') }}</label>
                             <div class="flex gap-2">
-                                <input type="text" x-model="cardDetails.expiry_month" placeholder="{{ __('orders.pay_expiry_month_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
-                                <input type="text" x-model="cardDetails.expiry_year" placeholder="{{ __('orders.pay_expiry_year_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                                <input type="text" x-model="cardDetails.expiry_month" placeholder="{{ __('orders.pay_expiry_month_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
+                                <input type="text" x-model="cardDetails.expiry_year" placeholder="{{ __('orders.pay_expiry_year_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-700 text-center">CVV</label>
-                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
                         </div>
                     </div>
 
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
                         {{ __('orders.pay_button') }} <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
@@ -757,8 +812,8 @@
                 <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_pin_heading') }}</h3>
                 <p class="text-xs text-zinc-600 mb-4">{{ __('orders.pay_pin_help') }}</p>
                 <div class="space-y-4">
-                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         {{ __('orders.pay_pin_confirm') }}
                     </button>
                 </div>
@@ -769,8 +824,8 @@
                 <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_otp_heading') }}</h3>
                 <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
                 <div class="space-y-4">
-                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         {{ __('orders.pay_otp_verify') }}
                     </button>
                 </div>
@@ -785,7 +840,7 @@
                     <iframe :src="session?.payment_payload?.redirect_url" class="w-full h-full border-0"></iframe>
                 </div>
 
-                <button @click="startStatusPolling()" class="w-full mt-4 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                <button @click="startStatusPolling()" class="w-full mt-4 rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                     {{ __('orders.pay_3ds_done') }}
                 </button>
             </div>
@@ -801,13 +856,13 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_momo_phone') }}</label>
-                        <input type="text" x-model="momoDetails.phone_number" placeholder="{{ __('orders.pay_momo_phone_placeholder') }}" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <input type="text" x-model="momoDetails.phone_number" placeholder="{{ __('orders.pay_momo_phone_placeholder') }}" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div x-show="(selectedMethod?.supported_networks ?? []).length > 0">
                         <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_momo_network') }}</label>
                         <div class="relative mt-1.5">
-                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-full border-2 border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge">
                                 <template x-for="net in selectedMethod?.supported_networks" :key="net">
                                     <option :value="net" x-text="net"></option>
                                 </template>
@@ -818,7 +873,7 @@
                         </div>
                     </div>
 
-                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                         {{ __('orders.pay_button') }} <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
@@ -894,7 +949,7 @@
                                 <div>
                                     <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_address') }}</span>
                                     <div class="mt-1 flex items-center gap-1">
-                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-[12px] text-[10px] text-zinc-800 font-mono select-all outline-none">
+                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-full text-[10px] text-zinc-800 font-mono select-all outline-none border-2 border-zinc-200 dark:border-white/10 focus:border-edge dark:focus:border-edge transition-colors">
                                         <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold shrink-0">{{ __('common.copy') }}</button>
                                     </div>
                                 </div>
@@ -955,8 +1010,10 @@
                 <x-error-cross />
                 <h3 class="mt-4 text-sm font-bold text-zinc-900">{{ __('orders.pay_failed_heading') }}</h3>
                 <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
-                
-                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+
+                @include('shop._payment-failure-help', ['methodVar' => 'selectedMethod'])
+
+                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-full bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
                     {{ __('orders.pay_try_another') }}
                 </button>
             </div>
@@ -964,7 +1021,7 @@
     @endif
 
     {{-- Order summary --}}
-    <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
+    <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6">
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-bold text-zinc-900">{{ __('checkout.order_summary') }}</h2>
             <span class="inline-flex items-center rounded-[12px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
@@ -1107,7 +1164,7 @@
 
     {{-- What happens next — only while the order is still being settled --}}
     @if ($isPending)
-        <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
+        <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6">
             <h2 class="text-lg font-bold text-zinc-900">{{ __('orders.next_heading') }}</h2>
             <ol class="mt-4 space-y-4">
                 @php
@@ -1151,11 +1208,11 @@
     {{-- Actions --}}
     <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <a href="{{ route('dashboard.orders') }}" wire:navigate
-            class="flex items-center justify-center rounded-[12px] border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
+            class="flex items-center justify-center rounded-full border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
             {{ __('orders.go_to_orders') }}
         </a>
         <a href="{{ $shopRoute('gift-cards') }}" wire:navigate
-            class="flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
+            class="flex items-center justify-center rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
             {{ __('orders.continue_shopping') }}
         </a>
     </div>

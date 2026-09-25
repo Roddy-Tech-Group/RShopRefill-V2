@@ -3,7 +3,8 @@
 namespace App\Domain\Payment\Services;
 
 use App\Domain\Payment\Exceptions\InvalidWebhookException;
-use Illuminate\Support\Facades\Http;
+use App\Domain\Payment\Support\FlutterwaveHttp;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -43,7 +44,7 @@ class FlutterwaveService
      */
     public function verifyTransaction(string $transactionId): ?array
     {
-        $response = Http::withToken($this->secretKey)
+        $response = FlutterwaveHttp::readClient($this->secretKey)
             ->get("{$this->baseUrl}/transactions/{$transactionId}/verify");
 
         if ($response->successful()) {
@@ -64,7 +65,7 @@ class FlutterwaveService
      */
     public function initializePayment(array $payload): ?array
     {
-        $response = Http::withToken($this->secretKey)
+        $response = FlutterwaveHttp::client($this->secretKey)
             ->post("{$this->baseUrl}/payments", $payload);
 
         if ($response->successful()) {
@@ -81,15 +82,31 @@ class FlutterwaveService
     }
 
     /**
-     * Fetch the list of banks for a given country.
+     * Fetch the list of banks for a given country. The list changes rarely
+     * and every read counts against the same gateway budget as a charge, so
+     * a non-empty answer is kept for a day.
      */
     public function getBanks(string $country = 'NG'): array
     {
-        $response = Http::withToken($this->secretKey)
+        $country = strtoupper($country);
+        $cacheKey = 'flutterwave:banks:'.$country;
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
+
+        $response = FlutterwaveHttp::readClient($this->secretKey)
             ->get("{$this->baseUrl}/banks/{$country}");
 
         if ($response->successful()) {
-            return $response->json('data') ?? [];
+            $banks = $response->json('data') ?? [];
+
+            if ($banks !== []) {
+                Cache::put($cacheKey, $banks, now()->addDay());
+            }
+
+            return $banks;
         }
 
         Log::error('Flutterwave get banks failed.', [
@@ -106,7 +123,7 @@ class FlutterwaveService
      */
     public function resolveBankAccount(string $accountNumber, string $bankCode): ?array
     {
-        $response = Http::withToken($this->secretKey)
+        $response = FlutterwaveHttp::client($this->secretKey)
             ->post("{$this->baseUrl}/accounts/resolve", [
                 'account_number' => $accountNumber,
                 'account_bank' => $bankCode,

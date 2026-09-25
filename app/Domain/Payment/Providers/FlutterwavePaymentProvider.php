@@ -4,13 +4,19 @@ namespace App\Domain\Payment\Providers;
 
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
+use App\Domain\Payment\Support\FlutterwaveHttp;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\Payment\Support\MobileMoneyApproval;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\MockMode;
 use App\Domain\PaymentInsights\Support\DeclineVerdict;
+use App\Domain\Wallet\Services\CurrencyRateService;
+use App\Models\CurrencyRate;
 use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
 
 class FlutterwavePaymentProvider implements PaymentProviderInterface
@@ -40,6 +46,18 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
         $this->secretKey = $secretKey ?: 'FLW_SECRET_KEY_MOCK';
         $this->baseUrl = 'https://api.flutterwave.com/v3';
+    }
+
+    /** A single attempt with timeouts: charges, validations, refunds. See FlutterwaveHttp. */
+    private function http(): PendingRequest
+    {
+        return FlutterwaveHttp::client($this->secretKey);
+    }
+
+    /** A read, retried with back-off on 429, 5xx and connection trouble. */
+    private function httpRead(): PendingRequest
+    {
+        return FlutterwaveHttp::readClient($this->secretKey);
     }
 
     public function initializePayment(PaymentAttempt $attempt): array
@@ -137,10 +155,19 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         $encrypted = $this->encryptPayload($payload);
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/charges?type=card", [
                     'client' => $encrypted,
                 ]);
+
+            FlutterwaveHttp::noteIfRateLimited($response);
+
+            // The gateway gave up on its own request (it does so at 28 seconds
+            // and answers 503). The charge may still have been taken, and its
+            // guidance is to look the reference up before anything else.
+            if ($response->serverError()) {
+                return $this->afterChargeInterrupted($attempt, null, $response, fn (array $known): array => $this->cardPendingAfterInterruption());
+            }
 
             if ($response->failed()) {
                 // Log the full HTTP failure so the actual Flutterwave message is
@@ -176,6 +203,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             }
 
             return $result;
+        } catch (ConnectionException $e) {
+            Log::warning('Flutterwave card charge did not answer in time', [
+                'message' => $e->getMessage(),
+                'tx_ref' => $attempt->idempotency_key,
+            ]);
+
+            return $this->afterChargeInterrupted($attempt, $e, null, fn (array $known): array => $this->cardPendingAfterInterruption());
         } catch (\Exception $e) {
             Log::error('Flutterwave card charge exception', [
                 'message' => $e->getMessage(),
@@ -298,7 +332,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/validate-charge", [
                     'otp' => $otp,
                     'flw_ref' => $flwRef,
@@ -361,7 +395,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/charges?type=bank_transfer", [
                     'tx_ref' => $attempt->idempotency_key,
                     'amount' => (float) $attempt->amount,
@@ -432,6 +466,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
      * The network and the phone are checked against the rail BEFORE anything
      * leaves the building: a label the rail does not know is a client bug and
      * must not become a failed order.
+     *
+     * A currency with no rail of its own (USD) is charged in the rail's
+     * currency: the attempt's total is converted into CFA francs at the live
+     * rate and the franc figure is written to pay_currency / pay_amount before
+     * the gateway is called, so verification, a webhook that lands ahead of
+     * our own read, and any later refund all work from what the rail was
+     * actually asked for. The attempt itself stays in its own currency.
      */
     public function chargeMobileMoney(PaymentAttempt $attempt, string $phoneNumber, ?string $network = null, ?string $returnUrl = null): array
     {
@@ -460,16 +501,51 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             }
         }
 
+        $chargeCurrency = MobileMoneyRail::chargeCurrency($currency, $phone);
+        $chargeAmount = (float) $attempt->amount;
+
+        if ($chargeCurrency !== $currency) {
+            $converted = $this->convertForRail($attempt, $chargeCurrency);
+
+            if ($converted === null) {
+                return [
+                    'status' => 'failed',
+                    'message' => 'Mobile money is temporarily unavailable for this order. Please try another payment method.',
+                    'failure' => GatewayFailure::internal('mobile_money_rate_unavailable', "No usable {$currency} to {$chargeCurrency} rate to convert the charge"),
+                ];
+            }
+
+            $chargeAmount = $converted['amount'];
+            $attempt->pay_currency = $chargeCurrency;
+            $attempt->pay_amount = $chargeAmount;
+            $attempt->metadata = array_merge($attempt->metadata ?? [], [
+                'mobile_money' => [
+                    'converted_from' => $currency,
+                    'charge_currency' => $chargeCurrency,
+                    'charge_amount' => $chargeAmount,
+                    'rate' => $converted['rate'],
+                    'converted_at' => now()->toIso8601String(),
+                ],
+            ]);
+            $attempt->save();
+        }
+
+        $chargeLabel = number_format($chargeAmount, MobileMoneyRail::precision($chargeCurrency)).' '.$chargeCurrency;
+        $networkLabel = MobileMoneyRail::networkLabel($currency, $network);
+        $country = MobileMoneyRail::countryFor($currency, $phone);
+
+        // The waiting state for a rail that prompts the handset, built from
+        // whatever the gateway answered (nothing, for a charge it never
+        // acknowledged).
+        $waiting = fn (array $data = []): array => $this->mobileMoneyWaiting($data, $phoneNumber, $chargeLabel, $networkLabel, $country);
+
         if (str_contains($this->secretKey, 'MOCK')) {
-            return [
-                'status' => 'awaiting_confirmation',
-                'message' => 'Please authorize the push notification sent to your phone ('.$phoneNumber.').',
-            ];
+            return $waiting();
         }
 
         $payload = [
-            'amount' => (float) $attempt->amount,
-            'currency' => $currency,
+            'amount' => $chargeAmount,
+            'currency' => $chargeCurrency,
             'email' => $attempt->user->email,
             'phone_number' => $phone,
             'tx_ref' => $attempt->idempotency_key,
@@ -479,7 +555,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             $payload['network'] = $gatewayNetwork;
         }
 
-        if (($country = MobileMoneyRail::countryFor($currency, $phone)) !== null) {
+        if ($country !== null) {
             $payload['country'] = $country;
         }
 
@@ -490,48 +566,19 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         $chargeType = MobileMoneyRail::chargeType($currency);
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/charges?type={$chargeType}", $payload);
+        } catch (ConnectionException $e) {
+            // The prompt may already be on the customer's phone: the gateway
+            // initiates the charge long before it gives up on the request.
+            // Its guidance is to look the reference up before anything else.
+            Log::warning('Flutterwave mobile money charge did not answer in time', [
+                'tx_ref' => $attempt->idempotency_key,
+                'rail' => $chargeType,
+                'message' => $e->getMessage(),
+            ]);
 
-            if ($response->failed()) {
-                Log::warning('Flutterwave mobile money charge refused', [
-                    'tx_ref' => $attempt->idempotency_key,
-                    'rail' => $chargeType,
-                    'currency' => $currency,
-                    'http_status' => $response->status(),
-                    'message' => $response->json('message'),
-                ]);
-
-                return [
-                    'status' => 'failed',
-                    'message' => 'Failed to initialize mobile money: '.($response->json('message') ?? 'Unknown error'),
-                    'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
-                ];
-            }
-
-            $data = $response->json();
-            $status = $data['status'] ?? 'error';
-
-            if ($status === 'success') {
-                if (($redirect = $this->mobileMoneyRedirect($data)) !== null) {
-                    return [
-                        'status' => 'awaiting_redirect',
-                        'redirect_url' => $redirect,
-                        'method' => 'mobile_money',
-                    ];
-                }
-
-                return [
-                    'status' => 'awaiting_confirmation',
-                    'message' => $this->mobileMoneyInstruction($data, $phoneNumber),
-                ];
-            }
-
-            return [
-                'status' => 'failed',
-                'message' => $data['message'] ?? 'Mobile money charge could not be initiated.',
-                'failure' => GatewayFailure::fromFlutterwave($data),
-            ];
+            return $this->afterChargeInterrupted($attempt, $e, null, $waiting);
         } catch (\Exception $e) {
             return [
                 'status' => 'failed',
@@ -539,21 +586,64 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                 'failure' => GatewayFailure::fromException($e),
             ];
         }
+
+        FlutterwaveHttp::noteIfRateLimited($response);
+
+        if ($response->serverError()) {
+            return $this->afterChargeInterrupted($attempt, null, $response, $waiting);
+        }
+
+        if ($response->failed()) {
+            Log::warning('Flutterwave mobile money charge refused', [
+                'tx_ref' => $attempt->idempotency_key,
+                'rail' => $chargeType,
+                'currency' => $currency,
+                'charged' => $chargeLabel,
+                'http_status' => $response->status(),
+                'message' => $response->json('message'),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'message' => 'Failed to initialize mobile money: '.($response->json('message') ?? 'Unknown error'),
+                'failure' => GatewayFailure::fromFlutterwave($response->json(), $response->status()),
+            ];
+        }
+
+        $data = $response->json();
+        $status = $data['status'] ?? 'error';
+
+        if ($status === 'success') {
+            // Rails that answer with an authorization page of their own send
+            // the customer there. The handset rails stay here: their prompt
+            // is already on the phone, and the URL they echo back under the
+            // redirect key is our own return page, not a step to take.
+            if (! MobileMoneyRail::promptsOnHandset($currency)
+                && ($redirect = $this->mobileMoneyRedirect($data)) !== null) {
+                return [
+                    'status' => 'awaiting_redirect',
+                    'redirect_url' => $redirect,
+                    'method' => 'mobile_money',
+                ];
+            }
+
+            return $waiting($data);
+        }
+
+        return [
+            'status' => 'failed',
+            'message' => $data['message'] ?? 'Mobile money charge could not be initiated.',
+            'failure' => GatewayFailure::fromFlutterwave($data),
+        ];
     }
 
     /**
-     * Build the on-screen confirmation instruction for a Francophone mobile-money
-     * charge. Flutterwave returns the operator's own "dial *126# / approve the
-     * prompt" wording in the authorization note (or processor_response), while the
-     * top-level `message` is usually a terse "Charge initiated". Prefer the
-     * actionable instruction so our modal mirrors what Flutterwave's hosted page
-     * shows; fall back to a clear dial/approve prompt when none is present.
+     * The rail's own authorization page, when it answers with one, under
+     * either spelling the gateway uses: `redirect` with mode `redirect` on
+     * the Ghana rail, `redirect_url` with mode `redirecturl` in the
+     * Francophone reference. The old check knew one spelling only.
      *
-     * @param  array<string, mixed>  $data  Decoded Flutterwave charge response.
-     */
-    /**
-     * The rail's own authorization page, when it answers with one. Ghana,
-     * Uganda and Rwanda do; the push-prompt rails leave it out.
+     * @param  array<string, mixed>  $data  Decoded charge response.
      */
     private function mobileMoneyRedirect(array $data): ?string
     {
@@ -561,16 +651,53 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             ?? $data['data']['meta']['authorization']
             ?? [];
 
-        if (($auth['mode'] ?? null) !== 'redirect') {
+        if (! in_array($auth['mode'] ?? null, ['redirect', 'redirecturl'], true)) {
             return null;
         }
 
-        $redirect = $auth['redirect'] ?? null;
+        $redirect = $auth['redirect'] ?? $auth['redirect_url'] ?? null;
 
         return is_string($redirect) && str_starts_with($redirect, 'https://') ? $redirect : null;
     }
 
-    private function mobileMoneyInstruction(array $data, string $phoneNumber): string
+    /**
+     * The waiting state for a rail that prompts the handset: what the
+     * customer is told, the facts the screens and the admin page show, and
+     * the operator's own way to approve when no prompt arrives.
+     *
+     * The gateway's answer is used only when it is an instruction. The
+     * Francophone rail answers "Transaction in progress" in
+     * processor_response, and that used to be shown as the whole instruction
+     * (it passed a length check), so a customer waiting for an MTN prompt saw
+     * a status phrase and no code to dial.
+     *
+     * @param  array<string, mixed>  $data  Decoded charge response, or empty.
+     * @return array<string, mixed>
+     */
+    private function mobileMoneyWaiting(array $data, string $phoneNumber, string $chargeLabel, ?string $networkLabel, ?string $country): array
+    {
+        return [
+            'status' => 'awaiting_confirmation',
+            'message' => $this->gatewayInstruction($data)
+                ?? __('checkout.momo_prompt_sent', ['amount' => $chargeLabel, 'phone' => $phoneNumber]),
+            'mobile_money' => [
+                'network' => $networkLabel,
+                'country' => $country,
+                'phone_number' => $phoneNumber,
+                'charge_label' => $chargeLabel,
+            ],
+            'approval' => MobileMoneyApproval::for($country, $networkLabel),
+        ];
+    }
+
+    /**
+     * The gateway's wording, when it tells the customer what to do: a dial
+     * code, or a verb that asks for an action. Status phrases ("Transaction
+     * in progress", "pending") are not instructions and are dropped.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function gatewayInstruction(array $data): ?string
     {
         $auth = $data['meta']['authorization']
             ?? $data['data']['meta']['authorization']
@@ -585,14 +712,100 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
         foreach ($candidates as $candidate) {
             $candidate = is_string($candidate) ? trim($candidate) : '';
-            // A real instruction is a sentence ("Dial *126# ..."), not a status
-            // word like "initiated" / "pending" that some operators echo back.
-            if (strlen($candidate) >= 12) {
+
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (preg_match('/[*#]\d[\d*#]*#/', $candidate) === 1
+                || preg_match('/\b(dial|approve|authori[sz]e|confirm|enter|prompt|composez|approuvez|validez|confirmez)\b/i', $candidate) === 1) {
                 return $candidate;
             }
         }
 
-        return "Dial your mobile money menu and approve the payment prompt sent to {$phoneNumber} to confirm. Keep this window open - it updates automatically once you approve.";
+        return null;
+    }
+
+    /**
+     * The rail's figure for an attempt priced in another currency, rounded UP
+     * to the rail currency's precision (whole francs) so a rounding step can
+     * never under-collect the order. Null when no usable rate exists.
+     *
+     * The rail currency's own active row is required before any rate is read:
+     * CurrencyRate::resolve() answers a missing code with the USD row, which
+     * would quietly charge 11 francs for an 11-dollar order.
+     *
+     * @return array{amount: float, rate: float}|null
+     */
+    private function convertForRail(PaymentAttempt $attempt, string $chargeCurrency): ?array
+    {
+        $currency = strtoupper($attempt->currency);
+
+        if (! CurrencyRate::query()->active()->where('code', $chargeCurrency)->exists()) {
+            Log::warning('Mobile money conversion refused: the rail currency has no active rate', [
+                'attempt_id' => $attempt->id,
+                'from' => $currency,
+                'to' => $chargeCurrency,
+            ]);
+
+            return null;
+        }
+
+        try {
+            $rate = app(CurrencyRateService::class)->resolveRate($currency, $chargeCurrency);
+        } catch (\Throwable $e) {
+            Log::warning('Mobile money conversion refused: rate lookup failed', [
+                'attempt_id' => $attempt->id,
+                'from' => $currency,
+                'to' => $chargeCurrency,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($rate <= 0) {
+            return null;
+        }
+
+        $factor = 10 ** MobileMoneyRail::precision($chargeCurrency);
+        $amount = ceil(round((float) $attempt->amount * $rate, 6) * $factor) / $factor;
+
+        return ['amount' => $amount, 'rate' => $rate];
+    }
+
+    /**
+     * What the gateway was asked to charge: the attempt's own figure, or the
+     * one a converted mobile-money charge recorded on pay_currency /
+     * pay_amount. Crypto never verifies or refunds through this provider, so
+     * those two columns can only carry that conversion here.
+     *
+     * @return array{0: float, 1: string}
+     */
+    private function chargedFigures(PaymentAttempt $attempt): array
+    {
+        if ($attempt->pay_currency !== null && $attempt->pay_amount !== null) {
+            return [(float) $attempt->pay_amount, strtoupper((string) $attempt->pay_currency)];
+        }
+
+        return [(float) $attempt->amount, strtoupper((string) $attempt->currency)];
+    }
+
+    /**
+     * An attempt-currency amount (the whole attempt for a duplicate payment,
+     * an item's share for a failed delivery) expressed in the currency the
+     * gateway holds the charge in. Identity unless the attempt was charged
+     * on a converted rail, where it is the same share of the charged figure.
+     */
+    private function onChargedScale(PaymentAttempt $attempt, float $amount): float
+    {
+        [$chargedAmount, $chargedCurrency] = $this->chargedFigures($attempt);
+
+        if ($chargedCurrency === strtoupper((string) $attempt->currency) || (float) $attempt->amount <= 0) {
+            return $amount;
+        }
+
+        return round($amount * $chargedAmount / (float) $attempt->amount, MobileMoneyRail::precision($chargedCurrency));
     }
 
     /**
@@ -641,7 +854,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/charges?type=applepay", $payload);
 
             if ($response->failed()) {
@@ -797,7 +1010,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/payments", [
                     'tx_ref' => $attempt->idempotency_key,
                     'amount' => (float) $attempt->amount,
@@ -892,7 +1105,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->httpRead()
                 ->get("{$this->baseUrl}/transactions/{$txId}/verify");
 
             if ($response->failed()) {
@@ -962,13 +1175,23 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return false;
         }
 
+        // Against what the gateway was asked for, which for a converted
+        // mobile-money charge is the franc figure, not the attempt's own.
+        [$expectedAmount, $expectedCurrency] = $this->chargedFigures($attempt);
+
         if ($status === 'successful'
-            && (float) $amount >= (float) $attempt->amount
-            && strtoupper((string) $currency) === strtoupper((string) $attempt->currency)
+            && (float) $amount >= $expectedAmount
+            && strtoupper((string) $currency) === $expectedCurrency
         ) {
             $attempt->payment_status = PaymentStatus::Paid;
             $attempt->confirmed_at = now();
             $attempt->verification_payload = $payload;
+
+            // A refusal remembered on an earlier look is stale once the
+            // reference has paid.
+            if (isset($attempt->metadata['gateway_verdict'])) {
+                $attempt->metadata = array_diff_key($attempt->metadata, ['gateway_verdict' => true]);
+            }
 
             // The card that paid, as a keyed fingerprint only. The risk
             // engine's instrument-reuse signal reads this to spot one card
@@ -988,7 +1211,49 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             return true;
         }
 
+        if ($status === 'failed') {
+            $this->rememberGatewayVerdict($attempt, $data);
+        }
+
         return false;
+    }
+
+    /**
+     * The gateway's terminal "failed" on this reference, kept on the attempt
+     * so the job that asked can fail the session with the reason instead of
+     * leaving the customer on a spinner until the sweeper. Only a verdict
+     * against this attempt's own reference gets here (the tx_ref check
+     * above), and a later paid verification clears it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function rememberGatewayVerdict(PaymentAttempt $attempt, array $data): void
+    {
+        $processorResponse = $data['processor_response'] ?? null;
+
+        $attempt->metadata = array_merge($attempt->metadata ?? [], [
+            'gateway_verdict' => [
+                'status' => 'failed',
+                'processor_response' => is_string($processorResponse) && trim($processorResponse) !== '' ? trim($processorResponse) : null,
+                'transaction_id' => isset($data['id']) ? (string) $data['id'] : (isset($data['transaction_id']) ? (string) $data['transaction_id'] : null),
+                'payment_type' => $data['payment_type'] ?? null,
+                'seen_at' => now()->toIso8601String(),
+            ],
+        ]);
+        $attempt->save();
+    }
+
+    /**
+     * The gateway's own "failed" verdict on this attempt's charge, when the
+     * last verification saw one. Null while the charge is open or paid.
+     *
+     * @return array{status: string, processor_response: ?string, transaction_id: ?string, payment_type: ?string, seen_at: string}|null
+     */
+    public function terminalFailure(PaymentAttempt $attempt): ?array
+    {
+        $verdict = $attempt->metadata['gateway_verdict'] ?? null;
+
+        return is_array($verdict) && ($verdict['status'] ?? null) === 'failed' ? $verdict : null;
     }
 
     /**
@@ -1024,7 +1289,10 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             // case), so later pages are read too, up to a cap that keeps a slow
             // gateway from holding the request that asked.
             do {
-                $response = Http::withToken($this->secretKey)
+                // Shorter than the shared timeouts: this runs while a customer
+                // request or the sweeper waits, and a slow page is worth
+                // giving up on.
+                $response = $this->httpRead()
                     ->timeout(8)
                     ->connectTimeout(4)
                     ->get("{$this->baseUrl}/transactions", ['tx_ref' => $txRef, 'page' => $page]);
@@ -1092,10 +1360,13 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->http()
                 ->post("{$this->baseUrl}/refunds", [
                     'id' => $attempt->gateway_reference,
-                    'amount' => $amount,
+                    // The gateway holds the charge in the currency it was
+                    // asked for; a converted mobile-money payment is refunded
+                    // in francs, as the same share of the franc figure.
+                    'amount' => $this->onChargedScale($attempt, $amount),
                 ]);
 
             if ($response->failed()) {
@@ -1129,7 +1400,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         try {
-            $response = Http::withToken($this->secretKey)
+            $response = $this->httpRead()
                 ->get("{$this->baseUrl}/transactions/verify_by_reference", [
                     'tx_ref' => $txRef,
                 ]);
@@ -1153,6 +1424,8 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
                     'currency' => $data['currency'] ?? '',
                     'transaction_id' => $data['id'] ?? null,
                     'tx_ref' => $data['tx_ref'] ?? null,
+                    'processor_response' => $data['processor_response'] ?? null,
+                    'payment_type' => $data['payment_type'] ?? null,
                     'raw' => $body,
                 ];
             }
@@ -1163,6 +1436,86 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
             return null;
         }
+    }
+
+    /**
+     * A charge request that timed out or met a 5xx may still have reached
+     * the gateway. Its guidance is to look the reference up before treating
+     * the charge as lost, and never to send a second one blind. A charge the
+     * gateway reports successful is confirmed here; one still pending is
+     * handed to the caller's waiting state; one it refused carries the
+     * refusal; a reference it does not know at all is a timeout, and nothing
+     * was charged.
+     *
+     * @param  \Closure(array<string, mixed>): array<string, mixed>  $stillPending  Builds the waiting state from the gateway's raw answer.
+     * @return array<string, mixed>
+     */
+    private function afterChargeInterrupted(PaymentAttempt $attempt, ?\Throwable $exception, ?Response $response, \Closure $stillPending): array
+    {
+        $txRef = (string) $attempt->idempotency_key;
+        $known = $this->verifyByReference($txRef);
+
+        if ($known !== null && hash_equals($txRef, (string) ($known['tx_ref'] ?? ''))) {
+            // The gateway's numeric id, for every later lookup and refund.
+            if (! empty($known['transaction_id'])) {
+                $attempt->gateway_reference = (string) $known['transaction_id'];
+                $attempt->save();
+            }
+
+            if ($this->applyVerificationResult($attempt, $known, $known['raw'] ?? $known)) {
+                return [
+                    'status' => 'confirmed',
+                    'transaction_id' => (string) $attempt->gateway_reference,
+                    'message' => 'Payment successful',
+                ];
+            }
+
+            if (($known['status'] ?? null) === 'failed') {
+                return [
+                    'status' => 'failed',
+                    'message' => 'The payment was not approved. Please try again or use another payment method.',
+                    'failure' => GatewayFailure::fromFlutterwave($known['raw'] ?? ['data' => $known]),
+                ];
+            }
+
+            Log::info('Flutterwave charge reached the gateway despite the interrupted answer', [
+                'tx_ref' => $txRef,
+                'status' => $known['status'] ?? null,
+            ]);
+
+            return $stillPending(is_array($known['raw'] ?? null) ? $known['raw'] : []);
+        }
+
+        Log::warning('Flutterwave charge interrupted and unknown to the gateway', [
+            'tx_ref' => $txRef,
+            'http_status' => $response?->status(),
+            'error' => $exception?->getMessage(),
+        ]);
+
+        return [
+            'status' => 'failed',
+            'message' => 'The payment service took too long to answer and nothing was charged. Please try again in a moment.',
+            'failure' => $exception !== null
+                ? GatewayFailure::fromException($exception)
+                : GatewayFailure::fromFlutterwave($response?->json(), $response?->status()),
+        ];
+    }
+
+    /**
+     * A card charge the gateway holds open after an interrupted answer has
+     * no authorization step this checkout can resume (no flw_ref reached
+     * us), so it is reported as the timeout it was; the reference is on the
+     * attempt for the webhook, should the gateway finish it.
+     *
+     * @return array<string, mixed>
+     */
+    private function cardPendingAfterInterruption(): array
+    {
+        return [
+            'status' => 'failed',
+            'message' => 'The payment service took too long to answer. Please try again in a moment.',
+            'failure' => GatewayFailure::internal('charge_pending_after_timeout', 'Charge open at the gateway after the request timed out'),
+        ];
     }
 
     public function normalizeWebhook(array $payload): array

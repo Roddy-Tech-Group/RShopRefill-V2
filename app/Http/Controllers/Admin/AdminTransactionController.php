@@ -8,9 +8,12 @@ use App\Domain\Payment\Exceptions\ManualSettlementRejectedException;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Payment\Services\CryptoManualSettlementService;
 use App\Domain\Payment\Services\TransactionReportService;
+use App\Domain\PaymentInsights\Enums\FailureCategory;
+use App\Domain\PaymentInsights\Services\FailureReasonClassifier;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentOutcome;
 use App\Models\PaymentWebhook;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
@@ -59,7 +62,88 @@ class AdminTransactionController extends Controller
             'siblings' => $siblings,
             'settleable' => $settleable,
             'shortfallFiat' => $shortfallFiat,
+            'verdict' => $this->failureVerdict($attempt),
         ]);
+    }
+
+    /**
+     * Why a payment failed, for the operator: who the verdict points at (the
+     * customer, the gateway, us, or their browser), the gateway's own words,
+     * and the sentence the customer was shown. Read from the outcome row once
+     * the queue has graded the failure, else graded here from the same
+     * evidence, so the page never has to wait for a worker.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function failureVerdict(PaymentAttempt $attempt): ?array
+    {
+        $session = $attempt->paymentSession;
+
+        if ($session === null) {
+            return null;
+        }
+
+        $sessionStatus = $session->status?->value ?? $session->status;
+        $ended = in_array($attempt->payment_status, [PaymentStatus::Failed, PaymentStatus::Expired], true)
+            || in_array($sessionStatus, ['failed', 'expired', 'cancelled'], true);
+
+        if (! $ended) {
+            return null;
+        }
+
+        $metadata = $session->metadata ?? [];
+        $details = is_array($metadata['failure_details'] ?? null) ? $metadata['failure_details'] : null;
+        $reason = $metadata['failure_reason'] ?? null;
+        $stage = $metadata['status_at_failure'] ?? $sessionStatus;
+
+        $outcome = PaymentOutcome::query()->where('payment_session_id', $session->id)->latest('id')->first();
+
+        if ($outcome !== null) {
+            $category = $outcome->failure_category;
+            $code = (string) ($outcome->failure_reason_code ?? 'unknown_error');
+            $retryable = (bool) $outcome->retryable;
+        } else {
+            $classification = app(FailureReasonClassifier::class)->classify(
+                $session->provider ?? 'unknown',
+                (string) ($reason ?? match ($sessionStatus) {
+                    'expired' => 'session_expired',
+                    'cancelled' => 'user cancelled',
+                    default => 'unknown',
+                }),
+                (string) $stage,
+                $details,
+            );
+            $category = $classification['category'];
+            $code = $classification['code'];
+            $retryable = $classification['retryable'];
+        }
+
+        [$owner, $tone] = match ($category) {
+            FailureCategory::Customer => ['Customer side', 'amber'],
+            FailureCategory::Provider => ['Gateway side', 'red'],
+            FailureCategory::System => ['Our platform', 'red'],
+            FailureCategory::Frontend => ['Customer browser', 'zinc'],
+            default => ['Not graded', 'zinc'],
+        };
+
+        $gatewayVerdict = is_array($attempt->metadata['gateway_verdict'] ?? null) ? $attempt->metadata['gateway_verdict'] : [];
+        $mobileMoney = is_array($session->payment_payload['mobile_money'] ?? null) ? $session->payment_payload['mobile_money'] : null;
+
+        return [
+            'owner' => $owner,
+            'tone' => $tone,
+            'reason' => FailureReasonClassifier::label($code),
+            'code' => $code,
+            'gateway_said' => $details['provider_message'] ?? ($gatewayVerdict['processor_response'] ?? null),
+            'http_status' => $details['http_status'] ?? null,
+            'stage' => $stage,
+            'retryable' => $retryable,
+            'customer_saw' => $session->payment_payload['failure_reason'] ?? null,
+            'mobile_money' => $mobileMoney !== null
+                ? trim(($mobileMoney['network'] ?? '').' '.($mobileMoney['phone_number'] ?? '').($mobileMoney['charge_label'] ?? null ? ' for '.$mobileMoney['charge_label'] : ''))
+                : null,
+            'seen_at' => $gatewayVerdict['seen_at'] ?? null,
+        ];
     }
 
     /**
