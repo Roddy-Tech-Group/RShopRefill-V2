@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
@@ -45,6 +46,12 @@ final class CatalogFigures
     }
 
     /**
+     * Where an admin can publish a customers figure of their own instead of
+     * the counted one. Blank means count.
+     */
+    public const CUSTOMERS_OVERRIDE_KEY = 'trust.customers_served';
+
+    /**
      * The two figures the public pages lead with: customers with an account,
      * and countries with something on the shelf. Cached fifteen minutes, so a
      * new sign-up is inside the number before anyone reads it twice.
@@ -53,7 +60,7 @@ final class CatalogFigures
      */
     public static function headlineCounts(): array
     {
-        return Cache::remember('home:counts:v2', now()->addMinutes(15), fn () => [
+        $counted = Cache::remember('home:counts:v2', now()->addMinutes(15), fn () => [
             'customers' => (int) User::where('is_guest', false)->count(),
             'countries' => (int) Product::query()
                 ->where('is_active', true)
@@ -61,6 +68,38 @@ final class CatalogFigures
                 ->distinct()
                 ->count('country_code'),
         ]);
+
+        // Read outside the fifteen-minute cache on purpose: the override is a
+        // deliberate act by an admin who is about to go and look at the page,
+        // and its own key is dropped from the cache the moment it is saved. It
+        // would be odd to type a number and then wait a quarter of an hour to
+        // see whether it took.
+        return [
+            'customers' => self::customersOverride() ?? $counted['customers'],
+            'countries' => $counted['countries'],
+        ];
+    }
+
+    /**
+     * The number an admin has chosen to publish as the customers headline, or
+     * null to let the real count stand.
+     *
+     * Anything that is not a number is treated as no answer rather than as
+     * zero: a typo in a settings box must not wipe a figure off the public
+     * pages. Zero itself is a real answer, and hides the figure, because a
+     * site with nothing to boast about should be allowed to say nothing.
+     */
+    public static function customersOverride(): ?int
+    {
+        $raw = trim((string) SiteSetting::get(self::CUSTOMERS_OVERRIDE_KEY, ''));
+
+        if ($raw === '' || ! is_numeric($raw)) {
+            return null;
+        }
+
+        $value = (int) $raw;
+
+        return $value >= 0 ? $value : null;
     }
 
     /**
