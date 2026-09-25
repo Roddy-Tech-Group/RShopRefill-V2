@@ -299,7 +299,41 @@ class RegistrationTest extends TestCase
             ->call('register')
             ->assertHasNoErrors();
 
-        $this->assertNotNull(User::where('email', 'complete@example.com')->firstOrFail()->profile_completed_at);
+        $user = User::where('email', 'complete@example.com')->firstOrFail();
+
+        $this->assertNotNull($user->profile_completed_at);
+        $this->assertFalse($user->needsProfileCompletion());
+
+        // And end to end: EnsureProfileCompleted holds anyone who still owes
+        // the step, so reaching the dashboard proves this signup owes nothing.
+        $this->actingAs($user)
+            ->withoutVite()
+            ->get(route('dashboard'))
+            ->assertOk();
+    }
+
+    /**
+     * A Google signup is the other door, and it is untouched: Google returns
+     * no country, phone or gender, so that account still owes the completion
+     * step and is held there until it answers them.
+     */
+    public function test_a_google_signup_still_owes_the_completion_step(): void
+    {
+        $google = User::factory()->create([
+            'google_id' => 'g-123',
+            'password' => null,
+            'country' => null,
+            'phone' => null,
+            'gender' => null,
+            'profile_completed_at' => null,
+        ]);
+
+        $this->assertTrue($google->needsProfileCompletion());
+
+        $this->actingAs($google)
+            ->withoutVite()
+            ->get(route('dashboard'))
+            ->assertRedirect(route('auth.complete-profile'));
     }
 
     /** The page offers the same three controls the modal does. */
