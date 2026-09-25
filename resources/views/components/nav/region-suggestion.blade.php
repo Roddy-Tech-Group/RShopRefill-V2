@@ -128,6 +128,7 @@
                         loading="lazy"
                         width="20"
                         height="20"
+                        decoding="async"
                     >
                     <span class="truncate text-sm font-semibold text-white">{{ $suggestion['name'] }}</span>
                 </button>

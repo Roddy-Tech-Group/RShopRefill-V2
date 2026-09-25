@@ -279,6 +279,10 @@
                     <img
                         :src="'https://flagcdn.com/w40/' + (countryCode || 'us').toLowerCase() + '.png'"
                         alt=""
+                        width="20"
+                        height="20"
+                        loading="lazy"
+                        decoding="async"
                         class="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-black/10"
                     >
                     {{-- The code is the active locale's own short code, as in the nav's

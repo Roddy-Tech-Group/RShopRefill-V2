@@ -555,7 +555,7 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                                     : '';
                             @endphp
                             @if ($profileCc)
-                                <img src="https://flagcdn.com/w40/{{ $profileCc }}.png" alt="" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200">
+                                <img src="https://flagcdn.com/w40/{{ $profileCc }}.png" alt="" width="20" height="14" loading="lazy" decoding="async" class="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200">
                             @endif
                             <span>{{ $profileCountryName ?: 'Not set' }}</span>
                         </p>

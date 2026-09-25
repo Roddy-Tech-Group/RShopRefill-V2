@@ -47,9 +47,14 @@
     class="flex h-9 shrink-0 items-center gap-2 rounded-full border-2 border-[#0c1337]/30 {{ $compact ? 'px-1 md:pl-1 md:pr-3' : 'pl-1 pr-3' }} text-[13px] font-semibold text-zinc-700 transition-colors hover:border-edge hover:bg-[#0c1337]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
     :aria-label="@js(__('navigation.region_pill_label', ['language' => $activeLanguageNative, 'country' => '__COUNTRY__', 'currency' => '__CURRENCY__'])).replace('__COUNTRY__', country).replace('__CURRENCY__', currency)"
 >
+    {{-- Eager: this pill is in the nav on arrival. Sized so the row keeps
+         its shape before the flag arrives, and decoded off the main thread. --}}
     <img
         :src="'https://flagcdn.com/w40/' + (countryCode || 'us').toLowerCase() + '.png'"
         alt=""
+        width="28"
+        height="28"
+        decoding="async"
         class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20"
     >
     {{-- Compact drops the label below md, where the nav row has no width to

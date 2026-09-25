@@ -1051,7 +1051,8 @@
                 aria-label="{{ __('common.language') }} / {{ __('common.payment_currency') }}"
                 class="hidden h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 lg:flex focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
             >
-                <img :src="'https://flagcdn.com/w40/' + code + '.png'" alt="" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20">
+                {{-- Eager: the desktop pill is in the bar on arrival. --}}
+                <img :src="'https://flagcdn.com/w40/' + code + '.png'" alt="" width="28" height="28" decoding="async" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20">
                 <span>{{ strtoupper((string) config('localization.supported.'.app()->getLocale().'.short', 'EN')) }} / <span x-text="currency">USD</span></span>
             </button>
 

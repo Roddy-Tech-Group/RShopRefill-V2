@@ -463,7 +463,7 @@
             <div>
                 <span class="mb-1.5 block text-[13px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.country') }}</span>
                 <button type="button" @click="pane = 'country'" class="flex w-full items-center gap-3 rounded-full bg-[#ffffff] px-4 py-3.5 text-base font-medium text-zinc-900 ring-1 ring-[#dee3e1] transition-colors hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/5 dark:text-white dark:ring-white/10">
-                    <img :src="'https://flagcdn.com/w40/' + (draftCountryCode || 'us').toLowerCase() + '.png'" alt="" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
+                    <img :src="'https://flagcdn.com/w40/' + (draftCountryCode || 'us').toLowerCase() + '.png'" alt="" width="24" height="24" loading="lazy" decoding="async" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
                     <span class="flex-1 text-left" x-text="draftCountry">United States</span>
                     <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
                 </button>
@@ -540,7 +540,10 @@
                         @click="pickCountry(entry[0], entry[1], codes, currencyByCode, symbolByCurrency); search = ''"
                         class="flex w-full items-center gap-3 rounded-full px-3 py-3 text-left text-base text-zinc-900 transition-colors hover:bg-[#f4f6f5] dark:text-white dark:hover:bg-white/10"
                     >
-                        <img :src="'https://flagcdn.com/w40/' + (codes[entry[0]] || '').toLowerCase() + '.png'" alt="" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
+                        {{-- One flag per country, and there are dozens. Lazy keeps
+                             the list to the rows actually scrolled into view instead
+                             of asking the CDN for every country at once. --}}
+                        <img :src="'https://flagcdn.com/w40/' + (codes[entry[0]] || '').toLowerCase() + '.png'" alt="" width="24" height="24" loading="lazy" decoding="async" class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-black/10 dark:ring-white/20">
                         <span class="flex-1 truncate" :class="draftCountry === entry[0] ? 'font-semibold' : ''" x-text="entry[0]"></span>
                         <template x-if="draftCountry === entry[0]">
                             <svg class="h-5 w-5 shrink-0 text-zinc-900 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">

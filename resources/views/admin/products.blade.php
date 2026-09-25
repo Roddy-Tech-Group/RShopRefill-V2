@@ -1180,7 +1180,7 @@
                             <template x-for="country in (data.roamingCountries || [])" :key="country.code">
                                 <li class="flex items-center justify-between gap-3 py-2 text-[12px]">
                                     <span class="flex items-center gap-2">
-                                        <img :src="'https://flagcdn.com/w40/' + (country.code || '').toLowerCase() + '.png'" alt="" class="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-white/15">
+                                        <img :src="'https://flagcdn.com/w40/' + (country.code || '').toLowerCase() + '.png'" alt="" width="18" height="12" loading="lazy" decoding="async" class="h-3 w-[18px] shrink-0 rounded-[2px] object-cover ring-1 ring-zinc-200 dark:ring-white/15">
                                         <span class="text-zinc-800 dark:text-zinc-200" x-text="country.name || country.code"></span>
                                     </span>
                                     <span class="text-[11px] text-zinc-500 dark:text-zinc-400" x-text="country.speeds || 'Speed not available'"></span>
