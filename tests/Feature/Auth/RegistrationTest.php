@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -28,6 +29,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', 'Test')
             ->set('last_name', 'User')
             ->set('email', 'test@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', true)
@@ -69,6 +73,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', 'Ada')
             ->set('last_name', 'Lovelace')
             ->set('email', 'ada@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', true)
@@ -85,6 +92,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', 'Ada')
             ->set('last_name', '')
             ->set('email', 'halfname@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', true)
@@ -95,6 +105,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', '')
             ->set('last_name', 'Lovelace')
             ->set('email', 'halfname@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', true)
@@ -116,6 +129,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', 'Test')
             ->set('last_name', 'User')
             ->set('email', 'consent@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', false)
@@ -149,6 +165,9 @@ class RegistrationTest extends TestCase
             ->set('first_name', 'Test')
             ->set('last_name', 'User')
             ->set('email', 'once@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
             ->set('password', 'password')
             ->set('password_confirmation', 'password')
             ->set('terms', true)
@@ -156,5 +175,149 @@ class RegistrationTest extends TestCase
             ->assertHasNoErrors();
 
         Event::assertDispatchedTimes(Registered::class, 1);
+    }
+
+    /**
+     * The country is not a field of its own. It is the dial code chosen on the
+     * phone row, so picking +234 IS picking Nigeria, and the number typed
+     * beside it is stored as E.164 rather than as whatever the customer typed.
+     * A trunk 0 is tolerated on the way in and stripped on the way to the
+     * column, which is the only reason a national-number unique rule could
+     * never have caught the same line twice.
+     */
+    public function test_the_dial_code_sets_the_country_and_the_number_is_stored_as_e164(): void
+    {
+        Volt::test('auth.register')
+            ->set('first_name', 'Ada')
+            ->set('last_name', 'Lovelace')
+            ->set('email', 'e164@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '08031234567')
+            ->set('gender', 'female')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password')
+            ->set('terms', true)
+            ->call('register')
+            ->assertHasNoErrors();
+
+        $user = User::where('email', 'e164@example.com')->firstOrFail();
+
+        $this->assertSame('+2348031234567', $user->phone, 'the trunk 0 should be stripped into E.164');
+        $this->assertSame('NG', $user->country, 'the dial code should have set the country');
+        $this->assertSame('female', $user->gender);
+    }
+
+    /**
+     * The page asks for the same three the sign-up modal does. It was rebuilt
+     * as a real page without them, which left the account a customer got
+     * depending on which door they came through.
+     */
+    public function test_the_country_phone_and_gender_are_all_required(): void
+    {
+        foreach ([
+            'country' => '',
+            'phone' => '',
+            'gender' => '',
+        ] as $field => $blank) {
+            Volt::test('auth.register')
+                ->set('first_name', 'Ada')
+                ->set('last_name', 'Lovelace')
+                ->set('email', 'missing@example.com')
+                ->set('country', 'NG')
+                ->set('phone', '8031234567')
+                ->set('gender', 'female')
+                ->set($field, $blank)
+                ->set('password', 'password')
+                ->set('password_confirmation', 'password')
+                ->set('terms', true)
+                ->call('register')
+                ->assertHasErrors($field);
+        }
+
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'missing@example.com']);
+    }
+
+    /** The number is checked against the chosen country's numbering plan. */
+    public function test_a_number_that_is_not_valid_for_the_country_is_refused(): void
+    {
+        Volt::test('auth.register')
+            ->set('first_name', 'Ada')
+            ->set('last_name', 'Lovelace')
+            ->set('email', 'badphone@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '123')
+            ->set('gender', 'female')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password')
+            ->set('terms', true)
+            ->call('register')
+            ->assertHasErrors('phone');
+
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'badphone@example.com']);
+    }
+
+    /** One line, one account, whichever form the second attempt comes through. */
+    public function test_a_phone_number_cannot_register_twice(): void
+    {
+        User::factory()->create(['phone' => '+2348031234567']);
+
+        Volt::test('auth.register')
+            ->set('first_name', 'Ada')
+            ->set('last_name', 'Lovelace')
+            ->set('email', 'second@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '08031234567')
+            ->set('gender', 'female')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password')
+            ->set('terms', true)
+            ->call('register')
+            ->assertHasErrors('phone');
+
+        $this->assertDatabaseMissing('users', ['email' => 'second@example.com']);
+    }
+
+    /**
+     * The form collects everything an account needs, so a signup made here is
+     * complete on arrival and never meets the completion step a Google sign-in
+     * lands on.
+     */
+    public function test_a_signup_from_this_page_is_a_complete_profile(): void
+    {
+        Volt::test('auth.register')
+            ->set('first_name', 'Ada')
+            ->set('last_name', 'Lovelace')
+            ->set('email', 'complete@example.com')
+            ->set('country', 'NG')
+            ->set('phone', '8031234567')
+            ->set('gender', 'female')
+            ->set('password', 'password')
+            ->set('password_confirmation', 'password')
+            ->set('terms', true)
+            ->call('register')
+            ->assertHasNoErrors();
+
+        $this->assertNotNull(User::where('email', 'complete@example.com')->firstOrFail()->profile_completed_at);
+    }
+
+    /** The page offers the same three controls the modal does. */
+    public function test_the_page_renders_the_phone_row_and_the_gender_choices(): void
+    {
+        $html = $this->withoutVite()->get('/register')->assertOk()->getContent();
+
+        // One row: the dial-code button and the national number beside it.
+        $this->assertTrue(str_contains($html, 'aria-label="'.e(__('auth.modal_dial_code')).'"'), 'the dial code picker is missing');
+        $this->assertTrue(str_contains($html, 'autocomplete="tel-national"'), 'the phone input is missing');
+        $this->assertTrue(str_contains($html, 'wire:model="phone"'), 'the phone field is not bound');
+
+        // And the three gender choices, each setting the one field.
+        foreach (['male', 'female', 'other'] as $choice) {
+            $this->assertTrue(
+                str_contains($html, 'wire:click="$set(\'gender\', \''.$choice.'\')"'),
+                "the {$choice} option is missing"
+            );
+        }
     }
 }

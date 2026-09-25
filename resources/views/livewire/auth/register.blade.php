@@ -3,10 +3,12 @@
 use App\Http\Middleware\CaptureReferralCookie;
 use App\Models\Referral;
 use App\Models\User;
+use App\Support\PhoneCountries;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use App\Domain\Security\Services\TurnstileService;
@@ -16,6 +18,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     public string $first_name = '';
@@ -23,6 +27,22 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $last_name = '';
 
     public string $email = '';
+
+    /**
+     * The country is picked from the phone field's dial code rather than from
+     * a list of its own: one control, one answer. The ISO code chosen there is
+     * what lands in users.country, and the number beside it is validated
+     * against that country's numbering plan.
+     */
+    public string $country = PhoneCountries::DEFAULT_ISO;
+
+    public string $phone = '';
+
+    /**
+     * Drives the default avatar until the customer uploads one, the same way
+     * the sign-up modal uses it.
+     */
+    public string $gender = '';
 
     public string $password = '';
 
@@ -63,11 +83,31 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
+            // The national number is validated against the chosen country's
+            // numbering plan (libphonenumber). A trunk 0 the customer may type
+            // is tolerated here and stripped when the number is stored.
+            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
+            'gender' => ['required', 'in:male,female,other'],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
             'terms' => ['accepted'],
         ], [
             'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
         ]);
+
+        // Canonicalise to E.164 (+2348031234567), the one format every gateway
+        // and SMS provider reads the same way, and enforce uniqueness on that.
+        // A rule on the national number could not see that 0803... and
+        // +234803... are the same line. One line, one account.
+        $phoneE164 = (new PhoneNumber($validated['phone'], [$validated['country']]))->formatE164();
+
+        if (User::where('phone', $phoneE164)->exists()) {
+            throw ValidationException::withMessages([
+                'phone' => __('auth.phone_taken'),
+            ]);
+        }
+
+        $validated['phone'] = $phoneE164;
 
         // Consent is recorded by the act of registering; it is not a column on
         // users, so it must not reach User::create().
@@ -81,6 +121,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         unset($validated['first_name'], $validated['last_name']);
 
         $validated['password'] = Hash::make($validated['password']);
+
+        // This form now collects everything an account needs, so the signup is
+        // complete on arrival and never meets the profile-completion step that
+        // a Google sign-in lands on.
+        $validated['profile_completed_at'] = now();
 
         $user = User::create($validated);
 
@@ -271,6 +316,104 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 @error('email') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
+            {{-- Country dial-code + phone, one control. The left segment is a
+                 searchable flag and +code picker, and what it picks IS the
+                 account's country; the right segment is the national number.
+                 libphonenumber validates the pair server-side and the number is
+                 stored as E.164, so it can be typed with or without a trunk 0. --}}
+            <div
+                x-data="{
+                    countries: @js(App\Support\PhoneCountries::all()),
+                    selected: @js($country),
+                    search: '',
+                    open: false,
+                    get current() { return this.countries.find(c => c.iso === this.selected) || this.countries[0]; },
+                    get matches() {
+                        const q = this.search.trim().toLowerCase();
+                        if (! q) return this.countries;
+                        return this.countries.filter(c =>
+                            c.name.toLowerCase().includes(q) || c.iso.toLowerCase().includes(q) || ('+' + c.dial).includes(q)
+                        );
+                    },
+                    choose(iso) {
+                        this.selected = iso;
+                        $wire.country = iso;
+                        this.open = false;
+                        this.search = '';
+                        this.$nextTick(() => this.$refs.phoneInput?.focus());
+                    },
+                }"
+                @click.outside="open = false"
+            >
+                <label for="phone" class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_phone') }}</label>
+                <div class="flex items-stretch rounded-full border-2 border-zinc-300 bg-white transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15">
+                    <button
+                        type="button"
+                        @click="open = ! open"
+                        :aria-expanded="open"
+                        aria-label="{{ __('auth.modal_dial_code') }}"
+                        class="flex shrink-0 items-center gap-1.5 rounded-l-full border-r-2 border-zinc-300 px-4 text-base text-zinc-900 outline-none transition-colors hover:bg-zinc-50"
+                    >
+                        <span class="text-base leading-none" x-text="current.flag"></span>
+                        <span class="font-medium" x-text="'+' + current.dial"></span>
+                        <svg class="h-4 w-4 text-zinc-500 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                    </button>
+
+                    <input
+                        wire:model="phone"
+                        x-ref="phoneInput"
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        inputmode="numeric"
+                        autocomplete="tel-national"
+                        required
+                        :placeholder="current.example"
+                        class="w-full min-w-0 rounded-r-full bg-transparent px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none"
+                    />
+                </div>
+
+                {{-- The list opens in flow rather than floating over the form, so
+                     it can never be clipped by an ancestor and never paints over
+                     the fields under it. It caps its own height and scrolls. --}}
+                <div
+                    x-show="open"
+                    x-collapse
+                    x-cloak
+                    @keydown.escape.stop="open = false"
+                    class="mt-2 overflow-hidden rounded-[12px] bg-white shadow-lg shadow-zinc-900/[0.08] ring-1 ring-zinc-200"
+                >
+                    <div class="border-b border-zinc-200 p-2">
+                        <input
+                            x-model="search"
+                            type="text"
+                            placeholder="{{ __('auth.modal_search_country') }}"
+                            class="w-full rounded-full border-2 border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500"
+                            @keydown.enter.prevent="if (matches.length) choose(matches[0].iso)"
+                        >
+                    </div>
+                    <ul class="max-h-52 overflow-y-auto overscroll-contain py-1" role="listbox">
+                        <template x-for="c in matches" :key="c.iso">
+                            <li>
+                                <button
+                                    type="button"
+                                    @click="choose(c.iso)"
+                                    class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-900 transition-colors hover:bg-[#f4f6f5]"
+                                    :class="c.iso === selected && 'bg-[#f4f6f5] font-semibold'"
+                                >
+                                    <span class="text-base leading-none" x-text="c.flag"></span>
+                                    <span class="flex-1 truncate" x-text="c.name"></span>
+                                    <span class="text-zinc-500" x-text="'+' + c.dial"></span>
+                                </button>
+                            </li>
+                        </template>
+                        <li x-show="! matches.length" class="px-3 py-3 text-center text-sm text-zinc-500">{{ __('auth.modal_no_match') }}</li>
+                    </ul>
+                </div>
+                @error('country') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('phone') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
             {{-- Password --}}
             <div x-data="{ show: false }">
                 <label for="password" class="mb-2 block text-sm font-medium text-zinc-700">Password</label>
@@ -333,6 +476,30 @@ new #[Layout('components.layouts.auth')] class extends Component {
                     </button>
                 </div>
                 @error('password_confirmation') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Gender. Three choices on one segmented control, in the same pill
+                 language as the fields above it. It picks the default avatar
+                 until the customer uploads one of their own. --}}
+            <div>
+                <span class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_gender') }}</span>
+                <div class="grid grid-cols-3 gap-1 rounded-full bg-zinc-100 p-1 ring-1 ring-zinc-200">
+                    @foreach ([
+                        ['value' => 'male',   'label' => __('auth.modal_gender_male')],
+                        ['value' => 'female', 'label' => __('auth.modal_gender_female')],
+                        ['value' => 'other',  'label' => __('auth.modal_gender_other')],
+                    ] as $opt)
+                        <button
+                            type="button"
+                            wire:click="$set('gender', '{{ $opt['value'] }}')"
+                            class="rounded-full px-3 py-3 text-sm font-semibold transition-all active:scale-95 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
+                            aria-pressed="{{ $gender === $opt['value'] ? 'true' : 'false' }}"
+                        >
+                            {{ $opt['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+                @error('gender') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             {{-- Referral code (optional). Prefilled from the ?ref=CODE cookie
