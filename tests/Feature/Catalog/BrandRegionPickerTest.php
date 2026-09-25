@@ -179,7 +179,9 @@ class BrandRegionPickerTest extends TestCase
         $source = file_get_contents(resource_path('views/shop/_country-availability.blade.php'));
 
         $this->assertStringContainsString('$availabilityCanSwitch = ($isGiftCard ?? false) && $availabilityCountries->count() > 1;', $source);
-        $this->assertStringContainsString('@elseif (! ($isGiftCard ?? false))', $source);
+        // Top-ups keep the global link only while there are refill countries to
+        // offer; the branch is scoped to that, not just to "not a gift card".
+        $this->assertStringContainsString('@elseif (! ($isGiftCard ?? false) && $availabilityRefillCountries->isNotEmpty())', $source);
         $this->assertStringContainsString("__('products.detail_find_your_country')", $source);
     }
 }

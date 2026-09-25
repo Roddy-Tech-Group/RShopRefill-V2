@@ -101,7 +101,9 @@ class DiscoverGlobalTest extends TestCase
 
         $first = $catalog->first();
         $this->assertStringContainsString('discover-global', $first['slug']);
-        $this->assertSame('Discover Global USA eSIM', $first['name']);
+        // Sold as "Global", never under the supplier's own product name, which
+        // is a brand a shopper has no reason to know; the grid adds the suffix.
+        $this->assertSame('Global eSIM', $first['name']);
         $this->assertSame(Product::flagUrl('US'), $first['flag']);
         $this->assertTrue($first['popular']);
 
