@@ -139,8 +139,15 @@ class ForPartnersTabsTest extends TestCase
         $this->assertStringContainsString('relative overflow-hidden rounded-[22px] bg-[#17171a]', $panel);
         // One face, one weight: DM Sans 399 across the card, emphasis by colour.
         $this->assertStringContainsString(".partner-hero, .partner-hero * { font-family: 'DM Sans', sans-serif; font-weight: 399; }", $panel);
+        // Checked on the hero's own markup: the shared components it renders
+        // may carry weight utilities, and the rule above overrides them all.
+        $source = file_get_contents(resource_path('views/dashboard/rewards.blade.php'));
+        $heroStart = strpos($source, 'partner-hero theme-static');
+        $heroEnd = strpos($source, '{{-- Refer a product', $heroStart);
+        $this->assertNotFalse($heroEnd, 'the Refer a product section no longer follows the hero');
+        $hero = substr($source, $heroStart, $heroEnd - $heroStart);
         foreach (['font-bold', 'font-extrabold', 'font-semibold', 'font-medium'] as $weight) {
-            $this->assertStringNotContainsString($weight, substr($panel, strpos($panel, 'partner-hero theme-static')), $weight.' should not appear inside the hero card.');
+            $this->assertStringNotContainsString($weight, $hero, $weight.' should not appear inside the hero card.');
         }
         // Single dark layer: no outer #08080a frame around the card.
         $this->assertStringNotContainsString('bg-[#08080a]', $panel);
@@ -230,14 +237,27 @@ class ForPartnersTabsTest extends TestCase
         ]);
         ProductVariant::factory()->create(['product_id' => $apple->id, 'face_value' => 100, 'cost_price' => 60, 'retail_price' => 100]);
 
-        // An eSIM links by its own slug, not by a brand page.
+        // An eSIM links by its own slug, not by a brand page. A worldwide
+        // plan: the region cards key on the WW country code, and the pinned
+        // regions read those cards.
         $esim = Product::factory()->create([
             'brand_key' => null,
+            'provider_name' => 'airalo',
+            'country_code' => 'WW',
             'name' => 'Global Data eSIM',
             'slug' => 'esim-ww-global',
             'category_id' => $esims->id,
         ]);
-        ProductVariant::factory()->create(['product_id' => $esim->id, 'face_value' => 100, 'cost_price' => 70, 'retail_price' => 100]);
+        ProductVariant::factory()->create([
+            'product_id' => $esim->id,
+            'face_value' => 100,
+            'cost_price' => 70,
+            'retail_price' => 100,
+            'is_available' => true,
+            'is_variable' => false,
+            // A plan the region cards can describe.
+            'metadata' => ['data_limit' => '1 GB', 'duration_days' => 7],
+        ]);
 
         // Top-ups are out of scope for this row, however fat the margin.
         $mtn = Product::factory()->create([
@@ -279,7 +299,7 @@ class ForPartnersTabsTest extends TestCase
 
         // Filter pills, styled from aria-pressed only so Alpine can move the state.
         $this->assertStringContainsString('aria-label="Filter products"', $cards);
-        $this->assertStringContainsString('aria-pressed:bg-[#0c1337]', $cards);
+        $this->assertStringContainsString('.refer-pill[aria-pressed="true"] { background-color: #0c1337;', $cards);
 
         // A top-up brand appears only when config pins it: MTN is pinned, so it
         // gets a card and links to its own page type; the margin fill still

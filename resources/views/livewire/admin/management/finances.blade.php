@@ -119,6 +119,21 @@ class extends Component {
         return round((($current - $prior) / abs($prior)) * 100, 1);
     };
 
+    // A net figure with what came off it noted underneath, only when
+    // something did. Keeps the tables to the columns an owner reads.
+    // Money::codeAmount is what @moneyCode renders, so these cells match the
+    // rest of the table (and need no intl extension).
+    $netCell = function (float $net, float $adjustment, string $noun) {
+        $html = \App\Domain\Shared\Services\Money::codeAmount($net, 'USD');
+
+        if ($adjustment > 0) {
+            $html .= '<span class="block text-[11px] font-normal text-zinc-400">less '
+                .\App\Domain\Shared\Services\Money::codeAmount($adjustment, 'USD').' '.e($noun).'</span>';
+        }
+
+        return $html;
+    };
+
     $deltaBadge = function (?float $pct, bool $downIsGood = false) {
         if ($pct === null) {
             return '';
@@ -136,7 +151,7 @@ class extends Component {
 <div class="space-y-6 max-w-7xl mx-auto -mt-2">
     {{-- ── Month picker ──────────────────────────────────────────── --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-zinc-600 dark:text-zinc-400">Monthly revenue, supplier cost and gross profit, by provider and category.</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">Monthly revenue, supplier cost and gross profit, by provider and category. Refunds and supplier credits come off in the month they happen.</p>
         @php $isLaunchMonth = $this->selectedMonth()->equalTo($this->launchMonth()); @endphp
         <div class="flex items-center gap-2">
             <button type="button" wire:click="stepMonth(-1)" @disabled($isLaunchMonth) class="rounded-[12px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Previous month">
@@ -183,16 +198,33 @@ class extends Component {
     {{-- ── Headline totals ───────────────────────────────────────── --}}
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         @php
+            $refunds = $data['refunds'];
+            $credits = $data['supplier_credits'];
+
+            // Revenue and supplier cost are NET: refunds and supplier credits
+            // come off in the month they happen. The gross figure rides along
+            // underneath whenever something was taken off it.
+            $revenueSub = $totals['refunds_usd'] > 0
+                ? \App\Domain\Shared\Services\Money::codeAmount($totals['gross_revenue_usd'], 'USD').' gross, less refunds'
+                : '';
+            $costSub = $totals['supplier_credits_usd'] > 0
+                ? \App\Domain\Shared\Services\Money::codeAmount($totals['gross_cost_usd'], 'USD').' gross, less credits'
+                : '';
+            $refundSub = number_format($refunds['count']).' '.($refunds['count'] === 1 ? 'refund' : 'refunds');
+            if ($credits['pending_count'] > 0) {
+                $refundSub .= ' · '.number_format($credits['pending_count']).' supplier '.($credits['pending_count'] === 1 ? 'claim' : 'claims').' pending';
+            }
+
             $headlines = [
-                ['label' => 'Revenue', 'money' => $totals['revenue_usd'], 'delta' => $delta($totals['revenue_usd'], $previous['revenue_usd'])],
+                ['label' => 'Revenue', 'money' => $totals['revenue_usd'], 'sub' => $revenueSub, 'delta' => $delta($totals['revenue_usd'], $previous['revenue_usd'])],
                 // Up is green here like every other headline: supplier cost
                 // rises with sales, so a bigger number is more business, not
                 // a problem. Marking it "down is good" painted growth red.
-                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'delta' => $delta($totals['cost_usd'], $previous['cost_usd'])],
+                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'sub' => $costSub, 'delta' => $delta($totals['cost_usd'], $previous['cost_usd'])],
                 ['label' => 'Gross profit', 'money' => $totals['profit_usd'], 'delta' => $delta($totals['profit_usd'], $previous['profit_usd'])],
                 ['label' => 'Gross margin', 'value' => number_format($totals['margin_pct'], 2).'%', 'delta' => $delta($totals['margin_pct'], $previous['margin_pct'])],
                 ['label' => 'Completed orders', 'value' => number_format($totals['orders']), 'delta' => $delta((float) $totals['orders'], (float) $previous['orders'])],
-                ['label' => 'Refunds issued', 'money' => $data['refunds']['total_usd'], 'sub' => number_format($data['refunds']['count']).' refunds', 'downGood' => true],
+                ['label' => 'Refunds', 'money' => $refunds['total_usd'], 'sub' => $refundSub, 'downGood' => true],
             ];
         @endphp
         @foreach ($headlines as $headline)
@@ -232,8 +264,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['label'] }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['orders']) }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['units']) }}</td>
-                            <td class="{{ $td }} text-right">@moneyCode($row['revenue_usd'], 'USD')</td>
-                            <td class="{{ $td }} text-right">@moneyCode($row['cost_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right">{!! $netCell($row['revenue_usd'], $row['refunds_usd'], 'refunded') !!}</td>
+                            <td class="{{ $td }} text-right">{!! $netCell($row['cost_usd'], $row['supplier_credits_usd'], 'credited') !!}</td>
                             <td class="{{ $td }} text-right font-semibold {{ $row['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($row['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right">{{ number_format($row['margin_pct'], 2) }}%</td>
                         </tr>
@@ -247,8 +279,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-bold text-zinc-900 dark:text-white">Company total</td>
                             <td class="{{ $td }} text-right font-bold">{{ number_format($totals['orders']) }}</td>
                             <td class="{{ $td }} text-right font-bold">{{ number_format($totals['units']) }}</td>
-                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['revenue_usd'], 'USD')</td>
-                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['cost_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right font-bold">{!! $netCell($totals['revenue_usd'], $totals['refunds_usd'], 'refunded') !!}</td>
+                            <td class="{{ $td }} text-right font-bold">{!! $netCell($totals['cost_usd'], $totals['supplier_credits_usd'], 'credited') !!}</td>
                             <td class="{{ $td }} text-right font-bold {{ $totals['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($totals['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right font-bold">{{ number_format($totals['margin_pct'], 2) }}%</td>
                         </tr>
@@ -282,8 +314,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['category'] }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['orders']) }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['units']) }}</td>
-                            <td class="{{ $td }} text-right">@moneyCode($row['revenue_usd'], 'USD')</td>
-                            <td class="{{ $td }} text-right">@moneyCode($row['cost_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right">{!! $netCell($row['revenue_usd'], $row['refunds_usd'], 'refunded') !!}</td>
+                            <td class="{{ $td }} text-right">{!! $netCell($row['cost_usd'], $row['supplier_credits_usd'], 'credited') !!}</td>
                             <td class="{{ $td }} text-right font-semibold {{ $row['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($row['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right">{{ number_format($row['margin_pct'], 2) }}%</td>
                         </tr>

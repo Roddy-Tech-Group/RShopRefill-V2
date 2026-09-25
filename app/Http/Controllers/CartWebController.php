@@ -15,6 +15,7 @@ use App\Support\FeatureFlag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Storefront-facing cart endpoints.
@@ -82,6 +83,9 @@ class CartWebController extends Controller
             // and copied onto order_items.metadata at checkout so the Zendit
             // top-up fulfilment provider can read it.
             'metadata.recipient_phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{6,20}$/'],
+            // The buyer's own number, for offers whose operator prints it on
+            // the receipt (sender.msisdn). Same shape as the recipient's.
+            'metadata.sender_phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{6,20}$/'],
             'metadata.delivery_email' => ['nullable', 'email'],
             // Bill payment account / meter ID. Alphanumeric + common separators,
             // 4-30 chars (covers electricity meters, DSTV smartcards, etc.).
@@ -93,6 +97,13 @@ class CartWebController extends Controller
 
         [$cart, $token] = $this->resolve($request);
         $variant = ProductVariant::findOrFail($data['product_variant_id']);
+
+        // An offer the supplier needs an account number or phone number to
+        // deliver cannot go in the cart without it; refuse it here rather
+        // than after payment.
+        if ($missing = $variant->missingPurchaseFields((array) ($data['metadata'] ?? []), $request->user())) {
+            throw ValidationException::withMessages($missing);
+        }
 
         $item = $this->cartManager->addItem(
             $cart,

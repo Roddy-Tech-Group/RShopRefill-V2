@@ -62,6 +62,9 @@ class FundingFailedListener
             message: $message,
             correlationId: 'funding_failed_'.$funding->id,
             metadata: [
+                // The bell and push read `url`: the funding sheet, opened on
+                // this currency and amount (RecoveryController does the same).
+                'url' => route('dashboard', ['fund' => strtoupper($currency), 'amount' => round((float) $funding->amount, 2)]),
                 'funding_id' => $funding->id,
                 'failure_reason_code' => $verdict['code'],
             ],

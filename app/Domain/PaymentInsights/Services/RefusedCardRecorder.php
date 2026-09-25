@@ -4,8 +4,10 @@ namespace App\Domain\PaymentInsights\Services;
 
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Support\CustomerFailureCopy;
+use App\Domain\Payment\Support\MockMode;
 use App\Domain\PaymentInsights\Enums\ProductLine;
 use App\Domain\PaymentInsights\Support\DeclineVerdict;
+use App\Domain\PaymentInsights\Support\IssuerCountry;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use App\Models\PaymentDecline;
@@ -106,7 +108,7 @@ class RefusedCardRecorder
                     'payment_method' => $charge['payment_type'] !== null ? Str::limit((string) $charge['payment_type'], 30, '') : null,
                     'card_fingerprint' => DeclineVerdict::fingerprint($charge['card']['first_6digits'], $charge['card']['last_4digits']),
                     'card_brand' => $charge['card']['type'] !== null ? Str::limit((string) $charge['card']['type'], 40, '') : null,
-                    'card_issuer_country' => $charge['card']['country'] !== null ? strtoupper(substr((string) $charge['card']['country'], 0, 2)) : null,
+                    'card_issuer_country' => IssuerCountry::normalise($charge['card']['country']),
                     'verdict' => Str::limit($verdict, 250, ''),
                     'verdict_class' => DeclineVerdict::classify($classification['code'], $verdict, $charge['card']['type']),
                     'reason_code' => $classification['code'],
@@ -230,7 +232,7 @@ class RefusedCardRecorder
 
         $secret = (string) config('services.flutterwave.secret_key');
 
-        return $secret !== '' && ! str_contains($secret, 'MOCK');
+        return $secret !== '' && ! MockMode::forKey($secret);
     }
 
     private function productLine(PaymentSession $session): ProductLine

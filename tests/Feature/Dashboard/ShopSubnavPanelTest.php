@@ -80,13 +80,22 @@ class ShopSubnavPanelTest extends TestCase
         );
     }
 
-    public function test_the_account_menu_language_row_opens_the_language_chooser(): void
+    /**
+     * The account menu's Language row opens the preferences modal on its root
+     * pane, where language, currency and country sit together, rather than
+     * deep-linking to the language list alone. The modal keeps accepting a
+     * pane for the callers that do want one screen.
+     */
+    public function test_the_account_menu_language_row_opens_the_preferences_modal(): void
     {
         $html = $this->withoutVite()->actingAs(User::factory()->create())->get('/dashboard')->assertOk()->getContent();
         $modal = $this->file('views/components/nav/locale-modal.blade.php');
 
-        $this->assertStringContainsString("\$dispatch('open-locale-modal', { pane: 'language' })", $html);
-        $this->assertStringContainsString('>Language<', $html);
+        $row = strpos($html, '>Language<');
+        $this->assertNotFalse($row, 'the Language row is missing');
+        $rowMarkup = substr($html, strrpos(substr($html, 0, $row), '<button'), $row - strrpos(substr($html, 0, $row), '<button'));
+        $this->assertStringContainsString("\$dispatch('open-locale-modal')\"", $rowMarkup);
+        $this->assertStringNotContainsString("pane: 'language'", $rowMarkup);
         $this->assertStringContainsString("['country', 'language', 'currency'].includes(\$event.detail.pane)", $modal);
     }
 }

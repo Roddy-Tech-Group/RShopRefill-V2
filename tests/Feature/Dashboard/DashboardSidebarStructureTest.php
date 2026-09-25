@@ -93,7 +93,7 @@ class DashboardSidebarStructureTest extends TestCase
 
     public function test_verify_identity_turns_into_identity_verified_after_approval(): void
     {
-        $pending = $this->sidebar(User::factory()->create(['kyc_status' => null]));
+        $pending = $this->sidebar(User::factory()->create(['kyc_status' => 'unsubmitted']));
         $this->assertStringContainsString('Verify Identity', $pending);
         $this->assertStringContainsString('>KYC</span>', $pending);
 

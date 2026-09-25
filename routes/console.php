@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Catalog\Enums\CatalogFeed;
+use App\Domain\Catalog\Enums\CatalogSyncRunStatus;
+use App\Domain\Catalog\Services\CatalogSyncRunService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Support\SweeperPickupCounter;
 use App\Domain\Payment\Enums\PaymentStatus;
@@ -61,6 +64,16 @@ Schedule::command('airalo:sync-esims')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/airalo-sync.log'))
     ->name('airalo:sync-esims-hourly');
+
+// Manage eSIMs: refresh status and data for the 200 least recently checked
+// eSIMs every half hour (Airalo caches usage for 20 minutes, so faster buys
+// nothing). About a minute per run at Airalo's 5 calls a second.
+Schedule::command('esims:sync-status --limit=200')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping(30)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/esim-status-sync.log'))
+    ->name('esims:sync-status');
 
 // Zendit catalog syncs - keep gift cards, top-ups and bills fresh without
 // any manual intervention. Cadence is every 6h (Zendit catalog changes
@@ -146,15 +159,20 @@ Artisan::command('payments:expire-stale', function () {
     $this->info('Done.');
 })->purpose('Expire payment sessions past their TTL and cancel their orders/fundings');
 
-Artisan::command('zendit:sync-giftcards', function () {
+Artisan::command('zendit:sync-giftcards {--force-cleanup : Hide offers Zendit no longer lists even when the shrink guards would hold back}', function (CatalogSyncRunService $runs) {
     $this->info('Setting default queue connection to sync...');
     config(['queue.default' => 'sync']);
 
-    $this->info('Dispatching SyncZenditGiftCardsJob synchronously...');
-    dispatch(new SyncZenditGiftCardsJob);
+    $run = $runs->start(CatalogFeed::ZenditVouchers, (bool) $this->option('force-cleanup'));
 
-    $this->info('Zendit Gift Card and Brand Sync completed successfully!');
-})->purpose('Sync Gift Cards and Brand Assets from Zendit API');
+    $this->info('Dispatching SyncZenditGiftCardsJob synchronously...');
+    dispatch(new SyncZenditGiftCardsJob(1, $run->id));
+
+    $run->refresh();
+    $this->info($run->summary());
+
+    return $run->status === CatalogSyncRunStatus::Completed ? 0 : 1;
+})->purpose('Sync Gift Cards and Brand Assets from Zendit API, then hide offers Zendit no longer lists');
 
 // Bug #4 fix: Fulfillment fallback sweeper.
 //
@@ -294,6 +312,17 @@ Schedule::command('ledger:verify')
     ->withoutOverlapping()
     ->name('ledger:verify-nightly')
     ->sentryMonitor('ledger-verify-nightly');
+
+// The wallet ledger chain: the hash-linked events WalletService writes for
+// every credit, debit, lock and unlock, re-proved link by link and checked
+// against each wallet's balance. This is the chain production actually
+// writes (the double-entry journals above have no writer yet), so this is
+// the check that stands behind every balance customers spend from.
+Schedule::command('ledger:verify-chain')
+    ->dailyAt('02:40')
+    ->withoutOverlapping()
+    ->name('ledger:verify-chain-nightly')
+    ->sentryMonitor('ledger-verify-chain-nightly');
 
 // Margin protection. Runs before the morning sweep so any below-cost sale from
 // overnight is on the desk before the day starts.

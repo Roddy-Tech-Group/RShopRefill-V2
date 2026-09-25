@@ -64,6 +64,10 @@ class CheckoutService
      *                                       the gateway alone cannot identify it.
      *                                       Falls back to the gateway, which is
      *                                       exact for wallet and crypto.
+     * @param  string|null  $walletCurrency  For wallet payments, the wallet the
+     *                                       customer chose to pay from. Null lets
+     *                                       the wallet provider pick the first
+     *                                       wallet that covers the order.
      *
      * @throws \Exception
      */
@@ -87,7 +91,7 @@ class CheckoutService
      */
     private const MINIMUM_REUSABLE_MINUTES = 2;
 
-    public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null): Order
+    public function placeOrder(User $user, Cart $cart, string $paymentMethod, string $displayCurrency, ?string $deliveryEmail = null, bool|string $applyRcoin = false, ?string $couponCode = null, ?string $selectedMethod = null, ?string $walletCurrency = null): Order
     {
         // -1. Gateway kill switch, before EVERYTHING including re-entry. This
         //     deliberately outranks reuse: backoff throttles the customer,
@@ -140,7 +144,11 @@ class CheckoutService
         //    currency, coupon, Rcoin choice or payment method changed at all,
         //    it does not match and we fall through to a fresh checkout. Two
         //    carts that merely happen to total the same amount never collide.
-        $fingerprint = $this->checkoutFingerprint($cart, $paymentMethod, $selectedMethod, $displayCurrency, $applyRcoin, $couponCode);
+        $walletCurrency = $paymentMethod === 'wallet' && $walletCurrency !== null && trim($walletCurrency) !== ''
+            ? strtoupper(trim($walletCurrency))
+            : null;
+
+        $fingerprint = $this->checkoutFingerprint($cart, $paymentMethod, $selectedMethod, $displayCurrency, $applyRcoin, $couponCode, $walletCurrency);
 
         if ($reusable = $this->findReusableCheckout($user, $cart, $fingerprint)) {
             Log::info('checkout.reused_live_session', [
@@ -177,7 +185,7 @@ class CheckoutService
         //     exactly like the old KYC gate. The intentional step-up/review/deny
         //     exceptions are surfaced by the controller. Raw USD total is the
         //     transaction's exposure value.
-        $this->riskGate->guard($this->orderRiskContext($user, $cart, (float) $validatedTotals['total'], $displayCurrency));
+        $this->riskGate->guard($this->orderRiskContext($user, $cart, (float) $validatedTotals['total'], $displayCurrency, $paymentMethod));
 
         // 1b. Resolve the display currency rate via CurrencyRateService so the
         //     same freshness gate that protects wallet funding protects the order
@@ -468,6 +476,10 @@ class CheckoutService
             'amount' => $order->total_amount,
             'exchange_rate_snapshot' => $exchangeRate,
             'payment_status' => PaymentStatus::Pending,
+            // The wallet the customer asked to pay from, if any. The wallet
+            // provider reads it at initialisation and records the wallet it
+            // actually charges (and the rate) beside it.
+            'metadata' => $walletCurrency !== null ? ['wallet' => ['requested_currency' => $walletCurrency]] : null,
         ]);
 
         OrderPlaced::dispatch($order);
@@ -504,6 +516,18 @@ class CheckoutService
             });
 
             throw $e;
+        }
+
+        // 5b. A wallet payment now knows which wallet pays and what it will be
+        //     charged in that wallet's currency (it can differ from the order's
+        //     currency). Written on the order the way the eSIM top-up writes
+        //     it, so the admin order page and the receipt can say so.
+        if ($paymentMethod === 'wallet' && is_array($choice = data_get($attempt->fresh()->metadata, 'wallet')) && isset($choice['currency'])) {
+            $order->update(['metadata' => array_merge($order->fresh()->metadata ?? [], [
+                'paid_from_wallet_currency' => $choice['currency'],
+                'paid_amount' => (float) $choice['amount'],
+                'paid_wallet_rate' => (float) $choice['rate'],
+            ])]);
         }
 
         // 6. Create the PaymentSession
@@ -586,7 +610,7 @@ class CheckoutService
      * purchase, and reusing the previous checkout would send the money to the
      * wrong number.
      */
-    private function checkoutFingerprint(Cart $cart, string $paymentMethod, ?string $selectedMethod, string $displayCurrency, bool|string $applyRcoin, ?string $couponCode): string
+    private function checkoutFingerprint(Cart $cart, string $paymentMethod, ?string $selectedMethod, string $displayCurrency, bool|string $applyRcoin, ?string $couponCode, ?string $walletCurrency = null): string
     {
         $lines = $cart->items()
             ->orderBy('product_variant_id')
@@ -609,6 +633,9 @@ class CheckoutService
             strtoupper($displayCurrency),
             is_string($applyRcoin) ? $applyRcoin : ($applyRcoin ? '1' : '0'),
             strtoupper($couponCode ?? ''),
+            // Which wallet pays changes what the customer is charged and in
+            // what currency: a different wallet is a different checkout.
+            strtoupper($walletCurrency ?? ''),
         ]));
     }
 
@@ -619,7 +646,7 @@ class CheckoutService
      * step-up/review/deny exceptions are intentional control flow the controller
      * handles.
      */
-    private function orderRiskContext(User $user, Cart $cart, float $amountUsd, string $displayCurrency): RiskContext
+    private function orderRiskContext(User $user, Cart $cart, float $amountUsd, string $displayCurrency, string $paymentMethod): RiskContext
     {
         $categories = [];
 
@@ -645,6 +672,10 @@ class CheckoutService
             categories: $categories,
             subjectType: 'cart',
             subjectId: (string) $cart->id,
+            // Paying from wallet balance brings no new money in: KYC's
+            // cumulative count must not add the order to a sum that already
+            // holds the funding it spends.
+            bringsNewMoney: ! in_array($paymentMethod, PaymentBackoffManager::BALANCE_PROVIDERS, true),
         );
     }
 

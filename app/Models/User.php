@@ -478,14 +478,6 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     }
 
     /**
-     * Get all KYC submissions for this user, newest first.
-     */
-    public function kycSubmissions(): HasMany
-    {
-        return $this->hasMany(KycSubmission::class)->latest();
-    }
-
-    /**
      * Provider-era KYC attempts (Smile ID sessions), newest first.
      */
     public function kycVerifications(): HasMany

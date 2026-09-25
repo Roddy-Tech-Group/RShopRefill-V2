@@ -167,6 +167,40 @@ class RefusedCardRecordingTest extends TestCase
     }
 
     /**
+     * The gateway names the card's country however it likes: a code, a full
+     * name, or "UNKNOWN". The column holds two characters, and the first cut
+     * of this stored the first two letters of whatever arrived, so IRELAND was
+     * filed as IR and read back as Iran in a fraud report. A name resolves to
+     * its ISO code, and anything unresolvable is stored as nothing at all.
+     */
+    public function test_a_country_name_from_the_gateway_is_stored_as_its_iso_code_or_not_at_all(): void
+    {
+        $user = User::factory()->create();
+        $session = $this->popupSession($user);
+
+        $ireland = $this->refusedCharge(9101, lastFour: '1001');
+        $ireland['card']['country'] = 'IRELAND';
+
+        $unknown = $this->refusedCharge(9102, lastFour: '1002');
+        $unknown['card']['country'] = 'UNKNOWN';
+
+        $sweden = $this->refusedCharge(9103, lastFour: '1003');
+        $sweden['card']['country'] = 'Sweden';
+
+        $this->gatewaySays([$ireland, $unknown, $sweden]);
+
+        $this->actingAs($user)
+            ->postJson(self::TELEMETRY, ['session_id' => $session->id, 'reason' => 'popup_closed', 'context' => ['provider' => 'flutterwave']])
+            ->assertOk();
+
+        $countries = PaymentDecline::query()->orderBy('gateway_transaction_id')->pluck('card_issuer_country', 'gateway_transaction_id');
+
+        $this->assertSame('IE', $countries['9101'], 'IRELAND must resolve to IE, never be cut to IR');
+        $this->assertNull($countries['9102'], 'UNKNOWN is no country, not "UN"');
+        $this->assertSame('SE', $countries['9103'], 'Sweden must resolve to SE, never be cut to SW');
+    }
+
+    /**
      * Bank transfers, mobile money and USSD carry no card, so there is nothing
      * to fingerprint and the gateway's own method name is the only thing that
      * tells them apart later. A rail failing in bulk is almost always our

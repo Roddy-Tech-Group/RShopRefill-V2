@@ -2,9 +2,15 @@
 
 namespace App\Domain\Kyc\Services;
 
+use App\Domain\Kyc\DTOs\KycSession;
 use App\Domain\Kyc\Enums\KycTier;
+use App\Domain\Kyc\Exceptions\KycAlreadyEnrolledException;
+use App\Domain\Kyc\Exceptions\KycProviderUnavailableException;
 use App\Domain\Kyc\Exceptions\KycStepUpRequiredException;
+use App\Domain\Kyc\Providers\SmileKycProvider;
 use App\Models\User;
+use App\Support\FeatureFlag;
+use Illuminate\Support\Facades\Log;
 
 /**
  * The enforcement seam between the tier engine and the money paths.
@@ -24,6 +30,7 @@ class KycGate
     public function __construct(
         private readonly KycTierService $tiers,
         private readonly KycProviderFactory $providers,
+        private readonly KycVerdictRecorder $recorder,
     ) {}
 
     /**
@@ -64,8 +71,70 @@ class KycGate
             return;
         }
 
-        $session = $this->providers->forUser($user)->startVerification($user);
+        // Verification switched off means no customer can complete one, so
+        // demanding it would only block the payment. Logged and let through,
+        // exactly as a step-up is in shadow mode.
+        if (! self::verificationAvailable()) {
+            Log::warning('kyc.step_up_skipped_verification_unavailable', [
+                'user_id' => $user->getKey(),
+                'context' => $context,
+                'required_tier' => $required->value,
+            ]);
+
+            return;
+        }
+
+        // Already submitted and waiting on the provider's verdict. Starting a
+        // new session would abandon the one under review and send the customer
+        // (and a paid check) round the flow again, so hold the payment and let
+        // the modal wait for the verdict instead.
+        if ($user->kyc_status === 'pending') {
+            throw new KycStepUpRequiredException($required, new KycSession(reference: '', metadata: ['in_review' => true]), $user, $context);
+        }
+
+        $provider = $this->providers->forUser($user);
+
+        try {
+            $session = $provider->startVerification($user);
+        } catch (KycAlreadyEnrolledException $e) {
+            // The provider already passed this customer; read that pass back
+            // rather than sending them round the flow again.
+            if ($provider instanceof SmileKycProvider && ($verdict = $provider->latestApprovedVerdictFor($user))) {
+                $this->recorder->apply($verdict, $user, source: 'enrollment_reconcile', correctDecided: true);
+
+                return;
+            }
+
+            $session = $this->unavailableSession($user, $e);
+        } catch (KycProviderUnavailableException $e) {
+            $session = $this->unavailableSession($user, $e);
+        }
 
         throw new KycStepUpRequiredException($required, $session, $user, $context);
+    }
+
+    /**
+     * Whether customers can verify their identity right now. Off until the
+     * provider runs on production credentials with a live callback URL.
+     */
+    public static function verificationAvailable(): bool
+    {
+        return FeatureFlag::on('features.kyc_verification_enabled', false);
+    }
+
+    /**
+     * A session with no token. Enforcement still holds the payment, and the
+     * verification modal tells the customer verification is not available
+     * right now instead of opening a flow that cannot start.
+     */
+    private function unavailableSession(User $user, KycProviderUnavailableException $e): KycSession
+    {
+        Log::error('kyc.step_up_session_refused', [
+            'user_id' => $user->getKey(),
+            'provider_code' => $e->providerCode,
+            'provider_message' => $e->providerMessage,
+        ]);
+
+        return new KycSession(reference: '');
     }
 }

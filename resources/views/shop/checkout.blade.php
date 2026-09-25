@@ -139,7 +139,7 @@
             class="mt-4"
         />
 
-        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees), @js($paymentHold))">
+        <div x-data="checkoutPage(@js($cryptoRatesForJs), @js($walletBalances), @js(auth()->check()), @js($rcoinConfig), @js(auth()->user()?->hasTransactionPin() ?? false), @js($paymentFees), @js($paymentHold), @js($walletOptions ?? []))">
 
             {{-- Loading — until the cart store's first fetch resolves.
                  The page is rendered from the Alpine cart store, so the server
@@ -759,16 +759,46 @@
                         </p>
                     </div>
 
-                    {{-- Wallet --}}
+                    {{-- Wallet. Pays from whichever wallet covers the order, not only
+                         the one in the cart's currency: the wallets that cover it are
+                         offered, the best one is picked, and the customer may switch.
+                         The server makes the same choice with the same rates and is
+                         the one that decides. --}}
                     <div x-show="method === 'wallet'" x-collapse x-cloak class="mt-5 space-y-3">
-                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-zinc-600 dark:text-zinc-400">{{ __('checkout.wallet_available_balance') }}</span>
-                                <span class="text-base font-bold text-zinc-900 dark:text-white" x-text="$store.cart.pay(walletBalances[$store.cart.currency] || 0)"></span>
-                            </div>
-                            <div x-show="!hasSufficientWalletBalance()" class="mt-3 text-xs text-red-600 font-medium">
-                                {{ __('checkout.wallet_insufficient') }}
-                            </div>
+                        <input type="hidden" name="wallet_currency" :value="method === 'wallet' ? walletCurrency : ''">
+
+                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5">
+                            <template x-if="coveringWallets().length > 0">
+                                <div>
+                                    <p class="text-sm font-medium text-zinc-600 dark:text-zinc-400">Pay from</p>
+                                    <div class="mt-2 space-y-2">
+                                        <template x-for="wallet in coveringWallets()" :key="wallet.currency">
+                                            <label class="flex cursor-pointer items-center justify-between gap-3 rounded-[10px] border px-3 py-2.5 transition-colors"
+                                                   :class="walletCurrency === wallet.currency ? 'border-blue-500 bg-white ring-2 ring-blue-500/15 dark:bg-white/10' : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-white/10 dark:bg-white/5'">
+                                                <span class="flex items-center gap-3">
+                                                    <input type="radio" class="h-4 w-4 accent-blue-600" :value="wallet.currency" x-model="walletCurrency">
+                                                    <span>
+                                                        <span class="block text-sm font-semibold text-zinc-900 dark:text-white" x-text="wallet.currency + ' wallet'"></span>
+                                                        <span class="block text-xs text-zinc-500 dark:text-zinc-400" x-text="'Balance ' + walletMoney(wallet.currency, wallet.balance)"></span>
+                                                    </span>
+                                                </span>
+                                                <span class="text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="walletMoney(wallet.currency, walletCharge(wallet))"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="coveringWallets().length === 0">
+                                <div>
+                                    <div class="flex items-center justify-between" x-show="walletOptions.length > 0">
+                                        <span class="text-sm font-medium text-zinc-600 dark:text-zinc-400">Your wallets</span>
+                                        <span class="text-sm font-semibold tabular-nums text-zinc-900 dark:text-white" x-text="walletOptions.map((w) => walletMoney(w.currency, w.balance)).join(' + ')"></span>
+                                    </div>
+                                    <div class="text-xs font-medium text-red-600" :class="walletOptions.length > 0 ? 'mt-3' : ''">
+                                        None of your wallets has enough to cover this order. Add funds or choose another payment method.
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
 
@@ -1493,13 +1523,18 @@
     </div>
 
     <script>
-        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees, initialHold = null) {
+        window.checkoutPage = function (cryptoRates, walletBalances, isLoggedIn, rcoinConfig, hasTransactionPin, paymentFees, initialHold = null, walletOptions = []) {
             return {
                 method: 'card',
                 crypto: '',
                 submitting: false,
                 cryptoRates: cryptoRates || {},
                 walletBalances: walletBalances || {},
+                // Every wallet the customer can pay from: {currency, balance,
+                // per_usd}. The one that pays is walletCurrency; empty until a
+                // covering wallet is chosen (see ensureWalletChoice).
+                walletOptions: Array.isArray(walletOptions) ? walletOptions : [],
+                walletCurrency: '',
                 isLoggedIn: isLoggedIn || false,
                 hasTransactionPin: hasTransactionPin || false,
                 paymentFees: paymentFees || { fee_free: [], methods: {}, default: { transaction: 0, international: 0 } },
@@ -1817,6 +1852,13 @@
                             window.rshopScrollLock?.unlock();
                         }
                     });
+                    // The paying wallet follows the order: whatever changes what the
+                    // wallet would be charged re-checks which wallets still cover it.
+                    this.ensureWalletChoice();
+                    this.$watch('$store.cart.currency', () => this.ensureWalletChoice());
+                    this.$watch('$store.cart.subtotalUsd', () => this.ensureWalletChoice());
+                    this.$watch('couponDiscountUsd', () => this.ensureWalletChoice());
+                    this.$watch('applyRcoin', () => this.ensureWalletChoice());
                 },
 
                 /**
@@ -2101,10 +2143,74 @@
                     return this.$store.cart.estimated_rcoin_reward || 0;
                 },
 
+                // What the wallet will be asked for, in USD: the order less the
+                // coupon and any Rcoin being applied. The server recomputes this
+                // with the same rates and decides; this only keeps the tile honest.
+                walletPayableUsd() {
+                    return Math.max(0, this.orderUsd() - this.rcoinDiscountUsd());
+                },
+
+                rcoinDiscountUsd() {
+                    if (! this.applyRcoin || ! this.isLoggedIn || ! this.rcoinConfig.enabled || ! this.rcoinConfig.redemption_enabled) {
+                        return 0;
+                    }
+                    const balanceUsd = Number(this.walletBalances.RCOIN || 0) * Number(this.rcoinConfig.usd_rate || 0);
+                    const cap = this.applyRcoin === 'full'
+                        ? this.orderUsd()
+                        : this.orderUsd() * (Number(this.rcoinConfig.redemption_max_pct || 0) / 100);
+
+                    return Math.max(0, Math.min(balanceUsd, cap));
+                },
+
+                // What a given wallet would be charged, in its own currency.
+                walletCharge(wallet) {
+                    return Math.round(this.walletPayableUsd() * Number(wallet.per_usd || 0) * 100) / 100;
+                },
+
+                walletCovers(wallet) {
+                    const charge = this.walletCharge(wallet);
+                    return charge > 0 && Number(wallet.balance || 0) + 0.000001 >= charge;
+                },
+
+                // The wallets that cover the order, best first: the cart's own
+                // currency, then USD, then the rest. The first one is the default.
+                coveringWallets() {
+                    const rank = (wallet) => wallet.currency === this.$store.cart.currency ? 0 : (wallet.currency === 'USD' ? 1 : 2);
+
+                    return this.walletOptions
+                        .filter((wallet) => this.walletCovers(wallet))
+                        .sort((a, b) => rank(a) - rank(b) || a.currency.localeCompare(b.currency));
+                },
+
+                // Keep the chosen wallet valid as the cart, currency, coupon or
+                // Rcoin choice changes: a wallet that no longer covers the order is
+                // dropped for the best one that does, and a valid choice is kept.
+                ensureWalletChoice() {
+                    const covering = this.coveringWallets();
+                    if (covering.some((wallet) => wallet.currency === this.walletCurrency)) {
+                        return;
+                    }
+                    this.walletCurrency = covering.length > 0 ? covering[0].currency : '';
+                },
+
+                // Amounts read "XAF 50,000", the currency code the wallet is
+                // named by, never the browser's own symbol for it ("FCFA").
+                walletMoney(currency, amount) {
+                    const value = Number(amount || 0);
+                    try {
+                        return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency, currencyDisplay: 'code' })
+                            .format(value)
+                            .replace(/ /g, ' ');
+                    } catch (e) {
+                        return currency + ' ' + value.toFixed(2);
+                    }
+                },
+
+                // Pure on purpose (it runs inside template bindings): some wallet
+                // covers the order. Which one is walletCurrency, kept in step by
+                // ensureWalletChoice; empty means the server picks the default.
                 hasSufficientWalletBalance() {
-                    const balance = Number(this.walletBalances[this.$store.cart.currency] || 0);
-                    const total = Number(this.$store.cart.subtotal);
-                    return balance >= total;
+                    return this.coveringWallets().length > 0;
                 },
                 
                 backoffRemaining: 0,

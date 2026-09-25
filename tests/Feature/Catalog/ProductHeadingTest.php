@@ -239,10 +239,11 @@ class ProductHeadingTest extends TestCase
         // The emerald badge circles are not drawn for a gift card.
         $this->assertStringNotContainsString('rounded-[12px] bg-emerald-50 text-emerald-600', $html);
 
-        // Top-ups and bills still have them; a source check, because building a
-        // top-up fixture here would test the fixture.
+        // Nor for anything else: the ringed emerald circles left every product
+        // page with the recolour (cards and badges carry no ring). A source
+        // check, because building a top-up fixture here would test the fixture.
         $source = file_get_contents(resource_path('views/shop/product.blade.php'));
-        $this->assertStringContainsString('bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100', $source);
+        $this->assertStringNotContainsString('ring-1 ring-emerald-100', $source);
         $this->assertStringContainsString('@unless ($isGiftCard)', $source);
     }
 

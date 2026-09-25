@@ -4,9 +4,13 @@ namespace Tests\Feature;
 
 use App\Domain\Admin\Enums\AdminRole;
 use App\Models\Admin;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SiteSetting;
 use App\Support\FeatureFlag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -75,7 +79,7 @@ class FlightsAndStaysFeatureFlagTest extends TestCase
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('eSIMs, flights &amp; stays', escape: false)
+            ->assertSee(e(__('home.teaser_flights_and_stays')), escape: false)
             ->assertSee('Travel smarter with secure bookings', escape: false)
             ->assertSee('Turn digital currency into real-world travel', escape: false);
     }
@@ -88,60 +92,95 @@ class FlightsAndStaysFeatureFlagTest extends TestCase
 
         $response->assertDontSee('Travel smarter with secure bookings', escape: false);
         $response->assertSee('Turn digital currency into real-world travel', escape: false);
-        // Heading and column count follow what is actually rendered.
-        $response->assertSee('eSIMs &amp; stays', escape: false);
-        $response->assertSee('sm:grid-cols-2', escape: false);
+        // Heading and column count follow what is actually rendered: the lone
+        // teaser takes the row's own heading and a single column. The grid is
+        // matched in full because other rows on the page use sm:grid-cols-2.
+        $response->assertSee('>'.e(__('navigation.stays')).'</h2>', escape: false);
+        $response->assertSee('grid grid-cols-1 gap-5 sm:grid-cols-1', escape: false);
+        $response->assertDontSee('grid grid-cols-1 gap-5 sm:grid-cols-2', escape: false);
     }
 
-    public function test_homepage_drops_to_a_single_column_when_both_are_off(): void
+    public function test_homepage_drops_the_teaser_row_when_both_are_off(): void
     {
         $this->setFlags('off', 'off');
+        $this->makeGlobalEsim();
 
         $response = $this->get('/')->assertOk();
 
         $response->assertDontSee('Travel smarter with secure bookings', escape: false);
         $response->assertDontSee('Turn digital currency into real-world travel', escape: false);
-        $response->assertSee('sm:grid-cols-1', escape: false);
-        // The lone eSIM card is still there - only the teasers are gated.
-        //
-        // This used to prove that by looking for the card's caption, "Ditch
-        // physical SIM cards...". The homepage redesign deliberately dropped
-        // that caption from the eSIM tile: the dark backdrop-blur strip it sat
-        // on was built to sit over the Flights and Stays photographs, and on
-        // the eSIM tile it covered the bottom third of an animated inline-SVG
-        // scene instead. Flights and Stays keep their captions, because they
-        // are coming-soon teasers whose copy is the whole point, while the eSIM
-        // tile is a plain link into the eSIM shop and takes its name from the
-        // section heading above it.
-        //
-        // So the proof moved to the two things the tile cannot render without:
-        // the illustration that fills it, and the full-bleed link into /esims.
-        // Neither string appears anywhere else on the homepage, so neither can
-        // be satisfied by some other mention of eSIMs on the page.
-        $response->assertSee('aria-label="Three people using their phones with eSIM connectivity"', escape: false);
-        $response->assertSee('aria-label="Browse eSIMs"', escape: false);
+        // No teaser heading and no teaser grid at all, not an empty
+        // single-column grid: the row has nothing to head or to lay out.
+        foreach (['home.teaser_flights_and_stays', 'navigation.flights', 'navigation.stays'] as $key) {
+            $response->assertDontSee('>'.e(__($key)).'</h2>', escape: false);
+        }
+        $response->assertDontSee('grid grid-cols-1 gap-5 sm:grid-cols-', escape: false);
+        // The eSIM row is its own thing and stays: its heading, its carousel
+        // track and the family card the catalogue gave it. Only the teasers
+        // are gated.
+        $response->assertSee(e(__('home.esim_row_heading', ['count' => 190])), escape: false);
+        $response->assertSee('grid w-max grid-flow-col grid-rows-[repeat(3,auto)]', escape: false);
+        $response->assertSee('esim-ww-discover-global', escape: false);
     }
 
-    public function test_admin_sidebar_links_follow_the_flags(): void
+    /**
+     * One global eSIM in the catalogue, which the home row's presenter turns
+     * into its Global card. The catalogue summary and the card family are both
+     * cached for an hour, so the cache is cleared after seeding.
+     */
+    private function makeGlobalEsim(): Product
     {
+        $category = Category::create(['name' => 'eSIMs', 'slug' => 'esims', 'type' => 'digital']);
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'provider_name' => 'airalo',
+            'country_code' => 'WW',
+            'currency_code' => 'USD',
+            'name' => 'Global Data eSIM',
+            'slug' => 'esim-ww-discover-global',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::factory()->for($product)->create([
+            'currency' => 'USD',
+            'face_value' => 5,
+            'retail_price' => 5,
+            'is_available' => true,
+            'is_variable' => false,
+            'metadata' => ['data_limit' => '1 GB', 'duration_days' => 7],
+        ]);
+
+        Cache::flush();
+
+        return $product;
+    }
+
+    public function test_the_admin_sidebar_links_to_the_catalogue_once_whatever_the_flags_say(): void
+    {
+        // The sidebar used to expand a "Products" group with a sub-link per
+        // category, and Flights and Stays came and went with their flags. It
+        // is one Catalogue link now: the catalogue page carries its own
+        // category picker, so the group only repeated it one level up. What
+        // still follows the flags on the admin side is the command bar, which
+        // the next test covers.
+        //
         // Any admin page renders the shared layout that holds the sidebar.
         // Deliberately NOT the products page: it filters variants with a raw
         // JSON_UNQUOTE, which SQLite has no function for.
-        $this->setFlags('off', 'off');
+        foreach ([['off', 'off'], ['on', 'on']] as [$flights, $stays]) {
+            $this->setFlags($flights, $stays);
 
-        $this->actingAs($this->admin(), 'admin')
-            ->get(route('admin.customers'))
-            ->assertOk()
-            ->assertDontSee(route('admin.products', ['category' => 'flights']))
-            ->assertDontSee(route('admin.products', ['category' => 'stays']));
+            $html = $this->actingAs($this->admin(), 'admin')
+                ->get(route('admin.customers'))
+                ->assertOk()
+                ->getContent();
 
-        $this->setFlags('on', 'on');
-
-        $this->actingAs($this->admin(), 'admin')
-            ->get(route('admin.customers'))
-            ->assertOk()
-            ->assertSee(route('admin.products', ['category' => 'flights']))
-            ->assertSee(route('admin.products', ['category' => 'stays']));
+            $this->assertTrue(str_contains($html, 'href="'.route('admin.products').'" wire:navigate data-tip="Catalogue"'), 'the one Catalogue link is missing');
+            foreach (['flights', 'stays', 'gift-cards', 'esims'] as $slug) {
+                $this->assertFalse(str_contains($html, route('admin.products', ['category' => $slug])), "the sidebar still links to the {$slug} category");
+            }
+        }
     }
 
     /**

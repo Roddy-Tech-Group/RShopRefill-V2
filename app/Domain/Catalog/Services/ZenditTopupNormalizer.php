@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 
 class ZenditTopupNormalizer implements CatalogNormalizerInterface
 {
-    public function normalizeAndSave(array $rawItem, string $providerName): void
+    public function normalizeAndSave(array $rawItem, string $providerName): array
     {
         // 1. Ensure the Mobile Airtime category exists.
         $category = Category::firstOrCreate(
@@ -163,5 +163,7 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
         if (! empty($rawItem['logoUrl']) && ! str_starts_with((string) $product->logo_url, 'local/')) {
             MediaProcessorJob::dispatch($product->id, $rawItem['logoUrl']);
         }
+
+        return [$offerId];
     }
 }

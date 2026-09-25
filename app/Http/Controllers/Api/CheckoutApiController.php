@@ -47,6 +47,7 @@ class CheckoutApiController extends Controller
             'payment_method' => ['required', 'string', Rule::in(['wallet', 'flutterwave', 'crypto'])],
             'preferred_currency' => ['required', 'string', 'size:3'],
             'delivery_email' => ['nullable', 'email'],
+            'wallet_currency' => ['nullable', 'string', 'size:3'],
         ]);
 
         $cart = Cart::with(['items.product', 'items.variant'])->findOrFail($validated['cart_id']);
@@ -58,7 +59,8 @@ class CheckoutApiController extends Controller
                 paymentMethod: $validated['payment_method'],
                 displayCurrency: strtoupper($validated['preferred_currency']),
                 deliveryEmail: $validated['delivery_email'] ?? null,
-                applyRcoin: $request->boolean('apply_rcoin')
+                applyRcoin: $request->boolean('apply_rcoin'),
+                walletCurrency: $validated['wallet_currency'] ?? null,
             );
 
             $order->load(['items', 'paymentAttempts', 'paymentAttempts.paymentSession']);

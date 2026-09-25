@@ -9,6 +9,7 @@ use App\Http\Resources\CartResource;
 use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 
 class CartController extends Controller
 {
@@ -48,11 +49,20 @@ class CartController extends Controller
             // Top-up recipient: digits-only after normalisation, no longer
             // than E.164's 15 digit upper bound. Stored on cart + order item.
             'metadata.recipient_phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{6,20}$/'],
+            'metadata.sender_phone' => ['nullable', 'string', 'regex:/^\+?[0-9 \-]{6,20}$/'],
             'metadata.delivery_email' => ['nullable', 'email'],
+            'metadata.account_id' => ['nullable', 'string', 'regex:/^[A-Za-z0-9 \-]{4,30}$/'],
         ]);
 
         $cart = $this->resolveCart($request);
         $variant = ProductVariant::findOrFail($request->product_variant_id);
+
+        // An offer the supplier needs an account number or phone number to
+        // deliver cannot go in the cart without it; refuse it here rather
+        // than after payment.
+        if ($missing = $variant->missingPurchaseFields((array) $request->input('metadata', []), $request->user())) {
+            throw ValidationException::withMessages($missing);
+        }
 
         $this->cartManager->addItem(
             $cart,

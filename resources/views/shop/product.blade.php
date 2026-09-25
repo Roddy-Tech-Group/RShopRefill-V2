@@ -63,6 +63,19 @@
     $fixedDenoms = $variants->where('is_variable', false)->sortBy('retail_price')->values();
     $variable    = $variants->where('is_variable', true)->first();
 
+    // Ask for the account number whenever the supplier needs it: every bill,
+    // and any other offer whose supplier lists it as required (betting
+    // wallets, electricity brands that sync in as gift cards).
+    $needsAccountId = $isBill || $variants->contains(fn ($v) => $v->requiresAccountId());
+
+    // Likewise the recipient's phone: every top-up, and any other offer whose
+    // supplier delivers to a number (some Kenyan and Togolese gift cards).
+    // And the buyer's own number where the supplier prints it on the receipt;
+    // prefilled from the profile so a customer we already know is not asked.
+    $needsRecipientPhone = $isTopup || $variants->contains(fn ($v) => $v->requiresRecipientPhone());
+    $needsSenderPhone = $variants->contains(fn ($v) => $v->requiresSenderPhone());
+    $senderPhoneOnFile = (string) (auth()->user()?->phone ?? '');
+
     $currency = $product->currency_code ?: 'USD';
 
     $symbols = [
@@ -699,9 +712,11 @@
             customRate: @js($customRate),
             customMin: @js($customDisplayMin),
             customMax: @js($customDisplayMax),
-            requiresRecipientPhone: @js($isTopup),
+            requiresRecipientPhone: @js($needsRecipientPhone),
             defaultDialCode: @js($dialCode),
-            requiresAccountId: @js($isBill),
+            requiresAccountId: @js($needsAccountId),
+            requiresSenderPhone: @js($needsSenderPhone),
+            senderPhoneOnFile: @js($senderPhoneOnFile),
             rcoinConfig: @js([
                 'enabled' => (bool) \App\Models\Setting::get('rcoin_enabled', true),
                 'cashback_percentage' => (float) \App\Models\Setting::get('cashback_percentage', 0.5),
@@ -1079,12 +1094,13 @@
                         <div class="flex min-w-0 flex-col gap-5 max-lg:order-4 lg:col-start-1 lg:row-start-3">
                     @endif
 
-                    {{-- Account ID — bill payments only. Captures the meter
-                         number / customer ID the biller expects. Mirrors the
-                         top-up phone pattern: validated client-side, blocks
-                         Add to cart until non-empty, persisted to cart→order
-                         metadata for the Zendit billing.accountId field. --}}
-                    @if ($isBill)
+                    {{-- Account ID — bills, and any offer whose supplier needs
+                         it. Captures the meter number / account ID the biller
+                         expects. Mirrors the top-up phone pattern: validated
+                         client-side, blocks Add to cart until non-empty,
+                         persisted to cart→order metadata for the Zendit
+                         billing.accountId field. --}}
+                    @if ($needsAccountId)
                         <div>
                             <label class="mb-2 flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 {{ __('products.detail_account_label', ['brand' => $brandName]) }}
@@ -1121,11 +1137,12 @@
                         </div>
                     @endif
 
-                    {{-- Recipient phone — top-ups only. The buyer enters the
-                         number to credit before adding to cart; canAddToCart()
-                         enforces a valid number. Country flag + dial code are
-                         locked to the product's country_code via dial_codes.php. --}}
-                    @if ($isTopup)
+                    {{-- Recipient phone - top-ups, and any offer whose supplier
+                         delivers to a number. The buyer enters it before adding
+                         to cart; canAddToCart() enforces a valid number. Country
+                         flag + dial code are locked to the product's country_code
+                         via dial_codes.php. --}}
+                    @if ($needsRecipientPhone)
                         {{-- Room above it: the amount block ends on its range
                              line, which sat directly against this label. --}}
                         <div id="topup-recipient" class="mt-5">
@@ -1133,7 +1150,7 @@
                                 @if (Product::flagUrl($product->country_code))
                                     <img src="{{ Product::flagUrl($product->country_code) }}" alt="" class="h-3.5 w-5 rounded-[2px] object-cover ring-1 ring-zinc-200" loading="lazy">
                                 @endif
-                                {{ __('products.detail_phone_label', ['country' => $countryName]) }}
+                                {{ $isTopup ? __('products.detail_phone_label', ['country' => $countryName]) : __('products.detail_phone_label_send', ['country' => $countryName]) }}
                             </label>
                             <div
                                 {{-- Grey until the caret is in it, then the
@@ -1182,6 +1199,48 @@
                                 x-cloak
                                 class="mt-1 text-[11px] font-medium text-red-600"
                             >{{ __('products.detail_phone_invalid', ['country' => $countryName]) }}</p>
+                        </div>
+                    @endif
+
+                    {{-- Sender phone - offers whose supplier prints the buyer's own
+                         number on the receipt (sender.msisdn). Prefilled from the
+                         profile; editable so a wrong or missing one can be fixed
+                         here. Typed in full with the country code, since the buyer
+                         is not necessarily in the product's country. --}}
+                    @if ($needsSenderPhone)
+                        <div id="sender-phone">
+                            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                                {{ __('products.detail_sender_phone_label') }}
+                            </label>
+                            <div
+                                :class="senderPhoneValid()
+                                    ? 'border-emerald-500 ring-2 ring-emerald-500/15'
+                                    : (senderPhone.length > 0 ? 'border-red-300' : 'border-zinc-200')"
+                                class="flex h-[52px] w-full items-center gap-3 rounded-[12px] border bg-[#eff6ff] px-4 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 dark:bg-[#26416b]"
+                            >
+                                <input
+                                    type="tel"
+                                    inputmode="tel"
+                                    autocomplete="tel"
+                                    x-model="senderPhone"
+                                    placeholder="+237 6 12 34 56 78"
+                                    class="min-w-0 flex-1 bg-transparent text-base font-medium text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
+                                >
+                                <svg
+                                    x-show="senderPhoneValid()"
+                                    x-cloak
+                                    class="h-5 w-5 shrink-0 text-emerald-600"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
+                                    aria-hidden="true"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                </svg>
+                            </div>
+                            <p
+                                x-show="senderPhone.length > 0 && ! senderPhoneValid()"
+                                x-cloak
+                                class="mt-1 text-[11px] font-medium text-red-600"
+                            >{{ __('products.detail_sender_phone_hint') }}</p>
                         </div>
                     @endif
 
@@ -1510,7 +1569,7 @@
 
 
     <script>
-        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, checkoutCurrencies, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, rcoinConfig, purchasable, topupTab }) {
+        window.brandDetail = function ({ variants, rangeText, cryptos, defaultCrypto, checkoutCurrencies, markup, customRate, customMin, customMax, requiresRecipientPhone, defaultDialCode, requiresAccountId, requiresSenderPhone, senderPhoneOnFile, rcoinConfig, purchasable, topupTab }) {
             // `cryptos` is an array of {code, name, type, perUsd, decimals, icon} from the
             // admin currency_rates table. Reshape into a code-keyed object.
             const cryptoMap = {};
@@ -1550,6 +1609,12 @@
                 // Bill payment: account / meter number the biller will credit.
                 requiresAccountId: !! requiresAccountId,
                 accountId: '',
+
+                // The buyer's own number, where the supplier prints it on the
+                // receipt. Starts as the profile number so it is usually
+                // already valid; typed in full with the country code.
+                requiresSenderPhone: !! requiresSenderPhone,
+                senderPhone: senderPhoneOnFile || '',
 
                 init() {
                     // Alpine calls this itself and x-init calls it again, so the
@@ -1605,6 +1670,19 @@
                     return cleaned.length >= 4 && cleaned.length <= 30;
                 },
 
+                // Same digit bounds as the recipient's number. The dial code is
+                // part of what the buyer types, so nothing is prefixed here.
+                senderPhoneValid() {
+                    if (! this.requiresSenderPhone) { return true; }
+                    const digits = (this.senderPhone || '').replace(/[^0-9]/g, '');
+                    return digits.length >= 6 && digits.length <= 15;
+                },
+
+                fullSenderPhone() {
+                    const digits = (this.senderPhone || '').replace(/[^0-9]/g, '');
+                    return digits ? '+' + digits : '';
+                },
+
                 canAddToCart() {
                     // Category feature off or product out of stock: never buyable. Mirrors
                     // the server-side block so the buttons visibly reflect what is enforced.
@@ -1625,6 +1703,9 @@
                     if (this.requiresAccountId && ! this.accountIdValid()) {
                         return false;
                     }
+                    if (this.requiresSenderPhone && ! this.senderPhoneValid()) {
+                        return false;
+                    }
                     return true;
                 },
 
@@ -1641,14 +1722,20 @@
                         ? Number(this.amount) / (this.customRate || 1)
                         : null;
 
-                    // Per-item context: recipient phone (top-ups) or account
-                    // ID (bill payments). Persisted to cart→order metadata
-                    // and consumed by the fulfilment provider.
-                    let metadata = null;
+                    // Per-item context the supplier needs to deliver: recipient
+                    // phone, account ID, the buyer's own phone. All of them
+                    // together, not one or the other: a betting wallet in Togo
+                    // wants the account ID and both phone numbers. Persisted
+                    // to cart→order metadata and read by the fulfilment provider.
+                    const metadata = {};
                     if (this.requiresRecipientPhone) {
-                        metadata = { recipient_phone: this.fullRecipientPhone() };
-                    } else if (this.requiresAccountId) {
-                        metadata = { account_id: (this.accountId || '').trim() };
+                        metadata.recipient_phone = this.fullRecipientPhone();
+                    }
+                    if (this.requiresAccountId) {
+                        metadata.account_id = (this.accountId || '').trim();
+                    }
+                    if (this.requiresSenderPhone) {
+                        metadata.sender_phone = this.fullSenderPhone();
                     }
 
                     this.cartState = 'loading';

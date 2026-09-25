@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Kyc\Exceptions\KycAlreadyEnrolledException;
+use App\Domain\Kyc\Exceptions\KycProviderUnavailableException;
+use App\Domain\Kyc\Providers\SmileKycProvider;
+use App\Domain\Kyc\Services\KycGate;
 use App\Domain\Kyc\Services\KycProviderFactory;
 use App\Domain\Kyc\Services\KycTierService;
+use App\Domain\Kyc\Services\KycVerdictRecorder;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,7 +42,7 @@ class KycStatusController extends Controller
         ]);
     }
 
-    public function start(Request $request, KycProviderFactory $providers)
+    public function start(Request $request, KycProviderFactory $providers, KycVerdictRecorder $recorder)
     {
         $user = $request->user();
 
@@ -54,6 +59,13 @@ class KycStatusController extends Controller
             return response()->json(['message' => 'Your verification is already in review. This usually completes within a few minutes.'], 409);
         }
 
+        // Closed until the provider is live in production. Checked before
+        // anything reaches the provider, so no session is started that could
+        // never end in a verified account.
+        if (! KycGate::verificationAvailable()) {
+            return response()->json(['message' => 'Verification is currently unavailable, try again later.'], 503);
+        }
+
         // The customer's explicit ID-issuing-country choice (the KYC page shows
         // the full country list) routes the product: biometric where Smile has
         // government-database coverage, document verification everywhere else.
@@ -62,8 +74,39 @@ class KycStatusController extends Controller
         ]);
         $issuingCountry = isset($validated['country']) ? strtoupper($validated['country']) : null;
 
+        $provider = null;
+
         try {
-            $session = $providers->forUser($user)->startVerification($user, $issuingCountry);
+            $provider = $providers->forUser($user);
+            $session = $provider->startVerification($user, $issuingCountry);
+        } catch (KycAlreadyEnrolledException $e) {
+            // The provider already passed this customer, so it will not run
+            // another verification. Read that pass back instead of leaving
+            // them at a dead end.
+            if ($provider instanceof SmileKycProvider && ($verdict = $provider->latestApprovedVerdictFor($user))) {
+                $recorder->apply($verdict, $user, source: 'enrollment_reconcile', correctDecided: true);
+
+                return response()->json([
+                    'already_verified' => true,
+                    'message' => 'Your identity is already verified.',
+                ]);
+            }
+
+            Log::error('kyc.already_enrolled_without_a_pass', [
+                'user_id' => $user->getKey(),
+                'provider_code' => $e->providerCode,
+                'provider_message' => $e->providerMessage,
+            ]);
+
+            return response()->json(['message' => 'We could not start verification right now. Please contact support.'], 502);
+        } catch (KycProviderUnavailableException $e) {
+            Log::error('kyc.self_serve_session_refused', [
+                'user_id' => $user->getKey(),
+                'provider_code' => $e->providerCode,
+                'provider_message' => $e->providerMessage,
+            ]);
+
+            return response()->json(['message' => 'We could not start verification right now. Please try again in a moment.'], 502);
         } catch (\Throwable $e) {
             Log::error('kyc.self_serve_start_failed', [
                 'user_id' => $user->getKey(),

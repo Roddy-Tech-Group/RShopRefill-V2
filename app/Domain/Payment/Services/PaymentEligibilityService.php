@@ -8,6 +8,8 @@ use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\PaymentGateway;
+use App\Domain\Shared\Services\OperationalAlerter;
+use App\Enums\AlertSeverity;
 use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\Log;
 
@@ -43,20 +45,51 @@ class PaymentEligibilityService
             return false;
         }
 
-        // Safety interlock: with ZERO approved cells, enforcement would refuse
-        // every restricted-category cart on every gateway - a full-catalogue
-        // outage from one toggle. The admin UI refuses that flip, but this is
-        // the un-bypassable backstop for any other write path: the flag stays
-        // inert (shadow) until at least one cell is approved.
+        // Enforcement with ZERO approved cells refuses every restricted cart
+        // on every gateway. The admin UI refuses both ways of getting here
+        // (enforcing with no cells, and switching off the last cell while
+        // enforcing), so this state only exists through a write path that
+        // bypassed it. It used to drop back to shadow, which turned a lockdown
+        // into allow-all the moment the last cell went off. A lockdown stays
+        // a lockdown; someone is told loudly and fixes the matrix.
         if ($this->approvedCellCount() === 0) {
-            Log::warning('payment_eligibility.enforce_ignored_zero_cells', [
-                'reason' => 'enforcement flag is on but no eligibility cell is approved; staying in shadow mode',
-            ]);
-
-            return false;
+            $this->reportEmptyMatrixUnderEnforcement();
         }
 
         return true;
+    }
+
+    /**
+     * Would switching this cell off leave enforcement running with no
+     * approved cell at all? The admin UI refuses that flip.
+     */
+    public function isLastApprovedCell(string $cellFlagKey): bool
+    {
+        if (! FeatureFlag::on('payment_eligibility_enforce', false)) {
+            return false;
+        }
+
+        return $this->approvedCellCount() === 1 && FeatureFlag::on($cellFlagKey, false);
+    }
+
+    private function reportEmptyMatrixUnderEnforcement(): void
+    {
+        Log::critical('payment_eligibility.enforcing_with_no_approved_cells', [
+            'reason' => 'enforcement is on and no eligibility cell is approved; every restricted-category cart is being refused',
+        ]);
+
+        try {
+            app(OperationalAlerter::class)->send(
+                severity: AlertSeverity::Sev2,
+                key: 'payment_eligibility:enforcing-empty-matrix',
+                title: 'Eligibility enforcement is on with no approved cells',
+                message: 'Every restricted-category cart is being refused on every gateway. Approve the right gateway x category cells, or switch enforcement off.',
+                context: ['admin' => 'Settings > Payments > Eligibility'],
+                runbook: 'docs/runbooks/payment-provider-failure.md',
+            );
+        } catch (\Throwable) {
+            // Alerting is best effort; the refusal is what matters.
+        }
     }
 
     /**

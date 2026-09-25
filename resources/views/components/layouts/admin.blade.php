@@ -380,6 +380,15 @@
                 </a>
                 @endif
 
+                {{-- Manage eSIMs --}}
+                @if ($can('admin.esims'))
+                @php $active = $isCurrent('admin.esims*'); @endphp
+                <a href="{{ route('admin.esims') }}" wire:navigate data-tip="Manage eSIMs" class="{{ $navItemClass($active) }}">
+                    <img src="{{ asset('assets/esims.svg') }}" alt="" class="{{ $imgIconClass($active) }}" loading="lazy">
+                    Manage eSIMs
+                </a>
+                @endif
+
                 {{-- User Management (expandable group — customers list plus the
                      account-lifecycle pages: moderation, closures, exit feedback,
                      country insights, retention health) --}}

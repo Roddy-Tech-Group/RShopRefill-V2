@@ -945,6 +945,7 @@
                                     <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_amount') }}</span>
                                     <span class="font-bold text-zinc-900 text-sm" x-text="session?.payment_payload?.pay_amount"></span>
                                     <span class="font-bold text-zinc-500 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
+                                    <span class="block text-[10px] text-zinc-500">Network fees included. Send this exact amount.</span>
                                 </div>
                                 <div>
                                     <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_address') }}</span>

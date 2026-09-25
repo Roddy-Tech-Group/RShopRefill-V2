@@ -82,17 +82,20 @@ class EsimPromoCopyTest extends TestCase
     //  First-visit popup
     // ────────────────────────────────────────────────────────────
 
-    public function test_the_popup_copy_comes_from_settings(): void
+    /**
+     * The first-visit popup left with the World Cup advert: the landing leads
+     * with the catalogue, so its copy settings no longer reach the page.
+     */
+    public function test_the_popup_copy_no_longer_reaches_the_page(): void
     {
         SiteSetting::put('esim.tip_heading', 'Off somewhere nice?', 'esim');
         SiteSetting::put('esim.tip_text', 'Sort your data before you fly.', 'esim');
         SiteSetting::put('esim.tip_body', 'A custom body paragraph for the popup.', 'esim');
 
-        $response = $this->get(route('shop.esims'))->assertOk();
+        $html = $this->get(route('shop.esims'))->assertOk()->getContent();
 
-        $response->assertSee('Off somewhere nice?');
-        $response->assertSee('Sort your data before you fly.');
-        $response->assertSee('A custom body paragraph for the popup.');
+        $this->assertFalse(str_contains($html, 'Off somewhere nice?'), 'the popup heading is back');
+        $this->assertFalse(str_contains($html, 'A custom body paragraph for the popup.'), 'the popup body is back');
     }
 
     public function test_the_popup_ships_with_seeded_evergreen_copy(): void
@@ -103,8 +106,8 @@ class EsimPromoCopyTest extends TestCase
             (string) SiteSetting::get('esim.tip_text')
         );
 
-        $this->get(route('shop.esims'))
-            ->assertOk()
-            ->assertSee('Where are you going?');
+        // Seeded still, shown nowhere: the popup is gone.
+        $html = $this->get(route('shop.esims'))->assertOk()->getContent();
+        $this->assertFalse(str_contains($html, 'Where are you going?'), 'the popup is back');
     }
 }

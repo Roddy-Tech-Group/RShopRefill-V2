@@ -4,6 +4,7 @@ use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Communication\Services\AdminNotificationService;
 use App\Domain\Order\Services\CouponApplicationService;
+use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -18,7 +19,6 @@ use App\Http\Controllers\EsimStoreController;
 use App\Http\Controllers\EsimTopupController;
 use App\Http\Controllers\GoogleMerchantFeedController;
 use App\Http\Controllers\HealthController;
-use App\Http\Controllers\KycController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PressController;
 use App\Http\Controllers\RcoinConvertController;
@@ -770,11 +770,20 @@ $renderCheckout = function (CartManager $cartManager, CartPricingService $pricin
             $cart ? $cart->items->map(fn ($item) => $item->product->complianceCategory()) : [],
         );
 
+    // The wallets the customer can pay from, each with its balance and its
+    // rate against USD, so the wallet tile can say which wallets cover the
+    // cart and what each would be charged. Checkout pays from whichever
+    // wallet covers the order, not only the one in the cart's currency.
+    $walletOptions = auth()->check()
+        ? app(WalletPaymentProvider::class)->optionsFor(auth()->user())
+        : [];
+
     return view('shop.checkout', [
         'cart' => $cart,
         'totals' => $totals,
         'rate' => $rate,
         'complianceIneligibleByCurrency' => $complianceIneligibleByCurrency,
+        'walletOptions' => $walletOptions,
     ]);
 };
 Route::get('checkout', $renderCheckout)->name('shop.checkout');
@@ -968,8 +977,6 @@ Route::middleware(['auth'])->group(function () {
     // Persists the customer's light/dark/system preference (theme engine posts here).
     Route::post('preferences/theme', [ThemeController::class, 'update'])->name('preferences.theme');
 
-    // KYC identity-verification submission (documents stored on the private disk).
-    Route::post('dashboard/kyc', [KycController::class, 'store'])->name('kyc.submit');
     // Right of access: a PDF copy of the customer's data, gated by an emailed
     // one-time code rather than the password (see DataExportController).
     Route::get('dashboard/privacy/export', [DataExportController::class, 'show'])->name('privacy.export');

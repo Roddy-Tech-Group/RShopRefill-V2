@@ -25,6 +25,7 @@ use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\FulfillOrderItemJob;
+use App\Jobs\VerifyPaymentJob;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
@@ -212,47 +213,20 @@ class PaymentSessionController extends Controller
         // numeric id and cross-binds it to this attempt. This removes the client
         // trust boundary entirely — a caller can never influence the
         // reconciliation reference used downstream.
+        //
+        // The settlement itself is VerifyPaymentJob, run inline. This endpoint
+        // used to carry its own copy of the chain with no row lock and no
+        // duplicate-payment guard, so a double tap, or a tap racing the
+        // webhook's job, could confirm and fulfil twice, and a second attempt
+        // paying an order that was already paid was delivered again instead
+        // of refunded. One chain, one lock, one set of rules.
 
         try {
-            $gatewayFactory = app(PaymentGatewayFactory::class);
-            $provider = $gatewayFactory->getProvider($attempt->gateway);
+            VerifyPaymentJob::dispatchSync($attempt);
 
-            // Call verifyPayment directly
-            $isPaid = $provider->verifyPayment($attempt);
+            $status = (string) $session->fresh()->status;
 
-            if ($isPaid) {
-                // Confirm the payment session
-                $sessionService = app(PaymentSessionService::class);
-                $sessionService->confirmSession($session, [
-                    'transaction_id' => $attempt->gateway_reference,
-                    'payload' => $attempt->verification_payload,
-                ]);
-
-                // If it is an order checkout payment, fulfill it
-                if ($attempt->order) {
-                    $orderService = app(OrderService::class);
-                    $orderService->transitionPaymentStatus($attempt->order, PaymentStatus::Paid, $attempt->verification_payload);
-
-                    PaymentConfirmed::dispatch($attempt->order, $attempt);
-
-                    // Dispatch fulfillment jobs (staggered per identical offer
-                    // so duplicates don't trip supplier velocity protection).
-                    FulfillOrderItemJob::dispatchStaggered($attempt->order->items);
-                }
-                // If it is wallet funding
-                elseif ($attempt->payable_type === WalletFunding::class) {
-                    $funding = $attempt->payable;
-                    if ($funding && $funding->status !== FundingStatus::Completed) {
-                        $fundingService = app(WalletFundingService::class);
-                        // Process funding safely
-                        $fundingService->processSuccessfulFunding(
-                            $funding->reference,
-                            $attempt->gateway_reference ?: 'DIRECT-'.uniqid(),
-                            $attempt->verification_payload ?: []
-                        );
-                    }
-                }
-
+            if ($status === 'confirmed') {
                 return response()->json([
                     'status' => 'confirmed',
                     'message' => 'Payment verified and session confirmed.',
@@ -260,7 +234,7 @@ class PaymentSessionController extends Controller
             }
 
             return response()->json([
-                'status' => $session->fresh()->status,
+                'status' => $status,
                 'message' => 'Payment could not be verified yet. Please try again.',
             ]);
         } catch (\Exception $e) {
@@ -730,6 +704,17 @@ class PaymentSessionController extends Controller
 
         if (! $provider instanceof NowPaymentsProvider) {
             return response()->json(['message' => 'Top-up is not available for this payment method.'], 422);
+        }
+
+        // Kill switch. A top-up mints a fresh charge at the gateway, so it is
+        // new money entering the pipe and honours the switch like pay() does.
+        // The shortfall stays owed; the customer comes back when the gateway
+        // is on again (or an admin settles it).
+        if (! FeatureFlag::gatewayEnabled('nowpayments')) {
+            return response()->json([
+                'message' => GatewayDisabledException::customerMessageFor('nowpayments'),
+                'gateway_disabled' => true,
+            ], 503);
         }
 
         // Eligibility gate. A top-up is a fresh crypto charge for the shortfall,

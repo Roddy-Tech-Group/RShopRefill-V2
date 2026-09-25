@@ -178,7 +178,11 @@ class NavMenuCacheTest extends TestCase
 
         $normalizer = new class implements CatalogNormalizerInterface
         {
-            public function normalizeAndSave(array $rawItem, string $providerName): void {}
+            /** Saves nothing and lists no offer ids; the cache flush is what is under test. */
+            public function normalizeAndSave(array $rawItem, string $providerName): array
+            {
+                return [];
+            }
         };
 
         return new CatalogSyncService($provider, $normalizer);

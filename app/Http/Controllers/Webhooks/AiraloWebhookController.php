@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Webhooks;
 use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Orders\EsimLowDataMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Fulfillment\Enums\EsimStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Esim;
 use App\Models\OrderItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -71,6 +74,8 @@ class AiraloWebhookController extends Controller
 
         $user = $orderItem->order->user;
 
+        $this->updateEsimRecord($iccid, $eventType, $payload);
+
         try {
             $title = $this->titleFor($eventType, $payload);
             $message = $this->messageFor($eventType, $payload, $orderItem);
@@ -109,6 +114,32 @@ class AiraloWebhookController extends Controller
         }
 
         return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Carry the news onto the Manage eSIMs record without waiting for the
+     * next sync: a data warning means the eSIM is in use and running low, and
+     * either event can carry the expiry. A refunded eSIM keeps Refunded.
+     * Fail-open: the customer's email matters more than the admin's record.
+     */
+    private function updateEsimRecord(string $iccid, string $eventType, array $payload): void
+    {
+        try {
+            Esim::query()->where('iccid', $iccid)->whereNull('refunded_at')->get()->each(function (Esim $esim) use ($eventType, $payload) {
+                if ($eventType === 'DATA_LOW' && in_array($esim->status, [EsimStatus::Inactive, EsimStatus::Active, EsimStatus::Unknown], true)) {
+                    $esim->status = EsimStatus::DataLow;
+                    $esim->activated_at ??= now();
+                }
+
+                if (filled($payload['expire_at'] ?? null)) {
+                    $esim->expires_at = Carbon::parse((string) $payload['expire_at'])->setTimezone(config('app.timezone'));
+                }
+
+                $esim->save();
+            });
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     private function titleFor(string $eventType, array $payload): string

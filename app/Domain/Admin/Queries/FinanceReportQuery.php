@@ -2,30 +2,53 @@
 
 namespace App\Domain\Admin\Queries;
 
+use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
-use App\Models\CurrencyRate;
-use App\Models\Setting;
+use App\Models\OrderRefund;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Company-finance aggregations for the Management → Finances page.
+ * Company-finance aggregations for the Management → Finances page: the
+ * monthly P&L per fulfilment provider and per product category.
  *
- * Answers the monthly P&L question per fulfillment provider: for a given
- * month, what did each provider (Airalo, Zendit, …) cost us, what revenue did
- * it produce, and what gross profit is left — plus the same cut by product
- * category and a 12-month trend for context.
+ *   Gross revenue      delivered items on orders completed in the month
+ *   less Refunds       customer refunds recorded in the month
+ *   = Revenue          (net)
+ *   Supplier cost      what those delivered items cost us
+ *   less Credits       supplier credits granted in the month
+ *   = Cost             (net)
+ *   Gross profit       Revenue - Cost
  *
- * All revenue figures are converted to USD through the order's exchange-rate
- * snapshot via {@see DashboardMetricsQuery::itemUsdSql()} and revenue is
- * recognised on `order_status = completed` / `completed_at` — the exact rules
- * the Overview dashboard and Reports page already use, so the three surfaces
- * can never disagree about a number.
+ * Three rules keep a closed month closed and the page true to the supplier's
+ * own invoice:
  *
- * Profit here is GROSS profit (revenue − supplier cost). Gateway fees and
- * operating costs are not captured per payment yet, so a "net profit" claim
- * would be dishonest — the page labels the figure accordingly.
+ *   1. Revenue is booked when an order completes and never un-booked. An
+ *      order refunded later keeps its completed_at, so it still counts in the
+ *      month it sold. (It used to vanish: a full refund set the order to
+ *      `refunded`, the page read `completed` only, and a closed month's revenue
+ *      and cost silently changed.)
+ *   2. Only delivered items are booked. A partially fulfilled order is marked
+ *      `completed`, and its failed items (never delivered, already reversed)
+ *      used to count as revenue and cost.
+ *   3. A refund lands in the month it was issued and a supplier credit in the
+ *      month it was granted, each from the refund ledger (order_refunds). The
+ *      Airalo invoice for a month is that month's eSIMs less that month's
+ *      credits, so the supplier cost line here reconciles to it.
+ *
+ * USD conversion is DashboardMetricsQuery::itemUsdSql() (item subtotal over
+ * the order's exchange-rate snapshot), and a refund reverses revenue at that
+ * same rate (RefundLedger), so no exchange-rate noise enters a refund.
+ *
+ * This is the P&L. The Overview dashboard's revenue KPI is a different
+ * measure (whole order totals, windowed by created_at) and is not reconciled
+ * to this page.
+ *
+ * Profit is GROSS profit (revenue - supplier cost). Gateway fees and operating
+ * costs are not captured per payment yet, so a "net profit" claim would be
+ * dishonest; the page labels the figure accordingly.
  */
 class FinanceReportQuery
 {
@@ -42,18 +65,34 @@ class FinanceReportQuery
     /** Canonical category slugs that get the same always-present treatment. */
     private const CORE_CATEGORY_SLUGS = ['gift-cards', 'esims', 'mobile-airtime', 'bill-payments'];
 
+    /**
+     * Order states that mean the order DID complete. Refunded is here on
+     * purpose: a refund is recorded in the month it happens, so the sale it
+     * refunds must stay booked in the month it happened.
+     */
+    private const BOOKED_ORDER_STATUSES = [
+        OrderStatus::Completed,
+        OrderStatus::PartiallyCompleted,
+        OrderStatus::Refunded,
+    ];
+
     public function __construct(private DashboardMetricsQuery $metrics) {}
 
     /**
      * Full monthly breakdown for the Finances page.
      *
+     * Every row carries both the gross and the net figures: gross_revenue_usd,
+     * refunds_usd, revenue_usd (net), gross_cost_usd, supplier_credits_usd,
+     * cost_usd (net), profit_usd and margin_pct.
+     *
      * @return array{
      *     month: string,
-     *     totals: array{orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float},
-     *     previous_totals: array{orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float},
-     *     providers: array<int, array{provider: string, label: string, orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}>,
-     *     categories: array<int, array{category: string, orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}>,
-     *     refunds: array{count: int, total_usd: float}
+     *     totals: array<string, int|float>,
+     *     previous_totals: array<string, int|float>,
+     *     providers: array<int, array<string, int|float|string>>,
+     *     categories: array<int, array<string, int|float|string>>,
+     *     refunds: array{count: int, total_usd: float},
+     *     supplier_credits: array{count: int, total_usd: float, pending_count: int}
      * }
      */
     public function monthlyBreakdown(Carbon $month): array
@@ -64,13 +103,23 @@ class FinanceReportQuery
         $previousStart = $start->copy()->subMonthNoOverflow()->startOfMonth();
         $previousEnd = $previousStart->copy()->endOfMonth();
 
+        $adjustments = $this->adjustmentsFor($start, $end);
+
         return [
             'month' => $start->format('Y-m'),
-            'totals' => $this->totalsRow($start, $end),
-            'previous_totals' => $this->totalsRow($previousStart, $previousEnd),
-            'providers' => $this->providerRows($start, $end),
-            'categories' => $this->categoryRows($start, $end),
-            'refunds' => $this->refundsForPeriod($start, $end),
+            'totals' => $this->totalsRow($start, $end, $adjustments),
+            'previous_totals' => $this->totalsRow($previousStart, $previousEnd, $this->adjustmentsFor($previousStart, $previousEnd)),
+            'providers' => $this->providerRows($start, $end, $adjustments),
+            'categories' => $this->categoryRows($start, $end, $adjustments),
+            'refunds' => [
+                'count' => $adjustments['refund_count'],
+                'total_usd' => round($adjustments['refunds_usd'], 2),
+            ],
+            'supplier_credits' => [
+                'count' => $adjustments['credit_count'],
+                'total_usd' => round($adjustments['credits_usd'], 2),
+                'pending_count' => $this->pendingSupplierCredits(),
+            ],
         ];
     }
 
@@ -82,11 +131,12 @@ class FinanceReportQuery
      * which for top-ups can carry the telecom operator written from variant
      * metadata rather than the partner we actually pay.
      *
-     * @return array<int, array{provider: string, label: string, orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}>
+     * @param  array<string, mixed>  $adjustments
+     * @return array<int, array<string, int|float|string>>
      */
-    private function providerRows(Carbon $start, Carbon $end): array
+    private function providerRows(Carbon $start, Carbon $end, array $adjustments): array
     {
-        $rows = $this->completedItemsQuery($start, $end)
+        $sales = $this->bookedItemsQuery($start, $end)
             ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->select(
                 DB::raw("LOWER(COALESCE(NULLIF(products.provider_name, ''), NULLIF(order_items.provider_name, ''), 'unknown')) as provider"),
@@ -96,27 +146,25 @@ class FinanceReportQuery
                 DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost_usd'),
             )
             ->groupBy('provider')
-            ->get();
+            ->get()
+            ->keyBy(fn ($row) => (string) $row->provider);
 
-        $presented = $rows
-            ->map(fn ($row) => $this->presentRow((array) $row) + [
-                'provider' => (string) $row->provider,
-                'label' => $this->providerLabel((string) $row->provider),
-            ])
-            ->keyBy('provider');
-
-        // Core partners always appear, zero-filled when they sold nothing —
+        // Every provider that sold, was refunded, or received a credit this
+        // month, plus the core partners, which always appear zero-filled:
         // "Airalo: 0" is information; a missing row is a question.
-        foreach (self::CORE_PROVIDERS as $provider) {
-            if (! $presented->has($provider)) {
-                $presented->put($provider, $this->presentRow([]) + [
-                    'provider' => $provider,
-                    'label' => $this->providerLabel($provider),
-                ]);
-            }
-        }
+        $keys = collect(self::CORE_PROVIDERS)
+            ->merge($sales->keys())
+            ->merge(array_keys($adjustments['providers']))
+            ->unique();
 
-        return $presented
+        return $keys
+            ->map(fn (string $provider) => $this->presentRow(
+                (array) ($sales[$provider] ?? []),
+                $adjustments['providers'][$provider] ?? [],
+            ) + [
+                'provider' => $provider,
+                'label' => $this->providerLabel($provider),
+            ])
             ->sortBy([['revenue_usd', 'desc'], ['label', 'asc']])
             ->values()
             ->all();
@@ -125,11 +173,12 @@ class FinanceReportQuery
     /**
      * The same money cut grouped by product category (gift cards, eSIMs, …).
      *
-     * @return array<int, array{category: string, orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}>
+     * @param  array<string, mixed>  $adjustments
+     * @return array<int, array<string, int|float|string>>
      */
-    private function categoryRows(Carbon $start, Carbon $end): array
+    private function categoryRows(Carbon $start, Carbon $end, array $adjustments): array
     {
-        $rows = $this->completedItemsQuery($start, $end)
+        $sales = $this->bookedItemsQuery($start, $end)
             ->join('categories', 'order_items.category_id', '=', 'categories.id')
             ->select(
                 'categories.name as category',
@@ -139,100 +188,30 @@ class FinanceReportQuery
                 DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost_usd'),
             )
             ->groupBy('categories.name')
-            ->get();
-
-        $presented = $rows
-            ->map(fn ($row) => $this->presentRow((array) $row) + ['category' => (string) $row->category])
-            ->keyBy('category');
+            ->get()
+            ->keyBy(fn ($row) => (string) $row->category);
 
         // The canonical product lines (gift cards, eSIMs, top-ups, bills)
         // always appear, zero-filled, so best-seller comparisons read at a
         // glance instead of by noticing what's absent.
         $coreCategories = DB::table('categories')
             ->whereIn('slug', self::CORE_CATEGORY_SLUGS)
-            ->pluck('name');
+            ->pluck('name')
+            ->map(fn ($name) => (string) $name);
 
-        foreach ($coreCategories as $name) {
-            if (! $presented->has((string) $name)) {
-                $presented->put((string) $name, $this->presentRow([]) + ['category' => (string) $name]);
-            }
-        }
+        $keys = $coreCategories
+            ->merge($sales->keys())
+            ->merge(array_keys($adjustments['categories']))
+            ->unique();
 
-        return $presented
+        return $keys
+            ->map(fn (string $category) => $this->presentRow(
+                (array) ($sales[$category] ?? []),
+                $adjustments['categories'][$category] ?? [],
+            ) + ['category' => $category])
             ->sortBy([['revenue_usd', 'desc'], ['category', 'asc']])
             ->values()
             ->all();
-    }
-
-    /**
-     * Refunds issued in the window, converted to USD.
-     *
-     * There is no refunds table — a refund is a wallet credit with
-     * `transaction_category = refund` (see GatewayRefundService), stored in
-     * the wallet's own currency, so each currency bucket converts via the
-     * platform's canonical balance-to-USD rule.
-     *
-     * @return array{count: int, total_usd: float}
-     */
-    private function refundsForPeriod(Carbon $start, Carbon $end): array
-    {
-        $buckets = DB::table('wallet_transactions')
-            ->where('transaction_category', 'refund')
-            ->where('type', 'credit')
-            ->whereBetween('created_at', [$start, $end])
-            ->select('currency', DB::raw('COUNT(*) as refunds'), DB::raw('SUM(amount) as total'))
-            ->groupBy('currency')
-            ->get();
-
-        if ($buckets->isEmpty()) {
-            return ['count' => 0, 'total_usd' => 0.0];
-        }
-
-        $ratesPerUsd = CurrencyRate::query()->where('is_active', true)->pluck('rate_per_usd', 'code');
-        $rcoinUsdRate = (float) Setting::rcoinUsdRate();
-
-        $count = 0;
-        $totalUsd = 0.0;
-        foreach ($buckets as $bucket) {
-            $count += (int) $bucket->refunds;
-            $totalUsd += $this->metrics->balanceToUsd((string) $bucket->currency, (float) $bucket->total, $ratesPerUsd, $rcoinUsdRate);
-        }
-
-        return ['count' => $count, 'total_usd' => round($totalUsd, 2)];
-    }
-
-    /**
-     * Base query: completed-order items in the window. Revenue recognition
-     * matches the dashboard — `order_status = completed` on `completed_at`.
-     */
-    private function completedItemsQuery(Carbon $start, Carbon $end): Builder
-    {
-        return DB::table('order_items')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
-            ->whereBetween('orders.completed_at', [$start, $end]);
-    }
-
-    /**
-     * Round a raw aggregate row into the shared presentation shape.
-     *
-     * @param  array<string, mixed>  $row
-     * @return array{orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}
-     */
-    private function presentRow(array $row): array
-    {
-        $revenue = round((float) ($row['revenue_usd'] ?? 0), 2);
-        $cost = round((float) ($row['cost_usd'] ?? 0), 2);
-        $profit = round($revenue - $cost, 2);
-
-        return [
-            'orders' => (int) ($row['orders_count'] ?? 0),
-            'units' => (int) ($row['units'] ?? 0),
-            'revenue_usd' => $revenue,
-            'cost_usd' => $cost,
-            'profit_usd' => $profit,
-            'margin_pct' => $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0.0,
-        ];
     }
 
     /**
@@ -240,11 +219,12 @@ class FinanceReportQuery
      * counted DISTINCT here rather than summed from the provider rows — a
      * mixed-provider order would otherwise be counted once per provider.
      *
-     * @return array{orders: int, units: int, revenue_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}
+     * @param  array<string, mixed>  $adjustments
+     * @return array<string, int|float>
      */
-    private function totalsRow(Carbon $start, Carbon $end): array
+    private function totalsRow(Carbon $start, Carbon $end, array $adjustments): array
     {
-        $row = $this->completedItemsQuery($start, $end)
+        $row = $this->bookedItemsQuery($start, $end)
             ->select(
                 DB::raw('COUNT(DISTINCT orders.id) as orders_count'),
                 DB::raw('SUM(order_items.quantity) as units'),
@@ -253,7 +233,170 @@ class FinanceReportQuery
             )
             ->first();
 
-        return $this->presentRow((array) $row);
+        return $this->presentRow((array) $row, [
+            'refunds_usd' => $adjustments['refunds_usd'],
+            'credits_usd' => $adjustments['credits_usd'],
+        ]);
+    }
+
+    /**
+     * What the refund ledger moves in the window: customer refunds (revenue
+     * unwound, by refunded_at) and supplier credits (cost recovered, by
+     * supplier_credited_at), each split by provider and by category.
+     *
+     * Fulfilment reversals are left out on purpose. They return money for an
+     * item that never delivered, and a never-delivered item is not booked as
+     * revenue (bookedItemsQuery), so there is nothing for them to reverse.
+     *
+     * @return array{
+     *     refunds_usd: float, refund_count: int, credits_usd: float, credit_count: int,
+     *     providers: array<string, array{refunds_usd: float, credits_usd: float}>,
+     *     categories: array<string, array{refunds_usd: float, credits_usd: float}>
+     * }
+     */
+    private function adjustmentsFor(Carbon $start, Carbon $end): array
+    {
+        $result = [
+            'refunds_usd' => 0.0,
+            'refund_count' => 0,
+            'credits_usd' => 0.0,
+            'credit_count' => 0,
+            'providers' => [],
+            'categories' => [],
+        ];
+
+        $refunds = OrderRefund::query()
+            ->where('kind', OrderRefund::KIND_CUSTOMER_REFUND)
+            ->whereBetween('refunded_at', [$start, $end])
+            ->get(['id', 'revenue_reversed_usd', 'allocations']);
+
+        $credits = OrderRefund::query()
+            ->where('supplier_credit_status', OrderRefund::CREDIT_CREDITED)
+            ->whereBetween('supplier_credited_at', [$start, $end])
+            ->get(['id', 'supplier_credit_usd', 'allocations']);
+
+        $categoryNames = DB::table('categories')
+            ->whereIn('id', $refunds->concat($credits)
+                ->flatMap(fn (OrderRefund $row) => array_column((array) $row->allocations, 'category_id'))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all())
+            ->pluck('name', 'id');
+
+        foreach ($refunds as $refund) {
+            $result['refunds_usd'] += (float) $refund->revenue_reversed_usd;
+            $result['refund_count']++;
+
+            foreach ((array) $refund->allocations as $allocation) {
+                $this->addTo($result, $allocation, $categoryNames, 'refunds_usd', (float) $allocation['revenue_reversed_usd']);
+            }
+        }
+
+        foreach ($credits as $credit) {
+            $amount = (float) $credit->supplier_credit_usd;
+            $result['credits_usd'] += $amount;
+            $result['credit_count']++;
+
+            // A credit recovers the cost of the items the refund covered, in
+            // the same proportion their revenue was split.
+            $allocations = (array) $credit->allocations;
+            $weight = array_sum(array_column($allocations, 'revenue_reversed_usd'));
+
+            foreach ($allocations as $allocation) {
+                $share = $weight > 0
+                    ? $amount * ((float) $allocation['revenue_reversed_usd'] / $weight)
+                    : $amount / max(1, count($allocations));
+
+                $this->addTo($result, $allocation, $categoryNames, 'credits_usd', $share);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Add one allocation's amount to its provider and category buckets.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array<string, mixed>  $allocation
+     * @param  Collection<int|string, mixed>  $categoryNames
+     */
+    private function addTo(array &$result, array $allocation, Collection $categoryNames, string $field, float $amount): void
+    {
+        $provider = (string) ($allocation['provider'] ?? 'unknown');
+        $result['providers'][$provider] ??= ['refunds_usd' => 0.0, 'credits_usd' => 0.0];
+        $result['providers'][$provider][$field] += $amount;
+
+        $categoryId = $allocation['category_id'] ?? null;
+        $category = $categoryId !== null ? ($categoryNames[$categoryId] ?? null) : null;
+
+        if ($category !== null) {
+            $category = (string) $category;
+            $result['categories'][$category] ??= ['refunds_usd' => 0.0, 'credits_usd' => 0.0];
+            $result['categories'][$category][$field] += $amount;
+        }
+    }
+
+    /**
+     * Supplier claims still waiting on the supplier, across all months: the
+     * cost is sunk until they are granted, so the page says how many are out.
+     */
+    private function pendingSupplierCredits(): int
+    {
+        return OrderRefund::query()
+            ->where('supplier_credit_status', OrderRefund::CREDIT_PENDING)
+            ->count();
+    }
+
+    /**
+     * Base query: the items booked as revenue in the window. Delivered items
+     * (anything but a failed delivery) on orders that completed in the window,
+     * whatever has happened to the order since.
+     */
+    private function bookedItemsQuery(Carbon $start, Carbon $end): Builder
+    {
+        return DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.order_status', array_map(fn (OrderStatus $status) => $status->value, self::BOOKED_ORDER_STATUSES))
+            ->whereNotNull('orders.completed_at')
+            ->whereBetween('orders.completed_at', [$start, $end])
+            // fulfillment_status is NOT NULL (default not_started), so a plain
+            // inequality never meets the SQL NULL trap.
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value);
+    }
+
+    /**
+     * Round a raw sales row plus its ledger adjustments into the shared
+     * presentation shape: gross, less refunds / credits, net.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array{refunds_usd?: float, credits_usd?: float}  $adjustment
+     * @return array{orders: int, units: int, gross_revenue_usd: float, refunds_usd: float, revenue_usd: float, gross_cost_usd: float, supplier_credits_usd: float, cost_usd: float, profit_usd: float, margin_pct: float}
+     */
+    private function presentRow(array $row, array $adjustment = []): array
+    {
+        $grossRevenue = round((float) ($row['revenue_usd'] ?? 0), 2);
+        $refunds = round((float) ($adjustment['refunds_usd'] ?? 0), 2);
+        $grossCost = round((float) ($row['cost_usd'] ?? 0), 2);
+        $credits = round((float) ($adjustment['credits_usd'] ?? 0), 2);
+
+        $revenue = round($grossRevenue - $refunds, 2);
+        $cost = round($grossCost - $credits, 2);
+        $profit = round($revenue - $cost, 2);
+
+        return [
+            'orders' => (int) ($row['orders_count'] ?? 0),
+            'units' => (int) ($row['units'] ?? 0),
+            'gross_revenue_usd' => $grossRevenue,
+            'refunds_usd' => $refunds,
+            'revenue_usd' => $revenue,
+            'gross_cost_usd' => $grossCost,
+            'supplier_credits_usd' => $credits,
+            'cost_usd' => $cost,
+            'profit_usd' => $profit,
+            'margin_pct' => $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0.0,
+        ];
     }
 
     private function providerLabel(string $provider): string

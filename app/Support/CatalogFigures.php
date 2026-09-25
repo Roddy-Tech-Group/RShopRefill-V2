@@ -62,4 +62,25 @@ final class CatalogFigures
                 ->count('country_code'),
         ]);
     }
+
+    /**
+     * A figure short enough for a badge: 1200 reads "1.2K", 3400000 reads
+     * "3.4M", below a thousand the number itself. Plain arithmetic, so it
+     * needs no intl extension (the framework abbreviation does, and a page
+     * that showed live figures returned a 500 on a machine without it).
+     */
+    public static function abbreviate(int|float $value): string
+    {
+        $value = (float) $value;
+
+        foreach ([1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'K'] as $unit => $suffix) {
+            if (abs($value) >= $unit) {
+                $short = round($value / $unit, 1);
+
+                return (fmod($short, 1.0) === 0.0 ? number_format($short) : number_format($short, 1)).$suffix;
+            }
+        }
+
+        return number_format($value);
+    }
 }

@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class ZenditEsimNormalizer implements CatalogNormalizerInterface
 {
-    public function normalizeAndSave(array $rawItem, string $providerName): void
+    public function normalizeAndSave(array $rawItem, string $providerName): array
     {
         // 1. Ensure eSIMs Category exists
         $category = Category::firstOrCreate(
@@ -119,5 +119,7 @@ class ZenditEsimNormalizer implements CatalogNormalizerInterface
         if (isset($rawItem['logoUrl']) && ! str_starts_with($product->logo_url, 'local/')) {
             MediaProcessorJob::dispatch($product->id, $rawItem['logoUrl']);
         }
+
+        return [$offerId];
     }
 }

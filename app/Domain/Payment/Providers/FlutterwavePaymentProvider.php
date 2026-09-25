@@ -31,6 +31,9 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     private string $secretKey;
 
+    /** Decided by environment policy (MockMode), never by the key alone. */
+    private bool $mock;
+
     private string $baseUrl;
 
     public function __construct()
@@ -45,6 +48,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         }
 
         $this->secretKey = $secretKey ?: 'FLW_SECRET_KEY_MOCK';
+        $this->mock = MockMode::forKey($secretKey);
         $this->baseUrl = 'https://api.flutterwave.com/v3';
     }
 
@@ -129,7 +133,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function chargeCard(PaymentAttempt $attempt, array $cardDetails, ?array $auth = null): array
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             return $this->simulateMockCardCharge($attempt, $cardDetails, $auth);
         }
 
@@ -310,7 +314,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function validateOTP(PaymentAttempt $attempt, string $otp, string $flwRef): array
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             if ($otp === '123456' || $otp === '1234') {
                 $attempt->payment_status = PaymentStatus::Paid;
                 $attempt->confirmed_at = now();
@@ -379,7 +383,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function chargeBankTransfer(PaymentAttempt $attempt): array
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $bankDetails = [
                 'bank_name' => 'Wema Bank (RshopRefill Mock)',
                 'account_number' => '9982'.rand(100000, 999999),
@@ -539,7 +543,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         // acknowledged).
         $waiting = fn (array $data = []): array => $this->mobileMoneyWaiting($data, $phoneNumber, $chargeLabel, $networkLabel, $country);
 
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             return $waiting();
         }
 
@@ -817,7 +821,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
      */
     public function chargeApplePay(PaymentAttempt $attempt, array $details = [], ?string $returnUrl = null): array
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $attempt->gateway_reference = 'FLW-MOCK-APPLE-'.uniqid();
             $attempt->payment_status = PaymentStatus::Paid;
             $attempt->confirmed_at = now();
@@ -997,7 +1001,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             default => $methodKey,
         };
 
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             // Sandbox / dev path - go straight to a mock-success return so the
             // wizard can be tested without real FW credentials.
             $mockUrl = $returnUrl.(str_contains($returnUrl, '?') ? '&' : '?').'tx_ref='.$attempt->idempotency_key.'&status=successful&mock=1';
@@ -1087,7 +1091,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function verifyPayment(PaymentAttempt $attempt): bool
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $attempt->payment_status = PaymentStatus::Paid;
             $attempt->confirmed_at = now();
             $attempt->save();
@@ -1274,7 +1278,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
      */
     public function listChargesByReference(string $txRef): array
     {
-        if (str_contains($this->secretKey, 'MOCK') || trim($txRef) === '') {
+        if ($this->mock || trim($txRef) === '') {
             return [];
         }
 
@@ -1352,7 +1356,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             $attempt->payment_status = PaymentStatus::Refunded;
             $attempt->save();
 
@@ -1388,7 +1392,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
     public function verifyByReference(string $txRef): ?array
     {
-        if (str_contains($this->secretKey, 'MOCK')) {
+        if ($this->mock) {
             return [
                 'status' => 'successful',
                 'amount' => 100.0,

@@ -211,7 +211,7 @@ class DashboardFrameLayoutTest extends TestCase
     /** Every text badge on a sidebar row wears the top bar's dark blue. */
     public function test_sidebar_badges_are_dark_blue(): void
     {
-        $user = User::factory()->create(['kyc_status' => null]);
+        $user = User::factory()->create(['kyc_status' => 'unsubmitted']);
         $this->withoutVite();
         $html = $this->actingAs($user)->get('/dashboard')->assertOk()->getContent();
 
@@ -412,7 +412,9 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('.dash-rail-tip.is-visible', $layout);
         // Speech-bubble pointer aimed at the icon.
         $this->assertMatchesRegularExpression('/\.dash-rail-tip::before \{[^}]*left: -4px;[^}]*background-color: inherit;[^}]*rotate\(45deg\)/', $layout);
-        $this->assertStringContainsString("target.closest('[data-flux-sidebar] nav a[data-tip]')", $layout);
+        // Links and the Shop button alike: the Shop row became a button when it
+        // learned to drop its categories down.
+        $this->assertStringContainsString("target.closest('[data-flux-sidebar] nav :is(a, button)[data-tip]')", $layout);
         $this->assertStringContainsString("classList.contains('dashboard-sidebar-collapsed')", $layout);
         // The clipped ::after version is gone.
         $this->assertStringNotContainsString('a[data-tip]:hover::after', $layout);
@@ -458,9 +460,12 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringNotContainsString('grid-rows-subgrid', $overview);
 
         // Reading order: wallet, Recent Orders, Rcoin, Quick Actions, promo, Recent Transactions.
+        // Checked on the markup alone: a Blade comment naming a card must not
+        // count as the card.
+        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $overview);
         $last = -1;
         foreach (['Total Wallet Balance', 'Recent Orders', 'RShop Rcoin', 'Quick Actions', 'Give the Perfect Gift', 'Recent Transactions'] as $label) {
-            $at = strpos($overview, $label, strpos($overview, 'lg:grid-cols-12'));
+            $at = strpos($markup, $label, strpos($markup, 'lg:grid-cols-12'));
             $this->assertNotFalse($at, $label.' is missing from the desktop overview.');
             $this->assertGreaterThan($last, $at, $label.' is out of order.');
             $last = $at;
@@ -501,12 +506,17 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringNotContainsString('href="'.route('shop.refund-policy').'"', $html);
     }
 
-    /** No empty strip left of the sidebar: the dashboard reserves the scrollbar gutter on the right only. */
+    /**
+     * No empty strip left of the sidebar: the gutter is reserved on the right
+     * only. That is the global rule now (the whole site dropped both-edges), so
+     * the dashboard needs no rule of its own and none may bring both-edges back.
+     */
     public function test_the_dashboard_drops_the_left_scrollbar_gutter(): void
     {
         $css = file_get_contents(resource_path('css/app.css'));
 
-        $this->assertMatchesRegularExpression('/html:has\(> body\.dashboard\) \{\s*scrollbar-gutter: stable;\s*\}/', $css);
+        $this->assertMatchesRegularExpression('/\nhtml \{[^}]*scrollbar-gutter: stable;/', $css);
+        $this->assertStringNotContainsString('both-edges;', $css);
     }
 
     /**

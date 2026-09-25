@@ -52,9 +52,16 @@ class extends Component {
             'features.device_restriction_enabled',
         ],
         'Verification & Limits' => [
+            'features.kyc_verification_enabled',
             'features.kyc_enforce_enabled',
             'features.kyc_tier2_threshold_usd',
+            'features.kyc_cumulative_threshold_usd',
             'features.spending_limits_enforce_enabled',
+            'features.spend_limit_standard_day_usd',
+            'features.spend_limit_standard_week_usd',
+            'features.spend_limit_verified_day_usd',
+            'features.spend_limit_verified_week_usd',
+            'features.spend_limit_verified_month_usd',
         ],
         'Users & Auth' => [
             'features.signup_enabled',
@@ -204,6 +211,19 @@ class extends Component {
             && in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
             && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->approvedCellCount() === 0) {
             $this->addError('settings.'.$key, 'Refused: no eligibility cell is approved yet. Approve at least one gateway x category cell before enforcing, or every cart would be refused.');
+
+            return;
+        }
+
+        // The same interlock from the other side: switching off the LAST
+        // approved cell while enforcing leaves a lockdown with nothing
+        // approved. Enforcement no longer falls back to shadow in that state
+        // (that turned a lockdown into allow-all), so the flip is refused
+        // here, where the admin can read why.
+        if (str_starts_with($key, 'features.eligibility_')
+            && ! in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
+            && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->isLastApprovedCell($key)) {
+            $this->addError('settings.'.$key, 'Refused: this is the last approved cell and enforcement is on. Approve another cell first, or switch enforcement off, otherwise every restricted cart would be refused.');
 
             return;
         }

@@ -84,22 +84,29 @@ window.rshopKyc = (function () {
     // Record that the capture reached Smile, so the KYC page shows an honest
     // "in review" state even if the provider callback is slow. Only called on
     // the widget's success, never optimistically.
+    // Resolves true once the server has the account in review. A retry after an
+    // earlier rejection only counts a later "rejected" as this attempt's result
+    // when the account was moved to review first; otherwise the old rejection
+    // would read as the new attempt failing.
     async function markSubmitted() {
         try {
-            await fetch('{{ route('api.kyc.submitted') }}', {
+            const res = await fetch('{{ route('api.kyc.submitted') }}', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                 },
             });
-        } catch (e) { /* non-fatal */ }
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
     }
 
     // Wait for Smile's async callback to reach our server and flip kyc_status.
     // Resolves 'verified' | 'rejected' | 'timeout' - a rejection must surface,
     // not leave the customer staring at "confirming" until the clock runs out.
-    async function pollUntilVerified() {
+    async function pollUntilVerified(trustRejected = true) {
         setStatus('Confirming your verification, please wait...');
         const started = Date.now();
         while (Date.now() - started < 120000) {
@@ -107,19 +114,46 @@ window.rshopKyc = (function () {
                 const res = await fetch('{{ route('api.kyc.status') }}', { headers: { 'Accept': 'application/json' } });
                 const data = await res.json();
                 if (data.verified) return 'verified';
-                if (data.kyc_status === 'rejected') return 'rejected';
+                if (trustRejected && data.kyc_status === 'rejected') return 'rejected';
             } catch (e) { /* keep polling */ }
             await new Promise((r) => setTimeout(r, 3000));
         }
         return 'timeout';
     }
 
+    // What the customer sees once a verdict is known (or still is not), then
+    // the caller's continuation on success.
+    function settle(outcome) {
+        if (outcome === 'verified') {
+            close();
+            if (typeof onVerifiedCb === 'function') onVerifiedCb();
+            return;
+        }
+
+        if (outcome === 'rejected') {
+            // Surface the rejection, then reload so the page shows its
+            // rejected state (Try again on the KYC page).
+            setStatus('Your verification was not successful. Please review your details and try again.');
+            setTimeout(() => { close(); window.location.reload(); }, 2500);
+            return;
+        }
+
+        setStatus('Your verification is still being reviewed. We will email you as soon as it is done.');
+    }
+
     async function launch(smile, onVerified) {
         onVerifiedCb = onVerified;
         open();
 
+        // Already submitted and under review: nothing new to launch, just wait
+        // for the verdict and continue the payment if it passes.
+        if (smile && smile.in_review) {
+            settle(await pollUntilVerified());
+            return;
+        }
+
         if (! smile || ! smile.token) {
-            setStatus('Verification is not available right now. Please try again later or contact support.');
+            setStatus('Verification is currently unavailable, try again later or contact support.');
             return;
         }
 
@@ -146,25 +180,17 @@ window.rshopKyc = (function () {
                 theme_color: '#2563eb',
             },
             onSuccess: async () => {
-                await markSubmitted();
-                const outcome = await pollUntilVerified();
+                const recorded = await markSubmitted();
+                const outcome = await pollUntilVerified(recorded);
 
-                if (outcome === 'verified') {
+                // Timeout: verdict still in flight; the KYC page reflects it
+                // and the outcome email follows.
+                if (outcome === 'timeout') {
                     close();
-                    if (typeof onVerifiedCb === 'function') onVerifiedCb();
                     return;
                 }
 
-                if (outcome === 'rejected') {
-                    // Surface the rejection, then reload so the page shows its
-                    // rejected state (Try again on the KYC page).
-                    setStatus('Your verification was not successful. Please review your details and try again.');
-                    setTimeout(() => { close(); window.location.reload(); }, 2500);
-                    return;
-                }
-
-                // Timeout: verdict still in flight; the KYC page will reflect it.
-                close();
+                settle(outcome);
             },
             onClose: () => close(),
             onError: () => {

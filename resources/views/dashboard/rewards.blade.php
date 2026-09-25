@@ -494,10 +494,10 @@
                          all the Rcoin the platform has minted, not a cash figure. --}}
                     @php
                         $platformReferralsLabel = $platformReferrals >= 1000
-                            ? \Illuminate\Support\Number::abbreviate($platformReferrals)
+                            ? \App\Support\CatalogFigures::abbreviate($platformReferrals)
                             : number_format($platformReferrals);
                         $platformMintedLabel = $platformRcoinMinted >= 1000
-                            ? \Illuminate\Support\Number::abbreviate($platformRcoinMinted)
+                            ? \App\Support\CatalogFigures::abbreviate($platformRcoinMinted)
                             : number_format($platformRcoinMinted);
                         $moreReferrers = max(0, $platformReferrerCount - $topReferrers->count());
                     @endphp
@@ -509,7 +509,7 @@
                                         <img src="{{ $referrer->avatar_url ?: $referrer->initialsAvatar(56) }}" alt="" class="no-dark-invert block h-[28px] w-[28px] rounded-full border-2 border-[#0e0e12] object-cover {{ $loop->first ? '' : '-ml-[10px]' }}" loading="lazy">
                                     @endforeach
                                     @if ($moreReferrers > 0)
-                                        <span class="-ml-[10px] grid h-[28px] min-w-[28px] place-items-center rounded-full border-2 border-[#0e0e12] bg-[#252f85] px-1.5 text-[11px] leading-none text-white">+{{ \Illuminate\Support\Number::abbreviate($moreReferrers) }}</span>
+                                        <span class="-ml-[10px] grid h-[28px] min-w-[28px] place-items-center rounded-full border-2 border-[#0e0e12] bg-[#252f85] px-1.5 text-[11px] leading-none text-white">+{{ \App\Support\CatalogFigures::abbreviate($moreReferrers) }}</span>
                                     @endif
                                 </span>
                             @endif

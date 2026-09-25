@@ -63,6 +63,9 @@ class CheckoutController extends Controller
             'delivery_email' => ['required', 'email'],
             'payment_method' => ['required', 'in:card,mobile_money,crypto,wallet,bank_transfer,apple_pay,ussd,pay_with_bank,bank_qr,mobile_wallet'],
             'coupon_code' => ['nullable', 'string', 'max:64'],
+            // The wallet the customer chose to pay from (wallet method only);
+            // absent, the first wallet that covers the order pays.
+            'wallet_currency' => ['nullable', 'string', 'size:3'],
         ]);
 
         $user = $request->user();
@@ -134,6 +137,7 @@ class CheckoutController extends Controller
                 // collapses eight Flutterwave methods into one gateway name, so
                 // this is the only place the real choice is still visible.
                 selectedMethod: $data['payment_method'],
+                walletCurrency: $data['wallet_currency'] ?? null,
             );
 
             // Order placed - the cart is converted, so drop the ephemeral

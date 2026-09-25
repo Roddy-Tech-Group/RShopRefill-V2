@@ -6,7 +6,9 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Wallet\Services\WalletFundingService;
+use App\Enums\AlertSeverity;
 use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
@@ -265,6 +267,76 @@ class CryptoDustSettlementTest extends TestCase
         // A closed dust settlement is not an alert; only a held one is.
         $this->assertSame(0, Artisan::call('crypto:settlements'));
         $this->assertStringContainsString('1 dust-settled', Artisan::output());
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function &captureAlerts(): array
+    {
+        $alerts = [];
+        $this->app->instance(OperationalAlerter::class, new class($alerts) extends OperationalAlerter
+        {
+            public function __construct(private array &$sent) {}
+
+            public function send(AlertSeverity $severity, string $key, string $title, string $message, array $context = [], ?string $runbook = null): bool
+            {
+                $this->sent[] = compact('severity', 'key', 'title', 'message', 'context');
+
+                return true;
+            }
+        });
+
+        return $alerts;
+    }
+
+    /**
+     * A held payment used to make the report exit 1, which the scheduler
+     * filed every morning in Sentry as "crypto:settlements crashed" with no
+     * detail (issue 7618307421). The report exits 0 and tells the ops
+     * channel which payment is waiting, how short it is, and where to act.
+     */
+    public function test_the_settlement_audit_reports_a_held_payment_to_the_ops_channel_not_as_a_crash(): void
+    {
+        $alerts = &$this->captureAlerts();
+
+        $attempt = $this->attempt(12.20);
+        $this->gatewayReports(['pay_amount' => 12.36, 'actually_paid' => 11.00]);
+        $this->assertFalse((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertSame(PaymentStatus::PartiallyPaid, $attempt->fresh()->payment_status);
+
+        $this->assertSame(0, Artisan::call('crypto:settlements'), 'a report that ran is not a crash');
+
+        $this->assertCount(1, $alerts);
+        $this->assertSame('crypto:settlements:held', $alerts[0]['key']);
+        $this->assertSame(AlertSeverity::Sev2, $alerts[0]['severity']);
+        $this->assertStringContainsString('1 crypto payment(s) arrived short', $alerts[0]['message']);
+        $this->assertStringContainsString($attempt->order->order_number, $alerts[0]['context']['Payments']);
+        $this->assertStringContainsString('received 11 of 12.36', $alerts[0]['context']['Payments']);
+        $this->assertStringContainsString(route('admin.transaction', $attempt), $alerts[0]['context']['Payments']);
+
+        // The pipeable form is quiet.
+        $this->assertSame(0, Artisan::call('crypto:settlements', ['--json' => true]));
+        $this->assertCount(1, $alerts);
+    }
+
+    /**
+     * The quoted amount rounds up, so a customer sending a satoshi or a
+     * fraction of a cent over is routine and already fulfilled: listed in
+     * the table, never an alert, never a failed run.
+     */
+    public function test_a_rounding_surplus_is_listed_but_never_alerts(): void
+    {
+        $alerts = &$this->captureAlerts();
+
+        $attempt = $this->attempt(12.20);
+        $this->gatewayReports(['payment_status' => 'finished', 'pay_amount' => 12.3579362, 'actually_paid' => 12.36]);
+        $this->assertTrue((new NowPaymentsProvider)->verifyPayment($attempt));
+        $this->assertTrue($attempt->fresh()->isOverpaid());
+
+        $this->assertSame(0, Artisan::call('crypto:settlements'));
+        $this->assertStringContainsString('1 overpaid', Artisan::output());
+        $this->assertSame([], $alerts);
     }
 
     /**
