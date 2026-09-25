@@ -159,7 +159,7 @@ class MobileWalletSheetTest extends TestCase
 
         $html = $this->actingAs($this->fundedUser())->get('/dashboard')->assertOk()->getContent();
 
-        $this->assertStringContainsString('Data plans for 3 countries', $html);
+        $this->assertStringContainsString('Data, Calls for 3 countries', $html);
         $this->assertStringContainsString('2 networks in 2 countries', $html);
         $this->assertStringContainsString('1 biller in 1 country', $html);
         $this->assertStringContainsString('2 brands to choose from', $html);

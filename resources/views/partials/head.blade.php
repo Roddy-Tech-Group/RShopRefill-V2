@@ -9,6 +9,47 @@
      surface pads for the inset; see the storefront header below and
      layouts/dashboard. --}}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+{{-- Installed, the app does not zoom. Pinching or double-tapping a native
+     app scales nothing, and here it only ever left the customer stranded
+     on a half-scrolled page with the fixed chrome adrift, since every
+     top- and bottom-anchored surface is positioned against a viewport the
+     zoom has just moved out from under it.
+
+     Only when installed. A browser tab keeps pinch-zoom, because taking it
+     away there removes the one way a customer who needs larger text can
+     get it, and the browser's own controls make the fixed chrome behave.
+     So the rule is written at runtime, off display-mode, rather than baked
+     into the meta tag above.
+
+     Three locks, because one is not enough: the viewport meta covers
+     Android and iOS standalone, touch-action rules out the double-tap
+     zoom that ignores the meta, and gesturestart is what iOS actually
+     listens to for a pinch. Inline and before paint so the page is never
+     briefly zoomable on the way in. --}}
+<script>
+    (function () {
+        var standalone = window.navigator.standalone === true
+            || window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: fullscreen)').matches
+            || window.matchMedia('(display-mode: minimal-ui)').matches;
+
+        if (! standalone) {
+            return;
+        }
+
+        document.documentElement.classList.add('is-standalone');
+
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no');
+        }
+
+        // iOS reads the pinch as a gesture rather than honouring the meta.
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+            document.addEventListener(name, function (e) { e.preventDefault(); }, { passive: false });
+        });
+    })();
+</script>
 <meta name="csrf-token" content="{{ csrf_token() }}" />
 <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
 

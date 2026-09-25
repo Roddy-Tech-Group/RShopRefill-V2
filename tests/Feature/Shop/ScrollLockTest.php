@@ -89,4 +89,45 @@ class ScrollLockTest extends TestCase
 
         $this->assertSame([], $offenders, "A scroll lock rides on a composite x-effect condition, which double-locks on any change that leaves it true:\n".implode("\n", $offenders));
     }
+
+    /**
+     * The lock is released when a navigation STARTS, not when it finishes.
+     *
+     * Livewire fires three hooks per navigation, and `livewire:navigated` is
+     * the last of them: the next page is already built and painted by the time
+     * it runs. Releasing only there meant a link tapped inside an open drawer
+     * rendered the whole next page under a body still at position:fixed - the
+     * dashboard's fixed header measuring against the viewport, the panel under
+     * it against the frozen body - and the release afterwards snapped it into
+     * place. That snap read as the top of the page shaking on the way in.
+     *
+     * `livewire:navigate` fires the moment a navigation is triggered, before
+     * any HTML is fetched or swapped, so the page is free before the new one
+     * lands. The late hook stays as the net for back / forward and redirects.
+     */
+    public function test_the_lock_is_released_before_the_next_page_is_swapped_in(): void
+    {
+        $partial = $this->partial();
+
+        foreach (['livewire:navigate', 'livewire:navigated'] as $hook) {
+            $this->assertStringContainsString(
+                "document.addEventListener('{$hook}', () => window.rshopScrollLock?.reset());",
+                $partial,
+                "nothing releases the lock on {$hook}"
+            );
+        }
+
+        // The early hook comes first, so a reader meets the release that
+        // matters before the one that is only a fallback.
+        $this->assertLessThan(
+            strpos($partial, "addEventListener('livewire:navigated'"),
+            strpos($partial, "addEventListener('livewire:navigate'"),
+            'the early release should be listed first'
+        );
+
+        // Released, not unlocked: reset() clears the body whatever the counter
+        // says, where unlock() only steps one holder down and would leave the
+        // page frozen if two overlays were open.
+        $this->assertStringNotContainsString("livewire:navigate', () => window.rshopScrollLock?.unlock()", $partial);
+    }
 }

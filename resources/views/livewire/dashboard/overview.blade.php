@@ -266,7 +266,9 @@ new #[Lazy] class extends Component
                         ? $stat('mobile-airtime', 'brands').' '.\Illuminate\Support\Str::plural('network', $stat('mobile-airtime', 'brands')).' in '.$countries($stat('mobile-airtime', 'countries'))
                         : 'Top up airtime & data', 'purchase/airtime.svg', route('dashboard.shop.topups')],
                     ['eSIM', $stat('esims', 'countries') > 0
-                        ? 'Data plans for '.$countries($stat('esims', 'countries'))
+                        // Data AND calls: the packages carry a number too, which is
+                        // the reason to pick one over a data-only plan.
+                        ? 'Data, Calls for '.$countries($stat('esims', 'countries'))
                         : 'Travel data plans', 'purchase/esim.svg', route('dashboard.shop.esims')],
                     ['Gift Cards', $stat('gift-cards', 'brands') > 0
                         ? $stat('gift-cards', 'brands').' '.\Illuminate\Support\Str::plural('brand', $stat('gift-cards', 'brands')).' to choose from'

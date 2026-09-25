@@ -3011,3 +3011,14 @@ body.dashboard .dashboard-notification-row-read { opacity: .7; }
 html.dark body.dashboard .dashboard-notification-row + .dashboard-notification-row { border-top-color: #2c2c31; }
 .dash-popup-hidden { opacity: 0; transform: translateY(-4px); }
 .dash-popup-shown { opacity: 1; transform: translateY(0); }
+
+/* Installed, the app does not zoom ------------------------------------------
+   The viewport meta is rewritten at runtime for a standalone launch (see
+   partials/head), which covers the pinch. This covers the other one: a
+   double-tap scales the page on iOS whatever the meta says, and `manipulation`
+   is what turns that off while leaving panning and ordinary taps alone. Scoped
+   to the class that same script sets, so a browser tab keeps both gestures. */
+html.is-standalone,
+html.is-standalone body {
+    touch-action: manipulation;
+}

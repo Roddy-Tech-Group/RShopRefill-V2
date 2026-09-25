@@ -68,10 +68,22 @@
             },
         };
 
-        // Safety net: if a modal/drawer was open when the user followed a
-        // wire:navigate link (an SPA swap, not a full reload), its close()
-        // never fired and the body would stay position:fixed - the new page
-        // then can't scroll. Clear any leftover lock on every SPA navigation.
+        // If a modal / drawer was open when the user followed a wire:navigate
+        // link (an SPA swap, not a full reload), its close() never fired and
+        // the body would stay position:fixed - the new page then can't scroll.
+        //
+        // Released on `livewire:navigate`, which fires the moment a navigation
+        // is TRIGGERED, before any HTML is fetched or swapped. Releasing on
+        // `livewire:navigated` alone was too late: that is the final step of a
+        // navigation, so the next page was built and painted under a body still
+        // at position:fixed - the dashboard's fixed header measures against the
+        // viewport, the panel under it against the frozen body - and the
+        // release afterwards snapped everything into place. That snap is what
+        // read as the top of the page shaking on the way in.
+        document.addEventListener('livewire:navigate', () => window.rshopScrollLock?.reset());
+
+        // Still the safety net, for navigations that begin some other way: a
+        // back / forward button, or a redirect with navigation enabled.
         document.addEventListener('livewire:navigated', () => window.rshopScrollLock?.reset());
     })();
 </script>
