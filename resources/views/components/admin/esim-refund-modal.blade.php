@@ -57,7 +57,7 @@
                     <div>
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Wallet credit on completion</p>
                         <p class="mt-1 text-lg font-bold tabular-nums text-zinc-900 dark:text-white">{{ $amount }}</p>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400">To their RshopRefills wallet, order {{ $esim->order?->order_number }}</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">To their {{ $siteName }} wallet, order {{ $esim->order?->order_number }}</p>
                     </div>
                 </div>
 

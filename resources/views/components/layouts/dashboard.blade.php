@@ -1581,7 +1581,7 @@
         </header>
         @endunless
 
-            <div data-page-content x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))" class="flex flex-col bg-[#f4f6f5] px-4 pt-5 pb-10 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
+            <div data-page-content x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))" class="flex min-h-full flex-col bg-[#f4f6f5] px-4 pt-5 pb-10 sm:px-6 sm:pt-6 lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
                 <div class="w-full min-w-0 lg:mx-auto lg:max-w-[1400px] lg:flex-1">
                     {{-- Suspension banner: visible on every dashboard page when the
                          account is suspended. Carries the admin-authored reason +
