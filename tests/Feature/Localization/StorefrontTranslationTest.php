@@ -34,7 +34,7 @@ class StorefrontTranslationTest extends TestCase
         foreach ([
             'Boutique',                 // Shop column heading
             'Cartes cadeaux',
-            'eSIM de voyage',
+            e(__('footer.esim_installation_guide', [], 'fr')), // the eSIM link itself reads "eSIM" in both languages
             'Centre d&#039;aide',
             'Conditions d&#039;utilisation',
             'Suivez-nous',

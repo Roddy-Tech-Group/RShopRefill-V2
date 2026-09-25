@@ -101,13 +101,16 @@ class BrandRowDepthTest extends TestCase
      * pass :bleed="false": the full-bleed track spans 100vw and would overrun
      * the column they sit in.
      */
-    public function test_the_dashboard_rows_match_and_stay_in_their_column(): void
+    public function test_the_dashboard_row_matches_and_stays_in_its_column(): void
     {
         $overview = File::get(resource_path('views/livewire/dashboard/overview.blade.php'));
 
-        $this->assertSame(2, substr_count($overview, ':mobile-rows="3"'));
+        // One brand row on the overview now, Popular Gift Cards. It keeps the
+        // home rows' depth and stays inside its 8-of-12 column.
+        $this->assertSame(1, substr_count($overview, '<x-home.brand-row'));
+        $this->assertSame(1, substr_count($overview, ':mobile-rows="3"'));
         $this->assertStringContainsString(':per-view="3"', $overview);
-        $this->assertSame(2, substr_count($overview, ':bleed="false"'));
-        $this->assertGreaterThanOrEqual(2, substr_count($overview, ':carousel="true"'));
+        $this->assertSame(1, substr_count($overview, ':bleed="false"'));
+        $this->assertSame(1, substr_count($overview, ':carousel="true"'));
     }
 }

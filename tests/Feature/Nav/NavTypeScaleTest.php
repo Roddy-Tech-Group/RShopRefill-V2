@@ -62,7 +62,7 @@ class NavTypeScaleTest extends TestCase
             'region-pill' => 0,         // ...here, shared by the row and the sheet. It is the dashboard's pill now, in its 13px semibold (RegionPillChipTest)
             'invite-link' => 1,
             'account-cart' => 1,        // Login. Cart is an icon-only chip now, with no text to face
-            'main-nav' => 1,            // the shared category-tab class
+            'main-nav' => 0,            // the category tabs set their own 13px / 16px scale (CategoryPillsTest), not the face
         ] as $view => $expected) {
             $this->assertSame(
                 $expected,

@@ -57,9 +57,10 @@ class ThemeTogglePanelTest extends TestCase
 
         // A pill, not a rounded rectangle: at this size the corner radius was
         // most of the cell anyway, so the shape reads cleaner fully round.
-        // Its outline is the locale chip's hairline ring, not the old blue
+        // Its outline is the locale chip's hairline ring (ring-zinc-200, which
+        // app.css remaps to #dee3e1 on the storefront), not the old blue
         // border, so the two controls in the footer row read as one family.
-        $this->assertStringContainsString('items-center gap-0.5 rounded-full p-0.5 ring-1 ring-[#dee3e1]', $blade);
+        $this->assertStringContainsString('items-center gap-0.5 rounded-full p-0.5 ring-1 ring-zinc-200', $blade);
         $this->assertStringNotContainsString('border-blue-400', $blade);
     }
 

@@ -81,11 +81,18 @@ class HeaderLinkPillTest extends TestCase
         $this->assertStringNotContainsString('hidden sm:flex', $reviews);
     }
 
-    public function test_dashboard_view_all_links_are_smaller_pills(): void
+    public function test_dashboard_view_all_links_are_round_buttons_and_small_pills(): void
     {
         $markup = file_get_contents(resource_path('views/livewire/dashboard/overview.blade.php'));
 
-        $this->assertStringContainsString('rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600', $markup);
+        // The phone cards: a round icon button, named for screen readers.
+        $this->assertSame(2, substr_count($markup, 'inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#f4f6f5] text-blue-700'));
+        $this->assertStringContainsString('aria-label="View all orders"', $markup);
+        $this->assertStringContainsString('aria-label="View all transactions"', $markup);
+
+        // The desktop cards: a small grey pill.
+        $this->assertSame(3, substr_count($markup, 'inline-flex items-center rounded-[10px] bg-zinc-100 px-4 py-1.5 text-xs font-semibold text-zinc-700'));
+
         // The old plain blue text link must be gone.
         $this->assertStringNotContainsString('text-xs font-semibold text-blue-600 hover:text-blue-700">View all', $markup);
     }

@@ -61,7 +61,7 @@ class FooterGroundTest extends TestCase
         // Comments stripped: the note explaining the opt-out names bg-white, and
         // prose must not be able to fail this.
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $blade);
-        $this->assertStringNotContainsString('bg-white', $markup);
+        $this->assertDoesNotMatchRegularExpression('/(?<![\w:\/-])bg-white(?![\w\/-])/', $markup, 'a bare bg-white is remapped to the card grey in dark');
 
         // 15px on every corner, and no dark: variant - one value per theme.
         preg_match('/<footer class="([^"]*)">/', $blade, $m);
@@ -178,21 +178,19 @@ class FooterGroundTest extends TestCase
      * width ever silently became the footer's again, the breakout would be
      * invisible rather than broken.
      */
-    public function test_the_footer_runs_wider_than_the_nav_column(): void
+    public function test_the_footer_shares_the_page_column_with_the_nav(): void
     {
         $nav = file_get_contents(resource_path('views/components/nav/main-nav.blade.php'));
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
-        // The page column. Both nav strips share it; the footer does not.
+        // The page column. Both nav strips share it, and so does the slab now,
+        // so the footer's edges line up with the nav's instead of running past.
         $this->assertStringContainsString('max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8', $nav);
-
-        // No cap on the slab: it spans whatever the band leaves it.
         $this->assertStringContainsString(
-            'footer-ground tex-grain mx-auto w-full rounded-[15px]',
+            'footer-ground tex-grain mx-auto w-full max-w-[1550px] rounded-[15px]',
             $footer
         );
         $this->assertStringNotContainsString('max-w-[1420px]', $footer);
-        $this->assertStringNotContainsString('max-w-[1550px]', $footer);
 
         // The band's padding is the only inset, and it is thin on a phone -
         // the footer was asked to read as almost full width there.

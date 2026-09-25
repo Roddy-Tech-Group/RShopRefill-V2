@@ -103,8 +103,13 @@ class CategoryCardsTest extends TestCase
         // The merged tile opens the full top-ups listing, which carries both.
         $this->assertStringContainsString("\$topupOn ? route('shop.topups') : null", $blade);
 
+        // The category section alone: the footer still lists a Data Bundles
+        // link, which is a different surface.
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertStringNotContainsString('Data Bundles', $html);
+        $start = strpos($html, '<section aria-label="Browse categories"');
+        $this->assertNotFalse($start, 'The category section is missing.');
+        $section = substr($html, $start, strpos($html, '</section>', $start) - $start);
+        $this->assertStringNotContainsString('Data Bundles', $section);
     }
 
     /** Four tiles divide evenly at both breakpoints, so no row keeps an orphan. */

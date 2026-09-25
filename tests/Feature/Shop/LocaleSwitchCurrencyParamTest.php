@@ -98,7 +98,7 @@ class LocaleSwitchCurrencyParamTest extends TestCase
 
         $this->assertStringContainsString('€5', $html, 'the USD card should convert, not vanish');
         $this->assertStringContainsString('€10', $html, 'the EUR card is already in the display currency');
-        $this->assertStringNotContainsString('$10', $html, 'nothing should still be priced in USD');
+        $this->assertDoesNotMatchRegularExpression('/\$10(?!\d)/', $html, 'nothing should still be priced in USD');
     }
 
     /**
@@ -112,7 +112,7 @@ class LocaleSwitchCurrencyParamTest extends TestCase
         $html = $this->get('/gift-cards?currency=EUR')->assertOk()->getContent();
 
         $this->assertStringContainsString('€10', $html);
-        $this->assertStringNotContainsString('$10', $html, 'the USD card is filtered out');
+        $this->assertDoesNotMatchRegularExpression('/\$10(?!\d)/', $html, 'the USD card is filtered out');
     }
 
     private function rate(string $base, string $target, float $rate): void

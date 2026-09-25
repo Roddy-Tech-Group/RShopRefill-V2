@@ -7,27 +7,26 @@ use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
- * The navigation progress bar is the site's one loading signal for a page
- * change.
- *
- * It was off for a while, when a full-screen branded loader also covered every
- * hard reload. That loader is gone because it hid pages the server had already
- * rendered. The thin bar stays, because it never covers content: a fast
- * navigation costs nothing and a slow one still says it is working.
+ * No navigation progress bar. It fired on every wire:navigate link, including
+ * ones that resolve in well under the time it takes to read a flash of blue,
+ * so it read as the page stuttering rather than as feedback. It was briefly
+ * switched back on as the one loading signal left once the full-screen loader
+ * went, and that is still not worth the stutter on fast navigations. The
+ * colour stays configured, so bringing it back is a one-word change.
  *
  * Pinned in a test because it is a config default: a future `php artisan
- * config:publish` or a package upgrade could quietly flip it.
+ * config:publish` or a package upgrade could quietly flip it back on.
  */
 class NavigationProgressBarTest extends TestCase
 {
     // One test here renders a page to prove no layout puts a slide back.
     use RefreshDatabase;
 
-    public function test_the_navigation_progress_bar_is_enabled(): void
+    public function test_the_navigation_progress_bar_is_off(): void
     {
-        $this->assertTrue(
+        $this->assertFalse(
             config('livewire.navigate.show_progress_bar'),
-            'Page changes should show the thin progress bar.'
+            'Page changes should not flash the progress bar.'
         );
     }
 

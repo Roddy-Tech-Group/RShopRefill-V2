@@ -42,9 +42,14 @@ class StorefrontLoaderTest extends TestCase
         $this->assertFileDoesNotExist(resource_path('views/components/ui/app-loader.blade.php'));
     }
 
-    /** Navigation still says it is working, without covering the page. */
-    public function test_navigation_uses_the_progress_bar(): void
+    /**
+     * Nor does navigation flash the progress bar: it read as a stutter on
+     * fast page changes (NavigationProgressBarTest). The colour stays
+     * configured so bringing it back is a one-word change.
+     */
+    public function test_navigation_does_not_flash_the_progress_bar(): void
     {
-        $this->assertTrue(config('livewire.navigate.show_progress_bar'));
+        $this->assertFalse(config('livewire.navigate.show_progress_bar'));
+        $this->assertNotEmpty(config('livewire.navigate.progress_bar_color'));
     }
 }

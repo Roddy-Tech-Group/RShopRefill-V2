@@ -66,28 +66,34 @@ class EsimLocationTabsTest extends TestCase
      * Only the positioning is desktop-scoped. The band is the page's own tone,
      * so on a phone, where nothing is stuck, there is nothing to see.
      */
-    public function test_the_tabs_stick_under_the_nav_on_a_band_of_page_tone(): void
+    public function test_the_tabs_stick_under_the_nav_on_a_band_that_paints_nothing(): void
     {
-        preg_match('/<section class="([^"]*md:sticky[^"]*)">\s*<x-esim\.location-tabs \/>/', $this->page(), $wrapper);
+        preg_match('/<section\s[^>]*class="([^"]*md:sticky[^"]*)"[^>]*>\s*<x-esim\.location-tabs \/>/s', $this->page(), $wrapper);
 
-        // A <section>, and that is not cosmetic. In dark mode the page tone is
-        // not a colour this element can name: app.css keeps dark:bg-[#0c1a36]
-        // at page black only for body, main, section, footer and
-        // [data-page-content], and flips it to card grey everywhere else. As a
-        // div the band rendered a lifted grey slab across a black page.
-        $this->assertNotEmpty($wrapper, 'The tabs wrapper is no longer a desktop-sticky <section>, so its dark tone will read as a card rather than the page.');
+        // A <section> still, and that is not cosmetic: app.css keeps the dark
+        // page tone for body, main, section, footer and [data-page-content]
+        // only, so as a div any tone it took would fall through to card grey.
+        $this->assertNotEmpty($wrapper, 'The tabs wrapper is no longer a desktop-sticky <section>.');
         $this->assertStringContainsString('md:top-[var(--nav-h,64px)]', $wrapper[1], 'The offset must follow the nav, which republishes --nav-h as it folds.');
         $this->assertStringContainsString('md:z-30', $wrapper[1]);
 
         // Nothing pins it on a phone: a bare `sticky`, not the md: variant.
         $this->assertDoesNotMatchRegularExpression('/(^|\s)sticky(\s|$)/', $wrapper[1], 'The tabs are pinned on a phone too.');
 
-        // The same pair <main> wears, so the band follows every remap the page
-        // tone does in both themes.
-        $main = File::get(resource_path('views/components/layouts/app/header.blade.php'));
-        $this->assertStringContainsString('bg-[#eff6ff] dark:bg-[#0c1a36]', $main);
-        $this->assertStringContainsString('bg-[#eff6ff]', $wrapper[1]);
-        $this->assertStringContainsString('dark:bg-[#0c1a36]', $wrapper[1]);
+        // The band paints nothing, stuck or not: the pill is its own surface
+        // and the page behind it is the hero artwork, so both the page-tone
+        // fill it had and the frosted fill it briefly took while stuck read
+        // as a slab across the picture.
+        $this->assertStringContainsString('bg-transparent', $wrapper[1]);
+        foreach (['bg-[#eff6ff]', 'dark:bg-[#0c1a36]', 'backdrop-blur'] as $fill) {
+            $this->assertStringNotContainsString($fill, $wrapper[1], 'the band paints '.$fill);
+        }
+
+        // Inside the dashboard frame the page scrolls in its own panel, below
+        // a header that is not part of it, so the band parks at the panel's
+        // top edge there instead of a header's height down it.
+        $this->assertStringContainsString('esim-tab-band', $wrapper[1]);
+        $this->assertStringContainsString('body.dashboard .esim-tab-band { top: 0; }', File::get(resource_path('css/app.css')));
     }
 
     /**

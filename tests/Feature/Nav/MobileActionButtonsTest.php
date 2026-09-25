@@ -27,30 +27,28 @@ class MobileActionButtonsTest extends TestCase
         return file_get_contents(resource_path('views/components/nav/account-cart.blade.php'));
     }
 
-    public function test_action_buttons_are_enlarged_on_mobile_with_10px_corners(): void
+    public function test_the_menu_button_clears_44px_and_the_account_controls_are_outlined_circles(): void
     {
         // Mobile-only menu button. Search used to hold this slot as a chip
         // that opened a sheet; it is a field on its own row now, so the menu
-        // button is what has to clear 44px here.
-        $this->assertStringContainsString('h-11 w-11 shrink-0 items-center justify-center rounded-[10px]', $this->nav());
+        // button is what has to clear 44px here. A circle: every control on
+        // the row is round now.
+        $this->assertStringContainsString('flex h-11 w-11 shrink-0 items-center justify-center rounded-full', $this->nav());
 
         $ac = $this->accountCart();
 
-        // Authenticated account avatar button. Same 44px floor as the rest of
-        // the row - the point of this test - but a circle rather than a 10px
-        // square: it is a face, not a panel. Sized here, shaped in
-        // AccountAvatarShapeTest.
-        $this->assertStringContainsString('w-11 h-11 md:w-10 md:h-10 overflow-hidden rounded-full', $ac);
+        // Every account control is a 36px circle: cart, the avatar, and the
+        // sign-in control a guest sees instead of it. Cart and avatar are the
+        // dashboard's chips adapted to this bar, with a 2px outline at 30% of
+        // the ink and a 10% wash on hover, no fill, no label. The avatar's
+        // crop is AccountAvatarShapeTest's.
+        $this->assertSame(3, substr_count($ac, 'h-9 w-9 shrink-0 items-center justify-center'));
+        $this->assertSame(2, substr_count($ac, 'rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors hover:border-edge hover:bg-[#0c1337]/10'));
 
-        // Sign in and Cart still have to clear 44px on mobile, which padding
-        // alone does not give them. min-h-11 is that floor; md:min-h-0 lets the
-        // desktop chip be compact again once there is a pointer.
-        $this->assertSame(2, substr_count($ac, 'min-h-11 items-center gap-2 rounded-[10px]'));
-        $this->assertSame(2, substr_count($ac, 'md:min-h-0'));
-
-        // The old full-circle sizing is gone from these action buttons.
-        $this->assertStringNotContainsString('rounded-full px-2.5 py-2', $ac);
-        $this->assertStringNotContainsString('w-9 h-9 md:w-10 md:h-10 rounded-full', $ac);
+        // The old sizing kit is gone from these action buttons.
+        foreach (['rounded-full px-2.5 py-2', 'w-9 h-9 md:w-10 md:h-10 rounded-full', 'min-h-11 items-center gap-2 rounded-[10px]'] as $old) {
+            $this->assertStringNotContainsString($old, $ac, $old.' is still in account-cart');
+        }
     }
 
     /**
@@ -62,7 +60,7 @@ class MobileActionButtonsTest extends TestCase
      * pill. Sign in and Cart keep a resting fill below md, where there is no
      * pointer to reveal a hover with.
      */
-    public function test_the_action_chips_share_the_locale_pill_fill(): void
+    public function test_the_utility_links_and_the_search_field_share_the_page_tone_fill(): void
     {
         // The utility links keep the page-tone hover fill. The region pill no
         // longer sets that tone: it is the dashboard's outlined pill now, and
@@ -72,24 +70,18 @@ class MobileActionButtonsTest extends TestCase
         $this->assertStringContainsString('hover:bg-[#f4f6f5]', $links);
         $this->assertStringContainsString('dark:hover:bg-white/10', $links);
 
-        // The search field wears the same fill at rest, and drops it for a
-        // white surface once it has focus.
-        $this->assertStringContainsString("'border-transparent bg-[#f4f6f5] dark:bg-white/8'", $this->nav());
+        // The phone search field wears the same fill at rest, and drops it for
+        // a white surface with the edge-blue border once it has focus.
+        $this->assertStringContainsString("'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white/10 dark:bg-white/8'", $this->nav());
 
-        // Sign in: filled on a phone, transparent from md up, and the hover
-        // fill on both sides of that breakpoint. Cart no longer shares this
-        // kit: it is the dashboard's outlined chip (see CartChipTest), so each
-        // of these appears once.
+        // Cart and account no longer share this kit: both are the dashboard's
+        // outlined chips (CartChipTest, AccountAvatarShapeTest), so none of
+        // the filled-chip classes are left in the file. bg-zinc-200 remaps to
+        // a different grey in dark and is what the chips used to use.
         $ac = $this->accountCart();
-        $this->assertSame(1, substr_count($ac, 'bg-[#f4f6f5] md:bg-transparent'));
-        $this->assertSame(1, substr_count($ac, 'hover:bg-[#e8ecea] md:hover:bg-[#f4f6f5]'));
-        $this->assertSame(1, substr_count($ac, 'dark:bg-white/8 md:dark:bg-transparent'));
-        $this->assertSame(1, substr_count($ac, 'dark:hover:bg-white/15 md:dark:hover:bg-white/10'));
-
-        // bg-zinc-200 remaps to a different grey in dark and is what the chips
-        // used to use. Nothing here carries it any more: the avatar took the
-        // dashboard's outline too (AccountAvatarShapeTest).
-        $this->assertSame(0, substr_count($ac, 'bg-zinc-200'));
+        foreach (['bg-[#f4f6f5] md:bg-transparent', 'hover:bg-[#e8ecea] md:hover:bg-[#f4f6f5]', 'bg-zinc-200'] as $old) {
+            $this->assertSame(0, substr_count($ac, $old), $old.' is still in account-cart');
+        }
     }
 
     public function test_the_guest_control_reads_sign_in(): void

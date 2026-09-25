@@ -38,9 +38,12 @@ class EsimPlanCardTest extends TestCase
             );
         }
 
-        // The claim is the one the voice tab already makes below the cards, so
+        // The claim is the one the voice tab already makes below the cards
+        // ("Every voice plan includes": app verification, then iMessage), so
         // the card and the panel under it cannot say different things.
-        $this->assertStringContainsString("'title' => 'App verification', 'desc' => 'WhatsApp,", $card);
+        $this->assertStringContainsString("['title' => __('esim.voice_app_title'), 'desc' => __('esim.voice_app_desc')", $card);
+        $this->assertStringContainsString("['title' => __('esim.voice_imessage_title'), 'desc' => __('esim.voice_imessage_desc')", $card);
+        $this->assertStringContainsString('WhatsApp', __('esim.voice_app_desc'));
     }
 
     /**
@@ -54,7 +57,7 @@ class EsimPlanCardTest extends TestCase
         $card = $this->card();
 
         $this->assertMatchesRegularExpression(
-            '/<template x-if="p\.top_up">\s*<span class="\{\{ \$planChip \}\}">Top-up<\/span>\s*<\/template>/',
+            '/<template x-if="p\.top_up">\s*<span class="\{\{ \$planChip \}\}">\{\{ __\(\'esim\.chip_top_up\'\) \}\}<\/span>\s*<\/template>/',
             $card,
             'The Top-up chip is missing, or is not gated on the plan being rechargeable.'
         );
@@ -87,28 +90,34 @@ class EsimPlanCardTest extends TestCase
         $this->assertStringContainsString('background-image: var(--grain) !important;', $m[1]);
     }
 
-    public function test_card_carries_the_new_design_pieces(): void
+    public function test_card_carries_the_current_design_pieces(): void
     {
         $card = $this->card();
 
-        // Allowance as one large figure, with the unit split off beside it.
-        $this->assertStringContainsString('x-text="p.data_num"', $card);
-        $this->assertStringContainsString('x-text="p.data_unit"', $card);
+        // The allowance as one line: the amount, or the word for unlimited.
+        $this->assertStringContainsString('x-text="p.is_unlimited ? @js(__(\'products.detail_unlimited_data\')) : p.data"', $card);
 
-        // Unlimited plans hold a word, not a number, so they step down a size.
-        $this->assertStringContainsString("p.is_unlimited ? 'text-[30px]' : 'text-[58px]'", $card);
+        // Every card names its family in the badge slot, Calls or Data, and
+        // the two are mutually exclusive so a card never shows both.
+        $this->assertMatchesRegularExpression('/<template x-if="p\.is_voice">\s*<span class="shrink-0 rounded-full bg-\[#0c1337\][^"]*">\{\{ __\(\'esim\.badge_calls\'\) \}\}<\/span>/', $card);
+        $this->assertMatchesRegularExpression('/<template x-if="! p\.is_voice">\s*<span class="shrink-0 rounded-full bg-\[#0c1337\][^"]*">\{\{ __\(\'esim\.chip_data\'\) \}\}<\/span>/', $card);
 
-        $this->assertStringContainsString('om-glow', $card);
-        $this->assertStringContainsString('esim-plate', $card);
-        $this->assertStringContainsString('Total', $card);
+        // The price sits at the foot, then the action pill.
+        $this->assertStringContainsString('x-text="rowPrice(p)"', $card);
+        $this->assertStringContainsString("{{ __('esim.get_esim') }}</span>", $card);
+
+        // The old plate, glow and 58px figure are gone from the card.
+        foreach (['x-text="p.data_num"', 'om-glow', 'esim-plate', 'text-[58px]'] as $old) {
+            $this->assertStringNotContainsString($old, $card, $old.' is back on the card');
+        }
     }
 
-    public function test_cta_opts_out_of_the_dark_surface_remap(): void
+    public function test_cta_is_brand_navy_and_flips_to_its_own_white_in_dark(): void
     {
-        // `.bg-white` is remapped to the card surface in dark. The CTA has to
-        // stay white there, so it is authored as dark:bg-white - a different
-        // class the remap does not touch.
-        $this->assertStringContainsString('dark:bg-white dark:text-zinc-900', $this->card());
+        // The card's action is the store's pill in brand navy. In dark it is
+        // authored as its own white (dark:bg-[#fdfdfd]) rather than bg-white,
+        // which the dark remap would turn into the card surface.
+        $this->assertStringContainsString('rounded-full bg-[#0c1337] px-3 py-2 text-center text-[14px] text-white transition-colors hover:bg-[#1a2560] dark:bg-[#fdfdfd]', $this->card());
     }
 
     public function test_spinning_badge_border_respects_reduced_motion(): void

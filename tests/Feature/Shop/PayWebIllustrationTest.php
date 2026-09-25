@@ -17,6 +17,15 @@ class PayWebIllustrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The migrations seed the launch line-up of coins. Each case here
+        // states exactly which coins exist, so it starts from none.
+        CurrencyRate::query()->delete();
+    }
+
     private function render(): string
     {
         PaymentStripBadges::forgetCryptoCache();

@@ -246,21 +246,30 @@ class FooterBrandColumnTest extends TestCase
         }
     }
 
-    public function test_newsletter_signup_is_gone_from_the_footer(): void
+    public function test_the_newsletter_is_its_own_row_at_the_top_of_the_footer(): void
     {
         $footer = file_get_contents(resource_path('views/components/footer.blade.php'));
 
+        // The old inline block, with its own heading, is gone; the signup is
+        // the shared component on one ruled-off line above everything else
+        // the footer holds.
         $this->assertStringNotContainsString('footer-newsletter', $footer);
         $this->assertStringNotContainsString('Stay in the loop', $footer);
+        $this->assertStringContainsString('<livewire:newsletter-signup />', $footer);
 
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertStringNotContainsString('wire:submit="subscribe"', $html);
+        $footerAt = strpos($html, 'class="footer-ground');
+        $form = strpos($html, 'wire:submit="subscribe"');
+        $this->assertNotFalse($footerAt);
+        $this->assertNotFalse($form);
+        $this->assertSame(1, substr_count($html, 'wire:submit="subscribe"'), 'the signup renders once, in the footer');
+        $this->assertGreaterThan($footerAt, $form);
 
-        // The band it shared is now the social row alone, still sitting
-        // between the link columns and the legal bar.
+        // Then the link columns, the social row and the legal bar, in order.
         $followUs = strpos($html, 'Follow us');
         $copyright = strpos($html, 'All rights reserved');
         $this->assertNotFalse($followUs);
+        $this->assertLessThan($followUs, $form);
         $this->assertLessThan($copyright, $followUs);
     }
 

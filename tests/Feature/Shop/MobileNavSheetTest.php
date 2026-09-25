@@ -175,7 +175,7 @@ class MobileNavSheetTest extends TestCase
         // (the pill with the locale chip's ring), not the dropdown trigger it
         // replaced. The label reads "Theme" as written, not shouted in caps.
         $this->assertStringContainsString(__('footer.theme'), $foot);
-        $this->assertStringContainsString('rounded-full p-0.5 ring-1 ring-[#dee3e1]', $foot);
+        $this->assertStringContainsString('rounded-full p-0.5 ring-1 ring-zinc-200', $foot);
         $this->assertStringNotContainsString('uppercase tracking-wider text-zinc-500', $foot);
     }
 

@@ -178,7 +178,7 @@ class ZenditRequiredAccountIdTest extends TestCase
 
         $this->get('/gift-cards/sporty-bet')
             ->assertOk()
-            ->assertSee('Sporty Bet account number')
+            ->assertSee(__('products.detail_account_label', ['brand' => 'Sporty Bet']))
             ->assertSee('requiresAccountId: true', false);
     }
 

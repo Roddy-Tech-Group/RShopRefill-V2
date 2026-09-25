@@ -83,7 +83,7 @@ class EsimPurchaseModalTest extends TestCase
 
         $this->assertStringContainsString('@if ($coverageCount > 1)', $page);
         $this->assertStringContainsString('$coverageList->take(12)', $page);
-        $this->assertStringContainsString('+{{ $coverageCount - 12 }} more', $page);
+        $this->assertStringContainsString("{{ __('esim.more_count', ['count' => \$coverageCount - 12]) }}", $page);
 
         // The two sheets are the same layer, so the one hands over to the other
         // rather than stacking on top of it.

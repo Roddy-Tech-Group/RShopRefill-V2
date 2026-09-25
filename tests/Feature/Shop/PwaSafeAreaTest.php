@@ -55,7 +55,9 @@ class PwaSafeAreaTest extends TestCase
     {
         $html = $this->withoutVite()->get('/')->assertOk()->getContent();
 
-        $this->assertStringContainsString('pb-[max(1rem,env(safe-area-inset-bottom))]', $html);
+        // Anchored above the inset rather than padded for it, so the card
+        // keeps its own padding on every device.
+        $this->assertStringContainsString('bottom-[max(1rem,env(safe-area-inset-bottom))]', $html);
     }
 
     /**
@@ -66,23 +68,22 @@ class PwaSafeAreaTest extends TestCase
     public function test_every_pinned_dashboard_surface_pads_for_its_inset(): void
     {
         $layout = File::get(resource_path('views/components/layouts/dashboard.blade.php'));
+        $css = File::get(resource_path('css/app.css'));
 
-        foreach ([
-            // Fixed frosted top bar, and the spacer that holds its room in flow.
-            'padding-top: max(0.75rem, env(safe-area-inset-top));',
-            'height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);',
-            // Floating locale / cart / bell pills.
-            'top: max(0.5rem, env(safe-area-inset-top));',
-            // Bottom tab bar. It floats 12px clear of the edge already, so it
-            // takes that back out of the inset rather than stacking on top of
-            // it; the max() floor keeps the 12px where there is no inset.
-            // The underscores are Tailwind's escape for the spaces CSS requires
-            // around a calc() minus; without them the declaration is invalid
-            // and padding-bottom silently collapses to 0.
-            'pb-[max(12px,calc(env(safe-area-inset-bottom)_-_12px))]',
-        ] as $rule) {
-            $this->assertStringContainsString($rule, $layout);
-        }
+        // The fixed navy bar reserves the status-bar strip itself, and the
+        // spacer under it holds the same room in normal flow.
+        $this->assertStringContainsString('padding-top: calc(0.75rem + env(safe-area-inset-top));', $css);
+        $this->assertStringContainsString('height: calc(env(safe-area-inset-top) + 3.75rem);', $layout);
+
+        // Every header popup drops under the bar as a sheet, below the strip,
+        // and never taller than what the strip leaves.
+        $this->assertStringContainsString('top: calc(env(safe-area-inset-top) + 4.25rem);', $css);
+        $this->assertStringContainsString('max-height: calc(100dvh - env(safe-area-inset-top) - 5rem);', $css);
+
+        // The notification bottom sheet clears the home indicator; the drawer
+        // owes the status bar at its head.
+        $this->assertStringContainsString('padding-bottom: env(safe-area-inset-bottom);', $css);
+        $this->assertStringContainsString('body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }', $css);
     }
 
     /**
@@ -105,56 +106,19 @@ class PwaSafeAreaTest extends TestCase
     /**
      * Padding the fixed chrome is only half the job. viewport-fit=cover also
      * pulls the viewport up under the status bar, so the page content needs
-     * something holding that strip in normal flow. Only the overview had it
-     * (the spacer under its glass band); every other page started on pt-5
-     * alone and read as shifted up, with the floating flag/cart pills landing
-     * on top of the first card on the shop pages.
+     * something holding that strip in normal flow. One spacer, the bar's own
+     * height plus the inset, on every dashboard page and only once: a task
+     * page, a shop page and the overview alike.
      */
-    public function test_a_task_page_reserves_the_status_bar_strip_in_flow(): void
+    public function test_every_dashboard_page_reserves_the_bar_and_the_status_strip_once(): void
     {
-        $html = $this->withoutVite()
-            ->actingAs(User::factory()->create())
-            ->get(route('dashboard.orders'))
-            ->assertOk()
-            ->getContent();
+        $user = User::factory()->create();
 
-        // No floating pills on a task page, so it owes the inset and nothing more.
-        $this->assertStringContainsString('height: env(safe-area-inset-top);', $html);
-    }
+        foreach (['dashboard.orders', 'dashboard.shop.gift-cards', 'dashboard'] as $route) {
+            $html = $this->withoutVite()->actingAs($user)->get(route($route))->assertOk()->getContent();
 
-    /**
-     * Shop pages float the flag + cart pills over the page with no band beneath
-     * them, so they have to reserve the pill row's height on top of the inset.
-     */
-    public function test_a_shop_page_reserves_the_floating_pill_row_too(): void
-    {
-        $html = $this->withoutVite()
-            ->actingAs(User::factory()->create())
-            ->get(route('dashboard.shop.gift-cards'))
-            ->assertOk()
-            ->getContent();
-
-        $this->assertStringContainsString(
-            'height: calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem);',
-            $html,
-        );
-    }
-
-    /**
-     * The overview already holds the band's room. Rendering the new spacer
-     * there as well would push its content down by a second status bar.
-     */
-    public function test_the_overview_does_not_stack_a_second_spacer(): void
-    {
-        $html = $this->withoutVite()
-            ->actingAs(User::factory()->create())
-            ->get(route('dashboard'))
-            ->assertOk()
-            ->getContent();
-
-        // Its own band spacer, and only that one.
-        $this->assertStringContainsString('height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);', $html);
-        $this->assertStringNotContainsString('height: calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem);', $html);
-        $this->assertStringNotContainsString('height: env(safe-area-inset-top);', $html);
+            $this->assertSame(1, substr_count($html, 'height: calc(env(safe-area-inset-top) + 3.75rem);'), $route.' should reserve the strip once');
+            $this->assertStringNotContainsString('height: env(safe-area-inset-top);', $html, $route.' stacks a second spacer');
+        }
     }
 }

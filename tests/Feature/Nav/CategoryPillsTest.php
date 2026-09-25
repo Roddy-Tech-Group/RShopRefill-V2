@@ -42,11 +42,12 @@ class CategoryPillsTest extends TestCase
     {
         $nav = $this->nav();
 
-        // The open page: the hover wash, held down, plus bold. px-4 rides with
-        // it because the base class only pads from md, and a fill with no
-        // padding hugs the text.
+        // The open page: on a phone the hover wash, held down, plus bold; from
+        // md, inside the frosted rail, solid white lit against the glass. px-3.5
+        // rides with it because the base class only pads from md, and a fill
+        // with no padding hugs the text.
         $this->assertStringContainsString(
-            "'bg-[#f4f6f5] px-4 font-bold text-zinc-900 dark:bg-white/12 dark:text-white'",
+            "'bg-[#f4f6f5] px-3.5 font-bold text-zinc-900 md:bg-white md:px-4 md:shadow-sm dark:bg-white/12 dark:text-white'",
             $nav
         );
 
@@ -65,7 +66,11 @@ class CategoryPillsTest extends TestCase
         $this->assertStringNotContainsString('bg-[#f4f6f5] text-zinc-900 hover:bg-[#e8ecea]', $nav);
 
         // And no outline either - a tab is carried by its fill and label alone.
-        $this->assertStringNotContainsString('rounded-full border ', $nav);
+        // Measured on the shared tab class: the search field's shortcut <kbd>
+        // elsewhere in the file wears a border of its own.
+        preg_match('/\$catLinkClass = "([^"]*)"/', $nav, $tab);
+        $this->assertNotEmpty($tab, 'The shared tab class is missing.');
+        $this->assertStringNotContainsString('border', $tab[1]);
     }
 
     /**
@@ -102,7 +107,7 @@ class CategoryPillsTest extends TestCase
     {
         $nav = $this->nav();
 
-        $this->assertStringContainsString('rounded-full px-0 py-2 nav-text', $nav);
+        $this->assertStringContainsString('rounded-full px-0 py-1.5 text-[13px] leading-none', $nav);
         $this->assertStringContainsString('md:px-4', $nav);
     }
 
@@ -128,18 +133,25 @@ class CategoryPillsTest extends TestCase
     }
 
     /** The open page is the filled tab, and it follows the route. */
-    public function test_only_a_category_page_fills_a_tab(): void
+    public function test_only_the_open_page_fills_a_tab(): void
     {
-        $active = 'bg-[#f4f6f5] px-4 font-bold text-zinc-900';
+        $active = 'bg-[#f4f6f5] px-3.5 font-bold text-zinc-900';
 
-        $home = $this->withoutVite()->get('/')->assertOk()->getContent();
-        $this->assertSame(0, substr_count($home, $active), 'Home is not a category page.');
-        $this->assertStringNotContainsString('aria-current="page"', $home);
-
-        foreach (['/gift-cards', '/esims'] as $url) {
+        // Home opens the row now, so it fills its own tab exactly as a
+        // category page does. Counted inside the header, where a tab may
+        // render more than once (the Gift Cards tab is its menu's trigger,
+        // echoed once per breakpoint): every filled tab is the open page, so
+        // the fill and aria-current always come in equal numbers, and never
+        // none.
+        foreach (['/', '/gift-cards', '/esims'] as $url) {
             $html = $this->withoutVite()->get($url)->assertOk()->getContent();
-            $this->assertGreaterThanOrEqual(1, substr_count($html, $active), $url.' should fill its tab.');
-            $this->assertStringContainsString('aria-current="page"', $html);
+            $start = strpos($html, '<header class="nav-surface');
+            $this->assertNotFalse($start, $url.' has no storefront header.');
+            $header = substr($html, $start, strpos($html, '</header>', $start) - $start);
+
+            $filled = substr_count($header, $active);
+            $this->assertGreaterThanOrEqual(1, $filled, $url.' should fill its tab.');
+            $this->assertSame($filled, substr_count($header, 'aria-current="page"'), $url.' fills a tab that is not the open page.');
         }
     }
 

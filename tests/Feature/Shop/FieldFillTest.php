@@ -35,8 +35,8 @@ class FieldFillTest extends TestCase
         return [
             'desktop nav search' => ['components/nav/main-nav.blade.php', 'rounded-full border-2 bg-[#eff6ff] pl-4 pr-1'],
             'phone nav search' => ['components/nav/main-nav.blade.php', "'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white/10 dark:bg-white/8'"],
-            'language search' => ['components/nav/language-switcher.blade.php', 'border-zinc-200 bg-[#ffffff] pl-10'],
-            'locale modal search' => ['components/nav/locale-modal.blade.php', 'border-zinc-200 bg-[#ffffff] pl-10'],
+            'language search' => ['components/nav/language-switcher.blade.php', 'border-2 border-edge bg-[#ffffff] pl-10'],
+            'locale modal search' => ['components/nav/locale-modal.blade.php', 'border-2 border-edge bg-[#ffffff] pl-10'],
             'product amount picker' => ['shop/product.blade.php', 'border-2 bg-white pl-3.5 pr-2.5'],
             'country availability picker' => ['shop/_country-availability.blade.php', 'border-2 bg-white px-3.5'],
             'reviews picker' => ['components/shop/product-reviews.blade.php', 'border-2 bg-white px-3.5'],
