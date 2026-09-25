@@ -107,7 +107,7 @@ class CategoryPillsTest extends TestCase
     {
         $nav = $this->nav();
 
-        $this->assertStringContainsString('rounded-full px-0 py-1.5 text-[13px] leading-none', $nav);
+        $this->assertStringContainsString('rounded-full px-0 py-1.5 text-[15px] leading-none', $nav);
         $this->assertStringContainsString('md:px-4', $nav);
     }
 

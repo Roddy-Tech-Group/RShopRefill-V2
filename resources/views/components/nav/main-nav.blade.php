@@ -732,7 +732,7 @@
                     // Sized to x-nav.invite-link, the pill at the other end of this same row:
                     // px-3.5 py-1.5 on a 13px label. Two pills on one line reading at two
                     // different heights is what made the row look unfinished.
-                    $catLinkClass = "inline-flex shrink-0 items-center rounded-full px-0 py-1.5 text-[13px] leading-none transition-colors duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 md:px-4 md:py-2 md:text-[16px] md:leading-4";
+                    $catLinkClass = "inline-flex shrink-0 items-center rounded-full px-0 py-1.5 text-[15px] leading-none transition-colors duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 md:px-4 md:py-2 md:text-[16px] md:leading-4";
 
                     // The active category is the OPEN page, resolved from the route —
                     // so the highlight is never statically stuck on Gift Cards.
