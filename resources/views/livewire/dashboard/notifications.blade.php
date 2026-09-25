@@ -2,15 +2,30 @@
 
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.dashboard')]
 #[Title('Notifications')]
 class extends Component {
-    use WithPagination;
+    /** How many more notifications each scroll to the bottom brings in. */
+    private const CHUNK = 10;
+
+    /**
+     * How many notifications are on the page right now. The list has no
+     * page numbers, same as the order history: reaching the bottom grows
+     * this figure and the next chunk renders under the rows already there.
+     * Locked so the browser cannot ask for the whole inbox in one request.
+     */
+    #[Locked]
+    public int $visible = self::CHUNK;
+
+    public function loadMore(): void
+    {
+        $this->visible += self::CHUNK;
+    }
 
     /** Mark a single notification as read. */
     public function markRead(string $id): void
@@ -38,12 +53,13 @@ class extends Component {
     {
         return [
             // orderByDesc('id') breaks created_at ties. A fan-out (order update,
-            // campaign send) writes several rows in the same second, and each page
-            // is its own query, so without a total order a tied notification can
-            // render on two pages or on neither. `id` is a UUID and carries no
-            // chronology - it is here purely to make the sort total, which is all
-            // a stable page split needs.
-            'notifications' => Auth::user()->notifications()->latest()->orderByDesc('id')->paginate(15),
+            // campaign send) writes several rows in the same second, and every
+            // chunk is its own query over the first $visible rows, so without a
+            // total order a tied notification can swap places between one chunk
+            // and the next. `id` is a UUID and carries no chronology - it is
+            // here purely to make the sort total, which is all a stable list
+            // needs. simplePaginate: one query, no count, always the first page.
+            'notifications' => Auth::user()->notifications()->latest()->orderByDesc('id')->simplePaginate($this->visible, ['*'], 'page', 1),
             'unreadCount' => Auth::user()->notifications()->whereNull('read_at')->count(),
         ];
     }
@@ -133,8 +149,23 @@ class extends Component {
             @endforeach
         </div>
 
-        @if ($notifications->hasPages())
-            <div>{{ $notifications->links('vendor.pagination.circles-livewire') }}</div>
+        @if ($notifications->hasMorePages())
+            {{-- Scroll sentinel, as on the order history: as it nears the
+                 viewport it asks for the next chunk. Its key carries the loaded
+                 count, so every response hands the browser a fresh element that
+                 fires again at once if the new rows still leave it on screen.
+                 It leaves with the last notification. --}}
+            <div
+                wire:key="notifications-more-{{ $visible }}"
+                wire:intersect.margin.400px="loadMore"
+                class="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+            >
+                <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
+                    <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
+                </svg>
+                Loading more notifications
+            </div>
         @endif
     @else
         {{-- Empty state --}}
