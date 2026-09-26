@@ -59,7 +59,11 @@ class MyEsimsPageTest extends TestCase
             ->assertSee('Delivered')
             ->assertSee('8944000000000000001')
             ->assertSee('Install on iPhone')
-            ->assertSee('Top up data');
+            // The same words the fulfilment email and the top-up page itself
+            // use. 'Top up data' was the one place that called it something else,
+            // on the very button that leads to the page headed 'Top up your eSIM'.
+            ->assertSee('Top up eSIM')
+            ->assertDontSee('Top up data');
     }
 
     public function test_only_this_customers_esims_are_listed_and_gift_cards_are_not(): void

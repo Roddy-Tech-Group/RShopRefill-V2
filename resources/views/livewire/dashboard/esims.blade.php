@@ -163,7 +163,7 @@ class extends Component {
                                 </button>
                             @endif
                             @if ($esim['can_top_up'])
-                                <a href="{{ route('dashboard.esim.topup', $esim['id']) }}" wire:navigate class="{{ $secondaryBtn }}">Top up data</a>
+                                <a href="{{ route('dashboard.esim.topup', $esim['id']) }}" wire:navigate class="{{ $secondaryBtn }}">Top up eSIM</a>
                             @endif
                             @if ($esim['manage'])
                                 <a href="{{ $esim['manage'] }}" target="_blank" rel="noopener" class="{{ $secondaryBtn }}">
