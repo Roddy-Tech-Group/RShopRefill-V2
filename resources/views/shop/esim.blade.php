@@ -356,7 +356,11 @@
         })"
         x-init="init()"
         translate="no"
-        class="notranslate mx-auto w-full max-w-[1150px] px-4 pb-32 pt-6 sm:px-6 lg:pt-10"
+        {{-- Inside the dashboard the frame pads the page itself, so the wrapper
+             adds none of its own: with both, the packages sat 16px narrower each
+             side than every other page there. pb-32 stays in both, because it is
+             not decoration - it is the clearance the floating buy bar needs. --}}
+        class="notranslate mx-auto w-full max-w-[1150px] pb-32 {{ $inDash ? '' : 'px-4 pt-6 sm:px-6 lg:pt-10' }}"
     >
 
         {{-- ── Breadcrumb (aligned with the 1100px cards) ────────────────────── --}}
@@ -1264,13 +1268,18 @@
                         </span>
                     </div>
 
+                    {{-- flex-1 is held back to sm on purpose. In a column the main
+                         axis is vertical, so flex-1 makes the height flex-derived and
+                         lets it shrink past h-[52px]: on a phone both pills collapsed to
+                         little more than their text. Across a row it does what it is
+                         meant to and shares the width. --}}
                     <div class="mt-4 flex flex-col gap-2 sm:flex-row">
                         <button
                             type="button"
                             @click="addFromBuyModal()"
                             :disabled="! selectedId || ! purchasable || cartState === 'loading'"
                             :class="cartState === 'success' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-blue-600 bg-transparent text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10'"
-                            class="flex h-12 flex-1 items-center justify-center rounded-full border-2 px-6 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            class="flex h-[52px] w-full shrink-0 items-center justify-center rounded-full border-2 px-4 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
                         >
                             <span x-show="cartState !== 'success'">{{ __('products.add_to_cart') }}</span>
                             <span x-show="cartState === 'success'" style="display:none;">{{ __('products.detail_added') }}</span>
@@ -1280,7 +1289,7 @@
                             type="button"
                             @click="buyNow()"
                             :disabled="! selectedId || ! purchasable || $store.cart.loading"
-                            class="flex h-12 flex-1 items-center justify-center rounded-full bg-blue-600 px-7 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="flex h-[52px] w-full shrink-0 items-center justify-center rounded-full bg-blue-600 px-4 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
                         >
                             {{ __('products.buy_now') }}
                         </button>
