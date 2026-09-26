@@ -20,7 +20,14 @@
     // rewards section and never renders as a wallet card. The default wallet
     // (funded; largest USD-equivalent when several are funded) leads the carousel.
     $defaultWallet = $user->defaultWallet();
+    // The markets the store actually sells into lead the rest, so a customer
+    // in Lagos, Douala or Accra meets their own wallet in the stack before a
+    // currency they hold a few cents in. The default wallet still comes
+    // first: this orders what follows it.
+    $walletLead = ['NGN' => 0, 'XAF' => 1, 'GHS' => 2];
+
     $allWallets = $user->wallets()->where('is_active', true)->where('currency', '!=', 'RCOIN')->get()
+        ->sortBy(fn ($w) => $walletLead[strtoupper((string) ($w->currency?->value ?? ''))] ?? 99)
         ->sortByDesc(fn ($w) => $defaultWallet && $w->id === $defaultWallet->id)
         ->values();
 
@@ -123,7 +130,7 @@
                 $ringOffset += $share * $ringLength;
             }
         @endphp
-        {{-- Total balance: a pill (the wallets' flags stacked, TOTAL BALANCE, a
+        {{-- Wallets: a pill (the wallets' flags stacked, the word, a
              chevron) over the USD figure. Tapping the pill slides a sheet up from
              the bottom with the ring and every wallet's balance, each with its own
              Top Up. The per-wallet swipe carousel this replaces is gone: one
@@ -152,7 +159,10 @@
                         <img src="{{ $w['icon'] }}" alt="" class="h-7 w-7 rounded-full object-cover ring-2 ring-white dark:ring-[#1a1a1e]" loading="lazy">
                     @endforeach
                 </span>
-                <span>Total balance</span>
+                {{-- It opens a sheet of wallets, and the figure it sits over is
+                     already labelled. "Total balance" named the number twice and
+                     the thing the pill actually does not at all. --}}
+                <span>Wallets</span>
                 <svg class="h-4 w-4 shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
                 </svg>

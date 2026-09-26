@@ -38,7 +38,14 @@ new #[Lazy] class extends Component
         // Exclude RCOIN: it's a rewards balance shown via the loyalty/tier
         // section below ($rcoinWallet), not a fundable wallet, so it must not
         // appear as a top-up-able wallet card. The default wallet leads the list.
+        // The markets the store actually sells into lead the rest, so a customer
+        // in Lagos, Douala or Accra meets their own wallet in the stack before a
+        // currency they hold a few cents in. The default wallet still comes
+        // first: this orders what follows it.
+        $walletLead = ['NGN' => 0, 'XAF' => 1, 'GHS' => 2];
+
         $allWallets = $user->wallets()->where('is_active', true)->where('currency', '!=', 'RCOIN')->get()
+            ->sortBy(fn ($w) => $walletLead[strtoupper((string) ($w->currency?->value ?? ''))] ?? 99)
             ->sortByDesc(fn ($w) => $primaryWallet && $w->id === $primaryWallet->id)
             ->values();
 
@@ -411,7 +418,7 @@ new #[Lazy] class extends Component
                             <p class="truncate text-[11px] text-zinc-600">{{ $txn->sub }}</p>
                         </div>
                         <div class="shrink-0 text-right">
-                            <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-zinc-900' }}">{{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}</p>
+                            <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-red-600' }}">{{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}</p>
                             <p class="text-[10px] text-zinc-600">{{ $txn->date->format('d M, H:i') }}</p>
                         </div>
                     </li>
@@ -831,7 +838,7 @@ new #[Lazy] class extends Component
                                     <p class="truncate text-[11px] text-zinc-600">{{ $txn->sub }}</p>
                                 </div>
                                 <div class="shrink-0 text-right">
-                                    <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-zinc-900' }}">{{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}</p>
+                                    <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-red-600' }}">{{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}</p>
                                     <p class="text-[10px] text-zinc-600">{{ $txn->date->format('d M, H:i') }}</p>
                                 </div>
                             </li>

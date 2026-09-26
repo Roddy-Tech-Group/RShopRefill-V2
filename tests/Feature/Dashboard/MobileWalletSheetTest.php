@@ -46,14 +46,27 @@ class MobileWalletSheetTest extends TestCase
         return $user;
     }
 
-    public function test_the_hero_shows_the_usd_total_behind_a_total_balance_pill(): void
+    public function test_the_hero_shows_the_usd_total_behind_a_wallets_pill(): void
     {
         $this->withoutVite();
 
         $html = $this->actingAs($this->fundedUser())->get('/dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString('aria-label="Show wallet balances"', $html);
-        $this->assertStringContainsString('Total balance', $html);
+        // The pill says what it opens. 'Total balance' named the figure it
+        // sits over, which is already labelled, and never named the sheet.
+        // Checked with str_contains rather than the assertString helpers: a
+        // failure in those prints the whole page, which takes minutes and
+        // reads as a hung run.
+        $this->assertTrue(str_contains($html, '>Wallets</span>'), 'the pill does not name the sheet it opens');
+        $this->assertFalse(str_contains($html, '<span>Total balance</span>'), 'the pill still names the figure instead');
+
+        // The ring inside the sheet keeps that label, because there it is the
+        // caption on the total itself rather than the name of a control.
+        $this->assertTrue(
+            str_contains($html, 'tracking-[0.14em] text-zinc-500 dark:text-zinc-400">Total balance</p>'),
+            'the ring lost the caption on its own figure'
+        );
         $this->assertStringContainsString('$125<span class="text-2xl">.00</span>', $html);
         $this->assertStringContainsString('2 wallets · USD equivalent', $html);
 

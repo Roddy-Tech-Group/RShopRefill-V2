@@ -6,36 +6,50 @@ use App\Domain\Shared\Enums\WalletTransactionType;
 use App\Models\PaymentAttempt;
 use App\Models\Product;
 use App\Models\WalletFunding;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Locked;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new
 #[Layout('components.layouts.dashboard')]
 #[Title('Transactions')]
 class extends Component {
-    use WithPagination;
-
     /** Search by reference / description. */
     public string $search = '';
 
     /** Direction filter: all | credit | debit. */
     public string $filter = 'all';
 
+    /** How many more rows each scroll to the bottom brings in. */
+    private const CHUNK = 12;
+
+    /**
+     * How many rows are on the page right now. The ledger has no page numbers:
+     * reaching the bottom grows this figure and the next chunk renders under
+     * the rows already there, the same as the order history and the
+     * notifications. Locked so the browser cannot ask for the whole ledger in
+     * one request.
+     */
+    #[Locked]
+    public int $visible = self::CHUNK;
+
+    public function loadMore(): void
+    {
+        $this->visible += self::CHUNK;
+    }
+
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     public function setFilter(string $filter): void
     {
         $this->filter = in_array($filter, ['all', 'credit', 'debit'], true) ? $filter : 'all';
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     /**
@@ -210,14 +224,11 @@ class extends Component {
 
         $rows = $rows->sortByDesc('date')->values();
 
-        $page = Paginator::resolveCurrentPage();
-        $transactions = new LengthAwarePaginator(
-            $rows->forPage($page, 12)->values(),
-            $rows->count(),
-            12,
-            $page,
-            ['path' => Paginator::resolveCurrentPath()],
-        );
+        // The feed is two queries merged and sorted in PHP, so the slice is
+        // taken here rather than by a paginator: the rows already exist, and
+        // the only question is how many of them to draw.
+        $hasMoreTransactions = $rows->count() > $this->visible;
+        $transactions = $rows->take($this->visible);
 
         // Non-completed funding attempts. A completed deposit already appears in
         // the ledger below as a credit, so here we surface only the in-flight and
@@ -241,6 +252,7 @@ class extends Component {
 
         return [
             'transactions' => $transactions,
+            'hasMoreTransactions' => $hasMoreTransactions,
             'recentDeposits' => $recentDeposits,
             'feedTruncated' => $feedTruncated,
             'feedCap' => $cap,
@@ -384,7 +396,7 @@ class extends Component {
                         </p>
                     </div>
                     <div class="flex shrink-0 flex-col items-end gap-0.5">
-                        <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-zinc-900' }}">
+                        <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-red-600' }}">
                             {{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}
                         </p>
                         @if ($txn->balance_after !== null)
@@ -425,15 +437,27 @@ class extends Component {
         </div>
     @endif
 
-    @if ($transactions->hasPages())
-        @if ($feedTruncated)
-            {{-- The feed merges two tables in PHP, so it is capped. Say so: without
-                 this the paginator's total looks like the whole history. --}}
-            <p class="mb-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                Showing your most recent {{ number_format($feedCap) }} transactions. Contact support if you need older records.
-            </p>
-        @endif
-        <div>{{ $transactions->links('vendor.pagination.circles-livewire') }}</div>
+    @if ($hasMoreTransactions)
+        {{-- Scroll sentinel, as on the order history. As it nears the viewport
+             it asks for the next chunk. Its key carries the loaded count, so
+             every response hands the browser a fresh element that fires again
+             at once if the new rows still leave it on screen. It leaves with
+             the last transaction.
+
+             The CSV beside the filters was never bound to what is drawn here:
+             it streams the whole ledger in chunks, so an export is the
+             complete history whether one chunk has been loaded or twenty. --}}
+        <div
+            wire:key="transactions-more-{{ $visible }}"
+            wire:intersect.margin.400px="loadMore"
+            class="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+        >
+            <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
+                <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
+            </svg>
+            Loading more transactions
+        </div>
     @endif
     </div>
 </div>
