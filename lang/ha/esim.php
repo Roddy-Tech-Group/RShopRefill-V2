@@ -136,8 +136,7 @@ return [
     'why_heading' => 'Dalilin da matafiya ke zaɓar eSIM na :site',
     'why_coverage' => 'Aiki na gida, na yanki da na duniya a wurare :count',
     'why_flexible' => 'Fakiti masu sassauƙa, har da zaɓuɓɓukan data marar iyaka',
-    'why_pay_languages' => 'Biya da kuɗin ƙasarka ko da crypto, tare da shagon a :languages',
-    'why_pay' => 'Biya da kuɗin ƙasarka ko da crypto',
+    'why_pay_methods' => 'Biya da Mobile Money, Katuna, Crypto, Apple Pay ko Canja wurin Banki',
     'why_install' => 'Sauƙin girkawa da saitawa don haɗuwa cikin mintuna',
 
     // Yadda ake ƙara eSIM ɗinka.

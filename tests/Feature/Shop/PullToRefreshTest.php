@@ -27,6 +27,46 @@ class PullToRefreshTest extends TestCase
         return File::get(resource_path('views/components/pull-to-refresh.blade.php'));
     }
 
+    /**
+     * The ring closes as the pull approaches the threshold, so the finger is
+     * drawing the thing that decides what happens when it lifts. 57 is the
+     * circumference of the r=9 circle it is drawn on.
+     */
+    public function test_the_ring_fills_with_the_pull(): void
+    {
+        $js = $this->ptrSource();
+
+        // Two rings: the whole journey, and the part covered so far.
+        $this->assertStringContainsString('class="rshop-ptr-track"', $js);
+        $this->assertStringContainsString('class="rshop-ptr-arc"', $js);
+        $this->assertStringContainsString('stroke-dasharray="57" stroke-dashoffset="57"', $js);
+
+        // Full offset at rest, closing to nothing at the threshold.
+        $this->assertStringContainsString('arc.style.strokeDashoffset = (57 * (1 - travelled)).toFixed(2);', $js);
+        $this->assertStringContainsString('const travelled = Math.min(nextPx / THRESHOLD, 1);', $js);
+
+        // Not the old static arc that never moved.
+        $this->assertStringNotContainsString("s.style.transform = 'rotate(' + (nextPx * 3.2)", $js);
+    }
+
+    /**
+     * Once the refresh is running there is no progress left to report, so the
+     * ring hands itself back to the stylesheet and spins. An inline offset
+     * left over from the pull would outrank it and freeze the arc.
+     */
+    public function test_the_ring_hands_itself_back_when_the_refresh_starts(): void
+    {
+        $js = $this->ptrSource();
+
+        $this->assertStringContainsString("if (arc) { arc.style.strokeDashoffset = ''; }", $js);
+        $this->assertMatchesRegularExpression(
+            '/#rshop-ptr\.rshop-ptr-refreshing \.rshop-ptr-arc \{\s*stroke-dasharray: 57;\s*stroke-dashoffset: 42;/',
+            $js
+        );
+        // And a snap back empties it for the next pull.
+        $this->assertStringContainsString("if (arc) { arc.style.strokeDashoffset = '57'; }", $js);
+    }
+
     public function test_the_spinner_arms_itself_at_the_threshold(): void
     {
         $js = $this->ptrSource();

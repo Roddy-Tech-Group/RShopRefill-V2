@@ -23,8 +23,16 @@
      reload it always did. --}}
 <div id="rshop-ptr" aria-hidden="true">
     <div class="rshop-ptr-circle">
+        {{-- Two rings on one circle. The faint one is the whole journey; the
+             bright one is how far down the pull has got, drawn by its dash
+             offset from nothing at rest to a closed ring at the threshold, so
+             the finger is drawing the thing that decides what happens when it
+             lifts. Once the refresh is running the same bright ring drops back
+             to an arc and spins, because there is no progress left to report,
+             only work in hand. --}}
         <svg class="rshop-ptr-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="44" stroke-dashoffset="12"/>
+            <circle class="rshop-ptr-track" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.6"/>
+            <circle class="rshop-ptr-arc" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="57" stroke-dashoffset="57" transform="rotate(-90 12 12)"/>
         </svg>
     </div>
 </div>
@@ -77,7 +85,21 @@
         box-shadow: 0 8px 22px rgba(0, 0, 0, .45);
     }
     .rshop-ptr-spin { height: 21px; width: 21px; }
+    /* The journey, always there, quiet enough to read as a groove. */
+    .rshop-ptr-track { opacity: .18; }
+    /* And the part of it the pull has covered. No transition: this follows a
+       finger, and easing a value that is already being animated by the hand
+       holding it only makes it lag. */
+    .rshop-ptr-arc { opacity: 1; }
+
+    /* Refreshing: the ring stops reporting progress and starts reporting work.
+       The arc is cut back to a quarter and the whole mark turns. */
     #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-spin { animation: rshop-ptr-rotate .75s linear infinite; }
+    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-arc {
+        stroke-dasharray: 57;
+        stroke-dashoffset: 42;
+    }
+    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-track { opacity: .25; }
     @keyframes rshop-ptr-rotate { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) {
         #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-spin { animation-duration: 1.4s; }
@@ -140,8 +162,15 @@
                 e.classList.toggle('rshop-ptr-ready', nextPx >= THRESHOLD);
                 e.style.transform = 'translateX(-50%) translateY(' + (HIDDEN_Y + nextPx) + 'px)';
                 e.style.opacity = Math.min(nextPx / THRESHOLD, 1).toFixed(3);
-                const s = e.querySelector('.rshop-ptr-spin');
-                if (s) { s.style.transform = 'rotate(' + (nextPx * 3.2) + 'deg)'; }
+
+                // The ring closes as the pull approaches the threshold: full
+                // offset is an empty circle, zero is a closed one. 57 is the
+                // circumference of the r=9 circle it is drawn on.
+                const arc = e.querySelector('.rshop-ptr-arc');
+                if (arc) {
+                    const travelled = Math.min(nextPx / THRESHOLD, 1);
+                    arc.style.strokeDashoffset = (57 * (1 - travelled)).toFixed(2);
+                }
             });
         }
 
@@ -155,6 +184,10 @@
             if (! e) { return; }
             e.classList.add('rshop-ptr-animate');
             e.classList.remove('rshop-ptr-ready', 'rshop-ptr-refreshing');
+
+            // Empty again, so the next pull draws the ring from nothing.
+            const arc = e.querySelector('.rshop-ptr-arc');
+            if (arc) { arc.style.strokeDashoffset = '57'; }
             e.style.transform = 'translateX(-50%) translateY(' + HIDDEN_Y + 'px)';
             e.style.opacity = '0';
         }
@@ -228,6 +261,12 @@
                 cancelRaf();
                 const e = el();
                 if (e) {
+                    // Hand the ring back to the stylesheet, which draws the
+                    // spinning quarter: an inline offset from the pull would
+                    // outrank it and freeze the arc at whatever it ended on.
+                    const arc = e.querySelector('.rshop-ptr-arc');
+                    if (arc) { arc.style.strokeDashoffset = ''; }
+
                     e.classList.add('rshop-ptr-animate', 'rshop-ptr-refreshing');
                     e.style.transform = 'translateX(-50%) translateY(' + REST_Y + 'px)';
                     e.style.opacity = '1';

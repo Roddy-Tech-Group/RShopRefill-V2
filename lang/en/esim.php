@@ -147,8 +147,7 @@ return [
     'why_heading' => 'Why travelers choose :site eSIMs',
     'why_coverage' => 'Local, regional and global coverage for :count destinations',
     'why_flexible' => 'Flexible packages, including unlimited data options',
-    'why_pay_languages' => 'Pay in your currency or crypto, with the store in :languages',
-    'why_pay' => 'Pay in your currency or crypto',
+    'why_pay_methods' => 'Pay in Mobile Money, Cards, Crypto, Apple Pay, Bank Transfer',
     'why_install' => 'Easy install and set up to get connected in minutes',
 
     // How to add your eSIM. The step titles are printed unescaped so the

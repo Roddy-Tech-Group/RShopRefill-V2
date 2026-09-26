@@ -136,8 +136,7 @@ return [
     'why_heading' => 'Kwa nini wasafiri huchagua eSIM za :site',
     'why_coverage' => 'Huduma ya ndani, ya kikanda na ya kimataifa kwa maeneo :count',
     'why_flexible' => 'Vifurushi vinavyonyumbulika, pamoja na chaguo za data bila kikomo',
-    'why_pay_languages' => 'Lipa kwa sarafu yako au kwa crypto, duka likiwa kwa :languages',
-    'why_pay' => 'Lipa kwa sarafu yako au kwa crypto',
+    'why_pay_methods' => 'Lipa kwa Mobile Money, Kadi, Crypto, Apple Pay au Uhamisho wa Benki',
     'why_install' => 'Usakinishaji na usanidi rahisi ili kuunganishwa kwa dakika chache',
 
     // Jinsi ya kuongeza eSIM yako.

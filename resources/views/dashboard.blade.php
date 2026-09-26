@@ -143,7 +143,12 @@
                 class="inline-flex items-center gap-2 rounded-full bg-[#ffffff] py-1.5 pl-1.5 pr-4 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-700 shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95 dark:bg-[#1d3252] dark:text-zinc-200 dark:shadow-none"
             >
                 <span class="flex -space-x-2.5">
-                    @foreach ($walletRows->take(3) as $w)
+                    {{-- Every wallet the customer holds, up to five. Three was a
+                         figure with nothing behind it: an account with five wallets
+                         showed three flags and a chevron, so the pill under-reported
+                         the very thing it exists to summarise. Five is where the
+                         stack stops reading as a stack on a phone. --}}
+                    @foreach ($walletRows->take(5) as $w)
                         <img src="{{ $w['icon'] }}" alt="" class="h-7 w-7 rounded-full object-cover ring-2 ring-white dark:ring-[#1a1a1e]" loading="lazy">
                     @endforeach
                 </span>

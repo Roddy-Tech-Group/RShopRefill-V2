@@ -201,7 +201,11 @@
                     aria-label="{{ $siteName }} - {{ __('products.detail_crumb_home') }}"
                     class="-ml-1 inline-flex h-11 items-center self-start rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
-                    <img src="{{ asset('assets/PWAicon.webp') }}" alt="{{ $siteName }}" class="site-logo h-9 w-auto object-contain" loading="lazy">
+                    {{-- The full wordmark, as the dashboard drawer carries. The
+                         nav row keeps the bare mark on a phone because it shares
+                         that line with the search field and the account chips; the
+                         drawer is 86vw of its own and has the room to say the name. --}}
+                    <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-9 w-auto object-contain" loading="lazy">
                 </a>
 
                 {{-- Categories first: this is the mega menu's home on a phone. --}}

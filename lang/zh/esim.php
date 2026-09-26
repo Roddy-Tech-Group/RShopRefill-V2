@@ -135,8 +135,7 @@ return [
     'why_heading' => '旅行者为何选择 :site eSIM',
     'why_coverage' => '覆盖 :count 个目的地的本地、区域和全球网络',
     'why_flexible' => '灵活的套餐，包括无限流量选项',
-    'why_pay_languages' => '用您的货币或加密货币付款，商店支持 :languages',
-    'why_pay' => '用您的货币或加密货币付款',
+    'why_pay_methods' => '支持手机钱包、银行卡、加密货币、Apple Pay 和银行转账',
     'why_install' => '安装设置简单，几分钟即可连接',
 
     // 如何添加 eSIM。

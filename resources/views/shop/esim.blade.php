@@ -314,10 +314,6 @@
     // has only ever offered English and French, and "200+ destinations" was
     // right by luck rather than by construction.
     $whyDestinations = \App\Http\Controllers\EsimStoreController::catalogSummary()->count();
-    $whyLanguages = array_values(\App\Support\Languages::names());
-    $whyLanguageLine = count($whyLanguages) > 1
-        ? __('esim.why_pay_languages', ['languages' => \Illuminate\Support\Arr::join($whyLanguages, ', ', ' '.__('products.detail_list_and').' ')])
-        : __('esim.why_pay');
 
     // Never the destination being viewed. "Need broader coverage?" offers a way
     // OUT of this plan, so listing this plan in it is a link back to the page
@@ -901,7 +897,11 @@
                     @foreach ([
                         ['t' => __('esim.why_coverage', ['count' => number_format($whyDestinations)]), 'd' => 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5 0 4.5-4.03 4.5-9S14.5 3 12 3 7.5 7.03 7.5 12s2 9 4.5 9zM3.6 9h16.8M3.6 15h16.8'],
                         ['t' => __('esim.why_flexible'), 'd' => 'M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5'],
-                        ['t' => $whyLanguageLine, 'image' => 'total transactions.svg'],
+                        {{-- The rails, not the languages. Someone weighing up an
+                             eSIM wants to know they can actually pay for it from
+                             where they are; the language the shop is in is the
+                             thing they can already see. --}}
+                        ['t' => __('esim.why_pay_methods'), 'image' => 'total transactions.svg'],
                         ['t' => __('esim.why_install'), 'd' => 'M3.75 4.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm12 0a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zm-12 12a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3a.75.75 0 01-.75.75h-3a.75.75 0 01-.75-.75v-3zM15 15.75h.008v.008H15v-.008zm0 3h.008v.008H15v-.008zm3-3h.008v.008H18v-.008zm0 3h.008v.008H18v-.008zm3-3h.008v.008H21v-.008zm0 3h.008v.008H21v-.008z'],
                     ] as $feature)
                         <div class="flex flex-col items-center text-center">
