@@ -123,7 +123,7 @@
                      positioning: the containing block is the viewport. It reads
                      --nav-h instead, the header's real measured height, published
                      by main-nav on scroll, resize and transitionend. --}}
-                class="cart-panel fixed right-3 top-[calc(var(--nav-h,64px)+8px)] z-[56] w-[min(340px,calc(100vw-1.5rem))] overflow-hidden rounded-[10px] bg-white/80 px-3 py-2 backdrop-blur-2xl backdrop-saturate-150 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 sm:right-4 lg:right-[max(2rem,calc((100vw-1550px)/2+2rem))] dark:bg-[#0c1a36]/80 dark:ring-white/10"
+                class="cart-panel fixed right-3 top-[calc(var(--nav-h,64px)+8px)] z-[56] w-[min(340px,calc(100vw-1.5rem))] overflow-hidden rounded-[10px] bg-white px-3 py-2 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 sm:right-4 lg:right-[max(2rem,calc((100vw-1550px)/2+2rem))] dark:bg-[#0c1a36] dark:ring-white/10"
                 role="menu"
             >
         {{-- Empty state --}}
@@ -242,7 +242,7 @@
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-1"
             style="display:none;"
-            class="cart-panel absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[10px] bg-white/85 backdrop-blur-md shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#0c1a36]/90 dark:ring-white/10"
+            class="cart-panel absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[10px] bg-white shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-white/10"
             role="menu"
         >
             <div class="p-1.5">

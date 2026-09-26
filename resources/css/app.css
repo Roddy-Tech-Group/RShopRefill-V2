@@ -1165,6 +1165,16 @@ html.dark .wallet-glass {
         border-top: 1px solid var(--dash-pane-line, transparent);
         background-color: #f4f6f5;
     }
+    /* The panel paints the page on a phone, so the content inside it must not
+       paint anything of its own.
+    
+       This needs the long selector. The content div carries dark:bg-[#0c1a36],
+       and a later rule maps that class to var(--ground) with !important and a
+       specificity of (0,3,1) - higher than the (0,2,0) this rule used to have.
+       So the ground won, every phone page sat on #060607 whatever the panel
+       said, and the panel's own tone never appeared. That is the third surface
+       that made the page read as more of the black bar. */
+    html.dark body.dashboard .dash-mobile-panel [data-page-content],
     .dash-mobile-panel [data-page-content] {
         background-color: transparent !important;
         background-image: none !important;
@@ -1183,7 +1193,7 @@ html.dark .wallet-glass {
            to, which on a phone screen is no difference at all: the page read as
            more of the bar with a curve cut into it. This is a real step up,
            and --ash moves with it so the cards keep the same distance above. */
-        background-color: #15151a;
+        background-color: #1e1e25;
         background-image: var(--grain);
         background-size: 220px 220px;
     }
@@ -1195,7 +1205,7 @@ html.dark .wallet-glass {
        the status bar, and at #000000 that whole strip read as switched-off
        glass rather than as a panel. It wears the page surface's own tone, so
        the drawer, the page under it and the bar above it are one family. */
-    html.dark body.dashboard .dash-drawer { background-color: #15151a; }
+    html.dark body.dashboard .dash-drawer { background-color: #1e1e25; }
     body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }
     body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
     body.dashboard .dash-drawer-row { color: rgb(255 255 255 / .85); }
@@ -1594,12 +1604,12 @@ html.dark .cart-panel {
      page: cards, tiles, composers. Two levels only. Panels stay on the
      ground and are separated by a hairline plus the grain, never by a
      lighter fill. A third surface is what makes a dark UI look muddy. */
-  --ash: #232329;
+  --ash: #2f2f38;
 
   /* Interactive lift above --ash. Keeping this separate from the resting card
      token prevents dark buttons, rows and carousel controls from resolving to
      the same computed colour before and during hover. */
-  --ash-hover: #2d2d34;
+  --ash-hover: #3a3a45;
 
   /* The grain, as a background-image rather than an overlay layer. The spec
      paints it at 0.14 in the rect and 0.5 on the layer; 0.07 in the rect is

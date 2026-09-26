@@ -77,7 +77,7 @@ class FooterGroundTest extends TestCase
         $css = $this->css();
 
         $this->assertStringContainsString('--ground: #060607;', $css);
-        $this->assertStringContainsString('--ash: #232329;', $css);
+        $this->assertStringContainsString('--ash: #2f2f38;', $css);
 
         // Two surface levels only: the footer sits on the ground, its tiles on ash.
         $this->assertStringContainsString('footer.footer-ground {', $css);

@@ -354,9 +354,9 @@
                existing near-black ground and grain. Keep the full map visible
                without repeating it, including when the pane is narrower. */
             html:root.dark body.dashboard > [data-flux-main] {
-                background-color: #15151a !important;
-                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map-dark.svg') }}'), var(--grain) !important;
-                background-size: min(1600px, 100%) auto, 220px 220px !important;
+                background-color: #1e1e25 !important;
+                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+                background-size: min(2000px, 125%) auto, 220px 220px !important;
                 background-position: center center, 0 0 !important;
                 background-repeat: no-repeat, repeat !important;
             }
@@ -404,11 +404,14 @@
            a single navy fill, near invisible on any dark surface, and an SVG
            loaded as a background cannot take its colour from CSS. */
         html.dark .dash-mobile-panel {
-            background-image: url('{{ $wallpaperUrl('assets/dotted-world-map-dark.svg') }}'), var(--grain) !important;
-            background-size: 150% auto, 220px 220px !important;
-            background-position: center 22%, 0 0 !important;
+            background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+            background-size: 240% auto, 220px 220px !important;
+            background-position: center 88%, 0 0 !important;
             background-repeat: no-repeat, repeat !important;
-            background-attachment: local, local !important;
+            /* scroll, not local: the map is attached to the panel's own box, so it
+               stays put while the content scrolls over it, the way the desktop
+               pane holds it. `local` had it riding along with the content. */
+            background-attachment: scroll, scroll !important;
         }
     </style>
     <body class="dashboard min-h-screen bg-[#f4f6f5] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">

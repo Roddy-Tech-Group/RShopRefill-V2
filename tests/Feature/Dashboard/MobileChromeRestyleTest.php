@@ -141,7 +141,7 @@ class MobileChromeRestyleTest extends TestCase
         $this->assertStringContainsString('body.dashboard .dash-drawer { background-color: #0c1337; color: #fff; }', $css);
         // Not pure black: the drawer runs flush to the top behind the status
         // bar, and #000000 read as switched-off glass rather than a panel.
-        $this->assertStringContainsString('html.dark body.dashboard .dash-drawer { background-color: #15151a; }', $css);
+        $this->assertStringContainsString('html.dark body.dashboard .dash-drawer { background-color: #1e1e25; }', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top));', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer-row-active { background-color: rgb(255 255 255 / .12); color: #fff; }', $css);

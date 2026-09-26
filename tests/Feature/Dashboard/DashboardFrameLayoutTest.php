@@ -167,21 +167,22 @@ class DashboardFrameLayoutTest extends TestCase
         $layout = $this->layout();
 
         $this->assertMatchesRegularExpression("/html:root:not\(\.dark\) body\.dashboard > \[data-flux-main\] \{\s*background-image: url\('\{\{ \\\$wallpaperUrl\(\\\$dashWallpaperLight\)/", $layout);
-        // Dark wears no photograph: the dotted world map, whose gaps show the
-        // near-black ground, over the grain. The map is drawn once, centred,
-        // never tiled, so there is no near-black image to band on a stretched pane.
+        // Dark wears no photograph: the dotted world map in its own navy, over
+        // the grain. It is drawn once, never tiled, and larger than it was so the
+        // dots read as dots rather than as a texture.
         $this->assertMatchesRegularExpression(
-            '/html:root\.dark body\.dashboard > \[data-flux-main\] \{\s*background-color: #15151a !important;\s*'
-            .'background-image: url\(\'\{\{ \$wallpaperUrl\(\'assets\/dotted-world-map-dark\.svg\'\) \}\}\'\), var\(--grain\) !important;\s*'
-            .'background-size: min\(1600px, 100%\) auto, 220px 220px !important;\s*'
+            '/html:root\.dark body\.dashboard > \[data-flux-main\] \{\s*background-color: #1e1e25 !important;\s*'
+            .'background-image: url\(\'\{\{ \$wallpaperUrl\(\'assets\/dotted-world-map\.svg\'\) \}\}\'\), var\(--grain\) !important;\s*'
+            .'background-size: min\(2000px, 125%\) auto, 220px 220px !important;\s*'
             .'background-position: center center, 0 0 !important;\s*'
             .'background-repeat: no-repeat, repeat !important;/',
             $layout
         );
         $this->assertFileExists(public_path('assets/dotted-world-map.svg'));
-        // The light-filled copy every dark surface uses. The original's dots
-        // are one navy fill, and a background SVG cannot take colour from CSS.
-        $this->assertFileExists(public_path('assets/dotted-world-map-dark.svg'));
+        $this->assertStringNotContainsString('dotted-world-map-dark', $layout);
+        // Phones carry the same map on the panel, since every pane rule above
+        // sits inside the 1024px query and did not exist below it.
+        $this->assertMatchesRegularExpression('/html\.dark \.dash-mobile-panel \{[^}]*dotted-world-map\.svg/s', $layout);
         $this->assertStringNotContainsString('dashWallpaperDark', $layout);
         $this->assertMatchesRegularExpression('/html:not\(\.dark\) body\.dashboard > \[data-flux-main\] \[data-page-content\] \{\s*background-color: var\(--dash-wallpaper-veil\) !important;/', $layout);
         $this->assertDoesNotMatchRegularExpression('/\[data-flux-sidebar\][^{]*\{[^}]*wallpaper/', $layout);
