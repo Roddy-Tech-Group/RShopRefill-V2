@@ -120,9 +120,13 @@
                     <span class="min-w-0 flex-1">
                         <span
                             class="block truncate text-sm font-semibold text-zinc-600 dark:text-zinc-400"
+                            {{-- The map is written into the expression rather than
+                                 kept on the component: it is built right here from the
+                                 same variants the tiles use, and a name that only this
+                                 one row reads does not belong in the page state. --}}
                             x-text="customMode
                                 ? @js(__('products.detail_custom_amount'))
-                                : (denomSummaries[selectedVariantId] || @js(__('products.detail_select_amount')))"
+                                : (@js($denomSummaries)[selectedVariantId] ?? @js(__('products.detail_select_amount')))"
                         >{{ __('products.detail_select_amount') }}</span>
 
                         {{-- The price only once there is something to price. --}}

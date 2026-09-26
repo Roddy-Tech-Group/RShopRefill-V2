@@ -167,7 +167,24 @@ class GiftCardDenominationSheetTest extends TestCase
     {
         $html = $this->giftCardPage([2, 5, 10, 25, 50]);
 
-        $this->assertTrue(str_contains($html, 'denomSummaries[selectedVariantId]'), 'the row does not name the chosen value');
+        // The labels are written into the expression as a literal. This was
+        // a bare name first, which Alpine could not resolve, so every
+        // evaluation threw and the row rendered empty. Asserting the name was
+        // present passed the whole time it was broken, so the assertion is
+        // that the values themselves are in the page.
+        $this->assertStringNotContainsString(
+            'denomSummaries[selectedVariantId]',
+            $html,
+            'the label map is a name nothing defines'
+        );
+        foreach (['5 USD', '25 USD', '50 USD'] as $label) {
+            $this->assertTrue(str_contains($html, str_replace(' ', ' ', $label)) || str_contains($html, addcslashes($label, '"')), $label.' is not among the labels the row can show');
+        }
+        $this->assertMatchesRegularExpression(
+            '/x-text="customMode[\s\S]{0,600}?\[selectedVariantId\]/',
+            $html,
+            'the row does not look its value up by the chosen variant'
+        );
         $this->assertTrue(str_contains($html, 'formatUsdIn(selectedCrypto, unitPriceUsd())'), 'the row does not price it');
 
         // Falls back to the prompt when nothing is chosen yet.
