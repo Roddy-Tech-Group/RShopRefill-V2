@@ -937,7 +937,7 @@
                             :aria-expanded="referOpen.toString()"
                             aria-haspopup="dialog"
                             aria-label="Refer & earn"
-                            class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+                            class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
                         >
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
@@ -1056,7 +1056,7 @@
                 @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
                 @click="$dispatch('open-locale-modal')"
                 aria-label="{{ __('common.language') }} / {{ __('common.payment_currency') }}"
-                class="hidden h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 lg:flex focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+                class="hidden h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 lg:flex focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5"
             >
                 {{-- Eager: the desktop pill is in the bar on arrival. --}}
                 <img :src="'https://flagcdn.com/w40/' + code + '.png'" alt="" width="28" height="28" decoding="async" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20">
@@ -1079,7 +1079,7 @@
                     @click="open = ! open; if (open) $nextTick(() => $refs.searchInput.focus())"
                     :aria-expanded="open.toString()"
                     aria-label="Search products, brands or categories"
-                    class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                    class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                 >
                     <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -1259,7 +1259,7 @@
                     @click="locked = !locked; $store.cart.open = locked"
                     :aria-expanded="$store.cart.open.toString()"
                     aria-haspopup="menu"
-                    class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+                    class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5"
                     aria-label="Shopping cart"
                 >
                     {{-- Inline so the cart rolls on hover, in the button's text colour. --}}
@@ -1377,7 +1377,7 @@
             >
                 {{-- Avatar button opens the account menu; the unread count also
                      appears on that menu's Notifications row. --}}
-                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="dashboard-avatar-button relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="dashboard-avatar-button relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
                     @if ($user?->avatar_url)
                         <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
                     @else
