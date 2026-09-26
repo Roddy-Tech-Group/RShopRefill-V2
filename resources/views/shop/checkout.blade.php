@@ -10,6 +10,10 @@
     // Post to the dashboard mirror when rendered under /dashboard/shop/* so the
     // server keeps the whole cart -> checkout -> order flow (and the order page's
     // redirect_url) inside the dashboard chrome instead of the public storefront.
+    // Rendered inside the dashboard chrome, the frame pads the page itself, so
+    // the wrapper below adds none of its own.
+    $inDashboard = request()->is('dashboard/shop*');
+
     $checkoutProcessUrl = request()->routeIs('dashboard.*')
         ? route('dashboard.shop.checkout.process')
         : route('checkout.process');
@@ -121,7 +125,7 @@
     <script src="https://checkout.flutterwave.com/v3.js"></script>
 
     <div class="min-h-full bg-zinc-100 dark:bg-[#0c1a36]">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+    <div class="mx-auto w-full max-w-7xl {{ $inDashboard ? '' : 'px-4 py-6 sm:px-6 lg:px-8 lg:py-10' }}">
 
         @if (session('checkout_status'))
             <div class="mt-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">

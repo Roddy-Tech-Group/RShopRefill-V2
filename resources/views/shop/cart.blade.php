@@ -14,7 +14,11 @@
 <x-shop.layout :title="__('checkout.cart_page_heading').' | '.$siteName">
 
     <div class="min-h-full bg-zinc-100 dark:bg-[#0c1a36]">
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+    {{-- Inside the dashboard the frame pads the page itself, the 16px a side
+         every other page there gets, so the wrapper adds none of its own: with
+         both, the cart ran 16px narrower than the rest each side. Same pattern
+         and same width as the product page. --}}
+    <div class="mx-auto w-full max-w-7xl {{ $inDashboard ? '' : 'px-4 py-6 sm:px-6 lg:px-8 lg:py-10' }}">
 
         <h1 class="text-[24px] font-bold leading-tight text-zinc-900 dark:text-white">{{ __('checkout.cart_page_heading') }}</h1>
 
