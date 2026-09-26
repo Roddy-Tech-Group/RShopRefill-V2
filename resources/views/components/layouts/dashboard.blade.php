@@ -354,8 +354,8 @@
                existing near-black ground and grain. Keep the full map visible
                without repeating it, including when the pane is narrower. */
             html:root.dark body.dashboard > [data-flux-main] {
-                background-color: #101011 !important;
-                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+                background-color: #15151a !important;
+                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map-dark.svg') }}'), var(--grain) !important;
                 background-size: min(1600px, 100%) auto, 220px 220px !important;
                 background-position: center center, 0 0 !important;
                 background-repeat: no-repeat, repeat !important;
@@ -389,6 +389,26 @@
                 transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
                 overflow: visible !important;
             }
+        }
+
+        /* The same map on a phone.
+        
+           Every pane rule above sits inside the 1024px query, so below that
+           width the map did not exist at all rather than being hidden: there
+           was nothing behind the content but the flat surface. On a phone the
+           scrolling surface is the panel, not the pane, so it carries the map
+           instead, sized to the panel's width so the whole world shows rather
+           than a cropped middle band of ocean.
+        
+           Both use the light-filled copy of the file. The original's dots are
+           a single navy fill, near invisible on any dark surface, and an SVG
+           loaded as a background cannot take its colour from CSS. */
+        html.dark .dash-mobile-panel {
+            background-image: url('{{ $wallpaperUrl('assets/dotted-world-map-dark.svg') }}'), var(--grain) !important;
+            background-size: 150% auto, 220px 220px !important;
+            background-position: center 22%, 0 0 !important;
+            background-repeat: no-repeat, repeat !important;
+            background-attachment: local, local !important;
         }
     </style>
     <body class="dashboard min-h-screen bg-[#f4f6f5] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
@@ -1694,11 +1714,11 @@
             // Drawer rows: 14px semibold on the bar's colour, 18px icons, 10px
             // corners, the current page on a soft white tile. The colours are
             // app.css's (.dash-drawer), so dark mode's remaps cannot touch them.
-            $drawerRow = fn (bool $active) => 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-semibold transition-colors'.($active ? ' dash-drawer-row-active' : '');
-            $drawerIcon = 'h-[18px] w-[18px] shrink-0';
+            $drawerRow = fn (bool $active) => 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[15px] font-semibold transition-colors'.($active ? ' dash-drawer-row-active' : '');
+            $drawerIcon = 'h-5 w-5 shrink-0';
             // The categories under Shop: a size down, text only (the Shop row
             // carries the icon), the current one on the same soft tile.
-            $drawerSubRow = fn (bool $active) => 'dash-drawer-subrow flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[13px] font-medium transition-colors'.($active ? ' dash-drawer-subrow-active' : '');
+            $drawerSubRow = fn (bool $active) => 'dash-drawer-subrow flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors'.($active ? ' dash-drawer-subrow-active' : '');
         @endphp
         {{-- `contents` keeps the wrapper out of Flux's grid so it cannot push
              flux:sidebar/header/main into an unexpected row. --}}
@@ -1753,7 +1773,7 @@
                     <a href="{{ route('dashboard') }}" wire:navigate.hover @click="menuOpen = false" class="flex items-center rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="{{ $siteName }} dashboard">
                         {{-- The full logo (mark + wordmark), the file the storefront
                              header shows from md up. --}}
-                        <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-10 w-auto object-contain">
+                        <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-12 w-auto object-contain">
                     </a>
                 </div>
 
@@ -1763,7 +1783,7 @@
                     @foreach ($drawerItems as $item)
                         @if (($item['group'] ?? null) !== $drawerGroup)
                             @php $drawerGroup = $item['group']; @endphp
-                            <p class="dash-drawer-label mb-1 mt-5 px-3 text-[12px] font-semibold">{{ $drawerGroup }}</p>
+                            <p class="dash-drawer-label mb-1 mt-5 px-3 text-[13px] font-semibold">{{ $drawerGroup }}</p>
                         @endif
                         @if ($item['expands'] ?? false)
                             {{-- Shop: the row is a button. Tapping it drops the categories

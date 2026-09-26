@@ -65,13 +65,13 @@
         @click="open = true"
         aria-haspopup="dialog"
         :aria-expanded="open.toString()"
-        class="flex w-full items-center justify-between gap-2 rounded-full bg-[#ffffff] px-4 py-1.5 text-left text-[13px] font-semibold text-zinc-900 shadow-sm ring-1 ring-[#dee3e1] transition-colors duration-150 hover:bg-[#f4f6f5] hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/15"
+        class="flex w-full items-center justify-between gap-2.5 rounded-full bg-[#ffffff] px-4 py-2.5 text-left text-[15px] font-semibold text-zinc-900 shadow-sm ring-1 ring-[#dee3e1] transition-colors duration-150 hover:bg-[#f4f6f5] hover:ring-[#c9d0cd] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-white/15"
     >
         <span class="flex min-w-0 items-center gap-2">
-            <img src="{{ asset('assets/' . rawurlencode($current['icon'])) }}" alt="" class="h-4 w-4 shrink-0 object-contain dark:brightness-0 dark:invert" loading="lazy">
+            <img src="{{ asset('assets/' . rawurlencode($current['icon'])) }}" alt="" class="h-5 w-5 shrink-0 object-contain dark:brightness-0 dark:invert" loading="lazy">
             <span class="truncate">{{ $current['label'] }}</span>
         </span>
-        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <svg class="h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
         </svg>
     </button>

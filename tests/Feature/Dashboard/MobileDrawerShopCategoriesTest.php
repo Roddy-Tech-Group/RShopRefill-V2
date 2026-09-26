@@ -95,10 +95,11 @@ class MobileDrawerShopCategoriesTest extends TestCase
         $this->assertStringContainsString('body.dashboard .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }', $css);
     }
 
-    public function test_the_drawer_logo_is_forty_pixels_tall(): void
+    public function test_the_drawer_logo_is_forty_eight_pixels_tall(): void
     {
+        // The head is 3.75rem tall, so 48px still clears it top and bottom.
         $this->assertStringContainsString(
-            'class="site-logo h-10 w-auto object-contain"',
+            'class="site-logo h-12 w-auto object-contain"',
             $this->drawer('/dashboard')
         );
     }

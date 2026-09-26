@@ -47,12 +47,37 @@
             bottom: 0;
             left: -13.50%;
             right: -6.17%;
-            background-color: rgb(191 219 254);
+            background-color: rgb(147 197 253);
             -webkit-mask: url('{{ $worldMapUrl }}') center / cover no-repeat;
             mask: url('{{ $worldMapUrl }}') center / cover no-repeat;
         }
         .dark .roddy-world-map {
-            background-color: rgba(161, 161, 170, 0.30);
+            background-color: rgba(190, 190, 200, 0.42);
+        }
+
+        /* Phones show the WHOLE map, not a slice of it.
+           
+           The file is 1600x820, near enough 2:1, and a phone hero is taller
+           than it is wide. `cover` therefore scales the map to fill the height
+           and crops the sides, leaving a middle band of ocean with no
+           recognisable coastline - the map was there, it just could not be
+           read as a map.
+
+           Width-bound instead: the map spans the full width and sits centred
+           in the hero's height. The offsets are recomputed for that. The dots
+           occupy x 127 to 1517.5 of the 1600 viewBox, so the layer is grown to
+           100/0.869 = 115.1% of the hero and pulled left by 127/1600 of that
+           and right by 82.5/1600, which lands the outermost dots on both page
+           edges exactly. */
+        @media (max-width: 767.98px) {
+            .roddy-world-map {
+                left: -9.14%;
+                right: -5.93%;
+                -webkit-mask-size: 100% auto;
+                mask-size: 100% auto;
+                -webkit-mask-position: center;
+                mask-position: center;
+            }
         }
         /* The readability scrim (radial gradient wash) was removed per request -
            the hero now shows the dotted backdrop with no gradient over it. */
