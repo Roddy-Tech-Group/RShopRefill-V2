@@ -27,6 +27,8 @@ return [
     'next_page' => 'المزيد من :category',
     'previous_page' => ':category السابقة',
     'switch_country' => 'تغيير البلد',
+    'back_to_overview' => 'الرجوع إلى النظرة العامة',
+    'back_to_home' => 'الرجوع إلى الصفحة الرئيسية',
     'no_gift_cards_in_country_hint' => 'لا نبيع بطاقات هدايا لهذا البلد بعد. اختر بلدًا آخر لترى المتاح.',
     'no_gift_cards_in_country' => 'لا توجد بطاقات هدايا متاحة في :country',
     'clear_all_filters' => 'مسح كل عوامل التصفية',

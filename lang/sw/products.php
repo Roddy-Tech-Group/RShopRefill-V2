@@ -25,6 +25,8 @@ return [
     'next_page' => ':category zaidi',
     'previous_page' => ':category zilizotangulia',
     'switch_country' => 'Badilisha nchi',
+    'back_to_overview' => 'Rudi kwenye muhtasari',
+    'back_to_home' => 'Rudi mwanzo',
     'no_gift_cards_in_country_hint' => 'Bado hatuuzi kadi za zawadi za nchi hii. Chagua nchi nyingine ili kuona zinazopatikana.',
     'no_gift_cards_in_country' => 'Hakuna kadi za zawadi zinazopatikana nchini :country',
     'clear_all_filters' => 'Futa vichujio vyote',

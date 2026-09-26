@@ -25,6 +25,8 @@ return [
     'next_page' => '更多 :category',
     'previous_page' => '上一页 :category',
     'switch_country' => '切换国家',
+    'back_to_overview' => '返回概览',
+    'back_to_home' => '返回首页',
     'no_gift_cards_in_country_hint' => '我们暂未销售该国家的礼品卡。请选择其他国家查看可购商品。',
     'no_gift_cards_in_country' => ':country 暂无可购礼品卡',
     'clear_all_filters' => '清除所有筛选',

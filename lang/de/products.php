@@ -25,6 +25,8 @@ return [
     'next_page' => 'Mehr :category',
     'previous_page' => 'Vorherige :category',
     'switch_country' => 'Land wechseln',
+    'back_to_overview' => 'Zurück zur Übersicht',
+    'back_to_home' => 'Zurück zur Startseite',
     'no_gift_cards_in_country_hint' => 'Für dieses Land verkaufen wir noch keine Geschenkkarten. Wählen Sie ein anderes Land, um zu sehen, was verfügbar ist.',
     'no_gift_cards_in_country' => 'Keine Geschenkkarten für :country verfügbar',
     'clear_all_filters' => 'Alle Filter löschen',

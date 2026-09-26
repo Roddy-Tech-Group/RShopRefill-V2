@@ -27,6 +27,8 @@ return [
     'next_page' => 'Ƙarin :category',
     'previous_page' => ':category da suka gabata',
     'switch_country' => 'Canza ƙasa',
+    'back_to_overview' => 'Koma zuwa taƙaitawa',
+    'back_to_home' => 'Koma shafin farko',
     'no_gift_cards_in_country_hint' => 'Ba mu sayar da katunan kyauta na wannan ƙasa tukuna. Zaɓi wata ƙasa don ganin abin da ake da shi.',
     'no_gift_cards_in_country' => 'Babu katunan kyauta a :country',
     'clear_all_filters' => 'Share duk tacewa',

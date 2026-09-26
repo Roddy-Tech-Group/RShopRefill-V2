@@ -27,6 +27,8 @@ return [
     'next_page' => 'More :category',
     'previous_page' => 'Previous :category',
     'switch_country' => 'Switch country',
+    'back_to_overview' => 'Back to overview',
+    'back_to_home' => 'Back to home',
     'no_gift_cards_in_country_hint' => 'We do not sell gift cards for this country yet. Pick another one to see what is available.',
     'no_gift_cards_in_country' => 'No gift cards available in :country',
     'clear_all_filters' => 'Clear all filters',

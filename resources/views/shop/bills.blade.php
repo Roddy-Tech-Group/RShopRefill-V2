@@ -315,6 +315,7 @@
                                 @else
                                     <p class="mt-4 text-base font-semibold text-zinc-900">Bill payments coming soon</p>
                                     <p class="mt-1 text-sm text-zinc-600">We're adding bill payment services for your region. Check back shortly.</p>
+                                    @include('shop._empty-state-back')
                                 @endif
                             </div>
                         @endif

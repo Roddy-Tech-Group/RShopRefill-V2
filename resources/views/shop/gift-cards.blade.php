@@ -802,7 +802,9 @@
                                         {{ __('products.no_gift_cards_in_country_hint') }}
                                     </p>
 
-                                    <div class="mt-5 flex items-center justify-center">
+                                    @include('shop._empty-state-back', ['switcher' => false])
+
+                                    <div class="mt-3 flex items-center justify-center">
                                         {{-- Opens the same locale sheet the nav pill does.
                                              `.stop` for the reason the footer chip needs it:
                                              without it the click bubbles, the backdrop

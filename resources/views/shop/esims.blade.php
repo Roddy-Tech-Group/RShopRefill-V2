@@ -380,6 +380,7 @@
                     <div class="mt-6 rounded-[12px] bg-white px-6 py-16 text-center ring-1 ring-zinc-200">
                         <p class="text-base font-semibold text-zinc-900">{{ __('esim.empty_title') }}</p>
                         <p class="mt-1 text-sm text-zinc-600">{{ __('esim.empty_body') }}</p>
+                        @include('shop._empty-state-back')
                     </div>
                 @endif
 

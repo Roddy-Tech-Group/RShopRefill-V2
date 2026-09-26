@@ -381,6 +381,7 @@
                                 @else
                                     <p class="mt-4 text-base font-semibold text-zinc-900">Mobile top-up coming soon</p>
                                     <p class="mt-1 text-sm text-zinc-600">We're adding mobile networks for your region. Check back shortly.</p>
+                                    @include('shop._empty-state-back')
                                 @endif
                             </div>
                         @endif
