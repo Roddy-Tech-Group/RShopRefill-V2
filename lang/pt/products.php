@@ -127,7 +127,7 @@ return [
     'detail_phone_invalid' => 'Informe um número de celular válido de :country.',
     'detail_points_you_earn' => 'Pontos que você ganha',
     'detail_points_icon_alt' => 'moedas',
-    'detail_out_of_stock_notice' => 'Este produto está esgotado no momento. Volte mais tarde.',
+    'detail_out_of_stock_notice' => 'Este produto está esgotado na sua região neste momento. Experimente outro país para ver se está disponível lá.',
     'detail_paused_notice' => 'As compras estão pausadas no momento. Volte em breve.',
     'detail_added' => 'Adicionado',
     'detail_works_for_numbers' => 'Funciona com números de celular de :country',

@@ -31,6 +31,12 @@
 
 @php
     use App\Models\Product;
+
+    // A category switched off has nothing behind it, so its tiles stay inert.
+    // Out of stock is a different answer: the product exists, this region has
+    // none, and the page says so and offers the switcher. The tile still greys
+    // out either way, so nothing about how it reads has changed.
+    $tileInert = ! $categoryEnabled;
 @endphp
 
 @if ($skeleton)
@@ -49,13 +55,14 @@
 
 <li>
     <a
-        @if (! $notBuyable && $href) href="{{ $href }}" wire:navigate @endif
+        @if (! $tileInert && $href) href="{{ $href }}" wire:navigate @endif
         @class([
             'card-3d-scene group block focus:outline-none',
-            'pointer-events-none opacity-60 grayscale' => $notBuyable,
+            'opacity-60 grayscale' => $notBuyable,
+            'pointer-events-none' => $tileInert,
         ])
         aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
-        @if ($notBuyable) aria-disabled="true" @endif
+        @if ($tileInert) aria-disabled="true" @endif
     >
         {{-- Logo tile. The plate stays white in BOTH themes: brand logos are
              drawn for a light tile and vanish on a dark one. The literal hex

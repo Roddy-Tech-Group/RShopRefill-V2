@@ -127,7 +127,7 @@ return [
     'detail_phone_invalid' => 'Ingresa un número móvil válido de :country.',
     'detail_points_you_earn' => 'Puntos que ganas',
     'detail_points_icon_alt' => 'monedas',
-    'detail_out_of_stock_notice' => 'Este producto está agotado por ahora. Vuelve a consultar más tarde.',
+    'detail_out_of_stock_notice' => 'Este producto está agotado en su región ahora mismo. Pruebe otro país para ver si está disponible allí.',
     'detail_paused_notice' => 'Las compras están en pausa por ahora. Vuelve a consultar pronto.',
     'detail_added' => 'Agregado',
     'detail_works_for_numbers' => 'Funciona con números móviles de :country',

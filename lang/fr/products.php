@@ -129,7 +129,7 @@ return [
     'detail_phone_invalid' => 'Saisissez un numéro mobile valide pour :country.',
     'detail_points_you_earn' => 'Points que vous gagnez',
     'detail_points_icon_alt' => 'pièces',
-    'detail_out_of_stock_notice' => 'Ce produit est en rupture de stock pour le moment. Merci de revenir plus tard.',
+    'detail_out_of_stock_notice' => 'Ce produit est en rupture de stock dans votre région. Essayez un autre pays pour voir s\'il y est disponible.',
     'detail_paused_notice' => 'Les achats sont suspendus pour le moment. Merci de revenir bientôt.',
     'detail_added' => 'Ajouté',
     'detail_works_for_numbers' => 'Fonctionne avec les numéros mobiles en :country',

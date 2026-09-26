@@ -127,7 +127,7 @@ return [
     'detail_phone_invalid' => 'Shigar da ingantacciyar lambar wayar :country.',
     'detail_points_you_earn' => 'Makin da za ka samu',
     'detail_points_icon_alt' => 'tsabar kuɗi',
-    'detail_out_of_stock_notice' => 'Wannan kaya ya ƙare a yanzu. Da fatan za a sake dubawa daga baya.',
+    'detail_out_of_stock_notice' => 'Wannan samfurin ya ƙare a yankinku a yanzu. Gwada wata ƙasa don ganin ko akwai shi a can.',
     'detail_paused_notice' => 'An dakatar da saye a yanzu. Da fatan za a sake dubawa nan ba da jimawa ba.',
     'detail_added' => 'An saka',
     'detail_works_for_numbers' => 'Yana aiki da lambobin waya na :country',

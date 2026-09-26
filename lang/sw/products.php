@@ -125,7 +125,7 @@ return [
     'detail_phone_invalid' => 'Weka namba sahihi ya simu ya :country.',
     'detail_points_you_earn' => 'Pointi utakazopata',
     'detail_points_icon_alt' => 'sarafu',
-    'detail_out_of_stock_notice' => 'Bidhaa hii imeisha kwa sasa. Tafadhali angalia tena baadaye.',
+    'detail_out_of_stock_notice' => 'Bidhaa hii haipatikani katika eneo lako kwa sasa. Jaribu nchi nyingine kuona kama inapatikana huko.',
     'detail_paused_notice' => 'Ununuzi umesitishwa kwa sasa. Tafadhali angalia tena hivi karibuni.',
     'detail_added' => 'Imeongezwa',
     'detail_works_for_numbers' => 'Inafanya kazi kwa namba za simu za :country',

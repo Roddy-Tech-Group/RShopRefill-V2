@@ -137,7 +137,7 @@ return [
     'detail_phone_invalid' => 'Enter a valid :country mobile number.',
     'detail_points_you_earn' => 'Points you earn',
     'detail_points_icon_alt' => 'coins',
-    'detail_out_of_stock_notice' => 'This product is out of stock right now. Please check back later.',
+    'detail_out_of_stock_notice' => 'This product is out of stock in your region right now. Try another country to see if it is available there.',
     'detail_paused_notice' => 'Purchases are paused right now. Please check back soon.',
     'detail_added' => 'Added',
     'detail_works_for_numbers' => 'Works for :country mobile numbers',

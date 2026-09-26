@@ -127,7 +127,7 @@ return [
     'detail_phone_invalid' => 'Inserisca un numero di cellulare valido per :country.',
     'detail_points_you_earn' => 'Punti che guadagna',
     'detail_points_icon_alt' => 'monete',
-    'detail_out_of_stock_notice' => 'Questo prodotto è esaurito al momento. Torni a controllare più tardi.',
+    'detail_out_of_stock_notice' => 'Questo prodotto è esaurito nella sua regione. Provi un altro Paese per vedere se è disponibile lì.',
     'detail_paused_notice' => 'Gli acquisti sono sospesi al momento. Torni a controllare presto.',
     'detail_added' => 'Aggiunto',
     'detail_works_for_numbers' => 'Valido per i numeri di cellulare in :country',

@@ -125,7 +125,7 @@ return [
     'detail_phone_invalid' => 'Geben Sie eine gültige Mobilnummer für :country ein.',
     'detail_points_you_earn' => 'Punkte, die Sie sammeln',
     'detail_points_icon_alt' => 'Münzen',
-    'detail_out_of_stock_notice' => 'Dieses Produkt ist derzeit nicht verfügbar. Bitte schauen Sie später wieder vorbei.',
+    'detail_out_of_stock_notice' => 'Dieses Produkt ist in Ihrer Region gerade nicht vorrätig. Wechseln Sie das Land, um zu sehen, ob es anderswo verfügbar ist.',
     'detail_paused_notice' => 'Käufe sind derzeit pausiert. Bitte schauen Sie bald wieder vorbei.',
     'detail_added' => 'Hinzugefügt',
     'detail_works_for_numbers' => 'Für Mobilnummern in :country',

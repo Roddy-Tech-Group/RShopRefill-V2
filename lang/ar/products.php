@@ -129,7 +129,7 @@ return [
     'detail_phone_invalid' => 'أدخل رقم جوال صالحًا في :country.',
     'detail_points_you_earn' => 'النقاط التي تكسبها',
     'detail_points_icon_alt' => 'عملات',
-    'detail_out_of_stock_notice' => 'هذا المنتج غير متوفر حاليًا. يُرجى المحاولة لاحقًا.',
+    'detail_out_of_stock_notice' => 'هذا المنتج غير متوفر في منطقتك الآن. جرّب تغيير الدولة لمعرفة ما إذا كان متاحًا في مكان آخر.',
     'detail_paused_notice' => 'عمليات الشراء متوقفة مؤقتًا. يُرجى المحاولة قريبًا.',
     'detail_added' => 'تمت الإضافة',
     'detail_works_for_numbers' => 'يعمل مع أرقام الجوال في :country',

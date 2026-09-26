@@ -126,7 +126,7 @@ return [
     'detail_phone_invalid' => '请输入有效的 :country 手机号码。',
     'detail_points_you_earn' => '可获得积分',
     'detail_points_icon_alt' => '积分币',
-    'detail_out_of_stock_notice' => '该产品目前缺货，请稍后再来查看。',
+    'detail_out_of_stock_notice' => '该商品目前在您所在的地区缺货。请切换其他国家/地区查看是否有货。',
     'detail_paused_notice' => '目前暂停购买，请稍后再来查看。',
     'detail_added' => '已添加',
     'detail_works_for_numbers' => '适用于 :country 手机号码',

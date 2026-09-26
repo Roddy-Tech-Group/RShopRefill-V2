@@ -233,6 +233,10 @@
                                         $isOut      = $variants->isNotEmpty() && $available->isEmpty();
                                         $outOfStock = $isOut || $product->is_out_of_stock;
                                         $notBuyable = ! $categoryEnabled || $outOfStock;
+                                        // Switched off stays inert; out of stock still opens,
+                                        // because the page it opens is where the customer
+                                        // learns they can look in another region.
+                                        $tileInert = ! $categoryEnabled;
                                         $priceLabel = $product->priceRangeLabel();
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                         $billerName = Product::brandDisplayName($product->brand_key);
@@ -240,13 +244,14 @@
                                     @endphp
                                     <li>
                                         <a
-                                            @if (! $notBuyable) href="{{ $shopRoute('bill', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}" wire:navigate @endif
+                                            @if (! $tileInert) href="{{ $shopRoute('bill', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}" wire:navigate @endif
                                             @class([
                                                 'card-3d-scene group block focus:outline-none',
-                                                'pointer-events-none opacity-60 grayscale' => $notBuyable,
+                                                'opacity-60 grayscale' => $notBuyable,
+                                                'pointer-events-none' => $tileInert,
                                             ])
                                             aria-label="{{ $billerName }}"
-                                            @if ($notBuyable) aria-disabled="true" @endif
+                                            @if ($tileInert) aria-disabled="true" @endif
                                         >
                                             {{-- White plate behind the biller logo, and keep-light holds it white in
                                                  dark mode. bg-[#ffffff] became the dashboard card class in the light

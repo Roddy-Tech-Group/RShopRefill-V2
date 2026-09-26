@@ -25,6 +25,23 @@
         <div>
             <p class="text-sm font-semibold {{ $product->is_out_of_stock ? 'text-zinc-900 dark:text-white' : 'text-amber-900 dark:text-amber-200' }}">{{ $product->is_out_of_stock ? __('products.out_of_stock') : __('products.temporarily_unavailable') }}</p>
             <p class="mt-0.5 text-xs {{ $product->is_out_of_stock ? 'text-zinc-500 dark:text-zinc-400' : 'text-amber-800/80 dark:text-amber-200/70' }}">{{ $product->is_out_of_stock ? __('products.detail_out_of_stock_notice') : __('products.detail_paused_notice') }}</p>
+            {{-- Out of stock is a fact about this region, not about the card:
+                 the same brand is often on the shelf a country over. The notice
+                 says so, and the switcher is right there, because telling a
+                 customer to look elsewhere without showing them how is barely
+                 telling them anything. Only for out of stock - a category
+                 switched off is off everywhere, and switching country would
+                 send them round the same loop. --}}
+            @if ($product->is_out_of_stock)
+                <button
+                    type="button"
+                    x-data
+                    @click.stop="$dispatch('open-locale-modal'); localeModalOpen = true"
+                    class="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 underline-offset-2 transition-colors hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-blue-400"
+                >
+                    {{ __('products.switch_country') }}
+                </button>
+            @endif
         </div>
     </div>
 @endunless
