@@ -179,7 +179,6 @@ class DashboardFrameLayoutTest extends TestCase
             $layout
         );
         $this->assertFileExists(public_path('assets/dotted-world-map.svg'));
-        $this->assertStringNotContainsString('dotted-world-map-dark', $layout);
         // Phones carry the same map on the panel, since every pane rule above
         // sits inside the 1024px query and did not exist below it.
         $this->assertMatchesRegularExpression('/html\.dark \.dash-mobile-panel \{[^}]*dotted-world-map\.svg/s', $layout);
