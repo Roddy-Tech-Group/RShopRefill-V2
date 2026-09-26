@@ -392,6 +392,11 @@
 
 @include('partials.scroll-lock')
 
+{{-- Swipe a bottom sheet down to close it. Loaded beside the scroll lock for
+     the same reason: every sheet on the site reaches for it, so it has to be
+     defined before any of them boots its Alpine scope. --}}
+@include('partials.sheet-swipe')
+
 {{-- Global keyboard shortcuts (Ctrl+J chat, Ctrl+F ticket, Ctrl+M theme,
      Ctrl+P profile). Site-wide, customer side only. --}}
 @include('partials.shortcuts')

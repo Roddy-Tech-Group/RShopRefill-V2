@@ -166,6 +166,7 @@
                 @if ($denomFolds)
                     class="denom-sheet"
                     :data-open="denomSheet ? 'true' : 'false'"
+                    x-init="window.rshopSheetSwipe?.($el, () => denomSheet = false)"
                     x-effect="denomSheet ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
                     @keydown.escape.window="denomSheet = false"
                     role="dialog"

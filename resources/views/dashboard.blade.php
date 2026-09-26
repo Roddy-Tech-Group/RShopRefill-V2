@@ -191,6 +191,8 @@
                     ></div>
                     <div
                         x-show="open"
+                        {{-- The handle at the top has always looked draggable. Now it is. --}}
+                        x-init="window.rshopSheetSwipe?.($el, () => open = false)"
                         x-transition:enter="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
                         x-transition:enter-start="translate-y-full"
                         x-transition:enter-end="translate-y-0"

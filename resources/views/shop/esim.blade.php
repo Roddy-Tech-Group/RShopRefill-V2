@@ -1120,7 +1120,7 @@
         >
             <div x-show="showBuy" @click="showBuy = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
 
-            <div x-show="showBuy" x-transition class="relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-[#24364f]">
+            <div x-show="showBuy" x-init="window.rshopSheetSwipe?.($el, () => showBuy = false)" x-transition class="relative flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:bg-[#0c1a36] dark:ring-[#24364f]">
 
                 {{-- Header: the plan being bought, so the sheet never floats
                      free of what opened it. --}}
@@ -1301,7 +1301,7 @@
         {{-- Networks modal --}}
         <div x-show="showNetworks" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="networks-title">
             <div x-show="showNetworks" @click="showNetworks = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
-            <div x-show="showNetworks" x-transition class="relative max-h-[85vh] w-full max-w-[760px] overflow-y-auto p-6 rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
+            <div x-show="showNetworks" x-init="window.rshopSheetSwipe?.($el, () => showNetworks = false)" x-transition class="relative max-h-[85vh] w-full max-w-[760px] overflow-y-auto p-6 rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
                 <div class="flex items-start justify-between gap-4">
                     <h2 id="networks-title" class="text-lg font-bold text-zinc-900 dark:text-white">{{ $coverageCount > 1 ? __('esim.countries_networks') : __('esim.networks') }}</h2>
                     <button type="button" @click="showNetworks = false" aria-label="{{ __('common.close') }}" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -1389,7 +1389,7 @@
              the list and the result reads as noise. --}}
         <div x-show="showCompat" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="compat-title">
             <div x-show="showCompat" @click="showCompat = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
-            <div x-show="showCompat" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
+            <div x-show="showCompat" x-init="window.rshopSheetSwipe?.($el, () => showCompat = false)" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
 
                 {{-- Header, held above the body so the title stays put while the
                      manufacturer list scrolls under it. --}}
@@ -1497,7 +1497,7 @@
         {{-- Package details modal --}}
         <div x-show="showDetails" style="display:none;" class="fixed inset-0 z-[70] flex items-end justify-center px-3 pb-3 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="details-title">
             <div x-show="showDetails" @click="showDetails = false" x-transition.opacity class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
-            <div x-show="showDetails" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
+            <div x-show="showDetails" x-init="window.rshopSheetSwipe?.($el, () => showDetails = false)" x-transition class="relative flex max-h-[85vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl ring-1 ring-zinc-200 dark:ring-[#24364f]">
                 {{-- Inner scroller: the sheet itself must NOT scroll, or the mask would
                      fade its glass background and rounded corners too, not just the text. --}}
                 <div class="modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 [-webkit-overflow-scrolling:touch]">
