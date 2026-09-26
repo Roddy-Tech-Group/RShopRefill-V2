@@ -58,6 +58,111 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     public ?string $turnstileToken = null;
 
+    /** Which page of the form is showing. */
+    public int $step = 1;
+
+    public const TOTAL_STEPS = 3;
+
+    /**
+     * What each page asks for.
+     *
+     * Presentation only. register() still validates the whole form before it
+     * writes anything, so a customer who skips ahead by poking at the Livewire
+     * component gains nothing: the steps are a way to present eleven fields
+     * without a wall of them, never the gate.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function rulesForStep(int $step): array
+    {
+        $all = $this->registrationRules();
+
+        $fields = match ($step) {
+            1 => ['first_name', 'last_name', 'email'],
+            2 => ['country', 'phone', 'gender'],
+            default => [],
+        };
+
+        return array_intersect_key($all, array_flip($fields));
+    }
+
+    /**
+     * Forward, once this page's own answers hold up. The phone is checked for
+     * an existing account here rather than at the end, so a customer who has
+     * signed up before learns it now and not after choosing a password.
+     */
+    public function next(): void
+    {
+        $this->validate($this->rulesForStep($this->step), $this->validationMessages());
+
+        if ($this->step === 2) {
+            $this->ensurePhoneIsFree();
+        }
+
+        $this->step = min($this->step + 1, self::TOTAL_STEPS);
+    }
+
+    public function back(): void
+    {
+        $this->step = max($this->step - 1, 1);
+    }
+
+    /**
+     * The whole form's rules, in one place, so a step can borrow its slice and
+     * the final submit can take the lot.
+     *
+     * max:100 a part, not 255: users.name holds both plus a space, and two
+     * 255s would overflow the column at the insert rather than at the form.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function registrationRules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
+            // The national number is validated against the chosen country's
+            // numbering plan (libphonenumber). A trunk 0 the customer may type
+            // is tolerated here and stripped when the number is stored.
+            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
+            'gender' => ['required', 'in:male,female,other'],
+            'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
+            'terms' => ['accepted'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function validationMessages(): array
+    {
+        return [
+            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
+        ];
+    }
+
+    /**
+     * The number in E.164 (+2348031234567), the one format every gateway and
+     * SMS provider reads the same way.
+     */
+    private function phoneE164(): string
+    {
+        return (new PhoneNumber($this->phone, [$this->country]))->formatE164();
+    }
+
+    /**
+     * One line, one account. A rule on the national number could not see that
+     * 0803... and +234803... are the same line, so the check is on E.164.
+     */
+    private function ensurePhoneIsFree(): void
+    {
+        if (User::where('phone', $this->phoneE164())->exists()) {
+            throw ValidationException::withMessages([
+                'phone' => __('auth.phone_taken'),
+            ]);
+        }
+    }
+
     /**
      * Prefill the referral code from the CaptureReferralCookie so a customer
      * who arrived via a `?ref=CODE` link sees their friend's code already
@@ -77,37 +182,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
         
         $this->ensureIsNotRateLimited();
 
-        // max:100 a part, not 255: users.name holds both plus a space, and two
-        // 255s would overflow the column at the insert rather than at the form.
-        $validated = $this->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
-            // The national number is validated against the chosen country's
-            // numbering plan (libphonenumber). A trunk 0 the customer may type
-            // is tolerated here and stripped when the number is stored.
-            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
-            'gender' => ['required', 'in:male,female,other'],
-            'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
-            'terms' => ['accepted'],
-        ], [
-            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
-        ]);
+        // Every field, whatever step the form thinks it is on. The steps are a
+        // presentation device; this is the gate.
+        $validated = $this->validate($this->registrationRules(), $this->validationMessages());
 
-        // Canonicalise to E.164 (+2348031234567), the one format every gateway
-        // and SMS provider reads the same way, and enforce uniqueness on that.
-        // A rule on the national number could not see that 0803... and
-        // +234803... are the same line. One line, one account.
-        $phoneE164 = (new PhoneNumber($validated['phone'], [$validated['country']]))->formatE164();
+        $this->ensurePhoneIsFree();
 
-        if (User::where('phone', $phoneE164)->exists()) {
-            throw ValidationException::withMessages([
-                'phone' => __('auth.phone_taken'),
-            ]);
-        }
-
-        $validated['phone'] = $phoneE164;
+        $validated['phone'] = $this->phoneE164();
 
         // Consent is recorded by the act of registering; it is not a column on
         // users, so it must not reach User::create().
@@ -256,6 +337,20 @@ new #[Layout('components.layouts.auth')] class extends Component {
         {{-- Registration form --}}
         <form wire:submit="register" class="flex flex-col gap-3 sm:gap-4">
 
+            {{-- Where you are, and how much is left. Three bars rather than a
+                 count, so the answer is the same shape as the form: short. --}}
+            <div class="mb-1 flex items-center gap-2" role="group" aria-label="Sign-up progress">
+                @foreach ([1, 2, 3] as $dot)
+                    <span
+                        class="h-1.5 flex-1 rounded-full transition-colors {{ $step >= $dot ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"
+                        @if ($step === $dot) aria-current="step" @endif
+                    ></span>
+                @endforeach
+                <span class="ml-1 shrink-0 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{{ $step }}/3</span>
+            </div>
+
+            {{-- Page one: who you are. --}}
+            @if ($step === 1)
             {{-- Name. Two fields, not one: given-name / family-name is what
                  browsers and password managers autofill against, and it is the
                  shape every later step wants a name in. One row at every width,
@@ -315,6 +410,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 </div>
                 @error('email') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
+
+            @endif
+
+            {{-- Page two: how we reach you. --}}
+            @if ($step === 2)
 
             {{-- Country dial-code + phone, one control. The left segment is a
                  searchable flag and +code picker, and what it picks IS the
@@ -414,6 +514,35 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 @error('phone') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
+            {{-- Gender. Three choices on one segmented control, in the same pill
+                 language as the fields above it. It picks the default avatar
+                 until the customer uploads one of their own. --}}
+            <div>
+                <span class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_gender') }}</span>
+                <div class="grid grid-cols-3 gap-1 rounded-full bg-zinc-100 p-1 ring-1 ring-zinc-200">
+                    @foreach ([
+                        ['value' => 'male',   'label' => __('auth.modal_gender_male')],
+                        ['value' => 'female', 'label' => __('auth.modal_gender_female')],
+                        ['value' => 'other',  'label' => __('auth.modal_gender_other')],
+                    ] as $opt)
+                        <button
+                            type="button"
+                            wire:click="$set('gender', '{{ $opt['value'] }}')"
+                            class="rounded-full px-3 py-3 text-sm font-semibold transition-all active:scale-95 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
+                            aria-pressed="{{ $gender === $opt['value'] ? 'true' : 'false' }}"
+                        >
+                            {{ $opt['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+                @error('gender') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            @endif
+
+            {{-- Page three: securing it, and the consent that finishes it. --}}
+            @if ($step === 3)
+
             {{-- Password --}}
             <div x-data="{ show: false }">
                 <label for="password" class="mb-2 block text-sm font-medium text-zinc-700">Password</label>
@@ -478,29 +607,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 @error('password_confirmation') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Gender. Three choices on one segmented control, in the same pill
-                 language as the fields above it. It picks the default avatar
-                 until the customer uploads one of their own. --}}
-            <div>
-                <span class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_gender') }}</span>
-                <div class="grid grid-cols-3 gap-1 rounded-full bg-zinc-100 p-1 ring-1 ring-zinc-200">
-                    @foreach ([
-                        ['value' => 'male',   'label' => __('auth.modal_gender_male')],
-                        ['value' => 'female', 'label' => __('auth.modal_gender_female')],
-                        ['value' => 'other',  'label' => __('auth.modal_gender_other')],
-                    ] as $opt)
-                        <button
-                            type="button"
-                            wire:click="$set('gender', '{{ $opt['value'] }}')"
-                            class="rounded-full px-3 py-3 text-sm font-semibold transition-all active:scale-95 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
-                            aria-pressed="{{ $gender === $opt['value'] ? 'true' : 'false' }}"
-                        >
-                            {{ $opt['label'] }}
-                        </button>
-                    @endforeach
-                </div>
-                @error('gender') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
-            </div>
 
             {{-- Referral code (optional). Prefilled from the ?ref=CODE cookie
                  when the customer arrived through a friend's invite link, but
@@ -523,19 +629,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 @error('referral') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Submit --}}
-            <div wire:ignore class="mb-2">
-                @if(config('services.turnstile.enabled') && config('services.turnstile.enforce_auth'))
-                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-callback="onTurnstileSuccessRegister" data-theme="light"></div>
-                    <script>
-                        function onTurnstileSuccessRegister(token) {
-                            @this.set('turnstileToken', token);
-                        }
-                    </script>
-                @endif
-            </div>
-            @error('turnstileToken') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
-
             {{-- Consent. Required, and enforced server-side by the `accepted`
                  rule above - a disabled button alone would be advisory only. --}}
             <div>
@@ -557,12 +650,61 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 @error('terms') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            <button
-                type="submit"
-                class="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
-            >
-                <span>Create Account</span>
-            </button>
+            @endif
+
+            {{-- Kept in the DOM from the first paint and merely hidden until
+                 the last page. Cloudflare's script draws .cf-turnstile once,
+                 when it loads, so a widget that only appeared on step three
+                 would never be drawn and its token would never arrive. The
+                 widget itself is wire:ignore so Livewire leaves it alone
+                 across the step changes; the wrapper is not, so it can hide
+                 and show. --}}
+            <div class="{{ $step === 3 ? 'mb-2' : 'hidden' }}">
+                <div wire:ignore>
+                    @if(config('services.turnstile.enabled') && config('services.turnstile.enforce_auth'))
+                        <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-callback="onTurnstileSuccessRegister" data-theme="light"></div>
+                        <script>
+                            function onTurnstileSuccessRegister(token) {
+                                @this.set('turnstileToken', token);
+                            }
+                        </script>
+                    @endif
+                </div>
+                @error('turnstileToken') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Continue until the last page, then submit. Both are the same
+                 pill; only the label and what they do change. The back button
+                 is a button, not a link: going back must not re-request the
+                 page and lose what has been typed. --}}
+            <div class="mt-2 flex items-center gap-3">
+                @if ($step > 1)
+                    <button
+                        type="button"
+                        wire:click="back"
+                        class="flex shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 px-5 py-3 text-base font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-white/5"
+                    >
+                        Back
+                    </button>
+                @endif
+
+                @if ($step < 3)
+                    <button
+                        type="button"
+                        wire:click="next"
+                        class="flex flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        <span>Continue</span>
+                    </button>
+                @else
+                    <button
+                        type="submit"
+                        class="flex flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        <span>Create Account</span>
+                    </button>
+                @endif
+            </div>
         </form>
 
         {{-- Security note --}}

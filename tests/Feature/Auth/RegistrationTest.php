@@ -145,7 +145,9 @@ class RegistrationTest extends TestCase
     /** The consent links have to reach the real documents, not just say so. */
     public function test_the_consent_links_point_at_the_legal_pages(): void
     {
-        $html = $this->withoutVite()->get('/register')->assertOk()->getContent();
+        // Consent lives on the last page of the form now, so the component is
+        // driven there rather than read off a fresh GET.
+        $html = Volt::test('auth.register')->set('step', 3)->html();
 
         $this->assertStringContainsString('I agree to the', $html);
         $this->assertStringContainsString('href="'.route('shop.terms').'"', $html);
@@ -336,10 +338,10 @@ class RegistrationTest extends TestCase
             ->assertRedirect(route('auth.complete-profile'));
     }
 
-    /** The page offers the same three controls the modal does. */
+    /** The second page offers the same three controls the modal does. */
     public function test_the_page_renders_the_phone_row_and_the_gender_choices(): void
     {
-        $html = $this->withoutVite()->get('/register')->assertOk()->getContent();
+        $html = Volt::test('auth.register')->set('step', 2)->html();
 
         // One row: the dial-code button and the national number beside it.
         $this->assertTrue(str_contains($html, 'aria-label="'.e(__('auth.modal_dial_code')).'"'), 'the dial code picker is missing');
