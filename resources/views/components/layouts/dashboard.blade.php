@@ -1742,8 +1742,14 @@
             >
                 {{-- Logo row: as tall as the bar, so the logo sits level with the
                      bar's chips and the close button beside the panel. The logo
-                     is drawn white (app.css) on the panel's dark colour. --}}
-                <div class="dash-drawer-head flex shrink-0 items-center px-4">
+                     is drawn white (app.css) on the panel's dark colour.
+
+                     The rule under it separates the brand from the destinations.
+                     white/20 rather than the usual white/10: this panel is navy
+                     in light and pure black in dark, and at 10 percent a hairline
+                     disappears entirely on black, the same way the header chips
+                     did. One value covers both themes because both are dark. --}}
+                <div class="dash-drawer-head flex shrink-0 items-center border-b border-white/20 px-4">
                     <a href="{{ route('dashboard') }}" wire:navigate.hover @click="menuOpen = false" class="flex items-center rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="{{ $siteName }} dashboard">
                         {{-- The full logo (mark + wordmark), the file the storefront
                              header shows from md up. --}}

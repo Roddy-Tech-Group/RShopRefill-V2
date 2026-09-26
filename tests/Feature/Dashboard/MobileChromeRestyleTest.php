@@ -114,7 +114,12 @@ class MobileChromeRestyleTest extends TestCase
         $this->assertStringContainsString('class="dash-drawer fixed inset-y-0 left-0 z-[70] flex w-[min(69vw,270px)] flex-col"', $aside);
         $this->assertStringNotContainsString('bg-[#eaeeec]', $aside);
         $this->assertStringNotContainsString('shadow-2xl', $aside);
-        $this->assertStringContainsString('class="dash-drawer-head flex shrink-0 items-center px-4">', $aside);
+        // A rule under the logo separates the brand from the destinations.
+        // white/20, not the usual white/10: this panel is navy in light and
+        // pure black in dark, and at 10 percent a hairline disappears on black
+        // the way the header chips did. It is mobile only for free, because the
+        // whole drawer is lg:hidden.
+        $this->assertStringContainsString('class="dash-drawer-head flex shrink-0 items-center border-b border-white/20 px-4">', $aside);
         $this->assertStringContainsString('class="site-logo h-10 w-auto object-contain"', $aside);
 
         // Three groups: the main rows, then Account, then More; the current page tiled.
