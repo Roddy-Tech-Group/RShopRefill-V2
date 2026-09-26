@@ -49,9 +49,6 @@ return [
 
     // Header category rail and the phone menu's Mobile Refill page.
     'product_categories' => 'Rukunonin kayayyaki',
-    'topups_all_networks' => 'Duk hanyoyin sadarwa',
-    'topups_credit_only' => 'Kiredit kawai',
-    'topups_bundles' => 'Kiredit, data da kira',
 
     // Region pill. :language is filled on the server; :country and :currency
     // in the browser, where the live values are.

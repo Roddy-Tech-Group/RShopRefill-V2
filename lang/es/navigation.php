@@ -49,9 +49,6 @@ return [
 
     // Header category rail and the phone menu's Mobile Refill page.
     'product_categories' => 'Categorías de productos',
-    'topups_all_networks' => 'Todas las redes',
-    'topups_credit_only' => 'Solo saldo',
-    'topups_bundles' => 'Saldo, datos y llamadas',
 
     // Region pill. :language is filled on the server; :country and :currency
     // in the browser, where the live values are.

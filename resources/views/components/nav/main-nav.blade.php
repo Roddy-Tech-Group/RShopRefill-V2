@@ -86,7 +86,7 @@
          Outside the collapsible wrapper on purpose: when the primary row
          collapses on scroll this stays reachable. --}}
     <div
-        x-data="{ menuOpen: false, sub: null }"
+        x-data="{ menuOpen: false }"
         @keydown.escape.window="menuOpen = false"
         x-effect="menuOpen ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
         class="md:hidden"
@@ -139,38 +139,34 @@
             aria-modal="true"
         >
             @php
-                // 'children' names the second page a row opens in place of
-                // navigating; null rows are plain links. Gift Cards' content
-                // is the same navMenu() payload the desktop hover panel
-                // renders - memoized, so the second call is free.
+                // The four categories, as four plain links. Nothing drills
+                // down any more.
+                //
+                // Gift Cards and Mobile Refill used to open a second page of
+                // the sheet listing every category and popular brand. Tapping
+                // one of those, say Gaming, landed on the listing with a
+                // category preselected, and that listing is the heaviest page
+                // we serve - every brand for the region, in every section - so
+                // the wait was long enough that the menu felt broken. The same
+                // categories are on the listing itself as pills, where
+                // switching is a class toggle on markup the browser already
+                // holds, so the menu was the slow way to reach something the
+                // page does instantly.
+                //
+                // The drill-down also cost every phone visit a navMenu() call
+                // to build a panel most people never opened.
                 $sheetLinks = array_values(array_filter([
                     \App\Support\FeatureFlag::on('gift_cards')
-                        ? ['label' => __('navigation.gift_cards'), 'url' => route('shop.gift-cards'), 'children' => 'gift-cards'] : null,
+                        ? ['label' => __('navigation.gift_cards'), 'url' => route('shop.gift-cards')] : null,
                     \App\Support\FeatureFlag::on('esims')
-                        ? ['label' => __('navigation.esims'), 'url' => route('shop.esims'), 'children' => null] : null,
+                        ? ['label' => __('navigation.esims'), 'url' => route('shop.esims')] : null,
                     \App\Support\FeatureFlag::on('topups')
-                        ? ['label' => __('navigation.mobile_refill'), 'url' => route('shop.topups'), 'children' => 'topups'] : null,
+                        ? ['label' => __('navigation.mobile_refill'), 'url' => route('shop.topups')] : null,
                     \App\Support\FeatureFlag::on('bills')
-                        ? ['label' => __('navigation.bill_payments'), 'url' => route('shop.bills'), 'children' => null] : null,
+                        ? ['label' => __('navigation.bill_payments'), 'url' => route('shop.bills')] : null,
                 ]));
 
-                $giftNav = \App\Support\FeatureFlag::on('gift_cards')
-                    ? \App\Support\GiftCardCategories::navMenu($region ?? null)
-                    : null;
-
-                // On the gift-card listing every category section is already
-                // on the page and switching is a class toggle, so a category
-                // deep-link there re-fetches markup the browser is holding.
-                // Dispatch the listing's own category-filtered event instead -
-                // the same thing x-shop.category-picker does with clientFilter.
-                // Everywhere else these stay ordinary wire:navigate links.
-                $sheetFiltersInPlace = request()->routeIs('shop.gift-cards');
-
                 $sheetRowClass = 'flex w-full items-center justify-between gap-3 py-3 text-[17px] font-bold text-zinc-900 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400';
-                $sheetSubLinkClass = 'block py-2.5 text-[16px] font-semibold text-zinc-800 transition-colors hover:text-blue-600 dark:text-zinc-100 dark:hover:text-blue-400';
-                $sheetSubHeadingClass = 'mt-4 text-[12px] font-bold uppercase tracking-[0.08em] text-[#0c1a36] dark:text-blue-300';
-                $sheetBackClass = '-ml-2 inline-flex items-center gap-1.5 self-start rounded-full px-2 py-2 text-[13px] font-semibold text-zinc-600 transition-colors hover:bg-[#f4f6f5] hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white';
-                $sheetPageTitleClass = 'py-2 text-[17px] font-bold text-zinc-900 dark:text-white';
             @endphp
 
             {{-- Paged, not an accordion: the sheet is 340px of thumb space,
@@ -181,14 +177,11 @@
                  right, back from the left - so the outgoing page never
                  stacks under the incoming one. --}}
 
-            {{-- Root page: the brand, the category rows, then the secondary controls. --}}
-            <div
-                x-show="sub === null"
-                x-transition:enter="transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                x-transition:enter-start="-translate-x-6 opacity-0"
-                x-transition:enter-end="translate-x-0 opacity-100"
-                class="flex flex-1 flex-col gap-5"
-            >
+            {{-- The brand, the four category rows, then the secondary
+                 controls. One page: the sheet used to swap itself for a second
+                 page of sub-categories, and the transitions here were that
+                 swap sliding in. --}}
+            <div class="flex flex-1 flex-col gap-5">
                 {{-- The mark, and Home. On a phone the bar shows the menu button
                      and nothing else of the brand (the R used to sit beside it),
                      so this is where the R lives now and where a tap goes home.
@@ -211,29 +204,14 @@
                 {{-- Categories first: this is the mega menu's home on a phone. --}}
                 <nav class="flex flex-col" aria-label="{{ __('navigation.categories') }}">
                     @foreach ($sheetLinks as $link)
-                        @if ($link['children'])
-                            <button
-                                type="button"
-                                @click="sub = '{{ $link['children'] }}'"
-                                aria-controls="mobile-{{ $link['children'] }}-menu"
-                                class="{{ $sheetRowClass }} text-left"
-                            >
-                                {{ $link['label'] }}
-
-                                <svg class="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        @else
-                            <a
-                                href="{{ $link['url'] }}"
-                                wire:navigate
-                                @click="menuOpen = false"
-                                class="{{ $sheetRowClass }}"
-                            >
-                                {{ $link['label'] }}
-                            </a>
-                        @endif
+                        <a
+                            href="{{ $link['url'] }}"
+                            wire:navigate
+                            @click="menuOpen = false"
+                            class="{{ $sheetRowClass }}"
+                        >
+                            {{ $link['label'] }}
+                        </a>
                     @endforeach
                 </nav>
 
@@ -264,113 +242,13 @@
                     </div>
                 </div>
             </div>
-
-            {{-- Gift Cards page: the mega menu's catalogue. --}}
-            @if (\App\Support\FeatureFlag::on('gift_cards'))
-                <div
-                    x-show="sub === 'gift-cards'"
-                    x-cloak
-                    x-transition:enter="transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    x-transition:enter-start="translate-x-6 opacity-0"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    id="mobile-gift-cards-menu"
-                    class="flex flex-col"
-                >
-                    <button type="button" @click="sub = null" class="{{ $sheetBackClass }}">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                        {{ __('common.menu') }}
-                    </button>
-
-                    <p class="{{ $sheetPageTitleClass }}">{{ __('navigation.gift_cards') }}</p>
-
-                    <a href="{{ route('shop.gift-cards') }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                        {{ __('products.all_gift_cards') }}
-                    </a>
-                    <a
-                        href="{{ route('shop.gift-cards', ['subcategory' => 'popular']) }}"
-                        @if ($sheetFiltersInPlace)
-                            @click.prevent="menuOpen = false; $dispatch('category-filtered', { slug: 'popular' })"
-                        @else
-                            wire:navigate @click="menuOpen = false"
-                        @endif
-                        class="{{ $sheetSubLinkClass }}"
-                    >
-                        {{ __('products.popular_brands') }}
-                    </a>
-                    <a href="{{ route('shop.gift-cards', ['sort' => 'recent']) }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                        {{ __('products.recently_added') }}
-                    </a>
-
-                    @if ($giftNav && $giftNav['categories']->isNotEmpty())
-                        <p class="{{ $sheetSubHeadingClass }}">{{ __('navigation.categories') }}</p>
-                        @foreach ($giftNav['categories'] as $category)
-                            <a
-                                href="{{ route('shop.gift-cards', ['subcategory' => $category['slug']]) }}"
-                                @if ($sheetFiltersInPlace)
-                                    @click.prevent="menuOpen = false; $dispatch('category-filtered', { slug: @js($category['slug']) })"
-                                @else
-                                    wire:navigate @click="menuOpen = false"
-                                @endif
-                                class="{{ $sheetSubLinkClass }}"
-                            >
-                                {{ $category['name'] }}
-                            </a>
-                        @endforeach
-                    @endif
-
-                    @if ($giftNav && $giftNav['popular']->isNotEmpty())
-                        <p class="{{ $sheetSubHeadingClass }}">{{ __('navigation.popular_in', ['country' => $giftNav['regionName']]) }}</p>
-                        @foreach ($giftNav['popular'] as $brandKey)
-                            <a href="{{ route('shop.brand', ['brandSlug' => \App\Models\Product::brandSlug($brandKey)]) }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                                {{ \App\Models\Product::brandDisplayName($brandKey) }}
-                            </a>
-                        @endforeach
-                    @endif
-                </div>
-            @endif
-
-            {{-- Mobile Refill page. Mirrors the filter pills on the top-ups
-                 page: same labels, same URLs, so the menu and the page never
-                 name a view differently. --}}
-            @if (\App\Support\FeatureFlag::on('topups'))
-                <div
-                    x-show="sub === 'topups'"
-                    x-cloak
-                    x-transition:enter="transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    x-transition:enter-start="translate-x-6 opacity-0"
-                    x-transition:enter-end="translate-x-0 opacity-100"
-                    id="mobile-topups-menu"
-                    class="flex flex-col"
-                >
-                    <button type="button" @click="sub = null" class="{{ $sheetBackClass }}">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                        {{ __('common.menu') }}
-                    </button>
-
-                    <p class="{{ $sheetPageTitleClass }}">{{ __('navigation.mobile_refill') }}</p>
-
-                    <a href="{{ route('shop.topups') }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                        {{ __('navigation.topups_all_networks') }}
-                    </a>
-                    <a href="{{ route('shop.topups', ['subcategory' => 'credit']) }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                        {{ __('navigation.topups_credit_only') }}
-                    </a>
-                    <a href="{{ route('shop.topups', ['subcategory' => 'bundles']) }}" wire:navigate @click="menuOpen = false" class="{{ $sheetSubLinkClass }}">
-                        {{ __('navigation.topups_bundles') }}
-                    </a>
-                </div>
-            @endif
         </div>
 
         {{-- The button itself sits in the logo row below, so it is rendered
              there and dispatches to this scope. --}}
         <span
             x-show="false"
-            @open-mobile-menu.window="menuOpen = true; sub = null"
+            @open-mobile-menu.window="menuOpen = true"
         ></span>
     </div>
 

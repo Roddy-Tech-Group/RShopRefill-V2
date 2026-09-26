@@ -54,10 +54,13 @@ class MobileDrawerShopCategoriesTest extends TestCase
             'eSIMs' => route('dashboard.shop.esims'),
             'Mobile Top-Ups' => route('dashboard.shop.topups'),
             'Bill Payments' => route('dashboard.shop.bills'),
-            'Gaming' => route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment']),
         ];
 
         $list = substr($aside, strpos($aside, 'id="dash-drawer-shop-categories"'));
+
+        // Four rows, and no deep link into a preselected category: that row
+        // landed on the heaviest page in the app and made the menu feel broken.
+        $this->assertStringNotContainsString('subcategory=gaming-entertainment', $list);
 
         $last = -1;
         foreach ($expected as $label => $href) {

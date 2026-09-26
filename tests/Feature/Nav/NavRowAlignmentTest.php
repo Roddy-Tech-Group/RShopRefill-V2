@@ -104,7 +104,7 @@ class NavRowAlignmentTest extends TestCase
         // twice. So this counts the tag, not the tag plus its props.
         $this->assertSame(2, substr_count($nav, '<x-nav.utility-links'));
         $this->assertSame(1, substr_count($nav, '<x-nav.utility-links :suggestion="true" />'));
-        $this->assertStringContainsString('x-data="{ menuOpen: false, sub: null }"', $nav);
+        $this->assertStringContainsString('x-data="{ menuOpen: false }"', $nav);
         $this->assertStringContainsString('hidden items-center gap-1 md:flex', $nav);
 
         // Neither partial wraps itself, or it would fight the parent flex row.
@@ -128,7 +128,7 @@ class NavRowAlignmentTest extends TestCase
     {
         $nav = $this->nav();
 
-        $sheetAt = strpos($nav, 'x-data="{ menuOpen: false, sub: null }"');
+        $sheetAt = strpos($nav, 'x-data="{ menuOpen: false }"');
         $collapseAt = strpos($nav, "[grid-template-rows:0fr] opacity-0'");
 
         $this->assertNotFalse($collapseAt, 'The category strip no longer folds by grid row.');
@@ -138,8 +138,10 @@ class NavRowAlignmentTest extends TestCase
 
         // The button lives in the logo row and reaches the sheet by event.
         $this->assertStringContainsString('$dispatch(\'open-mobile-menu\')', $nav);
-        // Reopening starts at the root page, never wherever it was left.
-        $this->assertStringContainsString('@open-mobile-menu.window="menuOpen = true; sub = null"', $nav);
+        // Opening just opens it. There is no page to reset: the sheet used to
+        // carry a second page of sub-categories and had to rewind to the root,
+        // and that drill-down is gone.
+        $this->assertStringContainsString('@open-mobile-menu.window="menuOpen = true"', $nav);
 
         // The strip above the logo is gone, not merely hidden.
         $this->assertStringNotContainsString('flex w-max min-w-full items-center justify-end gap-1 py-1', $nav);
@@ -312,7 +314,7 @@ class NavRowAlignmentTest extends TestCase
         // Still one visible at a time: the logo-row one is md+ only. Without
         // that guard both rendered on a phone and the picker appeared twice.
         $this->assertStringContainsString('<span class="hidden md:inline-flex">', $nav);
-        $this->assertStringContainsString('x-data="{ menuOpen: false, sub: null }"', $nav);
+        $this->assertStringContainsString('x-data="{ menuOpen: false }"', $nav);
         $this->assertStringNotContainsString('<x-theme-toggle', $links);
 
         $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $nav);

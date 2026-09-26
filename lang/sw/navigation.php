@@ -47,9 +47,6 @@ return [
 
     // Header category rail and the phone menu's Mobile Refill page.
     'product_categories' => 'Aina za bidhaa',
-    'topups_all_networks' => 'Mitandao yote',
-    'topups_credit_only' => 'Salio pekee',
-    'topups_bundles' => 'Salio, data na simu',
 
     // Region pill. :language is filled on the server; :country and :currency
     // in the browser, where the live values are.

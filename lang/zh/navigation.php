@@ -47,9 +47,6 @@ return [
 
     // Header category rail and the phone menu's Mobile Refill page.
     'product_categories' => '商品分类',
-    'topups_all_networks' => '所有运营商',
-    'topups_credit_only' => '仅话费',
-    'topups_bundles' => '话费、流量和通话',
 
     // Region pill. :language is filled on the server; :country and :currency
     // in the browser, where the live values are.

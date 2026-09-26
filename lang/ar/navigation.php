@@ -49,9 +49,6 @@ return [
 
     // Header category rail and the phone menu's Mobile Refill page.
     'product_categories' => 'فئات المنتجات',
-    'topups_all_networks' => 'جميع الشبكات',
-    'topups_credit_only' => 'رصيد فقط',
-    'topups_bundles' => 'رصيد وبيانات ومكالمات',
 
     // Region pill. :language is filled on the server; :country and :currency
     // in the browser, where the live values are.

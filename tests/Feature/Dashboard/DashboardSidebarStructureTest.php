@@ -49,14 +49,24 @@ class DashboardSidebarStructureTest extends TestCase
         $this->assertStringContainsString('href="'.route('dashboard.shop.gift-cards').'"', $sidebar);
 
         $last = -1;
-        foreach (['Gift Cards', 'eSIMs', 'Mobile Top-Ups', 'Bill Payments', 'Gaming'] as $label) {
+        // The four categories and nothing else. A Gaming row used to follow
+        // them, linking to the gift-card listing with a category preselected,
+        // and that listing is the heaviest page in the app.
+        foreach (['Gift Cards', 'eSIMs', 'Mobile Top-Ups', 'Bill Payments'] as $label) {
             $at = strpos($sidebar, $label);
             $this->assertNotFalse($at, $label.' is missing from the Shop menu.');
             $this->assertGreaterThan($last, $at, $label.' is out of order.');
             $last = $at;
         }
 
-        $this->assertStringContainsString('subcategory=gaming-entertainment', $sidebar);
+        // And nothing deep-links into a preselected category. This used to
+        // assert the opposite: a Gaming row linking to the gift-card listing
+        // with gaming-entertainment preselected. That listing is the heaviest
+        // page we serve, so the row took long enough to land that the menu felt
+        // broken, and the listing offers the same categories as pills.
+        $this->assertStringNotContainsString('subcategory=gaming-entertainment', $sidebar);
+        $this->assertStringNotContainsString('>Gaming<', $sidebar);
+
         $this->assertStringNotContainsString('All Categories', $sidebar);
         $this->assertStringNotContainsString('Topups &amp; Bills', $sidebar);
     }

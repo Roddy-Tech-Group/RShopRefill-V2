@@ -22,6 +22,13 @@ class StorefrontChromeTranslationTest extends TestCase
 {
     use RefreshDatabase;
 
+    /*
+     * The top-up filter labels used to be asserted here. They came from the
+     * phone menu sheet's Mobile Refill page, which listed All networks, Credit
+     * only and Credit, Data & Calls. That drill-down is gone: the sheet is four
+     * plain category links now, and those three translation keys went with it.
+     */
+
     private function page(string $locale, string $url = '/'): string
     {
         $this->post(route('locale.update'), ['locale' => $locale]);
@@ -147,8 +154,6 @@ class StorefrontChromeTranslationTest extends TestCase
 
         foreach ([
             'aria-label="Catégories de produits"',
-            'Tous les réseaux',
-            'Crédit uniquement',
             'Parrainez vos amis, gagnez',
             'Connectez-vous pour obtenir votre lien',
             'Créez un compte</a> et votre lien est prêt immédiatement.',
@@ -161,8 +166,6 @@ class StorefrontChromeTranslationTest extends TestCase
 
         foreach ([
             'Product categories',
-            'All networks',
-            'Credit only',
             'Sign in to get your link',
             'Send feedback',
             'Drag to move',
@@ -233,8 +236,6 @@ class StorefrontChromeTranslationTest extends TestCase
             'We use cookies to keep you signed in, secure your payments and improve',
             'Accept cookies',
             'aria-label="Product categories"',
-            'All networks',
-            'Credit, Data &amp; Calls',
             'Send feedback',
             'Refer friends, earn',
             '* I declare that I have read and agree to the <a',

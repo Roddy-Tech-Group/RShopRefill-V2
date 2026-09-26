@@ -507,8 +507,6 @@
                     $newServices = (array) config('dashboard.new_services', []);
                     $newBadge = 'inline-flex items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide '.$rowBadgeTone;
 
-                    $onGaming = request()->routeIs('dashboard.shop.gift-cards') && request()->query('subcategory') === 'gaming-entertainment';
-
                     // More Services: the services that sit outside the four core
                     // categories. It only appears once one of them is switched on,
                     // and opens the first that is.
@@ -518,13 +516,22 @@
                         \App\Support\FeatureFlag::categoryVisible('stays') ? route('dashboard.shop.stays') : null,
                     ])->filter()->first();
 
+                    // The four categories, and nothing below them.
+                    //
+                    // A Gaming row used to sit here, linking to the gift-card
+                    // listing with a category preselected. That listing is the
+                    // heaviest page we serve - every brand for the region, in
+                    // every section - so the row took long enough to land that
+                    // the menu felt broken, and the listing carries the same
+                    // categories as pills where switching is a class toggle on
+                    // markup the browser already holds.
+                    //
                     // [label, href, feature flag (null = none), new-badge key, active]
                     $shopSubItems = array_values(array_filter([
-                        ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards', 'gift_cards', request()->routeIs('dashboard.shop.gift-cards', 'dashboard.shop.brand') && ! $onGaming],
+                        ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards', 'gift_cards', request()->routeIs('dashboard.shop.gift-cards', 'dashboard.shop.brand')],
                         ['eSIMs',          route('dashboard.shop.esims'),      'esims',      'esims',      request()->routeIs('dashboard.shop.esim*')],
                         ['Mobile Top-Ups', route('dashboard.shop.topups'),     'topups',     'topups',     request()->routeIs('dashboard.shop.topup*')],
                         ['Bill Payments',  route('dashboard.shop.bills'),      'bills',      'bills',      request()->routeIs('dashboard.shop.bill*')],
-                        ['Gaming',         route('dashboard.shop.gift-cards', ['subcategory' => 'gaming-entertainment']), 'gift_cards', 'gaming', $onGaming],
                         $moreServicesHref ? ['More Services', $moreServicesHref, null, 'more', request()->routeIs('dashboard.shop.gomarket', 'dashboard.shop.flights', 'dashboard.shop.stays')] : null,
                     ]));
                 @endphp
