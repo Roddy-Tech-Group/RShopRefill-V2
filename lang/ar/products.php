@@ -109,6 +109,7 @@ return [
     'detail_amount' => 'المبلغ',
     'detail_credit_amount' => 'مبلغ الرصيد',
     'detail_select_amount' => 'اختر المبلغ',
+    'detail_change_amount' => 'تغيير المبلغ',
     'detail_clear_amount' => 'مسح المبلغ المحدد',
     'detail_custom_amount' => 'مبلغ مخصص',
     'detail_popular' => 'الأكثر طلبًا',

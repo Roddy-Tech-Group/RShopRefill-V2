@@ -109,6 +109,7 @@ return [
     'detail_amount' => 'Montant',
     'detail_credit_amount' => 'Montant du crédit',
     'detail_select_amount' => 'Choisir un montant',
+    'detail_change_amount' => 'Changer le montant',
     'detail_clear_amount' => 'Effacer le montant sélectionné',
     'detail_custom_amount' => 'Montant personnalisé',
     'detail_popular' => 'Populaire',

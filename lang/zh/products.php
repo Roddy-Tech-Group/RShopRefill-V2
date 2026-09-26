@@ -106,6 +106,7 @@ return [
     'detail_amount' => '金额',
     'detail_credit_amount' => '充值金额',
     'detail_select_amount' => '选择金额',
+    'detail_change_amount' => '更改金额',
     'detail_clear_amount' => '清除所选金额',
     'detail_custom_amount' => '自定义金额',
     'detail_popular' => '热门',

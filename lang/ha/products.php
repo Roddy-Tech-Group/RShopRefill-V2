@@ -107,6 +107,7 @@ return [
     'detail_amount' => 'Adadi',
     'detail_credit_amount' => 'Adadin kuɗin waya',
     'detail_select_amount' => 'Zaɓi adadi',
+    'detail_change_amount' => 'Canza adadi',
     'detail_clear_amount' => 'Share adadin da aka zaɓa',
     'detail_custom_amount' => 'Adadin da ka zaɓa da kanka',
     'detail_popular' => 'Shahararre',

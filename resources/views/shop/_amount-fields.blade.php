@@ -46,73 +46,152 @@
                  never promise a price the checkout contradicts. Selection is
                  carried by the variant id, which is also what prices it. Small
                  square tiles, four to a row, beside the art. --}}
-            <div class="grid grid-cols-4 gap-2" role="radiogroup" aria-label="{{ __('products.detail_amount') }}">
-                @php
-                    // Smallest first, and no tile is singled out: only the customer's
-                    // own choice is marked.
-                    $denomTiles = $fixedDenoms->sortBy(fn ($denom) => (float) ($denom->face_value ?? $denom->retail_price))->values();
-                @endphp
-                @foreach ($denomTiles as $v)
-                    @php
-                        $v->setRelation('product', $product);
-                        $face = (float) ($v->face_value ?? $v->retail_price);
-                        // `amount` keeps the value the dropdown used to set, so
-                        // nothing downstream of it changes. It does not price a
-                        // fixed value: the variant id does.
-                        $disp = round((float) $v->retail_price * $displayRate, 2);
+            @php
+                // A card with a handful of values shows them all; the catalogue
+                // also carries cards with twenty, and twenty squares is a screen
+                // and a half of scrolling on a phone before the button that buys
+                // them. Past four, the phone gets the chosen value and its price
+                // on one row, and the grid moves into a sheet behind it. Four or
+                // fewer is already short enough to leave alone, and no width
+                // above sm ever hides the grid.
+                $denomCount = $fixedDenoms->count() + ($variable ? 1 : 0);
+                $denomFolds = $denomCount > 4;
 
-                        $denomFace = rtrim(rtrim(number_format($face, 2, '.', ','), '0'), '.');
-                        $denomCode = strtoupper($v->currency ?: $currency);
+                // What the summary row calls the chosen value. Built here rather
+                // than read off the shared variants payload, which carries no
+                // currency: a tile takes the variant's own code where it has one.
+                $denomSummaries = [];
+                foreach ($fixedDenoms as $denomVariant) {
+                    $denomSummaryFace = (float) ($denomVariant->face_value ?? $denomVariant->retail_price);
+                    $denomSummaries[$denomVariant->id] = rtrim(rtrim(number_format($denomSummaryFace, 2, '.', ','), '0'), '.')
+                        .' '.strtoupper($denomVariant->currency ?: $currency);
+                }
+            @endphp
 
-                        // The tile is a ~94px square and the label wraps, so what has
-                        // to fit on one line is the longest word in it - the figure.
-                        // Most are short ("100") and take the full size; a catalogue
-                        // that runs to "5,000,000" steps down rather than spilling out
-                        // of the tile. Measured, not guessed: 16px overflowed a 94px
-                        // tile by 3px at nine characters.
-                        $denomLongest = max(strlen($denomFace), strlen($denomCode));
-                        $denomTextClass = match (true) {
-                            $denomLongest >= 10 => 'text-xs',
-                            $denomLongest >= 8 => 'text-sm',
-                            default => 'text-base',
-                        };
-                    @endphp
-                    <button
-                        type="button"
-                        role="radio"
-                        @click="amount = {{ $disp }}; selectedVariantId = {{ $v->id }}; customMode = false"
-                        :aria-checked="(! customMode && selectedVariantId === {{ $v->id }}).toString()"
-                        :class="(! customMode && selectedVariantId === {{ $v->id }}) ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-white/10 dark:hover:border-blue-400/50'"
-                        class="pure-card relative flex aspect-square flex-col items-center justify-center rounded-[12px] border bg-white px-2 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
-                    >
-                        {{-- The chosen tile also carries a check, so the choice reads at a
-                             glance and not only from the outline. --}}
-                        <span x-show="! customMode && selectedVariantId === {{ $v->id }}" x-cloak class="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white ring-2 ring-white dark:ring-[#1a1a1e]" aria-hidden="true">
-                            <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                        </span>
-                        {{-- The face value alone. What it costs is in the purchase card,
-                             which follows the chosen tile.
+            @if ($denomFolds)
+            {{-- Closed is the default, so a long card never paints its sheet
+                 open on the way in, and the open state is one attribute. Above
+                 sm none of this applies and the element is just the div holding
+                 the grid, which is why the desktop needs no second copy of the
+                 tiles and no Alpine at all. --}}
+            <style>
+                @media (max-width: 639.98px) {
+                    .denom-sheet {
+                        position: fixed;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        z-index: 71;
+                        max-height: 82vh;
+                        overflow-y: auto;
+                        overscroll-behavior: contain;
+                        -webkit-overflow-scrolling: touch;
+                        border-radius: 24px 24px 0 0;
+                        background-color: #ffffff;
+                        padding: 1rem 1rem max(1.25rem, env(safe-area-inset-bottom));
+                        box-shadow: 0 -8px 40px rgba(15, 23, 42, .25);
+                        transform: translateY(100%);
+                        visibility: hidden;
+                        transition: transform .3s cubic-bezier(.22, 1, .36, 1), visibility .3s;
+                    }
+                    .denom-sheet[data-open="true"] {
+                        transform: translateY(0);
+                        visibility: visible;
+                    }
+                    html.dark .denom-sheet {
+                        background-color: #101011;
+                        box-shadow: 0 -8px 40px rgba(0, 0, 0, .55);
+                    }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .denom-sheet { transition: none; }
+                }
+            </style>
 
-                             No whitespace-nowrap: most values are short ("25 USD") and
-                             sit on one line, but the catalogue runs up to "5,000,000
-                             VND", which wraps onto a second line inside the square
-                             rather than pushing out of it. --}}
-                        <span class="{{ $denomTextClass }} font-bold leading-tight tabular-nums text-zinc-900 dark:text-white">{{ $denomFace }} {{ $denomCode }}</span>
-                    </button>
-                @endforeach
-                @if ($variable)
-                    <button
-                        type="button"
-                        role="radio"
-                        @click="customMode = true; selectedVariantId = {{ $variable->id }}; amount = ''"
-                        :aria-checked="customMode.toString()"
-                        :class="customMode ? 'border-blue-600 ring-1 ring-blue-600 dark:border-blue-500 dark:ring-blue-500' : 'border-zinc-200 hover:border-blue-300 dark:border-white/10 dark:hover:border-blue-400/50'"
-                        class="pure-card col-span-4 flex flex-col items-center justify-center rounded-[12px] border bg-white px-2 py-3 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
-                    >
-                        <span class="text-sm font-bold leading-tight text-zinc-900 dark:text-white">{{ __('products.detail_custom_amount') }}</span>
-                        <span class="mt-0.5 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">{{ $customMoney($customDisplayMin) }} - {{ $customMoney($customDisplayMax) }}</span>
-                    </button>
+                {{-- The chosen value and what it costs, on one row, with the
+                     grid one tap away. Phone only: from sm the grid itself is
+                     on the page and a row summarising it would be noise. --}}
+                <button
+                    type="button"
+                    @click="denomSheet = true"
+                    class="pure-card flex w-full items-center gap-3 rounded-[12px] border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 sm:hidden dark:border-white/10 dark:bg-white/5"
+                    :aria-label="(selectedVariantId ? @js(__('products.detail_change_amount')) : @js(__('products.detail_select_amount')))"
+                >
+                    <span class="min-w-0 flex-1">
+                        <span
+                            class="block truncate text-sm font-semibold text-zinc-600 dark:text-zinc-400"
+                            x-text="customMode
+                                ? @js(__('products.detail_custom_amount'))
+                                : (denomSummaries[selectedVariantId] || @js(__('products.detail_select_amount')))"
+                        >{{ __('products.detail_select_amount') }}</span>
+
+                        {{-- The price only once there is something to price. --}}
+                        <span
+                            x-show="selectedVariantId"
+                            x-cloak
+                            x-data="valueFlip()"
+                            x-effect="selectedVariantId; amount; selectedCrypto; flash()"
+                            class="mt-0.5 block truncate text-lg font-bold tabular-nums text-zinc-900 dark:text-white"
+                            x-text="formatUsdIn(selectedCrypto, unitPriceUsd())"
+                        ></span>
+                    </span>
+
+                    {{-- A pencil, because the row is a thing already chosen that
+                         can be chosen again, not a field waiting to be filled. --}}
+                    <svg class="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 14.25v4.5A2.25 2.25 0 0117.25 21H5.25A2.25 2.25 0 013 18.75V6.75A2.25 2.25 0 015.25 4.5h4.5"/>
+                    </svg>
+                </button>
+
+                {{-- The dimmer behind the sheet, phone only. --}}
+                <div
+                    x-show="denomSheet"
+                    x-cloak
+                    x-transition.opacity
+                    @click="denomSheet = false"
+                    class="fixed inset-0 z-[70] bg-zinc-900/50 backdrop-blur-[2px] sm:hidden"
+                    aria-hidden="true"
+                ></div>
+            @endif
+
+            {{-- The grid. On a phone of a long card it is the sheet: parked below
+                 the fold and slid up. From sm every one of those rules is undone
+                 and it is simply the grid on the page, which is why the desktop
+                 needs no second copy of the tiles. --}}
+            <div
+                @if ($denomFolds)
+                    class="denom-sheet"
+                    :data-open="denomSheet ? 'true' : 'false'"
+                    x-effect="denomSheet ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
+                    @keydown.escape.window="denomSheet = false"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="{{ __('products.detail_amount') }}"
                 @endif
+            >
+                @if ($denomFolds)
+                    {{-- The sheet's own head: a handle to say it can be dragged
+                         away, the heading, and a close for anyone who would
+                         rather press than dismiss. All of it gone from sm. --}}
+                    <div class="sm:hidden">
+                        <span class="mx-auto mb-3 block h-1 w-10 rounded-full bg-zinc-300 dark:bg-white/20" aria-hidden="true"></span>
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <h2 class="text-base font-bold text-zinc-900 dark:text-white">{{ __('products.detail_amount') }}</h2>
+                            <button
+                                type="button"
+                                @click="denomSheet = false"
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white/10 dark:text-zinc-300"
+                                aria-label="{{ __('common.close') }}"
+                            >
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
+                @include('shop._denomination-tiles')
             </div>
         @else
         <div

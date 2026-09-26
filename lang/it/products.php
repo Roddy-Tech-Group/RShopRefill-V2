@@ -107,6 +107,7 @@ return [
     'detail_amount' => 'Importo',
     'detail_credit_amount' => 'Importo del credito',
     'detail_select_amount' => 'Scelga un importo',
+    'detail_change_amount' => 'Cambia importo',
     'detail_clear_amount' => 'Cancella l’importo selezionato',
     'detail_custom_amount' => 'Importo personalizzato',
     'detail_popular' => 'Popolare',

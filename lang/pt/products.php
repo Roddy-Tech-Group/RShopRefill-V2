@@ -107,6 +107,7 @@ return [
     'detail_amount' => 'Valor',
     'detail_credit_amount' => 'Valor do crédito',
     'detail_select_amount' => 'Escolha um valor',
+    'detail_change_amount' => 'Alterar o valor',
     'detail_clear_amount' => 'Limpar o valor escolhido',
     'detail_custom_amount' => 'Valor personalizado',
     'detail_popular' => 'Popular',

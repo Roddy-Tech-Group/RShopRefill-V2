@@ -1606,6 +1606,12 @@
                 recipientPhone: '',                          // digits the buyer typed (no country code)
                 recipientDialCode: defaultDialCode || '',    // e.g. '+1', shown as a prefix on the input
 
+                // A long gift card folds its values into a sheet on a phone
+                // (see shop/_amount-fields). False on a desktop for good: there
+                // is no sheet there, and the tiles clear this on every pick so
+                // one handler serves both layouts.
+                denomSheet: false,
+
                 // Bill payment: account / meter number the biller will credit.
                 requiresAccountId: !! requiresAccountId,
                 accountId: '',

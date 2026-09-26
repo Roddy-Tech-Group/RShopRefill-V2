@@ -105,6 +105,7 @@ return [
     'detail_amount' => 'Kiasi',
     'detail_credit_amount' => 'Kiasi cha salio',
     'detail_select_amount' => 'Chagua kiasi',
+    'detail_change_amount' => 'Badilisha kiasi',
     'detail_clear_amount' => 'Futa kiasi ulichochagua',
     'detail_custom_amount' => 'Kiasi maalum',
     'detail_popular' => 'Maarufu',

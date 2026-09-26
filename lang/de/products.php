@@ -105,6 +105,7 @@ return [
     'detail_amount' => 'Betrag',
     'detail_credit_amount' => 'Guthabenbetrag',
     'detail_select_amount' => 'Betrag wählen',
+    'detail_change_amount' => 'Betrag ändern',
     'detail_clear_amount' => 'Gewählten Betrag löschen',
     'detail_custom_amount' => 'Eigener Betrag',
     'detail_popular' => 'Beliebt',

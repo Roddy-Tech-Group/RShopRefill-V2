@@ -117,6 +117,7 @@ return [
     'detail_amount' => 'Amount',
     'detail_credit_amount' => 'Credit amount',
     'detail_select_amount' => 'Select amount',
+    'detail_change_amount' => 'Change amount',
     'detail_clear_amount' => 'Clear selected amount',
     'detail_custom_amount' => 'Custom amount',
     'detail_popular' => 'Popular',
