@@ -1,8 +1,8 @@
-# RshopRefills V2
+# RshopRefill V2
 
 **Buy gift cards, eSIMs, mobile top-ups and bill payments. One ecosystem, all your digital solutions.**
 
-RshopRefills is a digital commerce and wallet platform. V2 is a ground-up rebuild on a modern Laravel 12 stack with a domain-driven architecture, a multi-currency wallet, a full rewards economy, multi-gateway payments (card, mobile money, crypto, wallet), automated supplier fulfillment, and an installable PWA experience.
+RshopRefill is a digital commerce and wallet platform. V2 is a ground-up rebuild on a modern Laravel 12 stack with a domain-driven architecture, a multi-currency wallet, a full rewards economy, multi-gateway payments (card, mobile money, crypto, wallet), automated supplier fulfillment, and an installable PWA experience.
 
 The first product of **Roddy Technologies** - built in Cameroon, serving the world.
 
@@ -217,4 +217,4 @@ Built by **Roddy Technologies**.
 - **Divine Ofeh** - Chief Executive Officer (CEO)
 - **Madueke Johnpaul** - Chief Technology Officer (CTO)
 
-Building an Africa-to-international digital ecosystem, from Cameroon to the world. RshopRefills is the team's first product, with continuous updates shipping to solve real problems for the community.
+Building an Africa-to-international digital ecosystem, from Cameroon to the world. RshopRefill is the team's first product, with continuous updates shipping to solve real problems for the community.
