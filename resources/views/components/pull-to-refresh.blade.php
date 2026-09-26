@@ -7,11 +7,12 @@
 
      Two things make it feel like the real thing rather than a reload button.
 
-     The spinner says when it is armed: under the threshold it is grey and
-     small and nothing will happen, and the moment a release would fire it
-     goes brand blue and snaps up a size. Pulling is a gesture with no click
-     to commit it, so the control has to answer while the finger is still
-     down.
+     The spinner says when it is armed: under the threshold it is a quiet
+     grey and nothing will happen, and the moment a release would fire it
+     darkens and snaps up a size. Pulling is a gesture with no click to commit
+     it, so the control has to answer while the finger is still down. Greys
+     rather than a colour, because the wheel is the platform's own shape and
+     a brand colour on it reads as a different control.
 
      And the refresh keeps the page on screen. A hard reload drops the
      document the instant it commits, so the customer watched a white screen
@@ -23,16 +24,29 @@
      reload it always did. --}}
 <div id="rshop-ptr" aria-hidden="true">
     <div class="rshop-ptr-circle">
-        {{-- Two rings on one circle. The faint one is the whole journey; the
-             bright one is how far down the pull has got, drawn by its dash
-             offset from nothing at rest to a closed ring at the threshold, so
-             the finger is drawing the thing that decides what happens when it
-             lifts. Once the refresh is running the same bright ring drops back
-             to an arc and spins, because there is no progress left to report,
-             only work in hand. --}}
+        {{-- Twelve spokes round a hub, each one fainter than the last. The
+             fade is the whole trick: it gives the wheel a head, so even a
+             still frame reads as already turning, and a step per spoke then
+             turns it the way the eye expects rather than sliding it.
+
+             Drawn rather than pulled in as an image so it takes currentColor
+             and follows the state of the pull, and so there is no second
+             request between letting go and seeing that something happened. --}}
         <svg class="rshop-ptr-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle class="rshop-ptr-track" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.6"/>
-            <circle class="rshop-ptr-arc" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="57" stroke-dashoffset="57" transform="rotate(-90 12 12)"/>
+            <g class="rshop-ptr-spokes" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(0 12 12)" opacity="1"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(30 12 12)" opacity="0.928"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(60 12 12)" opacity="0.856"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(90 12 12)" opacity="0.784"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(120 12 12)" opacity="0.712"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(150 12 12)" opacity="0.64"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(180 12 12)" opacity="0.568"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(210 12 12)" opacity="0.496"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(240 12 12)" opacity="0.424"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(270 12 12)" opacity="0.352"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(300 12 12)" opacity="0.28"/>
+            <line x1="12" y1="3.4" x2="12" y2="7.6" transform="rotate(330 12 12)" opacity="0.208"/>
+            </g>
         </svg>
     </div>
 </div>
@@ -69,9 +83,11 @@
        reads without looking straight at it. */
     #rshop-ptr.rshop-ptr-ready .rshop-ptr-circle,
     #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-circle {
-        color: #2563eb;
+        /* Darker, not a different colour. The wheel is the platform's own
+           shape and a brand hue painted on it reads as a different control. */
+        color: #475569;
         transform: scale(1.12);
-        box-shadow: 0 8px 22px rgba(37, 99, 235, .28);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .26);
     }
     html.dark .rshop-ptr-circle {
         color: #64748b;
@@ -85,21 +101,14 @@
         box-shadow: 0 8px 22px rgba(0, 0, 0, .45);
     }
     .rshop-ptr-spin { height: 21px; width: 21px; }
-    /* The journey, always there, quiet enough to read as a groove. */
-    .rshop-ptr-track { opacity: .18; }
-    /* And the part of it the pull has covered. No transition: this follows a
-       finger, and easing a value that is already being animated by the hand
-       holding it only makes it lag. */
-    .rshop-ptr-arc { opacity: 1; }
 
-    /* Refreshing: the ring stops reporting progress and starts reporting work.
-       The arc is cut back to a quarter and the whole mark turns. */
-    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-spin { animation: rshop-ptr-rotate .75s linear infinite; }
-    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-arc {
-        stroke-dasharray: 57;
-        stroke-dashoffset: 42;
+    /* A step per spoke, not a glide. Twelve spokes turned smoothly read as a
+       blur; turned one spoke at a time, each step lands a lit spoke exactly
+       where the last one was, which is what the eye recognises as a spinner. */
+    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-spokes {
+        transform-origin: 50% 50%;
+        animation: rshop-ptr-rotate .9s steps(12, end) infinite;
     }
-    #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-track { opacity: .25; }
     @keyframes rshop-ptr-rotate { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) {
         #rshop-ptr.rshop-ptr-refreshing .rshop-ptr-spin { animation-duration: 1.4s; }
@@ -163,13 +172,15 @@
                 e.style.transform = 'translateX(-50%) translateY(' + (HIDDEN_Y + nextPx) + 'px)';
                 e.style.opacity = Math.min(nextPx / THRESHOLD, 1).toFixed(3);
 
-                // The ring closes as the pull approaches the threshold: full
-                // offset is an empty circle, zero is a closed one. 57 is the
-                // circumference of the r=9 circle it is drawn on.
-                const arc = e.querySelector('.rshop-ptr-arc');
-                if (arc) {
+                // The wheel turns with the pull, a spoke at a time, so the
+                // gesture drives the same motion the refresh will continue.
+                // A full pull to the threshold turns it a third of the way
+                // round, which is enough to see without looking straight at it.
+                const spokes = e.querySelector('.rshop-ptr-spokes');
+                if (spokes) {
                     const travelled = Math.min(nextPx / THRESHOLD, 1);
-                    arc.style.strokeDashoffset = (57 * (1 - travelled)).toFixed(2);
+                    const step = Math.round(travelled * 4) * 30;
+                    spokes.style.transform = 'rotate(' + step + 'deg)';
                 }
             });
         }
@@ -185,9 +196,9 @@
             e.classList.add('rshop-ptr-animate');
             e.classList.remove('rshop-ptr-ready', 'rshop-ptr-refreshing');
 
-            // Empty again, so the next pull draws the ring from nothing.
-            const arc = e.querySelector('.rshop-ptr-arc');
-            if (arc) { arc.style.strokeDashoffset = '57'; }
+            // Back to its start, so the next pull turns it from there.
+            const spokes = e.querySelector('.rshop-ptr-spokes');
+            if (spokes) { spokes.style.transform = ''; }
             e.style.transform = 'translateX(-50%) translateY(' + HIDDEN_Y + 'px)';
             e.style.opacity = '0';
         }
@@ -261,11 +272,11 @@
                 cancelRaf();
                 const e = el();
                 if (e) {
-                    // Hand the ring back to the stylesheet, which draws the
-                    // spinning quarter: an inline offset from the pull would
-                    // outrank it and freeze the arc at whatever it ended on.
-                    const arc = e.querySelector('.rshop-ptr-arc');
-                    if (arc) { arc.style.strokeDashoffset = ''; }
+                    // Hand the wheel back to the stylesheet, which spins it: an
+                    // inline rotation left from the pull would outrank the
+                    // animation and hold it still.
+                    const spokes = e.querySelector('.rshop-ptr-spokes');
+                    if (spokes) { spokes.style.transform = ''; }
 
                     e.classList.add('rshop-ptr-animate', 'rshop-ptr-refreshing');
                     e.style.transform = 'translateX(-50%) translateY(' + REST_Y + 'px)';

@@ -28,43 +28,53 @@ class PullToRefreshTest extends TestCase
     }
 
     /**
-     * The ring closes as the pull approaches the threshold, so the finger is
-     * drawing the thing that decides what happens when it lifts. 57 is the
-     * circumference of the r=9 circle it is drawn on.
+     * Twelve spokes round a hub, each fainter than the last. The fade gives
+     * the wheel a head, so even a still frame reads as already turning.
      */
-    public function test_the_ring_fills_with_the_pull(): void
+    public function test_the_mark_is_a_twelve_spoke_wheel(): void
     {
         $js = $this->ptrSource();
 
-        // Two rings: the whole journey, and the part covered so far.
-        $this->assertStringContainsString('class="rshop-ptr-track"', $js);
-        $this->assertStringContainsString('class="rshop-ptr-arc"', $js);
-        $this->assertStringContainsString('stroke-dasharray="57" stroke-dashoffset="57"', $js);
+        $this->assertStringContainsString('class="rshop-ptr-spokes"', $js);
+        $this->assertSame(12, substr_count($js, '<line x1="12" y1="3.4" x2="12" y2="7.6"'), 'a wheel has twelve spokes');
 
-        // Full offset at rest, closing to nothing at the threshold.
-        $this->assertStringContainsString('arc.style.strokeDashoffset = (57 * (1 - travelled)).toFixed(2);', $js);
-        $this->assertStringContainsString('const travelled = Math.min(nextPx / THRESHOLD, 1);', $js);
+        // One every thirty degrees, all the way round.
+        foreach ([0, 30, 90, 180, 330] as $angle) {
+            $this->assertStringContainsString('transform="rotate('.$angle.' 12 12)"', $js);
+        }
 
-        // Not the old static arc that never moved.
-        $this->assertStringNotContainsString("s.style.transform = 'rotate(' + (nextPx * 3.2)", $js);
+        // Brightest at the head, fading round.
+        $this->assertStringContainsString('opacity="1"', $js);
+        $this->assertStringContainsString('opacity="0.928"', $js);
+
+        // The ring it replaced is gone.
+        foreach (['rshop-ptr-arc', 'rshop-ptr-track', 'strokeDashoffset'] as $ring) {
+            $this->assertStringNotContainsString($ring, $js, $ring.' is still there');
+        }
     }
 
     /**
-     * Once the refresh is running there is no progress left to report, so the
-     * ring hands itself back to the stylesheet and spins. An inline offset
-     * left over from the pull would outrank it and freeze the arc.
+     * A step per spoke, not a glide. Turned smoothly the wheel reads as a
+     * blur; stepped, each frame lands a lit spoke where the last one was,
+     * which is what the eye recognises as a spinner.
      */
-    public function test_the_ring_hands_itself_back_when_the_refresh_starts(): void
+    public function test_it_turns_a_spoke_at_a_time(): void
     {
         $js = $this->ptrSource();
 
-        $this->assertStringContainsString("if (arc) { arc.style.strokeDashoffset = ''; }", $js);
         $this->assertMatchesRegularExpression(
-            '/#rshop-ptr\.rshop-ptr-refreshing \.rshop-ptr-arc \{\s*stroke-dasharray: 57;\s*stroke-dashoffset: 42;/',
+            '/#rshop-ptr\.rshop-ptr-refreshing \.rshop-ptr-spokes \{\s*transform-origin: 50% 50%;\s*animation: rshop-ptr-rotate \.9s steps\(12, end\) infinite;/',
             $js
         );
-        // And a snap back empties it for the next pull.
-        $this->assertStringContainsString("if (arc) { arc.style.strokeDashoffset = '57'; }", $js);
+
+        // The pull turns it too, in the same steps, so the gesture drives the
+        // motion the refresh then continues.
+        $this->assertStringContainsString('const step = Math.round(travelled * 4) * 30;', $js);
+        $this->assertStringContainsString("spokes.style.transform = 'rotate(' + step + 'deg)';", $js);
+
+        // And it is handed back to the stylesheet on release, or an inline
+        // rotation would outrank the animation and hold the wheel still.
+        $this->assertSame(2, substr_count($js, "spokes.style.transform = '';"));
     }
 
     public function test_the_spinner_arms_itself_at_the_threshold(): void
@@ -75,12 +85,16 @@ class PullToRefreshTest extends TestCase
         $this->assertStringContainsString("e.classList.toggle('rshop-ptr-ready', nextPx >= THRESHOLD);", $js);
         $this->assertStringContainsString("e.classList.remove('rshop-ptr-ready', 'rshop-ptr-refreshing');", $js);
 
-        // Armed reads as colour AND size: colour alone is easy to miss under a
-        // thumb, and the two states must not be told apart by hue only.
+        // Armed reads as weight AND size: a shade alone is easy to miss under
+        // a thumb, and the two states must not be told apart by colour only.
+        // Darker rather than a different hue, because the wheel is the
+        // platform's own shape and a brand colour on it reads as some other
+        // control entirely.
         $this->assertMatchesRegularExpression(
-            '/#rshop-ptr\.rshop-ptr-ready \.rshop-ptr-circle,\s*#rshop-ptr\.rshop-ptr-refreshing \.rshop-ptr-circle \{\s*color: #2563eb;\s*transform: scale\(1\.12\);/',
+            '/#rshop-ptr\.rshop-ptr-ready \.rshop-ptr-circle,\s*#rshop-ptr\.rshop-ptr-refreshing \.rshop-ptr-circle \{[^}]*color: #475569;\s*transform: scale\(1\.12\);/s',
             $js
         );
+        $this->assertStringNotContainsString('#2563eb', $js, 'the wheel should not carry a brand colour');
         // And it is grey until then, so the armed state is a change.
         $this->assertMatchesRegularExpression('/\.rshop-ptr-circle \{[^}]*color: #94a3b8;/s', $js);
     }
