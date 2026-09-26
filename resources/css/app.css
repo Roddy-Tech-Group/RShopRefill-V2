@@ -524,7 +524,7 @@ html.dark .divide-inset > *:not(:last-child)::after {
     background-color: rgb(250 250 250 / 0.6);
 }
 html.dark .divide-inset > *:hover {
-    background-color: #232328; /* hover lifts one step; cards rest at var(--ash) */
+    background-color: var(--ash-hover); /* hover lifts one step; cards rest at var(--ash) */
 }
 .divide-inset > *:hover::after,
 .divide-inset > *:has(+ *:hover)::after {
@@ -1176,10 +1176,14 @@ html.dark .wallet-glass {
         background-image: none !important;
     }
     html.dark .dash-mobile-panel {
-        /* The desktop pane's own dark tone (#101011): above the ground, below
-           the cards, so the bar behind it and the cards on it both keep their
-           lift, and both frames match. */
-        background-color: #101011;
+        /* Above the ground, below the cards, so the bar behind it and the cards
+           on it both keep their lift, and both frames match.
+
+           It was #101011, sixteen points off the pure black the bar is forced
+           to, which on a phone screen is no difference at all: the page read as
+           more of the bar with a curve cut into it. This is a real step up,
+           and --ash moves with it so the cards keep the same distance above. */
+        background-color: #15151a;
         background-image: var(--grain);
         background-size: 220px 220px;
     }
@@ -1187,7 +1191,11 @@ html.dark .wallet-glass {
     /* The sidebar drawer wears the bar's colour: navy, black in dark mode,
        the logo drawn white on it, the current page on a soft white tile. */
     body.dashboard .dash-drawer { background-color: #0c1337; color: #fff; }
-    html.dark body.dashboard .dash-drawer { background-color: #000000; }
+    /* Not pure black: the drawer runs flush to the top of the screen, behind
+       the status bar, and at #000000 that whole strip read as switched-off
+       glass rather than as a panel. It wears the page surface's own tone, so
+       the drawer, the page under it and the bar above it are one family. */
+    html.dark body.dashboard .dash-drawer { background-color: #15151a; }
     body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }
     body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
     body.dashboard .dash-drawer-row { color: rgb(255 255 255 / .85); }
@@ -1586,12 +1594,12 @@ html.dark .cart-panel {
      page: cards, tiles, composers. Two levels only. Panels stay on the
      ground and are separated by a hairline plus the grain, never by a
      lighter fill. A third surface is what makes a dark UI look muddy. */
-  --ash: #1a1a1e;
+  --ash: #232329;
 
   /* Interactive lift above --ash. Keeping this separate from the resting card
      token prevents dark buttons, rows and carousel controls from resolving to
      the same computed colour before and during hover. */
-  --ash-hover: #232328;
+  --ash-hover: #2d2d34;
 
   /* The grain, as a background-image rather than an overlay layer. The spec
      paints it at 0.14 in the rect and 0.5 on the layer; 0.07 in the rect is
@@ -1912,7 +1920,7 @@ html.dark body.dashboard .keep-light.bg-\[\#f4f6f5\] {
    .divide-inset above, which is the established dark row highlight. */
 html.dark body.dashboard .hover\:bg-\[\#ffffff\]:hover,
 html.dark body.dashboard .hover\:bg-\[\#f4f6f5\]:hover {
-    background-color: #232328;   /* cards rest at var(--ash); hover lifts one step */
+    background-color: var(--ash-hover);   /* cards rest at var(--ash); hover lifts one step */
     background-image: none;
 }
 
@@ -2424,7 +2432,7 @@ input[type="search"]::-webkit-search-results-decoration {
 .dark.pure-dark body.dashboard .keep-light.bg-\[\#ffffff\] { background-color: #ffffff; background-image: none; }
 .dark.pure-dark body.dashboard .bg-\[\#f4f6f5\] { background-color: var(--ground); }
 .dark.pure-dark body.dashboard .hover\:bg-\[\#ffffff\]:hover,
-.dark.pure-dark body.dashboard .hover\:bg-\[\#f4f6f5\]:hover { background-color: #232328; background-image: none; }
+.dark.pure-dark body.dashboard .hover\:bg-\[\#f4f6f5\]:hover { background-color: var(--ash-hover); background-image: none; }
 .dark.pure-dark .bg-\[\#f9fafb\]   { background-color: var(--ground); }
 /* Page bodies / mains carry `dark:bg-[#0c1a36]` for the page tone; that variant
    must beat the card-tone bg-[#eff6ff]/bg-white remaps (equal specificity, so it

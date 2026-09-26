@@ -35,7 +35,7 @@ class DarkThemeTest extends TestCase
         $css = $this->css();
 
         $this->assertStringContainsString('--ground: #060607;', $css);
-        $this->assertStringContainsString('--ash: #1a1a1e;', $css);
+        $this->assertStringContainsString('--ash: #232329;', $css);
 
         // The old ramp is gone from the stylesheet entirely: page surfaces were
         // #0d0d0d and cards #2a2a2a.
@@ -336,8 +336,8 @@ class DarkThemeTest extends TestCase
     {
         $css = $this->css();
 
-        $this->assertStringContainsString('--ash: #1a1a1e;', $css);
-        $this->assertStringContainsString('--ash-hover: #232328;', $css);
+        $this->assertStringContainsString('--ash: #232329;', $css);
+        $this->assertStringContainsString('--ash-hover: #2d2d34;', $css);
         $this->assertStringContainsString(
             '.dark\\:hover\\:bg-\\[\\#26416b\\]:hover { background-color: var(--ash-hover);',
             $css

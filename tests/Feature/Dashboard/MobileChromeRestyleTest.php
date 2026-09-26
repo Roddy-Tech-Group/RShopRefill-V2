@@ -120,7 +120,7 @@ class MobileChromeRestyleTest extends TestCase
         // the way the header chips did. It is mobile only for free, because the
         // whole drawer is lg:hidden.
         $this->assertStringContainsString('class="dash-drawer-head flex shrink-0 items-center border-b border-white/20 px-4">', $aside);
-        $this->assertStringContainsString('class="site-logo h-10 w-auto object-contain"', $aside);
+        $this->assertStringContainsString('class="site-logo h-12 w-auto object-contain"', $aside);
 
         // Three groups: the main rows, then Account, then More; the current page tiled.
         $this->assertSame(2, substr_count($aside, 'class="dash-drawer-label'));
@@ -130,7 +130,7 @@ class MobileChromeRestyleTest extends TestCase
         $this->assertLessThan(strpos($aside, '>Account</p>'), strpos($aside, '>Transactions<'));
         $this->assertGreaterThan(strpos($aside, '>Account</p>'), strpos($aside, '>Settings<'));
         $this->assertGreaterThan(strpos($aside, '>More</p>'), strpos($aside, '>For Partners<'));
-        $this->assertSame(13, substr_count($aside, 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-semibold'));
+        $this->assertSame(13, substr_count($aside, 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[15px] font-semibold'));
         $this->assertSame(1, substr_count($aside, 'dash-drawer-row-active'), 'only the current page is tiled');
         $this->assertMatchesRegularExpression('/dash-drawer-row-active"\s+aria-current="page"/', $aside);
 
@@ -139,7 +139,9 @@ class MobileChromeRestyleTest extends TestCase
 
         $css = $this->css();
         $this->assertStringContainsString('body.dashboard .dash-drawer { background-color: #0c1337; color: #fff; }', $css);
-        $this->assertStringContainsString('html.dark body.dashboard .dash-drawer { background-color: #000000; }', $css);
+        // Not pure black: the drawer runs flush to the top behind the status
+        // bar, and #000000 read as switched-off glass rather than a panel.
+        $this->assertStringContainsString('html.dark body.dashboard .dash-drawer { background-color: #15151a; }', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top));', $css);
         $this->assertStringContainsString('body.dashboard .dash-drawer-row-active { background-color: rgb(255 255 255 / .12); color: #fff; }', $css);
