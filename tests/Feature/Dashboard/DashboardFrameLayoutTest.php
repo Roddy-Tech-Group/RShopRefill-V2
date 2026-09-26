@@ -142,7 +142,11 @@ class DashboardFrameLayoutTest extends TestCase
 
         $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15', $layout);
         $this->assertStringContainsString("'dashboard-notification-chip' => \$tone === 'chip'", $bell);
-        $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/10', $bell);
+        // The bell carries the same ring in both themes. It used to drop to
+        // white/10 in dark, but the bar it sits on is navy in light and forced
+        // to pure black in dark, so that override ran the wrong way and the
+        // ring all but vanished on black.
+        $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/30', $bell);
         $this->assertStringNotContainsString('hover:bg-blue-600 hover:text-white', $bell);
     }
 

@@ -107,7 +107,7 @@ new class extends Component {
             'rounded-full bg-blue-100 ring-2 ring-blue-200 text-blue-700 hover:bg-blue-200 dark:bg-white/15 dark:ring-white/30 dark:text-white dark:hover:bg-white/25' => $tone === 'light',
             'rounded-full text-zinc-700 hover:bg-zinc-100' => $tone === 'dark',
             // 'chip' is the dashboard top bar's round outlined button (white on the blue bar), matching the cart beside it.
-            'h-9 w-9 rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60' => $tone === 'chip',
+            'h-9 w-9 rounded-full border-2 border-white/30 text-white hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60' => $tone === 'chip',
         ])
     >
         @if ($tone === 'chip')
