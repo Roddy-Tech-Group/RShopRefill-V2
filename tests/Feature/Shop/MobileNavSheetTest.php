@@ -100,11 +100,15 @@ class MobileNavSheetTest extends TestCase
         $this->assertNotFalse($end);
         $head = substr($html, $start, $end - $start);
 
-        // The mark, as a link home, before the first category row.
+        // The wordmark, as a link home, before the first category row. The
+        // drawer is 86vw of its own and has the room to say the name; the bar
+        // keeps the bare mark because it shares its line with the search field
+        // and the account chips.
         $this->assertMatchesRegularExpression(
-            '/<a\s+href="'.preg_quote(e(route('home')), '/').'"[^>]*>\s*<img src="[^"]*PWAicon\.webp"/s',
+            '/<a\s+href="'.preg_quote(e(route('home')), '/').'"[^>]*>\s*<img src="[^"]*logo\.webp[^"]*"/s',
             $head
         );
+        $this->assertStringNotContainsString('PWAicon.webp', $head, 'the drawer should not fall back to the bare mark');
         $this->assertStringContainsString('class="site-logo h-9 w-auto object-contain"', $head);
 
         // And the bar's own logo link is gone below md: hidden there, flex from md.
