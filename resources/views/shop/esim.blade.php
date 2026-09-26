@@ -679,7 +679,7 @@
                         x-transition:enter-start="opacity-0 translate-y-2"
                         x-transition:enter-end="opacity-100 translate-y-0"
                     >
-                        <x-home.brand-row :title="__('esim.choose_package')" :carousel="true" :bleed="! $inDash" view-all-variant="none">
+                        <x-home.brand-row :title="__('esim.choose_package')" :carousel="true" :bleed="true" view-all-variant="none">
                             <template x-for="(p, idx) in sortedPlans()" :key="p.id">
                             <button
                                 type="button"
@@ -864,7 +864,7 @@
                                 :title="__('esim.broader_title')"
                                 :subtitle="__('esim.broader_subtitle')"
                                 :carousel="true"
-                                :bleed="! $inDash"
+                                :bleed="true"
                                 view-all-variant="none"
                             >
                                 {{-- The same card the eSIM store grid uses, not a

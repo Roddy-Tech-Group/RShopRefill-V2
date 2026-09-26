@@ -93,6 +93,19 @@
         //   2. --card-w - a fixed per-breakpoint card width consumed by the
         //      carousel-list card-width rule in app.css. Without it the cards
         //      fall back to brand-card sm:w-auto and balloon to their logo size.
+        // Whether the track may actually span the page right now.
+        //
+        // On the storefront a bleeding row always may. Inside the dashboard it
+        // depends on the width: from lg the sidebar rail holds a column of its
+        // own, so a page-wide track would run out past the panel it lives in,
+        // but below lg the panel IS the page and the bleed is honest. setup()
+        // already re-runs on resize, so this settles itself at the breakpoint
+        // rather than being decided once on the server.
+        bleeding() {
+            return this.bleed
+                && ! (document.body.classList.contains('dashboard') && window.innerWidth >= 1024);
+        },
+
         setup() {
             const t    = this.$refs.track;
             const list = this.$refs.list;
@@ -107,7 +120,7 @@
             const apply = () => {
                 // Contained (non-bleed) tracks sit inside their own column, so the
                 // first card lines up at the track's left edge - no viewport offset.
-                const padLeft = this.bleed
+                const padLeft = this.bleeding()
                     ? Math.max(minPad, Math.round(this.$el.getBoundingClientRect().left))
                     : 0;
                 if (list.style.paddingLeft !== padLeft + 'px') {

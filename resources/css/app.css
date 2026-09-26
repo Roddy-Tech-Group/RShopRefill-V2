@@ -3022,3 +3022,17 @@ html.is-standalone,
 html.is-standalone body {
     touch-action: manipulation;
 }
+
+/* A bleeding carousel inside the dashboard -----------------------------------
+   Below lg the dashboard panel IS the page, so a page-wide track is exactly
+   right and the row scrolls edge to edge like it does on the storefront. From
+   lg the sidebar rail holds a column of its own and the panel is narrower than
+   the page, so the same track would run out past it. The width is handed back
+   there; brand-row's bleeding() makes the matching decision for the padding it
+   writes, and re-runs on resize, so the two never disagree. */
+@media (min-width: 1024px) {
+    body.dashboard .full-bleed {
+        width: 100%;
+        margin-inline: 0;
+    }
+}
