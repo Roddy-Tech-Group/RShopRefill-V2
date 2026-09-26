@@ -161,7 +161,10 @@ class MobileWalletSheetTest extends TestCase
 
         $this->assertStringContainsString('Data, Calls for 3 countries', $html);
         $this->assertStringContainsString('2 networks in 2 countries', $html);
-        $this->assertStringContainsString('1 biller in 1 country', $html);
+        // Bills states its purpose rather than counting billers, unlike the
+        // three cards beside it (PurchaseCardFiguresTest covers both).
+        $this->assertStringContainsString('Pay your bills seamlessly', $html);
+        $this->assertStringNotContainsString('biller in', $html);
         $this->assertStringContainsString('2 brands to choose from', $html);
         // The borrowed reference copy is gone.
         $this->assertStringNotContainsString('100+ countries', $html);

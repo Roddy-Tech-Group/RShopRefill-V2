@@ -259,9 +259,13 @@ new #[Lazy] class extends Component
                 $countries = fn (int $n): string => $n.' '.\Illuminate\Support\Str::plural('country', $n);
                 // Each card carries the illustration drawn for it (assets/purchase).
                 $purchaseCards = [
-                    ['Bills', $stat('bill-payments', 'brands') > 0
-                        ? $stat('bill-payments', 'brands').' '.\Illuminate\Support\Str::plural('biller', $stat('bill-payments', 'brands')).' in '.$countries($stat('bill-payments', 'countries'))
-                        : 'Pay your bills', 'purchase/bills.svg', route('dashboard.shop.bills')],
+                    // Bills says what it is for rather than how many billers are
+                    // wired up. The count is the wrong promise here: a customer
+                    // looking for their own electricity company is not reassured by
+                    // a total that may not include it, and the number moves every
+                    // time a supplier is added. The other three cards still count,
+                    // because breadth is the point of a catalogue.
+                    ['Bills', 'Pay your bills seamlessly', 'purchase/bills.svg', route('dashboard.shop.bills')],
                     ['Airtime & data', $stat('mobile-airtime', 'brands') > 0
                         ? $stat('mobile-airtime', 'brands').' '.\Illuminate\Support\Str::plural('network', $stat('mobile-airtime', 'brands')).' in '.$countries($stat('mobile-airtime', 'countries'))
                         : 'Top up airtime & data', 'purchase/airtime.svg', route('dashboard.shop.topups')],

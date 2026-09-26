@@ -106,4 +106,41 @@ class PurchaseCardFiguresTest extends TestCase
 
         $this->assertTrue(str_contains($this->overview(), 'Data, Calls for 3 countries'), 'the card did not follow the catalogue');
     }
+
+    /**
+     * Bills is the one card that does not count. A customer looking for their
+     * own electricity company is not reassured by a total that may not include
+     * it, so the card says what it is for instead, and says the same thing on
+     * a full catalogue as on an empty one.
+     */
+    public function test_the_bills_card_states_its_purpose_rather_than_counting(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        // Empty catalogue.
+        Cache::forget('dashboard.purchase-stats');
+        $this->assertTrue(str_contains($this->overview(), 'Pay your bills seamlessly'));
+
+        // And with billers on the shelf, still the same line.
+        $this->stock('bill-payments', ['NG', 'GH', 'KE']);
+        $html = $this->overview();
+
+        $this->assertTrue(str_contains($html, 'Pay your bills seamlessly'), 'the bills card should not change with the catalogue');
+        $this->assertFalse(str_contains($html, 'billers in'), 'the bills card is counting again');
+    }
+
+    /** The other three still count, so this is a choice about bills, not a retreat. */
+    public function test_the_other_cards_still_count(): void
+    {
+        $this->stock('esims', ['US', 'GB']);
+        $this->stock('mobile-airtime', ['NG', 'GH']);
+        $this->stock('gift-cards', ['US', 'GB', 'NG']);
+        $this->actingAs(User::factory()->create());
+
+        $html = $this->overview();
+
+        $this->assertTrue(str_contains($html, 'Data, Calls for 2 countries'), 'esims stopped counting');
+        $this->assertTrue(str_contains($html, '2 networks in 2 countries'), 'airtime stopped counting');
+        $this->assertTrue(str_contains($html, '3 brands to choose from'), 'gift cards stopped counting');
+    }
 }
