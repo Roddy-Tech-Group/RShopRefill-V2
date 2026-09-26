@@ -57,8 +57,17 @@ class ChannelResolver
             }
         }
 
-        // Push channel: check preferences.
-        if ($this->isPushAllowed($recipient, $category, $preferenceManager)) {
+        // Push channel: only to a recipient that could hold a subscription, and
+        // then only if preferences allow it.
+        //
+        // The capability check is the same one WebPushChannel makes before it
+        // refuses. Without it here, a newsletter broadcast resolved a push
+        // channel for every NewsletterSubscriber on the list, queued a job per
+        // subscriber, and had each one suppressed with "Recipient model does
+        // not support push subscriptions" - 1504 such rows in production. The
+        // email still went, so nothing was lost, but the queue carried work
+        // that could never succeed and the push metrics were mostly noise.
+        if ($this->canReceivePush($recipient) && $this->isPushAllowed($recipient, $category, $preferenceManager)) {
             $channels[] = CommunicationChannel::Push;
         }
 
@@ -88,6 +97,18 @@ class ChannelResolver
 
         // Check user preferences.
         return $preferenceManager->isAllowed($recipient, $category, CommunicationChannel::Email);
+    }
+
+    /**
+     * Could this recipient hold a push subscription at all?
+     *
+     * Recipient is typed as Model, not User, so anything an Eloquent model can
+     * be may arrive here. Users and Admins have the relation; a
+     * NewsletterSubscriber does not, and no preference makes one appear.
+     */
+    private function canReceivePush(Model $recipient): bool
+    {
+        return method_exists($recipient, 'pushSubscriptions');
     }
 
     /**

@@ -31,7 +31,13 @@ class WebPushChannel implements ChannelInterface
                 );
             }
 
-            $subscriptions = $payload->recipient->pushSubscriptions;
+            // Through the device manager, not the raw relation: it drops rows
+            // whose expires_at has passed. Reading the relation directly meant
+            // every send also went to endpoints we already knew were dead, and
+            // they were only pruned once the push service rejected them, so a
+            // known-expired row cost a request on every notification until
+            // something happened to send to it.
+            $subscriptions = $this->deviceManager->getSubscriptionsFor($payload->recipient);
 
             // Having no push subscriptions is an expected state for most
             // users, not a delivery failure — recording it as Failed floods

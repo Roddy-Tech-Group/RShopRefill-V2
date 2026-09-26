@@ -143,18 +143,48 @@ self.addEventListener('fetch', (event) => {
     }
 });
 
+/**
+ * The icon the notification carries when the payload does not name one.
+ *
+ * It used to be /icon-192x192.png with a /badge-72x72.png beside it, and
+ * neither file has ever existed in this repo. Nothing on the send path sets an
+ * icon either, so every push we have ever delivered asked the browser for two
+ * missing files and fell back to whatever generic mark it keeps for the case.
+ * This is the real icon, the one the manifest installs the app with.
+ *
+ * There is deliberately no badge default. A badge is the small monochrome
+ * silhouette Android puts in the status bar, we do not have one drawn, and a
+ * path to a file that is not there is worse than leaving it out: omitted, the
+ * browser picks its own sensible mark. The send path can still supply one.
+ */
+const NOTIFICATION_ICON = '/assets/icon-192.png';
+
 self.addEventListener('push', function(event) {
-    if (event.data) {
-        const payload = event.data.json();
-        event.waitUntil(
-            self.registration.showNotification(payload.title, {
-                body: payload.body,
-                icon: payload.icon || '/icon-192x192.png',
-                badge: payload.badge || '/badge-72x72.png',
-                data: payload
-            })
-        );
+    if (! event.data) {
+        return;
     }
+
+    let payload;
+    try {
+        payload = event.data.json();
+    } catch (_) {
+        // A push we cannot read is still a push the browser demanded we show
+        // something for, so show the little we know rather than nothing.
+        payload = { title: 'RshopRefill', body: event.data.text() };
+    }
+
+    const options = {
+        body: payload.body,
+        icon: payload.icon || NOTIFICATION_ICON,
+        data: payload,
+    };
+
+    // Only when we actually have one, for the reason above.
+    if (payload.badge) {
+        options.badge = payload.badge;
+    }
+
+    event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
 self.addEventListener('notificationclick', function(event) {
