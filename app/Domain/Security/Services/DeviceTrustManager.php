@@ -8,10 +8,11 @@ use App\Models\UserSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Jenssegers\Agent\Agent;
-use Stevebauman\Location\Facades\Location;
 
 class DeviceTrustManager
 {
+    public function __construct(private IpLocator $locator) {}
+
     /**
      * Compute a hybrid fingerprint combining client-provided data and server-side headers.
      */
@@ -45,7 +46,14 @@ class DeviceTrustManager
         $agent = new Agent;
         $agent->setUserAgent($userAgent);
 
-        $location = Location::get($ipAddress);
+        // Only resolve when there is something to learn: the same device
+        // signing in from the same address as last time already has its
+        // location on the row. This used to be an unconditional lookup on every
+        // single login, which put a location call on the authentication critical
+        // path for no new information.
+        $location = ($device->ip_address !== $ipAddress || $device->country_code === null)
+            ? $this->locator->locate($ipAddress)
+            : null;
 
         $device->fill([
             'device_name' => $deviceData['device_name'] ?? $device->device_name ?? self::friendlyDeviceName($agent),
@@ -53,9 +61,10 @@ class DeviceTrustManager
             'os' => $deviceData['os'] ?? ($agent->platform() ?: null) ?? $device->os,
             'device_type' => $deviceData['device_type'] ?? ($agent->isDesktop() ? 'desktop' : ($agent->isTablet() ? 'tablet' : 'mobile')) ?? $device->device_type,
             'ip_address' => $ipAddress,
-            'city' => $deviceData['city'] ?? ($location ? $location->cityName : $device->city),
-            'country' => $deviceData['country'] ?? ($location ? $location->countryName : $device->country),
-            'timezone' => $deviceData['timezone'] ?? ($location ? $location->timezone : $device->timezone),
+            'city' => $deviceData['city'] ?? $location?->city ?? $device->city,
+            'country' => $deviceData['country'] ?? $location?->countryName ?? $device->country,
+            'country_code' => $location?->countryCode ?? $device->country_code,
+            'timezone' => $deviceData['timezone'] ?? $location?->timezone ?? $device->timezone,
             'user_agent' => $userAgent,
             'last_seen_at' => now(),
         ]);

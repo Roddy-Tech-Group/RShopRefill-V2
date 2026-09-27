@@ -8,6 +8,7 @@ use App\Domain\Risk\DTOs\RiskDecision;
 use App\Domain\Risk\DTOs\SignalHit;
 use App\Domain\Risk\Enums\RiskBand;
 use App\Domain\Risk\Enums\RiskOutcome;
+use App\Domain\Security\Services\LoginCountryGuard;
 use App\Models\RiskAssessment;
 use App\Models\TrustedDevice;
 use App\Models\User;
@@ -35,10 +36,11 @@ use Throwable;
  * assess() is designed to never break a checkout: any internal failure is logged
  * and degrades to allow (fail-open), which in shadow mode is a no-op anyway.
  *
- * evaluateLoginRisk() is the pre-existing login-time risk path that drives email
- * OTP; it is retained unchanged here (its only caller is EvaluateLoginRiskListener)
- * and is slated to migrate onto the signal model with a real GEO_VELOCITY signal
- * in Stage 3.
+ * evaluateLoginRisk() is the login-time risk path that drives email OTP; its
+ * only caller is EvaluateLoginRiskListener. Its travel component now delegates
+ * to LoginCountryGuard, which compares countries and time instead of the naive
+ * "the IP changed" check it replaced. Device age and velocity still migrate onto
+ * the signal model.
  */
 class RiskEngine
 {
@@ -260,9 +262,9 @@ class RiskEngine
     /**
      * Evaluates a login attempt and returns a Session Risk Level: LOW, MEDIUM, HIGH, CRITICAL.
      *
-     * Legacy login-risk path (drives email OTP via EvaluateLoginRiskListener).
-     * Retained as-is for now; migrates onto the signal model with a real
-     * distance/time GEO_VELOCITY signal in Stage 3.
+     * Login-risk path, which drives the email OTP via EvaluateLoginRiskListener.
+     * The travel component is now a real country/time check owned by
+     * LoginCountryGuard; the rest still migrates onto the signal model.
      */
     public function evaluateLoginRisk(User $user, TrustedDevice $device, string $ipAddress): string
     {
@@ -277,15 +279,19 @@ class RiskEngine
             }
         }
 
-        if ($this->detectImpossibleTravel($user, $ipAddress)) {
-            $riskScore += 40;
+        // 50, not the 40 the old IP check scored, because HIGH starts at 50 and
+        // a genuine country change inside the window is worth a code on its own.
+        // At 40 the flag could only ever matter in combination with something
+        // else, which is a rule that does not do its own job.
+        if (app(LoginCountryGuard::class)->challengeRequired($user, $ipAddress, $device->device_uuid)) {
+            $riskScore += 50;
         }
 
         if ($this->hasHighVelocity($user->id, 'login')) {
             $riskScore += 30;
         }
 
-        $this->recordAction($user->id, 'login', $ipAddress);
+        $this->recordAction($user->id, 'login');
 
         if ($riskScore >= 80) {
             return 'CRITICAL';
@@ -308,23 +314,10 @@ class RiskEngine
         return $attempts > 5;
     }
 
-    private function detectImpossibleTravel(User $user, string $currentIp): bool
-    {
-        $lastIp = Cache::get("user_last_ip:{$user->id}");
-
-        if ($lastIp && $lastIp !== $currentIp) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function recordAction(int $userId, string $actionType, string $ipAddress): void
+    private function recordAction(int $userId, string $actionType): void
     {
         $key = "fraud_velocity:{$userId}:{$actionType}";
         Cache::add($key, 0, now()->addMinutes(10));
         Cache::increment($key);
-
-        Cache::put("user_last_ip:{$userId}", $ipAddress, now()->addHours(1));
     }
 }

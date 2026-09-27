@@ -171,18 +171,37 @@ class RiskLinkageSignalsTest extends TestCase
         $this->assertSilent($signal, $this->ctx(['user' => $clean]));
     }
 
+    /**
+     * The signal compares ISO codes, not country names: names are the
+     * provider's own spelling, so a provider swap would read as travel.
+     */
     public function test_geo_velocity_two_countries_in_window(): void
     {
         $signal = app(GeoVelocitySignal::class);
         $u = User::factory()->create();
-        $this->device($u->id, 'dev-ng', ['country' => 'NG', 'last_seen_at' => now()->subMinutes(10)]);
-        $this->device($u->id, 'dev-gb', ['country' => 'GB', 'last_seen_at' => now()->subMinutes(5)]);
+        $this->device($u->id, 'dev-ng', ['country' => 'Nigeria', 'country_code' => 'NG', 'last_seen_at' => now()->subMinutes(10)]);
+        $this->device($u->id, 'dev-gb', ['country' => 'United Kingdom', 'country_code' => 'GB', 'last_seen_at' => now()->subMinutes(5)]);
 
         $this->assertFires($signal, $this->ctx(['user' => $u]));
 
         $single = User::factory()->create();
-        $this->device($single->id, 'dev-one', ['country' => 'NG', 'last_seen_at' => now()]);
+        $this->device($single->id, 'dev-one', ['country' => 'Nigeria', 'country_code' => 'NG', 'last_seen_at' => now()]);
         $this->assertSilent($signal, $this->ctx(['user' => $single]));
+    }
+
+    /**
+     * A device resolved before the code column existed has a name and no code.
+     * It is skipped rather than guessed at, so the signal can only ever be
+     * quieter while devices:backfill-countries catches history up, never wrong.
+     */
+    public function test_geo_velocity_skips_devices_with_no_resolved_code(): void
+    {
+        $signal = app(GeoVelocitySignal::class);
+        $u = User::factory()->create();
+        $this->device($u->id, 'dev-old', ['country' => 'Nigeria', 'country_code' => null, 'last_seen_at' => now()->subMinutes(10)]);
+        $this->device($u->id, 'dev-new', ['country' => 'United Kingdom', 'country_code' => 'GB', 'last_seen_at' => now()->subMinutes(5)]);
+
+        $this->assertSilent($signal, $this->ctx(['user' => $u]));
     }
 
     public function test_chargeback_history_is_scored_not_override(): void

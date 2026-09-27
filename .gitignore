@@ -60,3 +60,8 @@ payment_provider_kill_switch_plan.md
 /AGENTS.md
 /.agents/skills/*
 !/.agents/skills/rshop-audit/
+
+# The GeoLite2 database is a large binary refreshed weekly by location:update,
+# not source. Keep the folder, never the file.
+/database/maxmind/*
+!/database/maxmind/.gitignore

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Security;
 use App\Domain\Security\Events\NewDeviceDetected;
 use App\Domain\Security\Events\OtpRequested;
 use App\Domain\Security\Services\DeviceTrustManager;
+use App\Domain\Security\Services\LoginCountryGuard;
 use App\Domain\Security\Services\SecurityIncidentManager;
 use App\Http\Controllers\Controller;
 use App\Models\TrustedDevice;
@@ -16,7 +17,8 @@ class DeviceVerificationController extends Controller
 {
     public function __construct(
         private DeviceTrustManager $trustManager,
-        private SecurityIncidentManager $incidentManager
+        private SecurityIncidentManager $incidentManager,
+        private LoginCountryGuard $loginCountryGuard,
     ) {}
 
     public function show(Request $request)
@@ -137,6 +139,13 @@ class DeviceVerificationController extends Controller
         Cache::forget('otp_attempts_'.$user->id);
         Cache::forget($failsKey);
         session()->forget('pending_email_otp');
+
+        // The customer has proved they can receive mail for this account from
+        // wherever they are, which is exactly the proof the login country check
+        // wants: this country stops being challenged until the proof expires.
+        // Holds whatever sent them here, since any challenged login is a login
+        // whose country is now vouched for.
+        $this->loginCountryGuard->markProven($user, $request->ip());
 
         $deviceId = session()->pull('pending_device_id');
         if ($deviceId) {

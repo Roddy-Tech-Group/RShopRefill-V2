@@ -13,8 +13,8 @@ class TrustedDevice extends Model
 
     protected $fillable = [
         'user_id', 'device_uuid', 'device_name', 'browser', 'os', 'device_type',
-        'ip_address', 'country', 'city', 'timezone', 'user_agent', 'fingerprint',
-        'trusted_since', 'trust_score', 'current_session_count', 'last_seen_at'
+        'ip_address', 'country', 'country_code', 'city', 'timezone', 'user_agent', 'fingerprint',
+        'trusted_since', 'trust_score', 'current_session_count', 'last_seen_at',
     ];
 
     protected $casts = [
@@ -34,6 +34,6 @@ class TrustedDevice extends Model
 
     public function isTrusted(): bool
     {
-        return !is_null($this->trusted_since);
+        return ! is_null($this->trusted_since);
     }
 }

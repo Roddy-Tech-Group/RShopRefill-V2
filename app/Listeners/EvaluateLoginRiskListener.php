@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Domain\Risk\Services\RiskEngine;
 use App\Domain\Security\Events\OtpRequested;
 use App\Domain\Security\Services\DeviceTrustManager;
+use App\Domain\Security\Services\LoginCountryGuard;
 use App\Domain\Security\Services\SessionSecurityManager;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Login;
@@ -19,7 +20,8 @@ class EvaluateLoginRiskListener
     public function __construct(
         private DeviceTrustManager $deviceTrustManager,
         private SessionSecurityManager $sessionManager,
-        private RiskEngine $riskEngine
+        private RiskEngine $riskEngine,
+        private LoginCountryGuard $loginCountryGuard,
     ) {}
 
     public function handle(Login $event): void
@@ -94,6 +96,14 @@ class EvaluateLoginRiskListener
         // on sensitive actions, on any device, for the life of the account.
         if (! $needsOtp && ! $device->isTrusted()) {
             $this->deviceTrustManager->markAsTrusted($device);
+        }
+
+        // Same reasoning one level up: a login that needed no code also proves
+        // the country it came from, so the customer's own home country is
+        // proved from their very first session. Without this their first trip
+        // abroad would challenge them on the way out and again on the way back.
+        if (! $needsOtp) {
+            $this->loginCountryGuard->markProven($user, $ipAddress);
         }
 
         if ($needsOtp) {

@@ -319,9 +319,19 @@ return [
         'instrument_reuse_window_days' => 30,
         'similarity_max_accounts' => 1,
 
-        // Geo-velocity (signal currently dormant): two distinct device countries
-        // inside this window, a pragmatic proxy until real GeoIP lands.
+        // Geo-velocity: two distinct countries on one account inside this
+        // window. ONE number, shared by the money path (GeoVelocitySignal) and
+        // the login path (LoginCountryGuard), so the two can never disagree
+        // about what counts as too fast to be a real journey. Six hours is
+        // short enough that no real flight fits and long enough that nothing
+        // routine does.
         'geo_velocity_window_hours' => 6,
+
+        // How long a country the customer has proved stays proved before the
+        // login check will ask about it again. Proof expires so an account
+        // cannot accumulate a standing list of countries that silences the
+        // check for life. 0 would mean forever.
+        'login_country_proof_days' => 90,
 
         // Chargeback feedback: lookback for both signals; Repeat fires at this
         // many disputes or more.

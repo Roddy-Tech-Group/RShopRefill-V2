@@ -7,11 +7,18 @@ use App\Domain\Risk\DTOs\SignalHit;
 use App\Models\TrustedDevice;
 
 /**
- * Impossible travel: the account's devices report two or more distinct countries
- * within a short window, which no single human could physically do. A pragmatic
- * distance/time proxy built from the device registry's resolved country, replacing
- * the old naive "IP changed" check; it upgrades to true lat/long distance the day
- * a GeoIP provider is wired, with no change to the engine.
+ * Impossible travel on the money path: the account's devices report two or more
+ * distinct countries within a short window, which no single human could
+ * physically do.
+ *
+ * Compares ISO country CODES, not names. Names are provider-specific ("The
+ * Netherlands" against "Netherlands" for the same place), so a name comparison
+ * would read a provider swap as a customer moving country. Devices whose code
+ * has not been resolved yet are skipped rather than guessed at, which can only
+ * ever make the signal quieter; `devices:backfill-countries` fills them in.
+ *
+ * Shares its window with the login-time check in LoginCountryGuard so both
+ * paths agree on what counts as too fast.
  */
 class GeoVelocitySignal extends AbstractRiskSignal
 {
@@ -33,9 +40,9 @@ class GeoVelocitySignal extends AbstractRiskSignal
         $countries = TrustedDevice::query()
             ->where('user_id', $user->getKey())
             ->where('last_seen_at', '>=', now()->subHours($windowHours))
-            ->whereNotNull('country')
+            ->whereNotNull('country_code')
             ->distinct()
-            ->pluck('country')
+            ->pluck('country_code')
             ->filter()
             ->values();
 
