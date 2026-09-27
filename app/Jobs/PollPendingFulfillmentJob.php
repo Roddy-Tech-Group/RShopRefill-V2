@@ -89,6 +89,26 @@ class PollPendingFulfillmentJob implements ShouldQueue
                     // Still pending/processing — signal that we need to re-queue after the transaction
                     $needsRelease = true;
 
+                    // Keep what the provider last said. This branch used to
+                    // throw it away, so an item sitting in IN_PROGRESS for an
+                    // hour looked identical to one the provider had never
+                    // heard of: fulfillment_payload stayed null and diagnosing
+                    // meant calling the provider's API by hand.
+                    //
+                    // It goes in metadata, not fulfillment_payload: that column
+                    // carries what the customer receives, and a status blob in
+                    // it would read as a delivery that never happened.
+                    if (! empty($result['payload'])) {
+                        $item->metadata = array_merge($item->metadata ?? [], [
+                            'last_provider_status' => [
+                                'at' => now()->toIso8601String(),
+                                'attempt' => $attempt,
+                                'payload' => $result['payload'],
+                            ],
+                        ]);
+                        $item->save();
+                    }
+
                     if ($attempt === 60 && $item->fulfillment_status !== FulfillmentStatus::Delayed) {
                         $item->fulfillment_status = FulfillmentStatus::Delayed;
                         $item->save();

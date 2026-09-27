@@ -1593,13 +1593,26 @@
              the desktop frame lifts its pane off the header (.dash-mobile-panel
              in app.css). lg:contents removes the wrapper from the desktop
              layout entirely. --}}
+        <div class="dash-curve-fill lg:hidden" aria-hidden="true"></div>
         <div class="dash-mobile-panel lg:contents" x-data x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))">
         @unless ($skipMobileHero)
-        {{-- The balance area. On the light panel it sits on the panel itself;
-             in the dark theme it is the dashboard's dark blue, the same navy
-             the sidebar marks and the light header wear, so the wallet reads
-             as its own band under the black bar. The panel's curve clips it. --}}
-        <header class="relative z-10 bg-transparent px-5 pt-5 pb-6 dark:bg-[#0c1337] lg:hidden">
+        {{-- The balance area, its own band under the bar, clipped by the
+             panel's curve.
+
+             It is a coloured band in both themes now. Dark keeps the navy it
+             always had. Light used to be transparent, so the balance sat on the
+             plain panel and the band did not read as a band at all; it now
+             carries a wash from deep blue into a bright cyan-blue.
+
+             bg-none in dark is what makes that work: the gradient is a
+             background-IMAGE, and a dark background-colour alone would sit
+             under it rather than replace it.
+
+             It runs deeper than its content needs and curves at the bottom so
+             the first row of cards rises into it, rather than the colour
+             stopping on a flat edge the moment the balance text ends. The
+             content below pulls up over that curve. --}}
+        <header class="dash-hero-wash relative z-10 rounded-b-[28px] px-5 pt-5 pb-14 lg:hidden">
             @isset($mobileHero)
                 {{-- Padding on the header, not a margin on the hero: a margin
                      would collapse through the header's top edge and leave the

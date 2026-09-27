@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dashboard;
 
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
@@ -63,7 +64,21 @@ class OverviewNavBandSurfaceTest extends TestCase
     {
         $rules = $this->phoneRules();
 
-        $this->assertMatchesRegularExpression('/\.dash-mobile-panel \{[^}]*border-top-left-radius: 32px;[^}]*border-top-right-radius: 32px;/', $rules);
+        // The curve under the bar is DRAWN, not cut.
+        //
+        // Cutting it out of the panel made two holes: a rounded corner shows
+        // whatever its parent paints there, and a probe colour on the pane
+        // never appeared anywhere on the page, so the panel overflows its
+        // parent and the corners fell through to the page canvas. Putting it
+        // on the balance band instead made it scroll away with the band.
+        //
+        // So the panel is square and two corner wedges are painted over the
+        // top, fixed. Only the corners are painted, the middle is transparent,
+        // which is why it can sit above the page without covering the cards.
+        $this->assertMatchesRegularExpression('/\.dash-mobile-panel \{[^}]*border-top-left-radius: 0;/s', $rules);
+        $this->assertMatchesRegularExpression('/\.dash-curve-fill \{[^}]*position: fixed;[^}]*height: 32px;/s', $rules);
+        $this->assertMatchesRegularExpression('/\.dash-curve-fill \{[^}]*radial-gradient\(circle 32px at 32px 32px, transparent 0 31\.4px, #0c1337 32\.6px\)/s', $rules);
+        $this->assertMatchesRegularExpression('/html\.dark \.dash-curve-fill \{[^}]*#000000 32\.6px\)/s', $rules);
         $this->assertStringContainsString('<div class="dash-mobile-panel lg:contents" x-data', $this->layout());
         // The bar mirrors the desktop header: navy in light, pure black in
         // dark, and the same colour runs behind the page so the panel's curve
@@ -87,15 +102,71 @@ class OverviewNavBandSurfaceTest extends TestCase
     }
 
     /**
-     * The wallet balance area is the dashboard's dark blue in the dark theme:
-     * the mobile hero header carries the navy the sidebar marks wear, under
-     * the black bar, and stays on the panel itself in the light theme.
+     * The wallet balance area is a coloured band in BOTH themes.
+     *
+     * Dark keeps the navy the sidebar marks wear. Light used to be transparent,
+     * so the balance sat on the plain panel and the band did not read as a band
+     * at all; it carries a blue wash now. It runs deeper than its text needs
+     * and curves at the bottom, so the cards below rise into it rather than
+     * meeting a flat edge.
      */
-    public function test_the_balance_area_is_dark_blue_in_the_dark_theme(): void
+    public function test_the_balance_area_is_a_coloured_band_in_both_themes(): void
     {
+        // The band carries only its BOTTOM curve. The curve under the bar is
+        // drawn over the top by .dash-curve-fill, because it has to stay put
+        // while the page scrolls and anything on the band scrolls away with it.
         $this->assertStringContainsString(
-            '<header class="relative z-10 bg-transparent px-5 pt-5 pb-6 dark:bg-[#0c1337] lg:hidden">',
+            '<header class="dash-hero-wash relative z-10 rounded-b-[28px] px-5 pt-5 pb-14 lg:hidden">',
             $this->layout(),
+        );
+
+        $css = File::get(resource_path('css/app.css'));
+
+        // Layered blooms, not one straight ramp: a single linear gradient reads
+        // as a printed ribbon, and the point is for the colour to pool.
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 88% 6%/s', $css);
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 97% 96%/s', $css);
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 0% 52%/s', $css);
+    }
+
+    /**
+     * bg-none is what lets dark keep its navy. The gradient is a background
+     * IMAGE, so a background-colour alone would sit under it rather than
+     * replace it, and dark would wear the light theme's wash.
+     */
+    public function test_dark_clears_the_gradient_rather_than_painting_over_it(): void
+    {
+        $css = File::get(resource_path('css/app.css'));
+
+        // background-image: none is the load-bearing line. The wash is an
+        // IMAGE, so dark's background-COLOUR alone would sit under it and dark
+        // would wear the light theme's gradient.
+        $this->assertMatchesRegularExpression(
+            '/html\.dark \.dash-hero-wash \{[^}]*background-color: #0c1337;[^}]*background-image: none;/s',
+            $css
+        );
+    }
+
+    /**
+     * No hairline above the band on a phone.
+     *
+     * The panel carried a 1px top border so its curve would read against the
+     * black ground. On a phone the band is the panel's top and provides that
+     * edge itself, and the border only ever produced a seam above it: the
+     * panel's own background showing through a transparent border in light,
+     * and a white line in dark.
+     */
+    public function test_the_phone_panel_has_no_hairline_above_the_band(): void
+    {
+        $rules = File::get(resource_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.dash-mobile-panel \{[^}]*border-top: 0;/s',
+            $rules
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.dash-mobile-panel \{[^}]*border-top: 1px solid var\(--dash-pane-line/s',
+            $rules
         );
     }
 }

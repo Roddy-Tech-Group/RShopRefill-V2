@@ -5,6 +5,7 @@ use App\Domain\Catalog\Enums\CatalogSyncRunStatus;
 use App\Domain\Catalog\Services\CatalogSyncRunService;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Support\SweeperPickupCounter;
+use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Jobs\ExpireStalePaymentSessionsJob;
 use App\Domain\PaymentInsights\Jobs\ExpireStaleRecoveriesJob;
@@ -231,6 +232,49 @@ Schedule::call(function () {
             });
         });
 })->everyMinute()->name('fulfillment:poll-pending')->withoutOverlapping();
+
+// The slow lane, for everything the fast one drops.
+//
+// The sweeper above only looks at items touched in the last thirty minutes, so
+// an item the provider accepted and then sat on fell out of the net and was
+// never polled again: paid, undelivered, and retried by nothing. A real MTN
+// Cameroon data top-up did exactly that, and only surfaced because the person
+// who bought it happened to own the shop.
+//
+// So the cutoff stops being an exit. Past thirty minutes an item keeps being
+// checked, just far less often, and after twelve hours it is handed to a human
+// instead of being dropped: requires_attention is a state the admin panel and
+// the operations monitor both already watch, which is exactly what abandoning
+// it silently was not.
+Schedule::call(function () {
+    $handOver = now()->subHours(12);
+
+    OrderItem::query()
+        ->whereIn('fulfillment_status', [FulfillmentStatus::Processing, FulfillmentStatus::Delayed])
+        ->where('updated_at', '<', now()->subMinutes(30))
+        ->chunkById(100, function ($items) use ($handOver) {
+            $items->each(function (OrderItem $item) use ($handOver) {
+                // One more ask: the provider may have resolved it since.
+                dispatch_sync(new PollPendingFulfillmentJob($item));
+
+                $item->refresh();
+
+                $unresolved = in_array($item->fulfillment_status, [
+                    FulfillmentStatus::Processing,
+                    FulfillmentStatus::Delayed,
+                ], true);
+
+                if ($unresolved && $item->created_at < $handOver) {
+                    $order = $item->order;
+
+                    if ($order && $order->order_status !== OrderStatus::RequiresAttention) {
+                        $order->order_status = OrderStatus::RequiresAttention;
+                        $order->save();
+                    }
+                }
+            });
+        });
+})->everyTenMinutes()->name('fulfillment:poll-stalled')->withoutOverlapping();
 
 // Horizon metrics snapshot (P0-5).
 //
