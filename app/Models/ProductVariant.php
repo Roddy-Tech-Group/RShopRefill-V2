@@ -26,6 +26,9 @@ class ProductVariant extends Model
         'max_amount',
         'is_variable',
         'is_available',
+        'supplier_available',
+        'admin_disabled_at',
+        'admin_disabled_by',
         'last_seen_at',
         'delisted_at',
         'metadata',
@@ -43,11 +46,67 @@ class ProductVariant extends Model
             'max_amount' => 'decimal:4',
             'is_variable' => 'boolean',
             'is_available' => 'boolean',
+            'supplier_available' => 'boolean',
             'catalog_feed' => CatalogFeed::class,
+            'admin_disabled_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'delisted_at' => 'datetime',
             'metadata' => 'array',
         ];
+    }
+
+    /**
+     * An offer an admin switched off stays off, whatever the supplier feed says.
+     *
+     * Enforced here rather than in each normalizer on purpose. Four normalizers
+     * write availability today and a fifth will exist one day; a rule that has
+     * to be remembered in five places is a rule that gets forgotten in one, and
+     * the way this was noticed the first time was a sync quietly putting a
+     * deliberately disabled product back on sale.
+     *
+     * It only ever forces OFF. Nothing here can put an offer back on sale, so a
+     * delisted or supplier-disabled variant cannot be resurrected by accident.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $variant): void {
+            if ($variant->admin_disabled_at !== null) {
+                $variant->is_available = false;
+            }
+        });
+    }
+
+    /**
+     * Whether an admin, rather than the supplier, is the reason this is off sale.
+     */
+    public function isAdminDisabled(): bool
+    {
+        return $this->admin_disabled_at !== null;
+    }
+
+    /**
+     * Put the offer back under the supplier's control: available again only if
+     * the feed still lists it and no cleanup has delisted it.
+     */
+    public function clearAdminDisable(): void
+    {
+        $this->forceFill([
+            'admin_disabled_at' => null,
+            'admin_disabled_by' => null,
+            'is_available' => (bool) $this->supplier_available && $this->delisted_at === null,
+        ])->save();
+    }
+
+    /**
+     * Take the offer off sale by hand, and keep it off across every sync.
+     */
+    public function adminDisable(?int $adminId = null): void
+    {
+        $this->forceFill([
+            'admin_disabled_at' => now(),
+            'admin_disabled_by' => $adminId,
+            'is_available' => false,
+        ])->save();
     }
 
     public function coupons()

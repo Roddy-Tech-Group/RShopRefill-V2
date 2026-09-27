@@ -200,13 +200,37 @@ class AdminCatalogController extends Controller
     /**
      * Toggle a single variant's storefront availability. Disabled variants
      * stop appearing in catalog listings + can't be added to cart.
+     *
+     * Switching OFF records that an admin did it, which is what makes the
+     * decision survive the six-hourly sync; before this the next run read the
+     * supplier's flag straight over the top and the product came back on sale
+     * with nobody told.
+     *
+     * Switching ON only hands the offer back to the supplier's word: it returns
+     * to sale if the feed still lists it and no cleanup has delisted it. An
+     * admin cannot force an offer on sale that the supplier has withdrawn,
+     * because that just moves the failure to the customer at fulfilment.
      */
     public function setVariantAvailability(Request $request, ProductVariant $variant)
     {
         $validated = $request->validate(['is_available' => ['required', 'boolean']]);
-        $variant->update(['is_available' => (bool) $validated['is_available']]);
 
-        return response()->json(['is_available' => (bool) $variant->is_available]);
+        if ($validated['is_available']) {
+            $variant->clearAdminDisable();
+        } else {
+            $variant->adminDisable(auth('admin')->id());
+        }
+
+        $variant->refresh();
+
+        return response()->json([
+            'is_available' => (bool) $variant->is_available,
+            'admin_disabled' => $variant->isAdminDisabled(),
+            'supplier_available' => (bool) $variant->supplier_available,
+            // The switch was turned on but the offer stayed off, so the panel
+            // can say why instead of looking broken.
+            'blocked_by_supplier' => $validated['is_available'] && ! $variant->is_available,
+        ]);
     }
 
     /**

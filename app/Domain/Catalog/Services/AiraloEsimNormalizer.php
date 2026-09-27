@@ -179,6 +179,7 @@ class AiraloEsimNormalizer implements CatalogNormalizerInterface
                         'cost_price' => $costPrice,
                         'retail_price' => $faceValue,
                         'is_variable' => false,
+                        'supplier_available' => true,
                         'is_available' => true,
                         'metadata' => $metadata,
                     ]

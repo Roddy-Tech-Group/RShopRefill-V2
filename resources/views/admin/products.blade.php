@@ -1726,6 +1726,14 @@
                                 `/admin/api/catalog/variants/${this.data.variantId}/availability`,
                                 { is_available: value });
                             this.data.isAvailable = json.is_available;
+                            // Switching off is always obeyed and now survives the
+                            // sync. Switching on only hands the offer back to the
+                            // supplier, so say why when the supplier still has it
+                            // withdrawn rather than letting the toggle snap back
+                            // and look broken.
+                            if (json.blocked_by_supplier) {
+                                alert('The supplier no longer lists this offer, so it cannot go back on sale. It will return by itself if the supplier lists it again.');
+                            }
                         } catch (e) {
                             this.data.isAvailable = previous;
                             alert(e.message);

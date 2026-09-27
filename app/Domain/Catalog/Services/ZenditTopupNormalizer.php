@@ -136,6 +136,7 @@ class ZenditTopupNormalizer implements CatalogNormalizerInterface
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
                 'is_variable' => $isVariable,
+                'supplier_available' => (bool) ($rawItem['enabled'] ?? true),
                 'is_available' => (bool) ($rawItem['enabled'] ?? true),
                 'metadata' => $rawItem,
             ]

@@ -149,6 +149,10 @@ class ZenditNormalizer implements CatalogNormalizerInterface
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
                 'is_variable' => $isVariable,
+                // The supplier's word and the effective flag are written
+                // together; ProductVariant forces is_available back to false if
+                // an admin has this offer switched off.
+                'supplier_available' => (bool) ($rawItem['enabled'] ?? true),
                 'is_available' => (bool) ($rawItem['enabled'] ?? true),
                 'metadata' => $rawItem,
             ]

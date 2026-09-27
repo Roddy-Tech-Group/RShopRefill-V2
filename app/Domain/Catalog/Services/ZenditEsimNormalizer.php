@@ -110,6 +110,7 @@ class ZenditEsimNormalizer implements CatalogNormalizerInterface
                 'cost_price' => $costPrice,
                 'retail_price' => $faceValue, // Default retail to face value for now
                 'is_variable' => false,
+                'supplier_available' => true,
                 'is_available' => true,
                 'metadata' => $metadata,
             ]
