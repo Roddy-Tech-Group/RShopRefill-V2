@@ -4,8 +4,10 @@ namespace Tests\Feature\Admin;
 
 use App\Domain\Admin\Enums\AdminRole;
 use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Order\Services\OrderReportService;
 use App\Models\Admin;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Volt\Volt;
@@ -83,6 +85,70 @@ class OrderReportAndAuditTest extends TestCase
         $order = Order::factory()->create();
 
         $this->get(route('admin.order.report', $order))->assertNotFound();
+    }
+
+    public function test_a_display_currency_item_is_reported_in_usd_with_the_customer_amount_beneath(): void
+    {
+        // RSR-20260927-ZVTQUW: XAF 4,562.94 of airtime at 575.604916 is $7.93,
+        // and the report printed it as $4,562.94.
+        $order = $this->orderWithItem('XAF', 4562.94, ['exchange_rate' => 575.604916]);
+
+        $data = app(OrderReportService::class)->assemble($order, 'admin@example.test');
+        $item = $data['items'][0];
+
+        $this->assertEqualsWithDelta(7.9272, $item['subtotal_usd'], 0.0001);
+        $this->assertSame('XAF', $item['display_currency']);
+        $this->assertEqualsWithDelta(4562.94, $item['subtotal_display'], 0.001);
+
+        $html = view('admin.reports.order-report-pdf', ['data' => $data])->render();
+
+        $this->assertTrue(str_contains($html, '$7.93'), 'the item subtotal should read $7.93');
+        $this->assertTrue(str_contains($html, 'XAF 4,562.94'), 'the customer amount should read XAF 4,562.94');
+        $this->assertFalse(str_contains($html, '$4,562.94'), 'the XAF amount must not be printed as dollars');
+    }
+
+    public function test_a_usd_item_is_reported_as_is_without_a_customer_line(): void
+    {
+        $order = $this->orderWithItem('USD', 10.00, ['exchange_rate' => 1]);
+
+        $item = app(OrderReportService::class)->assemble($order, 'admin@example.test')['items'][0];
+
+        $this->assertEqualsWithDelta(10.00, $item['subtotal_usd'], 0.0001);
+        $this->assertNull($item['display_currency']);
+    }
+
+    public function test_an_item_on_an_order_without_a_rate_keeps_its_stored_amount_and_hides_the_customer_line(): void
+    {
+        // Pre-snapshot orders stored the USD figure under a non-USD label, so
+        // the stored amount is the only honest one and the label is not shown.
+        $order = $this->orderWithItem('XAF', 12.50, []);
+
+        $item = app(OrderReportService::class)->assemble($order, 'admin@example.test')['items'][0];
+
+        $this->assertEqualsWithDelta(12.50, $item['subtotal_usd'], 0.0001);
+        $this->assertNull($item['display_currency']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    private function orderWithItem(string $currency, float $subtotal, array $metadata): Order
+    {
+        $order = Order::factory()->create([
+            'display_currency' => $currency,
+            'settlement_currency' => $currency,
+            'total_amount' => $subtotal,
+            'metadata' => $metadata,
+        ]);
+
+        OrderItem::factory()->create([
+            'order_id' => $order->id,
+            'display_currency' => $currency,
+            'display_amount' => $subtotal,
+            'subtotal_amount' => $subtotal,
+        ]);
+
+        return $order;
     }
 
     public function test_sensitive_user_changes_are_audited_from_any_surface(): void

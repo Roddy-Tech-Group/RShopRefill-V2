@@ -171,7 +171,7 @@
                     <tr>
                         <td><strong>{{ $item['name'] }}</strong><br><span class="muted" style="font-size:7.5px;">{{ $item['category'] }}</span></td>
                         <td>{{ $item['quantity'] }}</td>
-                        <td class="num">{{ $usd($item['subtotal_usd']) }}</td>
+                        <td class="num">{{ $usd($item['subtotal_usd']) }}@if ($item['display_currency'])<br><span class="muted" style="font-size:7.5px;">{{ $item['display_currency'] }} {{ number_format($item['subtotal_display'], 2) }}</span>@endif</td>
                         <td>{{ $item['provider'] ?? '—' }}<br><span class="mono muted">{{ $item['fulfillment_reference'] ?? '' }}</span></td>
                         <td><span class="pill" style="background: {{ $ib }}; color: {{ $if }};">{{ $item['fulfillment_status'] }}</span></td>
                         <td>{{ $fmt($item['delivered_at']) }}</td>

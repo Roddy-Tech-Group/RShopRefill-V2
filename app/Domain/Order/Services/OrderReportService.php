@@ -94,15 +94,29 @@ class OrderReportService
     }
 
     /**
+     * An item's subtotal is stored in the customer's display currency, so it
+     * is converted with the order's own rate snapshot, the same way the admin
+     * order page does. The customer's amount rides along when it differs from
+     * USD and the order's pricing can be trusted.
+     *
      * @return list<array<string, mixed>>
      */
     private function itemsSection(Order $order): array
     {
+        $rate = $order->exchangeRate();
+        $showCustomerAmount = ! $order->hasSuspectPricing();
+
         return $order->items->map(fn ($item) => [
             'name' => $item->product_snapshot['name'] ?? $item->product?->name ?? 'Item',
             'category' => $item->compliance_category->value ?? (string) $item->compliance_category,
             'quantity' => (int) $item->quantity,
-            'subtotal_usd' => (float) $item->subtotal_amount,
+            'subtotal_usd' => $rate
+                ? round((float) $item->subtotal_amount / $rate, 4)
+                : (float) $item->subtotal_amount,
+            'subtotal_display' => (float) $item->subtotal_amount,
+            'display_currency' => $showCustomerAmount && strtoupper((string) $item->display_currency) !== 'USD'
+                ? strtoupper((string) $item->display_currency)
+                : null,
             'provider' => $item->provider_name,
             'fulfillment_status' => (string) ($item->fulfillment_status->value ?? $item->fulfillment_status),
             'fulfillment_reference' => $item->fulfillment_reference,
