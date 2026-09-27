@@ -147,25 +147,32 @@
                 :aria-expanded="open.toString()"
                 aria-haspopup="dialog"
                 aria-label="Show wallet balances"
-                class="inline-flex items-center gap-2 rounded-full bg-[#ffffff] py-1.5 pl-1.5 pr-4 text-[12px] font-black uppercase tracking-[0.12em] text-zinc-900 shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95 dark:bg-[#1d3252] dark:text-zinc-200 dark:shadow-none"
+                class="rounded-full bg-white/20 p-2 transition-transform active:scale-95 dark:bg-white/[0.06]"
             >
-                <span class="flex -space-x-2.5">
+                {{-- Two layers: a soft halo on the band, and the pill inside it.
+                     No border on the inner pill; the two tones carry the edge. --}}
+                <span class="flex items-center gap-2.5 rounded-full bg-[#f1f1f3] py-2 pl-2 pr-4 text-[15px] font-medium uppercase tracking-[0.02em] text-slate-600 shadow-sm shadow-zinc-900/[0.06] dark:bg-[#1d3252] dark:text-zinc-200 dark:shadow-none">
+                <span class="flex -space-x-2">
                     {{-- Every wallet the customer holds, up to five. Three was a
                          figure with nothing behind it: an account with five wallets
                          showed three flags and a chevron, so the pill under-reported
                          the very thing it exists to summarise. Five is where the
                          stack stops reading as a stack on a phone. --}}
+                    {{-- The first flag sits on top and each one after tucks
+                         behind it; the ring in the pill's own tone cuts the
+                         crescent. --}}
                     @foreach ($walletRows->take(5) as $w)
-                        <img src="{{ $w['icon'] }}" alt="" class="h-7 w-7 rounded-full object-cover ring-2 ring-white dark:ring-[#1a1a1e]" loading="lazy">
+                        <img src="{{ $w['icon'] }}" alt="" class="relative h-6 w-6 rounded-full object-cover ring-2 ring-[#f1f1f3] dark:ring-[#1d3252]" style="z-index: {{ 5 - $loop->index }};" loading="lazy">
                     @endforeach
                 </span>
                 {{-- It opens a sheet of wallets, and the figure it sits over is
                      already labelled. "Total balance" named the number twice and
                      the thing the pill actually does not at all. --}}
                 <span>Wallets</span>
-                <svg class="h-4 w-4 shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <svg class="h-5 w-5 shrink-0 text-zinc-900 transition-transform dark:text-zinc-200" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
                 </svg>
+                </span>
             </button>
 
             {{-- Effective visibility = the local eye AND the account menu's global

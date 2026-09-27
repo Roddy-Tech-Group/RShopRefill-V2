@@ -75,6 +75,28 @@ class MobileWalletSheetTest extends TestCase
         $this->assertStringNotContainsString('fund-mobile-', $html);
     }
 
+    public function test_the_pill_is_a_borderless_pill_in_a_soft_halo_with_the_first_flag_on_top(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs($this->fundedUser())->get('/dashboard')->assertOk()->getContent();
+        $start = strpos($html, 'aria-label="Show wallet balances"');
+        $pill = substr($html, $start, strpos($html, '</button>', $start) - $start);
+
+        // The halo on the band, then the pill inside it, with no border of
+        // its own: the two tones carry the edge.
+        $this->assertTrue(str_contains($pill, 'class="rounded-full bg-white/20 p-2'), 'the halo around the pill is missing');
+        $this->assertTrue(str_contains($pill, 'rounded-full bg-[#f1f1f3] py-2 pl-2 pr-4 text-[15px] font-medium uppercase'), 'the inner pill lost its tone or type');
+        $this->assertSame(0, preg_match('/<span class="[^"]*\b(border|ring-1)\b[^"]*rounded-full bg-\[#f1f1f3\]/', $pill), 'the inner pill must not carry a border');
+
+        // Two wallets: the first flag stacks above the second, and each ring
+        // is the pill's own tone so the overlap reads as a cut-out.
+        $this->assertSame(2, substr_count($pill, 'ring-2 ring-[#f1f1f3] dark:ring-[#1d3252]'));
+        $this->assertLessThan(strpos($pill, 'z-index: 4;'), strpos($pill, 'z-index: 5;'));
+
+        $this->assertTrue(str_contains($pill, '>Wallets</span>'), 'the pill still says what it opens');
+    }
+
     public function test_the_sheet_carries_a_ring_and_a_breakdown_with_a_top_up_per_wallet(): void
     {
         $this->withoutVite();
