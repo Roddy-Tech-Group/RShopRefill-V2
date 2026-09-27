@@ -71,15 +71,36 @@ class DashboardMetricsUsdTest extends TestCase
         ]);
     }
 
+    /**
+     * A 4,200 XAF sale is $7, not $4,200. Revenue is summed from the items
+     * that delivered, each divided by its order's own rate snapshot, so two
+     * orders in different currencies add up to real dollars.
+     *
+     * The items matter: revenue is item-level now, on the same basis as cost
+     * and as the Finances page, because an order total includes items that
+     * never delivered and were refunded.
+     */
     public function test_overview_revenue_sums_settlement_usd_across_currencies(): void
     {
         $user = User::factory()->create();
-        $this->makeCompletedOrder($user, 'XAF', 4200.00, 600.0, 7.00);
-        $this->makeCompletedOrder($user, 'USD', 14.00, 1.0, 14.00);
+        $this->attachItem($this->makeCompletedOrder($user, 'XAF', 4200.00, 600.0, 7.00), 4200.00);
+        $this->attachItem($this->makeCompletedOrder($user, 'USD', 14.00, 1.0, 14.00), 14.00);
 
         $metrics = app(DashboardMetricsQuery::class)->getOverviewMetrics();
 
         $this->assertEqualsWithDelta(21.00, $metrics['total_revenue'], 0.01);
+    }
+
+    /**
+     * An order with no items is not revenue. It used to contribute its whole
+     * total, which is a figure with nothing sold behind it.
+     */
+    public function test_an_order_with_no_items_contributes_no_revenue(): void
+    {
+        $user = User::factory()->create();
+        $this->makeCompletedOrder($user, 'USD', 99.00, 1.0, 99.00);
+
+        $this->assertEqualsWithDelta(0.0, app(DashboardMetricsQuery::class)->getOverviewMetrics()['total_revenue'], 0.01);
     }
 
     public function test_wallet_balance_total_converts_each_currency_honestly(): void

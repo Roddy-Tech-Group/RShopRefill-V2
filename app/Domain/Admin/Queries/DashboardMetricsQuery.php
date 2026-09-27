@@ -69,13 +69,23 @@ class DashboardMetricsQuery
         // it was given back. Dropping the order instead is what made a closed
         // month's revenue shrink after the fact.
         //
-        // Summed via Order::usdTotal(): total_amount is the display-currency
-        // figure (4000 XAF, 12000 NGN, ...), so summing it raw would mix
-        // currencies into a number the dashboard then labels "USD".
-        $grossRevenue = (clone $ordersQuery)
-            ->whereIn('order_status', OrderStatus::booked())
-            ->get(['id', 'total_amount', 'display_currency', 'metadata'])
-            ->sum(fn (Order $order) => $order->usdTotal());
+        // Summed from DELIVERED ITEMS, never the whole order total, and via
+        // itemUsdSql() so the display-currency figures (4000 XAF, 12000 NGN)
+        // become real USD rather than being added together raw.
+        //
+        // The order total includes items that never delivered, which the
+        // customer was refunded for. Counting it while counting only delivered
+        // items' cost reports revenue we gave back against cost we never paid,
+        // and inflates profit by exactly the failed items' cost. Revenue and
+        // cost have to come off the same basis, which is what the Finances page
+        // has always done and what these two pages did not.
+        $grossRevenue = (float) DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
+            ->when($startDate, fn ($q) => $q->where('orders.created_at', '>=', $startDate))
+            ->when($endDate, fn ($q) => $q->where('orders.created_at', '<=', $endDate))
+            ->sum(DB::raw($this->itemUsdSql()));
 
         // Money handed back for goods the customer actually received, dated by
         // when it was handed back. Same ledger the Finances page reads, so the
@@ -184,14 +194,16 @@ class DashboardMetricsQuery
     {
         $customerFloat = $this->walletBalanceTotalUsd();
 
-        // All-time booked sales, converted per-order to USD (same rule as the
-        // Total Revenue KPI, just unfiltered by date), less what was handed
-        // back to customers. Profit the business can actually spend is net of
-        // refunds, so this figure has to be too.
-        $grossSales = (float) Order::query()
-            ->whereIn('order_status', OrderStatus::booked())
-            ->get(['id', 'total_amount', 'display_currency', 'metadata'])
-            ->sum(fn (Order $order) => $order->usdTotal());
+        // All-time booked sales on the SAME basis as the cost below: delivered
+        // items only. Using the whole order total here while costing only
+        // delivered items is what inflated profit by the failed items' cost.
+        // Less what was handed back to customers, because profit the business
+        // can actually spend is net of refunds.
+        $grossSales = (float) DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
+            ->sum(DB::raw($this->itemUsdSql()));
         $grossSales = max(0.0, $grossSales - $this->refunds->customerRefundsUsd());
 
         // Source-of-truth supplier cost from the item cost snapshots, delivered
@@ -381,11 +393,19 @@ class DashboardMetricsQuery
     }
 
     /**
-     * Report builder used by /admin/reports. Aggregates completed PRODUCT
-     * orders into buckets (daily / weekly / monthly), optionally narrowed to a
-     * category, and returns honest USD numbers via Order::usdTotal() — so
-     * legacy orders whose display_currency was mis-labelled don't poison the
-     * totals.
+     * Report builder used by /admin/reports. Aggregates booked PRODUCT orders
+     * into buckets (daily / weekly / monthly), optionally narrowed to a
+     * category.
+     *
+     * Revenue and cost both come from DELIVERED ITEMS, converted by the order's
+     * own rate snapshot, which is the basis the Finances page uses. For a given
+     * month this returns the same revenue Finances does, and a test asserts it,
+     * because the two pages disagreeing is how a refunded-but-still-counted
+     * item inflated profit here for months without anyone noticing.
+     *
+     * Narrowing to a category narrows the revenue too, since only that
+     * category's items are loaded. Previously a category filter still reported
+     * the WHOLE order total of any order containing that category.
      *
      * Product-only scope:
      *   - Sourced from `orders` only. Wallet top-ups live in `wallet_fundings`
@@ -404,7 +424,7 @@ class DashboardMetricsQuery
      * Returns an array keyed by bucket date (Y-m-d), each row carrying:
      *   - date              ISO bucket start
      *   - transactions      distinct completed product orders in the bucket
-     *   - sales_usd         sum of order USD totals
+     *   - sales_usd         delivered items' USD subtotals (NOT order totals)
      *   - cost_usd          sum of supplier USD cost
      *   - profit_usd        sales − cost
      *   - profit_margin     profit / sales × 100, or 0 when sales = 0
@@ -465,13 +485,23 @@ class DashboardMetricsQuery
                 $buckets[$bucketKey] = ['transactions' => 0, 'sales' => 0.0, 'cost' => 0.0];
             }
 
+            // Delivered items only, on BOTH sides. A failed item earned nothing
+            // (the customer was refunded) and cost nothing (it never
+            // delivered), so it belongs in neither figure. Counting the whole
+            // order total as revenue while costing only what delivered reports
+            // money we gave back against cost we never paid.
+            //
+            // Same conversion as itemUsdSql(), which divides each item's
+            // display-currency subtotal by the order's rate snapshot. The rate
+            // is per order, so dividing the order's summed subtotals by it once
+            // is identical arithmetic, and it keeps this figure equal to the
+            // Finances page's revenue for the same month.
+            $delivered = $order->items->where('fulfillment_status', '!=', FulfillmentStatus::Failed);
+            $rate = $order->exchangeRate() ?: 1.0;
+
             $buckets[$bucketKey]['transactions']++;
-            $buckets[$bucketKey]['sales'] += $order->usdTotal();
-            // Delivered items only. A failed item cost nothing and earned
-            // nothing, so charging its cost against a booked sale would invent
-            // a loss on a partially completed order.
-            $buckets[$bucketKey]['cost'] += $order->items
-                ->where('fulfillment_status', '!=', FulfillmentStatus::Failed)
+            $buckets[$bucketKey]['sales'] += $delivered->sum(fn ($item) => (float) $item->subtotal_amount) / $rate;
+            $buckets[$bucketKey]['cost'] += $delivered
                 ->sum(fn ($item) => (float) $item->provider_cost_usd * (int) $item->quantity);
         }
 

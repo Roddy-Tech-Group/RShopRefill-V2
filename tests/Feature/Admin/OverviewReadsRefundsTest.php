@@ -278,6 +278,102 @@ class OverviewReadsRefundsTest extends TestCase
     }
 
     /**
+     * THE TEST THAT WAS MISSING, and the reason this went to production wrong.
+     *
+     * An order that completed with one item undelivered. The customer keeps the
+     * delivered item and was refunded for the other, so revenue is the
+     * delivered item alone. Counting the whole order total as revenue while
+     * costing only what delivered reports money we gave back against cost we
+     * never paid, and inflates profit by exactly the failed item's cost.
+     *
+     * Reports and Finances must agree to the cent on the same month. They are
+     * different measures of the same thing, and if they diverge one of them is
+     * lying.
+     */
+    public function test_a_failed_item_is_in_neither_revenue_nor_cost_and_reports_matches_finances(): void
+    {
+        $soldOn = now()->startOfMonth()->addDays(2);
+
+        // Delivered: $100 of goods that cost us $70.
+        $order = $this->order(total: 150.0, cost: 70.0, completedAt: $soldOn->toDateTimeString());
+        $order->items->first()->forceFill(['subtotal_amount' => 100.0])->save();
+
+        // Undelivered: $50 the customer was refunded, which cost us nothing
+        // because it never reached the supplier.
+        $failed = $this->variant();
+        OrderItem::factory()->create([
+            'order_id' => $order->id,
+            'product_id' => $failed->product_id,
+            'product_variant_id' => $failed->id,
+            'category_id' => $this->category()->id,
+            'subcategory_id' => $this->subcategory()->id,
+            'quantity' => 1,
+            'provider_cost_usd' => 40.0,
+            'subtotal_amount' => 50.0,
+            'fulfillment_status' => FulfillmentStatus::Failed->value,
+            'product_snapshot' => ['name' => 'Steam', 'country_code' => 'US'],
+        ]);
+
+        $row = collect($this->metrics()->getReportSeries(now()->startOfMonth(), now()->endOfMonth(), 'daily'))
+            ->firstWhere('date', $soldOn->format('Y-m-d'));
+
+        $this->assertEqualsWithDelta(100.0, $row['sales_usd'], 0.01, 'the undelivered $50 was refunded, it is not revenue');
+        $this->assertEqualsWithDelta(70.0, $row['cost_usd'], 0.01, 'the undelivered item cost us nothing');
+        $this->assertEqualsWithDelta(30.0, $row['profit_usd'], 0.01);
+
+        $finances = app(FinanceReportQuery::class)->monthlyBreakdown(now()->startOfMonth());
+
+        $this->assertEqualsWithDelta(
+            $finances['totals']['revenue_usd'],
+            $row['sales_usd'],
+            0.01,
+            'Reports and Finances must not disagree about the same month',
+        );
+        $this->assertEqualsWithDelta(
+            $finances['totals']['cost_usd'],
+            $row['cost_usd'],
+            0.01,
+        );
+        $this->assertEqualsWithDelta(
+            $finances['totals']['profit_usd'],
+            $row['profit_usd'],
+            0.01,
+        );
+    }
+
+    /**
+     * The same basis rule on the all-time cards: an undelivered item is in
+     * neither gross sales nor supplier cost.
+     */
+    public function test_the_money_split_leaves_a_failed_item_out_of_both_sides(): void
+    {
+        $order = $this->order(total: 150.0, cost: 70.0);
+        $order->items->first()->forceFill(['subtotal_amount' => 100.0])->save();
+
+        $failed = $this->variant();
+        OrderItem::factory()->create([
+            'order_id' => $order->id,
+            'product_id' => $failed->product_id,
+            'product_variant_id' => $failed->id,
+            'category_id' => $this->category()->id,
+            'subcategory_id' => $this->subcategory()->id,
+            'quantity' => 1,
+            'provider_cost_usd' => 40.0,
+            'subtotal_amount' => 50.0,
+            'fulfillment_status' => FulfillmentStatus::Failed->value,
+            'product_snapshot' => ['name' => 'Steam', 'country_code' => 'US'],
+        ]);
+
+        $split = $this->metrics()->getMoneySplit();
+
+        $this->assertEqualsWithDelta(100.0, $split['gross_sales_usd'], 0.01);
+        $this->assertEqualsWithDelta(70.0, $split['supplier_cost_usd'], 0.01);
+        $this->assertEqualsWithDelta(30.0, $split['company_profit_usd'], 0.01);
+
+        $this->assertEqualsWithDelta(100.0, $this->metrics()->getOverviewMetrics()['total_revenue'], 0.01);
+    }
+
+    /**
      * The two pages must agree on what a sale is. If anyone adds a status to
      * one page's idea of "booked" without the other, this fails.
      */
