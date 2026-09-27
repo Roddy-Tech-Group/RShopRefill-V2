@@ -22,7 +22,7 @@ class WalletFundedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Wallet Funding Confirmed - '.$brand,

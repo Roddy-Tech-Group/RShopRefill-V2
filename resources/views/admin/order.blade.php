@@ -22,7 +22,7 @@
     <x-slot:subheading>
         Placed {{ $fmtDate($order->placed_at ?? $order->created_at) }}
         @if ($order->hasSuspectPricing())
-            · <span class="inline-flex items-center gap-1 rounded-[12px] bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
+            · <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-700">
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.732 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
                 </svg>
@@ -62,7 +62,7 @@
                 ['Payment', $order->payment_status?->value, $order->payment_status?->label()],
                 ['Fulfilment', $order->fulfillment_status?->value, $order->fulfillment_status?->label()],
             ] as [$label, $value, $text])
-                <div class="rounded-[16px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5">
                     <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">{{ $label }}</p>
                     <span class="mt-2 inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $toneFor($value) }}">
                         {{ $text ?? 'Pending' }}
@@ -75,7 +75,7 @@
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
             {{-- Customer --}}
-            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5">
                 <h3 class="text-sm font-bold text-zinc-900">Customer</h3>
                 <dl class="mt-3 space-y-2.5 text-xs">
                     <div class="flex justify-between gap-4">
@@ -94,7 +94,7 @@
             </div>
 
             {{-- Order info --}}
-            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5">
                 <h3 class="text-sm font-bold text-zinc-900">Order</h3>
                 <dl class="mt-3 space-y-2.5 text-xs">
                     <div class="flex justify-between gap-4">
@@ -142,7 +142,7 @@
         </div>
 
         {{-- Items --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Items ({{ $order->items->count() }})</h3>
             </div>
@@ -184,7 +184,7 @@
                                             <template x-teleport="body">
                                                 <div x-show="open" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm transition-opacity" x-transition.opacity>
                                                     <!-- Modal Panel -->
-                                                    <div x-show="open" @click.outside="if(!loading) open = false" x-transition class="w-full max-w-md transform overflow-hidden rounded-[20px] bg-white p-6 text-left align-middle shadow-2xl ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-white/10 m-4">
+                                                    <div x-show="open" @click.outside="if(!loading) open = false" x-transition class="w-full max-w-md transform overflow-hidden rounded-[12px] bg-white p-6 text-left align-middle shadow-2xl transition-all dark:bg-zinc-900 m-4">
                                                         <h3 class="text-lg font-semibold leading-6 text-zinc-900 dark:text-white">Confirm Manual Fulfillment</h3>
                                                         <div class="mt-2">
                                                             <p class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -198,7 +198,7 @@
                                                                 type="text" 
                                                                 x-model="manualPin"
                                                                 placeholder="Enter PIN / Code" 
-                                                                class="w-full rounded-xl border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400"
+                                                                class="w-full rounded-[12px] border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400"
                                                             >
                                                         </div>
 
@@ -206,7 +206,7 @@
                                                             <button 
                                                                 type="button" 
                                                                 @click="open = false"
-                                                                class="inline-flex justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:ring-zinc-700 dark:focus:ring-offset-zinc-900"
+                                                                class="inline-flex justify-center rounded-[12px] border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:focus:ring-zinc-700 dark:focus:ring-offset-zinc-900"
                                                             >
                                                                 Cancel
                                                             </button>
@@ -214,7 +214,7 @@
                                                                 type="button" 
                                                                 x-on:click="loading = true; fetch('{{ route('admin.api.commerce.mark-manually-fulfilled', $item->id) }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: JSON.stringify({ pin: manualPin }) }).then(r => { window.location.reload(); }).catch(() => loading = false)"
                                                                 :disabled="loading"
-                                                                class="inline-flex justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                class="inline-flex justify-center rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                                             >
                                                                 <span x-show="!loading">Confirm & Fulfill</span>
                                                                 <span x-show="loading" class="flex items-center gap-2">
@@ -286,7 +286,7 @@
 
                         {{-- Delivered payload (redemption codes / pins / links) --}}
                         @if ($payload->isNotEmpty())
-                            <div class="mt-3 rounded-[12px] bg-zinc-50 p-3 ring-1 ring-zinc-100 dark:bg-zinc-800 dark:ring-zinc-700">
+                            <div class="mt-3 rounded-[12px] bg-zinc-50 p-3 dark:bg-zinc-800">
                                 <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-300">Delivered details</p>
                                 <dl class="mt-1.5 space-y-1 text-[11px]">
                                     @foreach ($payload as $key => $value)
@@ -346,22 +346,22 @@
         </div>
 
         {{-- Payment attempts --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Payment attempts ({{ $order->paymentAttempts->count() }})</h3>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-[11px]">
-                    <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                    <thead class="">
                         <tr>
-                            <th class="px-5 py-3 font-semibold">Reference</th>
-                            <th class="px-5 py-3 font-semibold">Gateway</th>
-                            <th class="px-5 py-3 font-semibold">Amount</th>
-                            <th class="px-5 py-3 font-semibold">Status</th>
-                            <th class="px-5 py-3 font-semibold">Date</th>
+                            <th class="">Reference</th>
+                            <th class="">Gateway</th>
+                            <th class="">Amount</th>
+                            <th class="">Status</th>
+                            <th class="">Date</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody class="">
                         @forelse ($order->paymentAttempts as $attempt)
                             <tr>
                                 <td class="px-5 py-3 font-mono text-zinc-600">{{ $attempt->gateway_reference ?: $attempt->idempotency_key }}</td>

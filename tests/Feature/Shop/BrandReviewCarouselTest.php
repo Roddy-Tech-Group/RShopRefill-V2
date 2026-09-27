@@ -98,15 +98,21 @@ class BrandReviewCarouselTest extends TestCase
         ]);
     }
 
-    public function test_gift_card_page_shows_its_own_review_carousel(): void
+    /**
+     * The gift card page shows the same reviews as its own section rather than
+     * this carousel, so the brand's reviews are still on it, under its own
+     * heading (ProductReviewsSectionTest covers how that section behaves).
+     */
+    public function test_gift_card_page_shows_its_own_reviews_without_the_carousel(): void
     {
         $product = $this->seedBrandProduct();
         $this->seedBrandReview($product, 'Best Acme gift card purchase experience ever.');
 
         $this->withoutVite()->get(route('shop.brand', ['brandSlug' => 'acme']))
             ->assertOk()
-            ->assertSee('What customers say about Acme')
-            ->assertSee('Best Acme gift card purchase experience ever.');
+            ->assertSee('Best Acme gift card purchase experience ever.')
+            ->assertSee('Acme customer reviews', false)
+            ->assertDontSee('What customers say about Acme');
     }
 
     public function test_no_carousel_renders_when_the_brand_has_no_reviews(): void

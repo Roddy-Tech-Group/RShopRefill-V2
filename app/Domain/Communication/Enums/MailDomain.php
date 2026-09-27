@@ -37,7 +37,7 @@ enum MailDomain: string
      */
     public function senderName(): string
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return match ($this) {
             self::Verify => $brand.' Verification',

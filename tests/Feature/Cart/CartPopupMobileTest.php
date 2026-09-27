@@ -17,24 +17,29 @@ class CartPopupMobileTest extends TestCase
 
     public function test_cart_popup_is_a_bottom_sheet_on_mobile_and_top_right_on_desktop(): void
     {
+        // The storefront popup hangs under the nav on every screen now (the
+        // bottom-sheet variant it once had on phones is gone from the nav).
         $this->get('/')
             ->assertOk()
-            ->assertSee('inset-x-3 bottom-3', false)   // mobile: bottom sheet
-            ->assertSee('sm:top-[84px]', false);       // sm+: restores desktop top-right
+            ->assertSee('cart-panel fixed right-3 top-[calc(var(--nav-h,64px)+8px)]', false);
     }
 
     /**
-     * The dashboard desktop cart popup lives in the lg:flex header, hidden on
-     * phones - so the dashboard layout ships its own teleported bottom sheet,
-     * pinned above the mobile bottom nav, that opens on the same $store.cart.open.
+     * The dashboard header is the phone bar too (2026-09-23), so its cart
+     * popup serves phones as a sheet under the bar (app.css positions every
+     * dashboard-frame-popup that way). The separate teleported mobile cart
+     * sheet it used to ship is gone: with both bound to $store.cart.open,
+     * a phone got two empty-cart panels stacked on top of each other.
      */
-    public function test_dashboard_has_a_mobile_cart_bottom_sheet(): void
+    public function test_dashboard_has_one_cart_panel_for_every_screen(): void
     {
         $this->withoutVite();
-
-        $this->actingAs(User::factory()->create())
+        $html = $this->actingAs(User::factory()->create())
             ->get('/dashboard/shop/checkout')
             ->assertOk()
-            ->assertSee('inset-x-3 bottom-20 z-[80]', false); // mobile sheet above the bottom nav
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, 'dashboard-frame-popup cart-panel'), 'one dashboard cart panel: the header popup');
+        $this->assertStringNotContainsString('cart-panel fixed inset-x-3', $html);
     }
 }

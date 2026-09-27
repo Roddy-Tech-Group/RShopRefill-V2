@@ -42,7 +42,7 @@
         </a>
 
         {{-- Profile header --}}
-        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5">
             <div class="flex flex-wrap items-center gap-4">
                 <img src="{{ $avatar }}" alt="" class="h-16 w-16 shrink-0 rounded-[12px] object-cover ring-1 ring-blue-100">
                 <div class="min-w-0 flex-1">
@@ -103,7 +103,7 @@
             $kycRaw = strtolower((string) ($user->kyc_status ?? ''));
             $kycVerified = $kycRaw === 'verified';
         @endphp
-        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])), kycChange: @js($errors->has('kyc_reason') ? old('status') : null) }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div x-data="{ editing: @js($errors->hasAny(['name', 'email', 'phone', 'gender'])), warning: @js($errors->hasAny(['type', 'body'])), suspending: @js($errors->hasAny(['reason'])), kycChange: @js($errors->has('kyc_reason') ? old('status') : null) }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             @php
                 // Shared button shape. Compact + responsive:
                 //   - Mobile: full-width grid cells (two per row) so labels never truncate
@@ -449,7 +449,7 @@
                 $kycBadge = $kycMap[$kycRaw] ?? ['label' => 'KYC not started', 'tone' => 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-[#26416b] dark:text-zinc-200 dark:ring-zinc-700/60'];
                 // Compact pill: smaller padding + tighter text so the row tucks
                 // close to the divider above instead of floating in dead space.
-                $badgeBase = 'inline-flex items-center gap-1 rounded-[12px] px-2 py-0.5 text-[11px] font-medium ring-1';
+                $badgeBase = 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold';
             @endphp
             @if ($isBanned || $isSuspended || $isRestricted || $fundsHeld || $closureRequested || $isClosed || ! $emailVerified || ! $kycVerified)
                 <div class="flex flex-wrap gap-1.5 px-5 py-2">
@@ -584,7 +584,7 @@
             $allWallets = $user->wallets;
             $rcoinWalletBalance = (int) ($allWallets->firstWhere('currency', \App\Domain\Shared\Enums\Currency::RCOIN)?->balance ?? 0);
         @endphp
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-zinc-900">Wallet balances</h3>
@@ -601,9 +601,9 @@
                         @php
                             $code = $w->currency?->value ?? 'USD';
                             $isRcoin = $code === 'RCOIN';
-                            $tone = $isRcoin ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-zinc-50 text-zinc-700 ring-zinc-200';
+                            $tone = $isRcoin ? 'bg-blue-50 text-blue-700' : 'bg-zinc-50 text-zinc-700';
                         @endphp
-                        <div class="rounded-[12px] p-2.5 ring-1 {{ $tone }}">
+                        <div class="rounded-[12px] p-2.5 {{ $tone }}">
                             <p class="text-[10px] font-bold uppercase tracking-wider opacity-70">{{ $code }}</p>
                             <p class="mt-0.5 text-base font-black tabular-nums">{{ number_format((float) $w->balance, $isRcoin ? 0 : 2) }}</p>
                         </div>
@@ -652,7 +652,7 @@
                         class="mt-1 flex w-full items-center justify-between gap-3 rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-left text-sm text-zinc-900 outline-none transition-colors hover:border-zinc-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                     >
                         <span class="flex min-w-0 items-center gap-2">
-                            <span class="inline-flex items-center rounded-[6px] bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 ring-1 ring-blue-200" x-text="currency"></span>
+                            <span class="inline-flex items-center rounded-[6px] bg-blue-50 px-1.5 py-0.5 font-mono text-[11px] font-bold text-blue-700" x-text="currency"></span>
                             <span class="truncate text-zinc-700" x-text="currencyLabel"></span>
                         </span>
                         <svg class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -700,7 +700,7 @@
 
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     {{-- Credit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] border border-zinc-100 p-3">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-zinc-50 dark:bg-white/5">
                         @csrf
                         <input type="hidden" name="direction" value="credit">
                         <input type="hidden" name="currency" :value="currency">
@@ -714,7 +714,7 @@
                     </form>
 
                     {{-- Debit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] border border-zinc-100 p-3" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-zinc-50 dark:bg-white/5" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
                         @csrf
                         <input type="hidden" name="direction" value="debit">
                         <input type="hidden" name="currency" :value="currency">
@@ -732,7 +732,7 @@
                 @error('reason')<p class="mt-2 text-xs font-medium text-red-600">{{ $message }}</p>@enderror
             </div>
         </div>
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-zinc-900">Rcoin earnings multiplier</h3>
@@ -800,7 +800,7 @@
                 default    => 'zinc',
             };
         @endphp
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Identity verification (KYC)</h3>
                 <x-admin.badge :tone="$kycTone">{{ $user->kyc_status }}</x-admin.badge>
@@ -821,7 +821,7 @@
                                     default    => 'amber',
                                 };
                             @endphp
-                            <div class="px-5 py-4">
+                            <div class="rounded-[12px] bg-zinc-50/60 px-4 py-3">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="text-xs font-semibold text-zinc-900">{{ $verification->productLabel() }}</span>
@@ -871,23 +871,23 @@
         </div>
 
         {{-- Trusted Devices --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Devices ({{ $user->trustedDevices->count() }})</h3>
             </div>
             @if ($user->trustedDevices->isNotEmpty())
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800">
+                <div class="overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">Device</th>
-                                <th class="px-5 py-3 font-semibold">IP Address</th>
-                                <th class="px-5 py-3 font-semibold">Location</th>
-                                <th class="px-5 py-3 font-semibold">Last Seen</th>
-                                <th class="px-5 py-3 font-semibold">Status</th>
+                                <th class="">Device</th>
+                                <th class="">IP Address</th>
+                                <th class="">Location</th>
+                                <th class="">Last Seen</th>
+                                <th class="">Status</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-100">
+                        <tbody class="">
                             @foreach ($user->trustedDevices()->orderByDesc('last_seen_at')->get() as $device)
                                 <tr>
                                     <td class="px-5 py-3">
@@ -899,9 +899,9 @@
                                     <td class="px-5 py-3 text-zinc-700">{{ $fmtDate($device->last_seen_at ?? $device->created_at) }}</td>
                                     <td class="px-5 py-3">
                                         @if ($device->isTrusted())
-                                            <span class="inline-flex items-center rounded-[12px] bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Trusted</span>
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">Trusted</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-[12px] bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Pending</span>
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">Pending</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -958,7 +958,7 @@
                 ['Wallet balance', ($walletTotalApprox ? '~' : '').\App\Domain\Shared\Services\Money::codeAmount((float) $walletTotalUsd, 'USD')],
                 ['Unread alerts', number_format($unreadNotifications)],
             ] as [$label, $value])
-                <div class="rounded-[16px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5">
                     <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">{{ $label }}</p>
                     <p class="mt-1.5 text-lg font-bold text-zinc-900">{{ $value }}</p>
                 </div>
@@ -966,11 +966,11 @@
         </div>
 
         {{-- Wallets --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Wallets ({{ $user->wallets->count() }})</h3>
             </div>
-            <div class="divide-y divide-zinc-100">
+            <div class="divide-y divide-zinc-100 pb-3">
                 @forelse ($user->wallets as $wallet)
                     <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                         <div>
@@ -980,7 +980,7 @@
                                 · Locked @money((float) $wallet->locked_balance, $wallet->currency)
                             </p>
                         </div>
-                        <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $wallet->is_active ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $wallet->is_active ? 'bg-emerald-50 text-emerald-700 ' : 'bg-zinc-100 text-zinc-700 ' }}">
                             {{ $wallet->is_active ? 'Active' : 'Inactive' }}
                         </span>
                     </div>
@@ -991,22 +991,22 @@
         </div>
 
         {{-- Recent orders --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Recent orders</h3>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-[11px]">
-                    <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                    <thead class="">
                         <tr>
-                            <th class="px-5 py-3 font-semibold">Order</th>
-                            <th class="px-5 py-3 font-semibold">Status</th>
-                            <th class="px-5 py-3 font-semibold">Total</th>
-                            <th class="px-5 py-3 font-semibold">Placed</th>
-                            <th class="px-5 py-3 text-right font-semibold">Actions</th>
+                            <th class="">Order</th>
+                            <th class="">Status</th>
+                            <th class="">Total</th>
+                            <th class="">Placed</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody class="">
                         @forelse ($user->orders as $order)
                             <tr>
                                 <td class="px-5 py-3 font-mono font-semibold text-zinc-900">#{{ $order->order_number }}</td>
@@ -1037,27 +1037,27 @@
         </div>
 
         {{-- Recent wallet activity --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Recent wallet activity</h3>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-[11px]">
-                    <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-800">
+            <div class="overflow-x-auto p-3">
+                <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                    <thead class="">
                         <tr>
-                            <th class="px-5 py-3 font-semibold">Type</th>
-                            <th class="px-5 py-3 font-semibold">Amount</th>
-                            <th class="px-5 py-3 font-semibold">Description</th>
-                            <th class="px-5 py-3 font-semibold">Balance after</th>
-                            <th class="px-5 py-3 font-semibold">Date</th>
+                            <th class="">Type</th>
+                            <th class="">Amount</th>
+                            <th class="">Description</th>
+                            <th class="">Balance after</th>
+                            <th class="">Date</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody class="">
                         @forelse ($user->walletTransactions as $tx)
                             @php $isCredit = $tx->type === \App\Domain\Shared\Enums\WalletTransactionType::Credit; @endphp
                             <tr>
                                 <td class="px-5 py-3">
-                                    <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $isCredit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-zinc-100 text-zinc-700 ring-zinc-200' }}">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $isCredit ? 'bg-emerald-50 text-emerald-700 ' : 'bg-zinc-100 text-zinc-700 ' }}">
                                         {{ $tx->type->label() }}
                                     </span>
                                 </td>
@@ -1091,18 +1091,22 @@
             $emailTone = function ($status): array {
                 $value = is_object($status) ? $status->value : (string) $status;
 
+                // Same pill as the customer dashboard's delivery badges: a soft
+                // tint, no ring, and a dark counterpart. These carried light-mode
+                // colours only, so on a dark card the badge stayed a pale green
+                // chip with dark green text on it.
                 return match ($value) {
-                    'delivered', 'opened', 'clicked' => ['Delivered', 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
-                    'bounced', 'failed', 'complained', 'suppressed' => [ucfirst($value), 'bg-red-50 text-red-700 ring-red-200'],
-                    default => [ucfirst($value), 'bg-zinc-100 text-zinc-700 ring-zinc-200'],
+                    'delivered', 'opened', 'clicked' => ['Delivered', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'],
+                    'bounced', 'failed', 'complained', 'suppressed' => [ucfirst($value), 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
+                    default => [ucfirst($value), 'bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-300'],
                 };
             };
         @endphp
-        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">Recent emails sent</h3>
             </div>
-            <div class="divide-y divide-zinc-100">
+            <div class="divide-y divide-zinc-100 pb-3">
                 @forelse ($recentEmails as $index => $email)
                     @php [$statusLabel, $statusTone] = $emailTone($email->status); @endphp
                     <div @if ($index >= 5) x-show="expanded" x-cloak @endif class="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
@@ -1110,7 +1114,7 @@
                             <p class="truncate text-[13px] font-semibold text-zinc-900">{{ $email->subject ?: ucfirst(str_replace('_', ' ', is_object($email->category) ? $email->category->value : $email->category)) }}</p>
                             <p class="mt-0.5 text-[11px] text-zinc-500">{{ $fmtDate($email->sent_at ?? $email->created_at) }}</p>
                         </div>
-                        <span class="inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $statusTone }}">{{ $statusLabel }}</span>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusTone }}">{{ $statusLabel }}</span>
                     </div>
                 @empty
                     <div class="px-5 py-8 text-center text-sm text-zinc-600">No emails on record for this customer.</div>
@@ -1146,11 +1150,11 @@
                 return $log->actor_id ? 'User #'.$log->actor_id : 'System';
             };
         @endphp
-        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div x-data="{ expanded: false }" class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
             <div class="border-b border-zinc-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-zinc-900">History</h3>
             </div>
-            <div class="divide-y divide-zinc-100">
+            <div class="divide-y divide-zinc-100 pb-3">
                 @forelse ($history as $index => $log)
                     <div @if ($index >= 5) x-show="expanded" x-cloak @endif class="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
                         <div class="min-w-0">

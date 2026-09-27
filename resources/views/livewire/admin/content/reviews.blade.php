@@ -42,8 +42,8 @@ class extends Component {
     // storefront (Review::scopeOwnCollected), so a review added here defaulting
     // to a platform would save fine, list fine, and then never appear on the
     // site. Trustpilot and Google stay selectable for recording what they hold.
-    #[Validate('required|in:Trustpilot,Google,RshopRefills')]
-    public string $source = 'RshopRefills';
+    #[Validate('required|in:Trustpilot,Google,RshopRefill')]
+    public string $source = 'RshopRefill';
 
     #[Validate('required|date')]
     public string $reviewedAt = '';
@@ -144,10 +144,10 @@ class extends Component {
 
         if ($this->editingId) {
             Review::findOrFail($this->editingId)->update($payload);
-            session()->flash('status', 'Review updated.');
+            $this->dispatch('toast', message: 'Review updated.');
         } else {
             Review::create($payload);
-            session()->flash('status', 'Review created.');
+            $this->dispatch('toast', message: 'Review created.');
         }
 
         $this->resetForm();
@@ -157,7 +157,7 @@ class extends Component {
     public function delete(int $id): void
     {
         Review::findOrFail($id)->delete();
-        session()->flash('status', 'Review deleted.');
+        $this->dispatch('toast', message: 'Review deleted.');
         unset($this->reviews);
     }
 
@@ -175,7 +175,7 @@ class extends Component {
         $this->initials = '';
         $this->body = '';
         $this->rating = 5.0;
-        $this->source = 'RshopRefills';
+        $this->source = 'RshopRefill';
         $this->reviewedAt = now()->toDateString();
         $this->isPublished = true;
         $this->sortOrder = 0;
@@ -197,10 +197,6 @@ class extends Component {
         </button>
     </header>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-    @endif
-
     {{-- Aggregate stats — same KPI strip pattern used across every admin
          list page (Rates, Pricing Rules, Account Activity, etc.). --}}
     <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -210,7 +206,7 @@ class extends Component {
             ['label' => 'Since',        'value' => $this->aggregate['since'],                             'dot' => 'bg-emerald-500'],
             ['label' => 'Source',       'value' => $this->aggregate['source'],                            'dot' => 'bg-fuchsia-500'],
         ] as $stat)
-            <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+            <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                 <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                     <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                     {{ $stat['label'] }}
@@ -239,7 +235,7 @@ class extends Component {
         @endif
     </div>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
         <div class="overflow-x-auto p-3">
             <table class="admin-table w-full text-left text-sm">
                 <thead>
@@ -264,9 +260,19 @@ class extends Component {
                                     @endif
                                 </p>
                                 <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">{{ $review->initials }}</p>
+                                @if ($review->is_anonymous)
+                                    {{-- Admin sees who wrote it; customers will not. --}}
+                                    <x-admin.badge tone="zinc">Anonymous</x-admin.badge>
+                                @endif
                             </td>
                             <td>{{ $review->source }}</td>
-                            <td>{{ rtrim(rtrim(number_format($review->rating, 1), '0'), '.') }} / 5</td>
+                            <td>
+                                {{ rtrim(rtrim(number_format($review->rating, 1), '0'), '.') }} / 5
+                                @if ($review->score !== null)
+                                    {{-- From the experience prompt: the answer as given, and what it asked about. --}}
+                                    <p class="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">Scored {{ $review->score }} / 10{{ $review->category ? ' on '.$review->category : '' }}</p>
+                                @endif
+                            </td>
                             <td>{{ $review->reviewed_at->format('M j, Y') }}</td>
                             <td class="max-w-md truncate">{{ $review->body }}</td>
                             <td>
@@ -282,7 +288,7 @@ class extends Component {
                                 <div class="inline-flex items-center gap-1.5">
                                     <button wire:click="togglePublish({{ $review->id }})" type="button" class="rounded-[5px] bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-700/50 dark:text-zinc-300 dark:hover:bg-zinc-700">{{ $review->is_published ? 'Unpublish' : 'Publish' }}</button>
                                     <button wire:click="edit({{ $review->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">Edit</button>
-                                    <button wire:click="delete({{ $review->id }})" wire:confirm="Delete this review permanently?" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
+                                    <button wire:click="delete({{ $review->id }})" data-confirm="Delete this review permanently?" data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -344,7 +350,7 @@ class extends Component {
                         </div>
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Source</label>
-                            <x-admin.select wire:model="source" :options="['RshopRefills' => 'RshopRefills (our website, shows on the site)', 'Trustpilot' => 'Trustpilot (record only, not shown)', 'Google' => 'Google (record only, not shown)']" />
+                            <x-admin.select wire:model="source" :options="['RshopRefill' => 'RshopRefill (our website, shows on the site)', 'Trustpilot' => 'Trustpilot (record only, not shown)', 'Google' => 'Google (record only, not shown)']" />
                             <p class="mt-1 text-[10px] text-zinc-500">Picks the brand icon and star colour on the storefront card.</p>
                             @error('source') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>

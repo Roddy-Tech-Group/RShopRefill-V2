@@ -18,6 +18,7 @@ class TermsPageTest extends TestCase
             ->assertSee('Terms of Service')
             ->assertSee('Acceptance of these Terms')
             ->assertSee('Acceptable use')
-            ->assertSee('info@rshoprefill.com');
+            ->assertSee('support@rshoprefill.com')
+            ->assertDontSee('info@rshoprefill.com');
     }
 }

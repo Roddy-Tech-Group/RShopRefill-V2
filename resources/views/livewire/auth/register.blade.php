@@ -3,10 +3,12 @@
 use App\Http\Middleware\CaptureReferralCookie;
 use App\Models\Referral;
 use App\Models\User;
+use App\Support\PhoneCountries;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use App\Domain\Security\Services\TurnstileService;
@@ -16,11 +18,31 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 new #[Layout('components.layouts.auth')] class extends Component {
-    public string $name = '';
+    public string $first_name = '';
+
+    public string $last_name = '';
 
     public string $email = '';
+
+    /**
+     * The country is picked from the phone field's dial code rather than from
+     * a list of its own: one control, one answer. The ISO code chosen there is
+     * what lands in users.country, and the number beside it is validated
+     * against that country's numbering plan.
+     */
+    public string $country = PhoneCountries::DEFAULT_ISO;
+
+    public string $phone = '';
+
+    /**
+     * Drives the default avatar until the customer uploads one, the same way
+     * the sign-up modal uses it.
+     */
+    public string $gender = '';
 
     public string $password = '';
 
@@ -28,7 +50,118 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     public string $referral = '';
 
+    /**
+     * Consent to the Terms of Service and Privacy Policy. Not a users column -
+     * it gates the submit and is stripped before the model is created.
+     */
+    public bool $terms = false;
+
     public ?string $turnstileToken = null;
+
+    /** Which page of the form is showing. */
+    public int $step = 1;
+
+    public const TOTAL_STEPS = 3;
+
+    /**
+     * What each page asks for.
+     *
+     * Presentation only. register() still validates the whole form before it
+     * writes anything, so a customer who skips ahead by poking at the Livewire
+     * component gains nothing: the steps are a way to present eleven fields
+     * without a wall of them, never the gate.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function rulesForStep(int $step): array
+    {
+        $all = $this->registrationRules();
+
+        $fields = match ($step) {
+            1 => ['first_name', 'last_name', 'email'],
+            2 => ['country', 'phone', 'gender'],
+            default => [],
+        };
+
+        return array_intersect_key($all, array_flip($fields));
+    }
+
+    /**
+     * Forward, once this page's own answers hold up. The phone is checked for
+     * an existing account here rather than at the end, so a customer who has
+     * signed up before learns it now and not after choosing a password.
+     */
+    public function next(): void
+    {
+        $this->validate($this->rulesForStep($this->step), $this->validationMessages());
+
+        if ($this->step === 2) {
+            $this->ensurePhoneIsFree();
+        }
+
+        $this->step = min($this->step + 1, self::TOTAL_STEPS);
+    }
+
+    public function back(): void
+    {
+        $this->step = max($this->step - 1, 1);
+    }
+
+    /**
+     * The whole form's rules, in one place, so a step can borrow its slice and
+     * the final submit can take the lot.
+     *
+     * max:100 a part, not 255: users.name holds both plus a space, and two
+     * 255s would overflow the column at the insert rather than at the form.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function registrationRules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
+            // The national number is validated against the chosen country's
+            // numbering plan (libphonenumber). A trunk 0 the customer may type
+            // is tolerated here and stripped when the number is stored.
+            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
+            'gender' => ['required', 'in:male,female,other'],
+            'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
+            'terms' => ['accepted'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function validationMessages(): array
+    {
+        return [
+            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
+        ];
+    }
+
+    /**
+     * The number in E.164 (+2348031234567), the one format every gateway and
+     * SMS provider reads the same way.
+     */
+    private function phoneE164(): string
+    {
+        return (new PhoneNumber($this->phone, [$this->country]))->formatE164();
+    }
+
+    /**
+     * One line, one account. A rule on the national number could not see that
+     * 0803... and +234803... are the same line, so the check is on E.164.
+     */
+    private function ensurePhoneIsFree(): void
+    {
+        if (User::where('phone', $this->phoneE164())->exists()) {
+            throw ValidationException::withMessages([
+                'phone' => __('auth.phone_taken'),
+            ]);
+        }
+    }
 
     /**
      * Prefill the referral code from the CaptureReferralCookie so a customer
@@ -49,15 +182,33 @@ new #[Layout('components.layouts.auth')] class extends Component {
         
         $this->ensureIsNotRateLimited();
 
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
-        ]);
+        // Every field, whatever step the form thinks it is on. The steps are a
+        // presentation device; this is the gate.
+        $validated = $this->validate($this->registrationRules(), $this->validationMessages());
+
+        $this->ensurePhoneIsFree();
+
+        $validated['phone'] = $this->phoneE164();
+
+        // Consent is recorded by the act of registering; it is not a column on
+        // users, so it must not reach User::create().
+        unset($validated['terms']);
+
+        // The split is a form concern only. users.name is still the single
+        // column every screen reads to greet a customer, so the two fields are
+        // joined back into it here rather than pushing the split onto the
+        // schema and every caller of $user->name.
+        $validated['name'] = trim($validated['first_name'].' '.$validated['last_name']);
+        unset($validated['first_name'], $validated['last_name']);
 
         $validated['password'] = Hash::make($validated['password']);
 
-        event(new Registered(($user = User::create($validated))));
+        // This form now collects everything an account needs, so the signup is
+        // complete on arrival and never meets the profile-completion step that
+        // a Google sign-in lands on.
+        $validated['profile_completed_at'] = now();
+
+        $user = User::create($validated);
 
         // ── Referral attribution ────────────────────────────────────────
         // Prefer the code the customer typed on the form; fall back to the
@@ -150,11 +301,12 @@ new #[Layout('components.layouts.auth')] class extends Component {
     }
 }; ?>
 
-<div class="flex flex-col sm:flex-1">
+{{-- Enters from the right; see .auth-slide-right in app.css.
+     Sign-in and create-account arrive from opposite sides so the two read
+     as a pair rather than as one screen replacing the other. --}}
+<div class="auth-slide-right flex flex-col sm:flex-1">
     {{-- Centered form --}}
-    <div class="mx-auto flex w-full max-w-sm flex-col py-3 sm:flex-1 sm:justify-center sm:py-6">
-
-        <p class="text-center text-base text-zinc-600">Join {{ $siteName }} and start shopping today</p>
+    <div class="mx-auto flex w-full flex-col sm:flex-1 sm:justify-center">
 
         <x-auth-session-status class="mt-4 text-center" :status="session('status')" />
 
@@ -163,7 +315,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
             <a
                 href="{{ route('auth.google.redirect', ['popup' => 1]) }}"
                 @click.prevent="window.rshopOpenGoogleOAuth($el.href)"
-                class="flex items-center justify-center gap-3 rounded-[12px] border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                class="flex items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 py-3 text-base font-semibold text-zinc-800 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
             >
                 <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -185,39 +337,66 @@ new #[Layout('components.layouts.auth')] class extends Component {
         {{-- Registration form --}}
         <form wire:submit="register" class="flex flex-col gap-3 sm:gap-4">
 
-            {{-- Name --}}
-            <div>
-                <label for="name" class="mb-1.5 block text-sm font-medium text-zinc-700">Full Name</label>
-                <div class="relative">
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                        </svg>
-                    </span>
-                    <input
-                        wire:model="name"
-                        id="name"
-                        name="name"
-                        type="text"
-                        required
-                        autofocus
-                        autocomplete="name"
-                        placeholder="Enter your full name"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
-                    />
+            {{-- Where you are, and how much is left. Three bars rather than a
+                 count, so the answer is the same shape as the form: short. --}}
+            <div class="mb-1 flex items-center gap-2" role="group" aria-label="Sign-up progress">
+                @foreach ([1, 2, 3] as $dot)
+                    <span
+                        class="h-1.5 flex-1 rounded-full transition-colors {{ $step >= $dot ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"
+                        @if ($step === $dot) aria-current="step" @endif
+                    ></span>
+                @endforeach
+                <span class="ml-1 shrink-0 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{{ $step }}/3</span>
+            </div>
+
+            {{-- Page one: who you are. --}}
+            @if ($step === 1)
+            {{-- Name. Two fields, not one: given-name / family-name is what
+                 browsers and password managers autofill against, and it is the
+                 shape every later step wants a name in. One row at every width,
+                 phones included - they are two halves of one answer, and
+                 stacking them read as two unrelated questions. --}}
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="first_name" class="mb-2 block text-sm font-medium text-zinc-700">First Name</label>
+                    <div class="relative">
+                        <input
+                            wire:model="first_name"
+                            id="first_name"
+                            name="first_name"
+                            type="text"
+                            required
+                            autofocus
+                            autocomplete="given-name"
+                            placeholder="First name"
+                            class="w-full rounded-full border-2 border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
+                        />
+                    </div>
+                    @error('first_name') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
-                @error('name') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
+
+                <div>
+                    <label for="last_name" class="mb-2 block text-sm font-medium text-zinc-700">Last Name</label>
+                    <div class="relative">
+                        <input
+                            wire:model="last_name"
+                            id="last_name"
+                            name="last_name"
+                            type="text"
+                            required
+                            autocomplete="family-name"
+                            placeholder="Last name"
+                            class="w-full rounded-full border-2 border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
+                        />
+                    </div>
+                    @error('last_name') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
             </div>
 
             {{-- Email --}}
             <div>
-                <label for="email" class="mb-1.5 block text-sm font-medium text-zinc-700">Email Address</label>
+                <label for="email" class="mb-2 block text-sm font-medium text-zinc-700">Email Address</label>
                 <div class="relative">
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                        </svg>
-                    </span>
                     <input
                         wire:model="email"
                         id="email"
@@ -226,21 +405,148 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         required
                         autocomplete="email"
                         placeholder="Enter your email address"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
                     />
                 </div>
-                @error('email') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('email') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
+
+            @endif
+
+            {{-- Page two: how we reach you. --}}
+            @if ($step === 2)
+
+            {{-- Country dial-code + phone, one control. The left segment is a
+                 searchable flag and +code picker, and what it picks IS the
+                 account's country; the right segment is the national number.
+                 libphonenumber validates the pair server-side and the number is
+                 stored as E.164, so it can be typed with or without a trunk 0. --}}
+            <div
+                x-data="{
+                    countries: @js(App\Support\PhoneCountries::all()),
+                    selected: @js($country),
+                    search: '',
+                    open: false,
+                    get current() { return this.countries.find(c => c.iso === this.selected) || this.countries[0]; },
+                    get matches() {
+                        const q = this.search.trim().toLowerCase();
+                        if (! q) return this.countries;
+                        return this.countries.filter(c =>
+                            c.name.toLowerCase().includes(q) || c.iso.toLowerCase().includes(q) || ('+' + c.dial).includes(q)
+                        );
+                    },
+                    choose(iso) {
+                        this.selected = iso;
+                        $wire.country = iso;
+                        this.open = false;
+                        this.search = '';
+                        this.$nextTick(() => this.$refs.phoneInput?.focus());
+                    },
+                }"
+                @click.outside="open = false"
+            >
+                <label for="phone" class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_phone') }}</label>
+                <div class="flex items-stretch rounded-full border-2 border-zinc-300 bg-white transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15">
+                    <button
+                        type="button"
+                        @click="open = ! open"
+                        :aria-expanded="open"
+                        aria-label="{{ __('auth.modal_dial_code') }}"
+                        class="flex shrink-0 items-center gap-1.5 rounded-l-full border-r-2 border-zinc-300 px-4 text-base text-zinc-900 outline-none transition-colors hover:bg-zinc-50"
+                    >
+                        <span class="text-base leading-none" x-text="current.flag"></span>
+                        <span class="font-medium" x-text="'+' + current.dial"></span>
+                        <svg class="h-4 w-4 text-zinc-500 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                    </button>
+
+                    <input
+                        wire:model="phone"
+                        x-ref="phoneInput"
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        inputmode="numeric"
+                        autocomplete="tel-national"
+                        required
+                        :placeholder="current.example"
+                        class="w-full min-w-0 rounded-r-full bg-transparent px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none"
+                    />
+                </div>
+
+                {{-- The list opens in flow rather than floating over the form, so
+                     it can never be clipped by an ancestor and never paints over
+                     the fields under it. It caps its own height and scrolls. --}}
+                <div
+                    x-show="open"
+                    x-collapse
+                    x-cloak
+                    @keydown.escape.stop="open = false"
+                    class="mt-2 overflow-hidden rounded-[12px] bg-white shadow-lg shadow-zinc-900/[0.08] ring-1 ring-zinc-200"
+                >
+                    <div class="border-b border-zinc-200 p-2">
+                        <input
+                            x-model="search"
+                            type="text"
+                            placeholder="{{ __('auth.modal_search_country') }}"
+                            class="w-full rounded-full border-2 border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500"
+                            @keydown.enter.prevent="if (matches.length) choose(matches[0].iso)"
+                        >
+                    </div>
+                    <ul class="max-h-52 overflow-y-auto overscroll-contain py-1" role="listbox">
+                        <template x-for="c in matches" :key="c.iso">
+                            <li>
+                                <button
+                                    type="button"
+                                    @click="choose(c.iso)"
+                                    class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-900 transition-colors hover:bg-[#f4f6f5]"
+                                    :class="c.iso === selected && 'bg-[#f4f6f5] font-semibold'"
+                                >
+                                    <span class="text-base leading-none" x-text="c.flag"></span>
+                                    <span class="flex-1 truncate" x-text="c.name"></span>
+                                    <span class="text-zinc-500" x-text="'+' + c.dial"></span>
+                                </button>
+                            </li>
+                        </template>
+                        <li x-show="! matches.length" class="px-3 py-3 text-center text-sm text-zinc-500">{{ __('auth.modal_no_match') }}</li>
+                    </ul>
+                </div>
+                @error('country') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('phone') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Gender. Three choices on one segmented control, in the same pill
+                 language as the fields above it. It picks the default avatar
+                 until the customer uploads one of their own. --}}
+            <div>
+                <span class="mb-2 block text-sm font-medium text-zinc-700">{{ __('auth.modal_gender') }}</span>
+                <div class="grid grid-cols-3 gap-1 rounded-full bg-zinc-100 p-1 ring-1 ring-zinc-200">
+                    @foreach ([
+                        ['value' => 'male',   'label' => __('auth.modal_gender_male')],
+                        ['value' => 'female', 'label' => __('auth.modal_gender_female')],
+                        ['value' => 'other',  'label' => __('auth.modal_gender_other')],
+                    ] as $opt)
+                        <button
+                            type="button"
+                            wire:click="$set('gender', '{{ $opt['value'] }}')"
+                            class="rounded-full px-3 py-3 text-sm font-semibold transition-all active:scale-95 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
+                            aria-pressed="{{ $gender === $opt['value'] ? 'true' : 'false' }}"
+                        >
+                            {{ $opt['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+                @error('gender') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            @endif
+
+            {{-- Page three: securing it, and the consent that finishes it. --}}
+            @if ($step === 3)
 
             {{-- Password --}}
             <div x-data="{ show: false }">
-                <label for="password" class="mb-1.5 block text-sm font-medium text-zinc-700">Password</label>
+                <label for="password" class="mb-2 block text-sm font-medium text-zinc-700">Password</label>
                 <div class="relative">
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                        </svg>
-                    </span>
                     <input
                         wire:model="password"
                         id="password"
@@ -249,7 +555,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="Create a password"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white py-3 pl-4 pr-12 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
                     />
                     <button
                         type="button"
@@ -266,18 +572,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         </svg>
                     </button>
                 </div>
-                @error('password') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('password') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             {{-- Confirm Password --}}
             <div x-data="{ show: false }">
-                <label for="password_confirmation" class="mb-1.5 block text-sm font-medium text-zinc-700">Confirm Password</label>
+                <label for="password_confirmation" class="mb-2 block text-sm font-medium text-zinc-700">Confirm Password</label>
                 <div class="relative">
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                        </svg>
-                    </span>
                     <input
                         wire:model="password_confirmation"
                         id="password_confirmation"
@@ -286,7 +587,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         required
                         autocomplete="new-password"
                         placeholder="Re-enter your password"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-12 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white py-3 pl-4 pr-12 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
                     />
                     <button
                         type="button"
@@ -303,22 +604,18 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         </svg>
                     </button>
                 </div>
-                @error('password_confirmation') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('password_confirmation') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
+
 
             {{-- Referral code (optional). Prefilled from the ?ref=CODE cookie
                  when the customer arrived through a friend's invite link, but
                  always editable so anyone can paste a code in by hand. --}}
             <div>
-                <label for="referral" class="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label for="referral" class="mb-2 block text-sm font-medium text-zinc-700">
                     Referral code <span class="font-normal text-zinc-500">(optional)</span>
                 </label>
                 <div class="relative">
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-                        </svg>
-                    </span>
                     <input
                         wire:model="referral"
                         id="referral"
@@ -326,79 +623,98 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         type="text"
                         autocomplete="off"
                         placeholder="Enter a friend's referral code"
-                        class="w-full rounded-[12px] border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full border-2 border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-600 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge"
                     />
                 </div>
-                @error('referral') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('referral') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Submit --}}
-            <div wire:ignore class="mb-2">
-                @if(config('services.turnstile.enabled') && config('services.turnstile.enforce_auth'))
-                    <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-callback="onTurnstileSuccessRegister" data-theme="light"></div>
-                    <script>
-                        function onTurnstileSuccessRegister(token) {
-                            @this.set('turnstileToken', token);
-                        }
-                    </script>
+            {{-- Consent. Required, and enforced server-side by the `accepted`
+                 rule above - a disabled button alone would be advisory only. --}}
+            <div>
+                <label for="terms" class="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+                    <input
+                        wire:model="terms"
+                        id="terms"
+                        name="terms"
+                        type="checkbox"
+                        class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-[4px] border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/40 dark:border-white/20 dark:bg-white/5"
+                    />
+                    <span>
+                        I agree to the
+                        <a href="{{ route('shop.terms') }}" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">Terms of Service</a>
+                        and
+                        <a href="{{ route('shop.privacy') }}" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">Privacy Policy</a>.
+                    </span>
+                </label>
+                @error('terms') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            @endif
+
+            {{-- Kept in the DOM from the first paint and merely hidden until
+                 the last page. Cloudflare's script draws .cf-turnstile once,
+                 when it loads, so a widget that only appeared on step three
+                 would never be drawn and its token would never arrive. The
+                 widget itself is wire:ignore so Livewire leaves it alone
+                 across the step changes; the wrapper is not, so it can hide
+                 and show. --}}
+            <div class="{{ $step === 3 ? 'mb-2' : 'hidden' }}">
+                <div wire:ignore>
+                    @if(config('services.turnstile.enabled') && config('services.turnstile.enforce_auth'))
+                        <div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}" data-callback="onTurnstileSuccessRegister" data-theme="light"></div>
+                        <script>
+                            function onTurnstileSuccessRegister(token) {
+                                @this.set('turnstileToken', token);
+                            }
+                        </script>
+                    @endif
+                </div>
+                @error('turnstileToken') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Continue until the last page, then submit. Both are the same
+                 pill; only the label and what they do change. The back button
+                 is a button, not a link: going back must not re-request the
+                 page and lose what has been typed. --}}
+            <div class="mt-2 flex items-center gap-3">
+                @if ($step > 1)
+                    <button
+                        type="button"
+                        wire:click="back"
+                        class="flex shrink-0 items-center justify-center rounded-full border-2 border-zinc-300 px-5 py-3 text-base font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-white/5"
+                    >
+                        Back
+                    </button>
+                @endif
+
+                @if ($step < 3)
+                    <button
+                        type="button"
+                        wire:click="next"
+                        class="flex flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        <span>Continue</span>
+                    </button>
+                @else
+                    <button
+                        type="submit"
+                        class="flex flex-1 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                    >
+                        <span>Create Account</span>
+                    </button>
                 @endif
             </div>
-            @error('turnstileToken') <p class="mt-1 text-center text-sm text-red-600">{{ $message }}</p> @enderror
-
-            <button
-                type="submit"
-                class="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
-            >
-                <span>Create Account</span>
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M9 4.5a1.5 1.5 0 0 1 3 0V10h.5V6a1.5 1.5 0 0 1 3 0v4h.5V7.5a1.5 1.5 0 0 1 3 0V10h.5a1.5 1.5 0 0 1 1.5 1.5v3.5a5 5 0 0 1-5 5h-2.4a3 3 0 0 1-2.12-.88l-3.96-3.96a1.5 1.5 0 0 1 2.12-2.12L9 14.38V4.5z" />
-                </svg>
-            </button>
         </form>
-
-        {{-- Log in link --}}
-        <div class="mt-3 flex justify-center text-base sm:mt-4">
-            <span class="text-zinc-600">Already have an account?</span>
-            <a href="{{ route('login') }}" wire:navigate class="ml-1 font-semibold text-blue-600 hover:text-blue-700">Log in</a>
-        </div>
-
-        {{-- Socials divider --}}
-        <div class="my-3 flex items-center gap-4 sm:my-5">
-            <span class="h-px flex-1 bg-zinc-200"></span>
-            <span class="text-sm text-zinc-600">Connect with us on our socials</span>
-            <span class="h-px flex-1 bg-zinc-200"></span>
-        </div>
-
-        {{-- Social row --}}
-        <div class="flex items-center justify-center gap-3">
-            <a href="https://facebook.com/rshoprefills" target="_blank" rel="noopener noreferrer" aria-label="Visit our Facebook page" class="flex h-11 w-11 items-center justify-center rounded-[12px] border border-zinc-200 bg-white transition-colors hover:bg-zinc-50">
-                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="#1877F2" aria-hidden="true">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-            </a>
-            <a href="https://x.com/rshoprefills" target="_blank" rel="noopener noreferrer" aria-label="Follow us on X" class="flex h-11 w-11 items-center justify-center rounded-[12px] border border-zinc-200 bg-white transition-colors hover:bg-zinc-50">
-                <svg viewBox="0 0 24 24" class="h-4 w-4 text-zinc-900" fill="currentColor" aria-hidden="true">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
-                </svg>
-            </a>
-            <a href="https://tiktok.com/@rshoprefills" target="_blank" rel="noopener noreferrer" aria-label="Follow us on TikTok" class="flex h-11 w-11 items-center justify-center rounded-[12px] border border-zinc-200 bg-white transition-colors hover:bg-zinc-50">
-                <svg viewBox="0 0 24 24" class="h-5 w-5 text-zinc-900" fill="currentColor" aria-hidden="true">
-                    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-                </svg>
-            </a>
-            <a href="https://instagram.com/rshoprefills" target="_blank" rel="noopener noreferrer" aria-label="Follow us on Instagram" class="flex h-11 w-11 items-center justify-center rounded-[12px] border border-zinc-200 bg-white transition-colors hover:bg-zinc-50">
-                <svg viewBox="0 0 24 24" class="h-5 w-5 text-pink-600" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.07 1.644.07 4.849 0 3.205-.012 3.584-.07 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                </svg>
-            </a>
-        </div>
 
         {{-- Security note --}}
         <div class="mt-4 flex items-center justify-center gap-1.5 text-sm text-zinc-600 sm:mt-6">
             <svg class="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152A11.959 11.959 0 0 1 12 2.714Z" />
             </svg>
-            <span>Your security is our priority. We never share your data.</span>
+            <span>Your information is protected and handled according to our
+                <a href="{{ route('shop.privacy') }}" wire:navigate class="font-semibold underline underline-offset-2 transition-colors hover:text-zinc-900 dark:hover:text-white">Privacy Policy</a>
+            </span>
         </div>
 
     </div>

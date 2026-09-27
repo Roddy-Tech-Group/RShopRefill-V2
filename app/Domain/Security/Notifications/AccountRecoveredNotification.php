@@ -22,7 +22,7 @@ class AccountRecoveredNotification extends Notification
         return (new MailMessage)
             ->subject('Your account has been recovered')
             ->greeting("Hello {$notifiable->name},")
-            ->line('Your RshopRefills account has been successfully recovered and Protected Mode has been lifted.')
+            ->line('Your RshopRefill account has been successfully recovered and Protected Mode has been lifted.')
             ->line('Financial operations are now available.')
             ->line('**Security Tip:** We strongly recommend updating your account password and transaction PIN if you suspect your credentials may have been compromised.')
             ->line('If this was you, no further action is required.')

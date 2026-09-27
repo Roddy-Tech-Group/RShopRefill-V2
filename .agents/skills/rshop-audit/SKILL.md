@@ -1,4 +1,4 @@
----
+Secure by design---
 name: rshop-audit
 description: >
   Run a comprehensive read-only production audit of the RShopRefills Laravel application.

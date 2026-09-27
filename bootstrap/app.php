@@ -13,7 +13,10 @@ use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\EnsureProfileCompleted;
 use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\RedirectAlternateHosts;
+use App\Http\Middleware\RejectMalformedInput;
+use App\Http\Middleware\ResolveDisplayCurrency;
 use App\Http\Middleware\ResolveRegion;
+use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
 use App\Models\Admin;
@@ -104,17 +107,31 @@ return Application::configure(basePath: dirname(__DIR__))
             'device.mature' => EnsureDeviceMature::class,
         ]);
 
+        // Refuses malformed-UTF-8 and oversized input with 422 before any
+        // controller runs. Global, not per-group: an endpoint that echoes a
+        // parameter into a JSON response 500s on bad encoding wherever it
+        // lives, and web and api both do that.
+        $middleware->prepend(RejectMalformedInput::class);
+
         $middleware->append(TraceRequestMiddleware::class);
 
         // Theme hint cookies are written client-side (plain '0'/'1') by the theme
         // engine so the server can paint the right dark / Extra Dark ramp on the
         // first byte. They carry no sensitive data; exclude them from cookie
         // encryption or they decrypt to null and the pre-paint frame flashes.
+        //
+        // region_suggest_dismissed is the same shape: the region suggestion
+        // popup writes a plain '1' from JavaScript when it is dismissed, and
+        // the component checks it server-side so a dismissed popup is never
+        // rendered at all. Encrypted, that check reads null on every request -
+        // the cookie would still hide the popup client-side, but only after it
+        // had already been sent to someone who said no.
         $middleware->encryptCookies(except: [
             'theme_web_dark',
             'theme_admin_dark',
             'theme_web_puredark',
             'theme_admin_puredark',
+            'region_suggest_dismissed',
         ]);
 
         // Locks the storefront catalog to the customer's chosen country/region.
@@ -128,12 +145,25 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            // FIRST in the append list, which puts it after EncryptCookies and
+            // StartSession and before anything that renders.
+            //
+            // It cannot be prepended: prepend runs ahead of the framework's own
+            // web stack, where the locale cookie is still encrypted and there is
+            // no session yet - so both of those sources silently read as absent
+            // and every request fell back to English.
+            SetLocale::class,
             ResolveRegion::class,
             // Ties every web session to the password hash it signed in with:
             // a password change or reset signs every OTHER session out on its
             // next request, on any session driver. Without it, a thief who
             // was already logged in survived the victim changing the password.
             AuthenticateSession::class,
+            // Display currency is read from the query string and a cookie only,
+            // never from auth state, so it is independent of the line above and
+            // sits after it for no reason beyond matching how sessions settle
+            // before anything renders a price.
+            ResolveDisplayCurrency::class,
             EnsureAccountActive::class,
             CaptureReferralCookie::class,
             EnforceDeviceVerification::class,

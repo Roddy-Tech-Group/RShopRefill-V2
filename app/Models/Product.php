@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Domain\Catalog\Support\TopupQuickPicks;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Enums\PricingBasis;
+use App\Models\Concerns\HasTranslations;
+use App\Support\DisplayCurrency;
 use App\Support\FeatureFlag;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +16,16 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
+    use HasTranslations;
+
+    /**
+     * Prose the admin can translate. The column stays the SOURCE text;
+     * a locale with no row here reads straight through to it.
+     *
+     * @var array<int, string>
+     */
+    protected array $translatable = ['name', 'description', 'redeem_instructions', 'terms_and_conditions', 'protip'];
+
     use HasFactory, SoftDeletes;
 
     /**
@@ -116,14 +128,33 @@ class Product extends Model
      * Used as a branded fallback — mobile-airtime operators carry no logo, so
      * their cards become a coloured name tile instead of an empty box.
      */
-    public static function tileColor(?string $key): string
+    /**
+     * @param  list<string>  $avoid  Colours already used by nearby tiles.
+     */
+    public static function tileColor(?string $key, array $avoid = []): string
     {
         $palette = [
             '#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2',
             '#db2777', '#4f46e5', '#ca8a04', '#0d9488', '#e11d48', '#9333ea',
         ];
 
-        return $palette[abs(crc32((string) $key)) % count($palette)];
+        $start = abs(crc32((string) $key)) % count($palette);
+
+        // The colour is derived from the brand, so an operator keeps the same
+        // tile wherever it appears. With 194 logo-less brands over twelve
+        // colours, though, neighbours collide often, and two identical tiles
+        // side by side read as a rendering fault rather than a palette. A
+        // caller drawing a grid passes the colours it just used and the brand
+        // steps to the next free one.
+        foreach (range(0, count($palette) - 1) as $step) {
+            $candidate = $palette[($start + $step) % count($palette)];
+
+            if (! in_array($candidate, $avoid, true)) {
+                return $candidate;
+            }
+        }
+
+        return $palette[$start];
     }
 
     /**
@@ -270,7 +301,15 @@ class Product extends Model
             return null;
         }
 
-        $sym = self::currencySymbol($this->currency_code ?: 'USD');
+        // In the customer's chosen display currency when one is set and the
+        // pair is priceable; the product's own currency otherwise. See
+        // App\Support\DisplayCurrency for the resolution and fallbacks.
+        [$min, $code] = DisplayCurrency::convert((float) $min, $this->currency_code);
+        if ($max !== null) {
+            [$max] = DisplayCurrency::convert((float) $max, $this->currency_code);
+        }
+
+        $sym = self::currencySymbol($code);
         $fmt = fn ($v) => $sym.rtrim(rtrim(number_format($v, 2), '0'), '.');
 
         return ($max !== null && $max > $min)
@@ -292,6 +331,7 @@ class Product extends Model
         'slug',
         'description',
         'redeem_instructions',
+        'protip',
         'terms_and_conditions',
         'logo_url',
         'featured_image',

@@ -9,6 +9,47 @@
      surface pads for the inset; see the storefront header below and
      layouts/dashboard. --}}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+{{-- Installed, the app does not zoom. Pinching or double-tapping a native
+     app scales nothing, and here it only ever left the customer stranded
+     on a half-scrolled page with the fixed chrome adrift, since every
+     top- and bottom-anchored surface is positioned against a viewport the
+     zoom has just moved out from under it.
+
+     Only when installed. A browser tab keeps pinch-zoom, because taking it
+     away there removes the one way a customer who needs larger text can
+     get it, and the browser's own controls make the fixed chrome behave.
+     So the rule is written at runtime, off display-mode, rather than baked
+     into the meta tag above.
+
+     Three locks, because one is not enough: the viewport meta covers
+     Android and iOS standalone, touch-action rules out the double-tap
+     zoom that ignores the meta, and gesturestart is what iOS actually
+     listens to for a pinch. Inline and before paint so the page is never
+     briefly zoomable on the way in. --}}
+<script>
+    (function () {
+        var standalone = window.navigator.standalone === true
+            || window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: fullscreen)').matches
+            || window.matchMedia('(display-mode: minimal-ui)').matches;
+
+        if (! standalone) {
+            return;
+        }
+
+        document.documentElement.classList.add('is-standalone');
+
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no');
+        }
+
+        // iOS reads the pinch as a gesture rather than honouring the meta.
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+            document.addEventListener(name, function (e) { e.preventDefault(); }, { passive: false });
+        });
+    })();
+</script>
 <meta name="csrf-token" content="{{ csrf_token() }}" />
 <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
 
@@ -46,16 +87,9 @@
         default => $themeCookieHead === '1',
     };
 
-    // Extra Dark (pure black) is the DEFAULT dark palette on the customer side -
-    // navy is the opt-in "Soft dark" appearance. The choice lives in a cookie
-    // mirrored from the theme engine so the first paint already carries the right
-    // ramp. Absent cookie: customer defaults ON (black), admin stays OFF (navy).
-    $themePureDarkCookieHead = $themeIsAdminAreaHead
-        ? request()->cookie('theme_admin_puredark')
-        : request()->cookie('theme_web_puredark');
-    $themeIsPureDarkInitial = $themeIsDarkInitial && ($themeIsAdminAreaHead
-        ? $themePureDarkCookieHead === '1'
-        : $themePureDarkCookieHead !== '0');
+    // Soft dark is retired: there is a single dark palette, so the first paint
+    // no longer needs a second cookie to pick a ramp. .pure-dark now rides
+    // along with .dark wherever dark resolves.
 @endphp
 
 {{-- Tell the browser the resolved scheme so the OS-default blank-page bg
@@ -77,7 +111,9 @@
         @if ($themeIsDarkInitial)
             document.documentElement.classList.add('dark');
         @endif
-        @if ($themeIsPureDarkInitial)
+        @if ($themeIsDarkInitial)
+            {{-- One dark palette now, so .pure-dark rides along with .dark
+                 rather than being a separate stored preference. --}}
             document.documentElement.classList.add('pure-dark');
         @endif
         try {
@@ -107,14 +143,17 @@
      correct rule wins from the first paint. --}}
 <style>
     html { background-color: #ffffff; }
-    html.dark { background-color: #1a1a1a; }
-    /* Extra Dark is the default dark palette (customer side); paint the pre-CSS
-       frame true black so the default never flashes navy first. */
-    html.dark.pure-dark { background-color: #000000; }
-    /* Kill the ~15px horizontal scrollbar from full-bleed sections
-       (mx-[calc(50%-50vw)]) at the viewport root. `clip` keeps vertical scroll
-       and, unlike doing this on an inner wrapper, never becomes a containing
-       block/clip context for position:fixed modals + bars. */
+    /* Paint the pre-CSS frame at the grainy-black ground so the first byte
+       already matches the palette and dark never flashes a lighter grey. */
+    html.dark { background-color: #060607; }
+    /* Kill the horizontal scrollbar from full-bleed sections (.full-bleed in
+       app.css) at the viewport root. `clip` keeps vertical scroll and, unlike
+       doing this on an inner wrapper, never becomes a containing block/clip
+       context for position:fixed modals + bars.
+
+       This is belt-and-braces now: .full-bleed corrects for the scrollbar
+       itself, so a bleeding row no longer overhangs the right edge in the first
+       place. Kept because other pages still bleed with a raw calc(50%-50vw). */
     html { overflow-x: clip; }
 </style>
 
@@ -127,7 +166,7 @@
     // Public-facing brand name. Shared globally by SiteIdentityComposer from the
     // admin "Site -> name" setting; the ?? keeps a literal fallback for the rare
     // view that renders outside the composer (defensive, should not happen).
-    $siteName = $siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefills');
+    $siteName = $siteName ?? \App\Models\SiteSetting::get('site.name', 'RshopRefill');
 
     // Admin-controlled SEO defaults (System Settings -> SEO). Each falls back to
     // the built-in default when the admin field is blank, so the panel is the
@@ -136,7 +175,7 @@
     $defaultDescription = \App\Models\SiteSetting::get('seo.default_description')
         ?: 'Buy gift cards, eSIMs, mobile top-ups and bill payments worldwide - instantly. '.$siteName.' removes the friction of regional restrictions, slow delivery and limited payment options, with instant digital delivery, great prices, crypto and mobile-money checkout, and 24/7 support.';
     $defaultKeywords = \App\Models\SiteSetting::get('seo.default_keywords')
-        ?: $siteName.', gift cards, buy gift cards online, eSIM, travel eSIM, mobile top up, airtime recharge, bill payments, crypto gift cards, Amazon gift card, Apple gift card, Google Play, Steam, Netflix, PlayStation, Xbox, Cameroon, Africa fintech, Divine Ofeh, Johnpaul';
+        ?: $siteName.', gift cards, buy gift cards online, eSIM, mobile top up, airtime recharge, bill payments, crypto gift cards, Amazon gift card, Apple gift card, Google Play, Steam, Netflix, PlayStation, Xbox, Cameroon, Africa fintech, Divine Ofeh, Johnpaul';
     $defaultTitle = \App\Models\SiteSetting::get('seo.default_title')
         ?: $siteName.' - Gift Cards, eSIMs, Top-ups & Bill Payments';
 
@@ -171,21 +210,21 @@
     // Brand-entity signals so Google resolves every spelling of the name to ONE
     // entity (this site) and ranks us for brand searches. alternateName covers
     // the singular/plural + .com variants people actually type (the site brand is
-    // "RshopRefills" but the domain is rshoprefill.com); sameAs points at the
+    // "RshopRefill" but the domain is rshoprefill.com); sameAs points at the
     // official profiles, read from the same settings the footer uses so there's a
     // single place to edit them.
-    $brandAliases = ['Rshop Refills', 'rshoprefills', 'rshoprefills.com', 'rshoprefill', 'rshoprefill.com'];
+    $brandAliases = ['RshopRefill', 'rshoprefills', 'rshoprefills.com', 'rshoprefill', 'rshoprefill.com'];
 
     $brandProfiles = array_values(array_filter([
         \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills'),
-        \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills'),
+        \App\Models\SiteSetting::get('social.x', 'https://x.com/roddytech237'),
         \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills'),
         \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills'),
         config('services.trustpilot.profile_url'),
     ]));
 
     // Organization schema: the brand, the founders, and the mission - written so
-    // search engines and AI crawlers can pick up who built RshopRefills and why.
+    // search engines and AI crawlers can pick up who built RshopRefill and why.
     $orgJsonLd = [
         '@context' => 'https://schema.org',
         '@type' => 'Organization',
@@ -299,13 +338,14 @@
     }
 </script>
 
-{{-- Satoshi is the only web font we load (the primary --font-sans). It is
-     @imported inside app.css, so its connection only opens after the CSS
-     parses. Pre-opening api.fontshare.com here lets the font fetch start in
-     parallel with the CSS, cutting first-text delay. We deliberately do NOT
-     load Instrument Sans any more: it was only ever a fallback behind Satoshi,
-     so system-ui covers the brief pre-Satoshi window without a second origin. --}}
-<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+{{-- DM Sans is the only web font we load (the primary --font-sans). It is
+     pulled by an @import at the top of app.css, which the browser cannot start
+     until the stylesheet parses. Pre-opening both Google Fonts origins here
+     lets the fetch begin in parallel: googleapis serves the CSS, gstatic serves
+     the font files, and the second needs crossorigin because fonts are always
+     fetched anonymously. --}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
 {{-- Flag CDN used by the locale modal, top-bar country chip, and admin
      country pickers. Pre-resolving the DNS shaves ~50-100ms off the first
@@ -337,41 +377,41 @@
     <link rel="dns-prefetch" href="https://www.googletagmanager.com">
 @endif
 
+{{-- The language the server rendered this page in, as its display name.
+
+     app.js paints the nav's language pill from this before hydration and
+     mirrors it into localStorage. It has to be set BEFORE the bundle loads,
+     and it has to come from the server: the pill used to read localStorage
+     first, which was right while a browser translate widget owned the choice
+     and wrong the moment Laravel took it back, because a stale entry would
+     label the page with a language it is not in. --}}
+<script>window.rshopLanguage = @json(\App\Support\Languages::nameFor(app()->getLocale()) ?? \App\Support\Languages::defaultName());</script>
+
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
 
 @include('partials.scroll-lock')
 
+{{-- Swipe a bottom sheet down to close it. Loaded beside the scroll lock for
+     the same reason: every sheet on the site reaches for it, so it has to be
+     defined before any of them boots its Alpine scope. --}}
+@include('partials.sheet-swipe')
+
 {{-- Global keyboard shortcuts (Ctrl+J chat, Ctrl+F ticket, Ctrl+M theme,
      Ctrl+P profile). Site-wide, customer side only. --}}
 @include('partials.shortcuts')
 
-{{-- Page transition - the incoming page slides up from the bottom on every
-     navigation (full page load + wire:navigate SPA swap). Driven entirely
-     by JS class-swap so initial load and SPA swaps use the same single
-     mechanism (previous mix of CSS keyframe + JS was racing on `transform`
-     and producing a blink). Lives in the shared head partial so storefront,
-     dashboard, admin, and auth layouts all get the same motion treatment. --}}
-<style>
-    /* Pure-CSS slide-in. Runs automatically whenever a <main> element is
-       inserted into the DOM (initial page load AND every wire:navigate
-       morph - Livewire replaces the <main> on navigation so the animation
-       re-fires naturally). No JS class-swap means no snap-down-then-up
-       jitter and no race between the keyframe and the JS handler. This is
-       the same pattern the user dashboard uses smoothly. `backwards` so
-       the starting state is held before the first frame paints. */
-    @keyframes pageSlideIn {
-        from { transform: translateY(32px); }
-        to   { transform: translateY(0); }
-    }
-    main {
-        animation: pageSlideIn 500ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-        /* NOTE: no `will-change: transform` here. It would make <main> a permanent
-           containing block for position:fixed descendants, trapping fixed buy bars
-           and modals inside <main> instead of pinning them to the viewport. The
-           500ms slide runs fine without the hint. */
-    }
+{{-- Page transitions. There is no default one: an arriving page is simply
+     there. A layout opts in by setting data-page-transition on <body>, which
+     is what admin does below - its dense tables looked like they were dropping
+     into place on every navigation, and a short fade reads better there than a
+     slide.
 
+     The default used to be a 500ms upward slide on every <main> insertion, on
+     every layout. Nothing waited for it, but half a second of movement on
+     arrival is not distinguishable from half a second of loading, and it ran
+     on every wire:navigate swap the site made. --}}
+<style>
     /* Micro-Fade Shift: scoped to layouts that opt in via
        <body data-page-transition="micro-fade-shift">. Replaces the slide
        with a very short opacity DIP + tiny upward nudge. Admin uses this

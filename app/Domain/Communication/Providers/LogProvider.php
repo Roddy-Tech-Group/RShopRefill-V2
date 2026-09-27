@@ -16,8 +16,9 @@ class LogProvider implements MailProviderInterface
         Mailable $mailable,
         array $metadata = []
     ): array {
-        // Send using Laravel's default mailer, which is configured to 'log'
-        // This will write the email contents to storage/logs/laravel.log
+        // Send using Laravel's default mailer, configured to the 'log' transport.
+        // The rendered email lands in the channel MAIL_LOG_CHANNEL names (the
+        // dedicated mail log when set), never in the application log.
         try {
             // Parse the "From" header: "Display Name <email@domain.com>"
             $fromAddress = $from;

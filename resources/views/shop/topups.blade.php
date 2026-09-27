@@ -130,9 +130,6 @@
     // So the listing is one flat "All networks" list.
     $subcategories = collect();
 
-    // Green tint for the trust-badge icons (instant delivery / refund policy).
-    $greenTint = 'filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(394%) hue-rotate(105deg) brightness(92%) contrast(87%);';
-
     // Distinct countries actually available in the synced mobile-airtime catalog.
     $availableCountries = Product::query()
         ->where('category_id', $topupCategory?->id ?? 0)
@@ -190,10 +187,15 @@
 
 <x-shop.layout :title="'Mobile Top-up | '.$siteName">
 
-    <section class="min-h-full rounded-[15px] bg-[#eff6ff]">
-        <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
+    {{-- No radius: this is the page slab, edge to edge, not a card. Rounded
+         corners on it left the page ground showing through above and below. --}}
+    <section class="min-h-full bg-[#eff6ff]">
+        {{-- Inside the dashboard the frame pads the page itself (16px a side on a
+             phone, what the overview gets), so the wrapper adds none of its own:
+             with both, the listing ran 16px narrower than the overview each side. --}}
+        <div class="mx-auto w-full max-w-[1550px] {{ $inDash ? '' : 'px-4 py-8 sm:px-6 lg:px-8' }}">
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr] lg:gap-8">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[268px_1fr] lg:gap-8">
 
                 {{-- Shared category sidebar — same component on every storefront. --}}
                 <x-shop.category-sidebar active="mobile-airtime" :sub-items="$sidebarSubItems" />
@@ -209,16 +211,6 @@
                     <div class="mb-6 flex flex-col gap-3 sm:grid sm:grid-cols-3 sm:items-center sm:gap-4">
                         <div class="hidden sm:block">
                             <h1 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Mobile Top-up</h1>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-zinc-700">
-                                <span class="flex items-center gap-1.5">
-                                    <img src="{{ asset('assets/' . rawurlencode('instant delivery.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Instant Delivery
-                                </span>
-                                <a href="{{ route('shop.refund-policy') }}" wire:navigate class="flex items-center gap-1.5 underline-offset-2 transition-colors hover:text-blue-600 hover:underline">
-                                    <img src="{{ asset('assets/' . rawurlencode('Fair Redund Policy.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Clear Refund Policy
-                                </a>
-                            </div>
                         </div>
 
                         {{-- Modern segmented sort selector. URL-driven so the choice survives reloads. --}}
@@ -233,7 +225,7 @@
                                     wire:navigate
                                     role="tab"
                                     aria-selected="{{ $sort === $opt['value'] ? 'true' : 'false' }}"
-                                    class="inline-flex items-center justify-center rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
+                                    class="inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
                                 >
                                     {{ $opt['label'] }}
                                 </a>
@@ -248,7 +240,7 @@
                                 <a
                                     href="{{ $item['url'] }}"
                                     wire:navigate
-                                    class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $item['active'] ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                    class="inline-flex shrink-0 items-center rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {{ $item['active'] ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
                                 >
                                     {{ $item['label'] }}
                                 </a>
@@ -271,7 +263,11 @@
                     {{-- Operator grid. Same card treatment as the gift-card listing. --}}
                     <div>
                         @if ($products->isNotEmpty())
-                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            {{-- The colours the last few tiles used, so a logo-less
+                                 brand never repeats the one beside it. Four deep,
+                                 which is the widest this grid ever gets. --}}
+                            @php $recentTileColors = []; @endphp
+                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
                                 @foreach ($products as $product)
                                     @php
                                         $variants   = $product->variants;
@@ -282,7 +278,11 @@
                                         $priceLabel = $product->priceRangeLabel(fixedFacesFirst: true);
                                         $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
                                         $opName     = Product::brandDisplayName($product->brand_key);
-                                        $tileColor  = Product::tileColor($product->brand_key);
+                                        $tileColor  = Product::tileColor($product->brand_key, $logoSrc ? [] : $recentTileColors);
+                                        if (! $logoSrc) {
+                                            $recentTileColors[] = $tileColor;
+                                            $recentTileColors = array_slice($recentTileColors, -4);
+                                        }
                                         $badges     = $topupBadgesByProduct[$product->id] ?? collect();
                                     @endphp
                                     <li>
@@ -295,9 +295,13 @@
                                             aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
                                             @if ($notBuyable) aria-disabled="true" @endif
                                         >
-                                            {{-- White tile, logo fills the card edge-to-edge. Caption sits OUTSIDE on the page background. --}}
+                                            {{-- White tile, logo fills the card edge-to-edge. Caption sits OUTSIDE on
+                                                 the page background. keep-light holds the tile white in dark mode:
+                                                 bg-[#ffffff] became the dashboard card class in the light redesign, so
+                                                 without the opt-out the tile repaints to the card grey and an operator
+                                                 logo drawn in dark linework disappears into it. --}}
                                             <div
-                                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300 {{ $logoSrc ? 'bg-[#ffffff]' : '' }}"
+                                                class="card-3d relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[15px] shadow-sm ring-1 ring-zinc-200 group-hover:shadow-lg group-hover:ring-zinc-300 {{ $logoSrc ? 'keep-light bg-[#ffffff]' : '' }}"
                                                 @if (! $logoSrc) style="background-color: {{ $tileColor }}" @endif
                                                 x-data="cardTilt()"
                                                 @mousemove="tilt($event)"
@@ -306,7 +310,7 @@
                                                 @if ($logoSrc)
                                                     <img src="{{ $logoSrc }}" alt="{{ $opName }}" class="h-full w-full object-cover" loading="lazy">
                                                 @else
-                                                    <span class="px-3 text-center text-lg font-extrabold leading-tight text-white">{{ $opName }}</span>
+                                                    <span class="px-3 text-center text-2xl font-extrabold leading-tight text-white">{{ $opName }}</span>
                                                 @endif
 
                                                 @if ($outOfStock)
@@ -330,20 +334,25 @@
                                                  tile; the styled tile already shows the name) + amount range. --}}
                                             <div class="mt-2 px-0.5">
                                                 @if ($logoSrc)
-                                                    <p class="truncate text-[13px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $opName }}</p>
+                                                    <p class="truncate text-[16px] font-bold leading-tight text-zinc-900 group-hover:text-blue-700">{{ $opName }}</p>
                                                 @endif
                                                 @if ($priceLabel)
-                                                    <p class="mt-0.5 truncate text-[14px] text-zinc-600">{{ $priceLabel }}</p>
+                                                    <p class="mt-0.5 truncate text-[14px] font-bold text-zinc-900 dark:text-white">{{ $priceLabel }}</p>
                                                 @endif
                                                 @if ($badges->isNotEmpty())
                                                     {{-- What this network offers: Credit / Data / Bundle. --}}
                                                     <div class="mt-1.5 flex flex-wrap gap-1">
                                                         @foreach ($badges as $badge)
+                                                            {{-- Credit carries its own tone rather than bg-zinc-100:
+                                                                 app.css repaints that class to the page ground in dark
+                                                                 mode, which left the badge invisible against the page
+                                                                 it sat on. Each one also wears a ring, so a badge still
+                                                                 reads as a badge where its fill is close to the page. --}}
                                                             <span @class([
-                                                                'inline-flex items-center rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold',
-                                                                'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300' => $badge === 'Credit',
-                                                                'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' => $badge === 'Data',
-                                                                'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' => $badge === 'Bundle',
+                                                                'inline-flex items-center rounded-full px-2.5 py-1 text-[13px] font-semibold ring-1',
+                                                                'bg-[#e8ecf4] text-zinc-700 ring-[#d5dce8] dark:bg-white/12 dark:text-zinc-100 dark:ring-white/15' => $badge === 'Credit',
+                                                                'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30' => $badge === 'Data',
+                                                                'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/30' => $badge === 'Bundle',
                                                             ])>{{ $badge }}</span>
                                                         @endforeach
                                                     </div>
@@ -362,7 +371,7 @@
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
-                                <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
+                                <img src="{{ asset('assets/empty-state-blue.webp') }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
                                 @if ($search !== '' || $countryFiltered || $sub !== '')
                                     <p class="mt-4 text-base font-semibold text-zinc-900">No networks match these filters</p>
                                     <p class="mt-1 text-sm text-zinc-600">Try clearing the search or pick a different country.</p>
@@ -372,6 +381,7 @@
                                 @else
                                     <p class="mt-4 text-base font-semibold text-zinc-900">Mobile top-up coming soon</p>
                                     <p class="mt-1 text-sm text-zinc-600">We're adding mobile networks for your region. Check back shortly.</p>
+                                    @include('shop._empty-state-back')
                                 @endif
                             </div>
                         @endif
@@ -380,6 +390,26 @@
             </div>
 
         </div>
+
+        {{-- The store's own FAQ. Questions come from the faqs table through
+             <x-home.faq>, the same component and the same admin editor as the
+             homepage, gift card and eSIM stores, scoped to the Mobile Top-Ups
+             topic. Nothing is written here, so the copy cannot drift from /faq.
+
+             It sits inside the section so it keeps the page ground, and the
+             component is full-bleed, so it spans the window like the footer
+             rather than the 1550 column that closes above it. --}}
+        @if (! $inDash)
+            <div class="pb-3 sm:pb-4 lg:pb-5">
+                <x-home.faq
+                    :topics="['Mobile Top-Ups']"
+                    :limit="12"
+                    heading-id="topups-faq-heading"
+                    :grow-from="1100"
+                    top-margin=""
+                />
+            </div>
+        @endif
     </section>
 
 </x-shop.layout>

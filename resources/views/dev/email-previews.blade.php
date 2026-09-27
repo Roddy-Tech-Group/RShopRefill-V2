@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Email template previews - RshopRefills</title>
+    <title>Email template previews - RshopRefill</title>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #eff6ff; color: #18181b; height: 100vh; display: grid; grid-template-columns: 280px 1fr; transition: grid-template-columns .2s ease; }
+        body { margin: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #f4f6f5; color: #18181b; height: 100vh; display: grid; grid-template-columns: 280px 1fr; transition: grid-template-columns .2s ease; }
         body.nav-hidden { grid-template-columns: 0 1fr; }
         aside { background: #0c1a2e; color: #fff; padding: 20px 16px; overflow-y: auto; overflow-x: hidden; white-space: nowrap; }
         .brand { font-size: 15px; font-weight: 800; letter-spacing: .02em; margin: 0 0 4px; }
-        .brand span { color: #60a5fa; }
+        .brand span { color: #ffffff; }
         .hint { font-size: 11px; color: #94a3b8; margin: 0 0 20px; line-height: 1.5; white-space: normal; }
         .group { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin: 18px 0 6px; font-weight: 700; }
         a.tpl { display: block; padding: 9px 12px; border-radius: 8px; color: #e2e8f0; text-decoration: none; font-size: 13px; font-weight: 500; transition: background .15s, color .15s; }

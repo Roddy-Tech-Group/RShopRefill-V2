@@ -13,9 +13,13 @@ class AuthenticationTest extends TestCase
 
     public function test_login_screen_can_be_rendered(): void
     {
-        // Login is no longer a dedicated page; /login redirects to the home
-        // page with ?auth=login which triggers the global auth modal.
-        $this->get('/login')->assertRedirect('/?auth=login');
+        // Login is a real page again. It used to redirect to /?auth=login so the
+        // global auth modal could pop open over the home page; routes/auth.php
+        // now serves the Volt page, which is what the URL always claimed to be.
+        $this->withoutVite()->get('/login')
+            ->assertOk()
+            ->assertSee('Sign In')
+            ->assertSee('Sign Up');
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void

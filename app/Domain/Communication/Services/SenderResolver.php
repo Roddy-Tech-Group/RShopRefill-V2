@@ -24,7 +24,7 @@ class SenderResolver
 
     /**
      * Get the "From" header value for a category.
-     * Example: "RshopRefills Security <security@rshoprefill.com>"
+     * Example: "RshopRefill Security <security@rshoprefill.com>"
      */
     public function fromHeader(CommunicationCategory $category): string
     {

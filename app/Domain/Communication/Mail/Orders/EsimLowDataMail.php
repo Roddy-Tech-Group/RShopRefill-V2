@@ -37,7 +37,7 @@ class EsimLowDataMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
         $isExpiry = $this->eventType === 'EXPIRY_SOON' || isset($this->payload['days_remaining']);
         $subject = $isExpiry
             ? '⏰ Your '.$brand.' eSIM expires soon'

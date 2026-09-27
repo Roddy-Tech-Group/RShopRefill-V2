@@ -180,25 +180,16 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-6"
-            {{-- Drops in BELOW the sticky nav, never over/behind it: the offset
-                 tracks the live header height (varies per breakpoint/collapse). --}}
-            x-data="{ navH: 0 }"
-            x-init="
-                const nav = document.querySelector('header.sticky');
-                if (nav) {
-                    const sync = () => navH = Math.round(nav.getBoundingClientRect().height);
-                    sync();
-                    new ResizeObserver(sync).observe(nav);
-                }
-            "
+            {{-- A plain 12px from the top. It used to track the live header
+                 height to sit below the pinned nav; nothing is pinned now. --}}
             {{-- Object syntax: a string :style would REPLACE the whole style
                  attribute and wipe the display x-show manages. --}}
-            :style="{ top: (navH + 12) + 'px' }"
+            style="top: 12px"
             style="display:none;"
             class="fixed inset-x-0 z-[100] px-3 sm:px-5"
         >
             <div class="relative mx-auto flex w-full max-w-[640px] flex-wrap items-center gap-3 rounded-[20px] border border-white/40 bg-white/70 px-4 py-3 shadow-[0_14px_44px_-12px_rgba(15,23,42,0.4)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#1d3252]/80">
-                <button type="button" @click="selectedId = null" aria-label="Deselect plan" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 dark:bg-[#0c1a36] dark:text-white dark:ring-[#24364f] dark:hover:bg-[#34507a]">
+                <button type="button" @click="selectedId = null" aria-label="Deselect plan" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-30 disabled:cursor-not-allowed dark:bg-[#1d3252] dark:text-zinc-200 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 <div class="min-w-0">
@@ -212,7 +203,7 @@
                         @click="addToCart()"
                         :disabled="cartState !== 'idle'"
                         :class="cartState === 'success' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:text-blue-300 dark:hover:text-white'"
-                        class="hidden h-11 items-center rounded-[12px] border-2 px-4 text-sm font-semibold transition-colors disabled:opacity-60 sm:inline-flex"
+                        class="hidden h-11 items-center rounded-full border-2 px-4 text-sm font-semibold transition-colors disabled:opacity-60 sm:inline-flex"
                     >
                         <span x-show="cartState !== 'success'">Add to cart</span>
                         <span x-show="cartState === 'success'" style="display:none;">Added</span>
@@ -221,7 +212,7 @@
                         type="button"
                         @click="buyNow()"
                         :disabled="$store.cart.loading"
-                        class="inline-flex h-11 items-center rounded-[12px] bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-60"
+                        class="inline-flex h-11 items-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-60"
                     >Buy now</button>
                 </div>
             </div>
@@ -237,7 +228,7 @@
                         </span>
                         Discover Global
                     </h2>
-                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-[#0c1a36] dark:text-zinc-200 dark:hover:bg-[#34507a]"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="showDetails = false" aria-label="Close" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
 
                 <div class="mt-5">
@@ -313,7 +304,7 @@
                     {{-- Add to cart straight from the details modal. --}}
                     <div class="mt-6 flex items-center justify-between gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-700/60">
                         <p class="text-xl font-extrabold tabular-nums text-zinc-900 dark:text-white" x-text="detailsPlan()?.price_label"></p>
-                        <button type="button" @click="selectedId = detailsId; showDetails = false; addToCart()" class="inline-flex h-11 items-center rounded-[12px] bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:opacity-60" :disabled="$store.cart.loading">Add to cart</button>
+                        <button type="button" @click="selectedId = detailsId; showDetails = false; addToCart()" class="inline-flex h-11 items-center rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 disabled:opacity-60" :disabled="$store.cart.loading">Add to cart</button>
                     </div>
 
                     <p class="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">To complete your order, confirm your device is eSIM-compatible and network-unlocked.</p>

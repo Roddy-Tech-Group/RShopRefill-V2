@@ -48,7 +48,7 @@ class FulfillmentNotificationListener
             $this->communication->send(
                 recipient: $user,
                 category: CommunicationCategory::AccountClaim,
-                title: 'Claim your RShopRefills account',
+                title: 'Claim your RshopRefill account',
                 message: 'Set a password to track this order and everything you buy later.',
                 mailable: new GuestAccountClaimMail($user),
                 correlationId: 'guest_claim_'.$user->id

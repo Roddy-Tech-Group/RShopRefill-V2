@@ -8,8 +8,10 @@ use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
+use App\Domain\Payment\Support\CustomerFailureCopy;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Jobs\ReconcileRefusedCardsJob;
+use App\Domain\PaymentInsights\Services\FailureReasonClassifier;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
@@ -306,8 +308,22 @@ class PaymentSessionService
             // (`payment_payload?.failure_reason`). Without this, the customer
             // always sees the generic "Transaction could not be completed."
             // fallback regardless of the actual gateway error.
+            //
+            // Beside it, the classifier's verdict as a customer-safe code. The
+            // reason is a sentence in whatever language the code path that
+            // failed the session was running in; the code lets every page
+            // show the customer why in their own language, and never names
+            // what a fraud screen detected (CustomerFailureCopy).
+            $classification = app(FailureReasonClassifier::class)->classify(
+                $session->provider ?? 'unknown',
+                $reason,
+                $statusAtFailure,
+                is_array($payload['failure'] ?? null) ? $payload['failure'] : null,
+            );
+
             $session->payment_payload = array_merge($session->payment_payload ?? [], [
                 'failure_reason' => $reason,
+                'failure_code' => CustomerFailureCopy::customerCode($classification['code']),
             ]);
 
             $session->save();

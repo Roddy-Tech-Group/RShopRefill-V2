@@ -148,6 +148,10 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
                 'is_expired' => false,
                 'confirmed_at' => null,
                 'failed_at' => null,
+                // Null unless the session failed: then the customer-safe reason
+                // and its code travel here, the only channel a waiting customer
+                // has to learn why.
+                'payment_payload' => null,
                 // Null unless the customer's payment came up short. The poll is the
                 // only channel that can tell a waiting customer that, since a short
                 // payment is deliberately never auto-fulfilled.
@@ -535,7 +539,10 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
      */
     public function test_currency_to_payment_method_validation_errors(): void
     {
-        // 1. Initiate USD funding (should reject mobile_money and bank_transfer)
+        // 1. Initiate USD funding. Mobile money is no longer refused for USD:
+        //    a dollar order rides the Francophone rail in CFA francs (decided
+        //    2026-09-20), so the method is accepted and the charge proceeds
+        //    (or fails on its own terms), never a 422 on the method.
         $usdResponse = $this->actingAs($this->user)->postJson(route('api.wallets.fund.initiate'), [
             'currency' => 'USD',
             'amount' => 10.0,
@@ -550,8 +557,9 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
                 'network' => 'mtn',
             ],
         ]);
-        $payMobileMoney->assertStatus(422)
-            ->assertJsonFragment(['message' => 'The payment method mobile_money is not available for currency USD.']);
+        $payMobileMoney->assertOk();
+        $this->assertContains($payMobileMoney->json('data.status'), ['awaiting_confirmation', 'awaiting_redirect', 'failed']);
+        $this->assertNotSame('The payment method mobile_money is not available for currency USD.', $payMobileMoney->json('message'));
 
         // 2. Initiate NGN funding (should reject mobile_money)
         $ngnResponse = $this->actingAs($this->user)->postJson(route('api.wallets.fund.initiate'), [

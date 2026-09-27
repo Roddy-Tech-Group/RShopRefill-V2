@@ -62,8 +62,8 @@ class WelcomeListener
         $this->communication->send(
             recipient: $user,
             category: CommunicationCategory::AccountActivation, // Using AccountActivation for Welcome
-            title: 'Welcome to RShopRefills!',
-            message: "Hi {$user->first_name}, welcome to RShopRefills! We're glad you're here.",
+            title: 'Welcome to RshopRefill!',
+            message: "Hi {$user->first_name}, welcome to RshopRefill! We're glad you're here.",
             mailable: new WelcomeMail($user),
             correlationId: $correlationId
         );

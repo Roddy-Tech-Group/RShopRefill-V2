@@ -78,6 +78,30 @@ new class extends Component {
         $this->regReferral = trim((string) request()->cookie(CaptureReferralCookie::COOKIE_NAME, ''));
     }
 
+    /**
+     * Field names for validation messages, in the visitor's language. Without
+     * these Laravel names the Livewire property, so a French visitor read
+     * "Le champ reg email est obligatoire".
+     *
+     * @return array<string, string>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'loginEmail' => __('auth.modal_attributes.email'),
+            'loginPassword' => __('auth.modal_attributes.password'),
+            'regName' => __('auth.modal_attributes.name'),
+            'regEmail' => __('auth.modal_attributes.email'),
+            'regCountry' => __('auth.modal_attributes.country'),
+            'regPhone' => __('auth.modal_attributes.phone'),
+            'regPassword' => __('auth.modal_attributes.password'),
+            'regPasswordConfirmation' => __('auth.modal_attributes.password_confirmation'),
+            'regGender' => __('auth.modal_attributes.gender'),
+            'regAcceptedTerms' => __('auth.modal_attributes.terms'),
+            'regReferral' => __('auth.modal_attributes.referral'),
+        ];
+    }
+
     public function login(): void
     {
         $this->validateTurnstile();
@@ -131,7 +155,7 @@ new class extends Component {
         // Server-side gate on the signup feature flag - blocks API replays
         // even if the front-end Register tab has been hidden by features.signup_enabled.
         if (! \App\Support\FeatureFlag::on('signup')) {
-            throw ValidationException::withMessages(['regEmail' => 'New registrations are temporarily closed.']);
+            throw ValidationException::withMessages(['regEmail' => __('auth.registrations_closed')]);
         }
 
         // Five sign-up attempts per IP per ten minutes. Login has had this
@@ -186,7 +210,7 @@ new class extends Component {
             $this->dispatch('registration-error', step: 1);
 
             throw ValidationException::withMessages([
-                'regPhone' => 'This phone number is already registered. Try logging in instead.',
+                'regPhone' => __('auth.phone_taken'),
             ]);
         }
 
@@ -343,10 +367,10 @@ new class extends Component {
             return;
         }
         if (($result['status'] ?? null) === TurnstileService::STATUS_TIMEOUT) {
-            throw ValidationException::withMessages(['turnstileToken' => 'Security check is temporarily unavailable. Please try again.']);
+            throw ValidationException::withMessages(['turnstileToken' => __('auth.security_unavailable')]);
         }
 
-        throw ValidationException::withMessages(['turnstileToken' => 'Security verification failed. Please refresh and try again.']);
+        throw ValidationException::withMessages(['turnstileToken' => __('auth.security_failed')]);
     }
 }; ?>
 
@@ -362,8 +386,14 @@ new class extends Component {
         showOpen(mode) {
             this.mode = (mode === 'register') ? 'register' : 'login';
             this.step = 1;
+            // Only on the way in. showOpen runs from a window event, so it can
+            // fire again while the modal is already up (signing in, then
+            // switching to register), and the lock counts references: a second
+            // lock with one close leaves the page frozen for good.
+            if (! this.open) {
+                window.rshopScrollLock?.lock();
+            }
             this.open = true;
-            window.rshopScrollLock?.lock();
             this.$nextTick(() => this.renderTurnstile(this.mode));
         },
         close() {
@@ -495,20 +525,20 @@ new class extends Component {
         {{-- Header --}}
         <div class="flex shrink-0 items-start justify-between gap-3 px-5 py-4 sm:px-7">
             <div class="leading-none">
-                <h2 class="text-lg font-bold leading-none text-white sm:text-xl" x-text="mode === 'login' ? 'Log in' : (mode === 'success' ? 'Welcome aboard' : 'Register')">Log in</h2>
+                <h2 class="text-lg font-bold leading-none text-white sm:text-xl" x-text="mode === 'login' ? @js(__('auth.modal_log_in')) : (mode === 'success' ? @js(__('auth.modal_welcome_aboard')) : @js(__('auth.modal_register')))">{{ __('auth.modal_log_in') }}</h2>
                 <p
                     x-show="mode === 'register'"
                     x-cloak
                     class="mt-1 text-xs leading-none text-white/65 sm:text-sm"
-                >Join {{ $siteName }} and start spending instantly</p>
+                >{{ __('auth.modal_join', ['site' => $siteName]) }}</p>
             </div>
             <button
                 type="button"
                 @click="close()"
-                aria-label="Close"
-                class="flex h-9 w-9 items-center justify-center rounded-[12px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="{{ __('common.close') }}"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"
             >
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
                 </svg>
             </button>
@@ -524,14 +554,14 @@ new class extends Component {
 
             {{-- ── LOGIN VIEW ───────────────────────────────────────────── --}}
             <div x-show="mode === 'login'" x-cloak>
-                <h3 class="text-xl font-bold tracking-tight text-white sm:text-2xl">Welcome back</h3>
-                <p class="mt-1.5 text-sm text-white/65">Sign in to your {{ $siteName }} account</p>
+                <h3 class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ __('auth.modal_welcome_back') }}</h3>
+                <p class="mt-1.5 text-sm text-white/65">{{ __('auth.modal_sign_in_to', ['site' => $siteName]) }}</p>
 
                 {{-- Google OAuth --}}
                 <a
                     href="{{ route('auth.google.redirect', ['popup' => 1]) }}"
                     @click.prevent="window.rshopOpenGoogleOAuth ? window.rshopOpenGoogleOAuth($el.href) : (window.location.href = $el.href)"
-                    class="mt-5 flex w-full items-center justify-center gap-3 rounded-[12px] border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    class="mt-5 flex w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                 >
                     <svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -539,32 +569,32 @@ new class extends Component {
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                    Continue with Google
+                    {{ __('auth.continue_with_google') }}
                 </a>
 
                 <div class="my-6 flex items-center gap-3">
                     <span class="h-px flex-1 bg-white/15"></span>
-                    <span class="text-sm uppercase tracking-wider text-white/50">or</span>
+                    <span class="text-sm uppercase tracking-wider text-white/50">{{ __('auth.or') }}</span>
                     <span class="h-px flex-1 bg-white/15"></span>
                 </div>
 
                 <form wire:submit="login" class="flex flex-col gap-5">
                     <div>
-                        <label for="loginEmail" class="mb-1.5 block text-sm font-medium text-white/85">Email</label>
+                        <label for="loginEmail" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_email') }}</label>
                         <input
                             wire:model="loginEmail"
                             id="loginEmail"
                             type="email"
                             required
                             autocomplete="email"
-                            placeholder="you@example.com"
-                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            placeholder="{{ __('checkout.delivery_email_placeholder') }}"
+                            class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                         >
                         @error('loginEmail') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div x-data="{ show: false }">
-                        <label for="loginPassword" class="mb-1.5 block text-sm font-medium text-white/85">Password</label>
+                        <label for="loginPassword" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.password_label') }}</label>
                         <div class="relative">
                             <input
                                 wire:model="loginPassword"
@@ -573,9 +603,9 @@ new class extends Component {
                                 required
                                 autocomplete="current-password"
                                 placeholder="••••••••"
-                                class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                                class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                             >
-                            <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 transition-colors hover:text-blue-300" :aria-label="show ? 'Hide password' : 'Show password'">
+                            <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 transition-colors hover:text-blue-300" :aria-label="show ? @js(__('auth.modal_hide_password')) : @js(__('auth.modal_show_password'))">
                                 <svg x-show="!show" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 <svg x-show="show" x-cloak class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.244 7.244L19.5 19.5m-2.876-2.876L13.875 13.875M9.878 9.878a3 3 0 105.249 5.249"/></svg>
                             </button>
@@ -586,10 +616,10 @@ new class extends Component {
                     <div class="flex items-center justify-between">
                         <label class="flex cursor-pointer select-none items-center gap-2.5">
                             <input wire:model="loginRemember" type="checkbox" class="h-5 w-5 rounded-[5px] border-white/30 bg-white/5 text-blue-500 focus:ring-blue-500/30">
-                            <span class="text-sm text-white/75">Remember me</span>
+                            <span class="text-sm text-white/75">{{ __('auth.remember_me') }}</span>
                         </label>
                         @if (Route::has('password.request'))
-                            <a href="{{ route('password.request') }}" wire:navigate class="text-sm font-medium text-blue-400 hover:text-blue-300">Forgot password?</a>
+                            <a href="{{ route('password.request') }}" wire:navigate class="text-sm font-medium text-blue-400 hover:text-blue-300">{{ __('auth.forgot_password') }}</a>
                         @endif
                     </div>
 
@@ -602,17 +632,17 @@ new class extends Component {
 
                     <button
                         type="submit"
-                        class="mt-3 w-full rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
+                        class="mt-3 w-full rounded-full bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
                     >
-                        <span wire:loading.remove wire:target="login">Log in</span>
-                        <span wire:loading wire:target="login">Signing in...</span>
+                        <span wire:loading.remove wire:target="login">{{ __('auth.modal_log_in') }}</span>
+                        <span wire:loading wire:target="login">{{ __('auth.modal_signing_in') }}</span>
                     </button>
                 </form>
 
                 @feature('signup')
                 <p class="mt-5 pt-5 text-center text-sm text-white/65">
-                    Don't have an account?
-                    <button type="button" @click="switchTo('register')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">Create one</button>
+                    {{ __('auth.modal_no_account') }}
+                    <button type="button" @click="switchTo('register')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">{{ __('auth.modal_create_one') }}</button>
                 </p>
                 @endfeature
             </div>
@@ -623,8 +653,8 @@ new class extends Component {
                 {{-- Progress: animated step counter + bar. --}}
                 <div class="mt-6">
                     <div class="flex items-center justify-between text-xs font-semibold">
-                        <span class="text-white/55" x-text="`Step ${step} of 3`"></span>
-                        <span class="text-white/80" x-text="['Your details', 'Security', 'Finish'][step - 1]"></span>
+                        <span class="text-white/55" x-text="@js(__('auth.modal_step_of')).replace(':step', step).replace(':total', 3)"></span>
+                        <span class="text-white/80" x-text="@js([__('auth.modal_step_details'), __('auth.modal_step_security'), __('auth.modal_step_finish')])[step - 1]"></span>
                     </div>
                     <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                         <div class="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]" :style="`width: ${(step / 3) * 100}%`"></div>
@@ -640,29 +670,29 @@ new class extends Component {
                             {{-- STEP 1 — Your details --}}
                             <div x-ref="step1" class="flex w-full shrink-0 flex-col gap-5 px-0.5">
                     <div>
-                        <label for="regName" class="mb-1.5 block text-sm font-medium text-white/85">Full name</label>
+                        <label for="regName" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_full_name') }}</label>
                         <input
                             wire:model="regName"
                             id="regName"
                             type="text"
                             required
                             autocomplete="name"
-                            placeholder="Your name"
-                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            placeholder="{{ __('auth.modal_name_placeholder') }}"
+                            class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                         >
                         @error('regName') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="regEmail" class="mb-1.5 block text-sm font-medium text-white/85">Email</label>
+                        <label for="regEmail" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_email') }}</label>
                         <input
                             wire:model="regEmail"
                             id="regEmail"
                             type="email"
                             required
                             autocomplete="email"
-                            placeholder="you@example.com"
-                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            placeholder="{{ __('checkout.delivery_email_placeholder') }}"
+                            class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                         >
                         @error('regEmail') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
@@ -696,14 +726,14 @@ new class extends Component {
                         }"
                         @click.outside="open = false"
                     >
-                        <label for="regPhone" class="mb-1.5 block text-sm font-medium text-white/85">Phone number</label>
+                        <label for="regPhone" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_phone') }}</label>
                         <div class="relative flex items-stretch rounded-[12px] border border-white/15 bg-white/5 transition-colors focus-within:border-blue-400 focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-blue-500/20">
                             {{-- Country selector --}}
                             <button
                                 type="button"
                                 @click="open = ! open"
                                 :aria-expanded="open"
-                                aria-label="Select country dialing code"
+                                aria-label="{{ __('auth.modal_dial_code') }}"
                                 class="flex shrink-0 items-center gap-1.5 rounded-l-[12px] border-r border-white/15 px-3 text-sm text-white outline-none hover:bg-white/5"
                             >
                                 <span class="text-base leading-none" x-text="current.flag"></span>
@@ -742,8 +772,8 @@ new class extends Component {
                                 <input
                                     x-model="search"
                                     type="text"
-                                    placeholder="Search country or code"
-                                    class="w-full rounded-[8px] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-blue-400"
+                                    placeholder="{{ __('auth.modal_search_country') }}"
+                                    class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-blue-400 focus:border-edge dark:focus:border-edge transition-colors"
                                     @keydown.enter.prevent="if (matches.length) choose(matches[0].iso)"
                                 >
                             </div>
@@ -762,7 +792,7 @@ new class extends Component {
                                         </button>
                                     </li>
                                 </template>
-                                <li x-show="! matches.length" class="px-3 py-3 text-center text-sm text-white/50">No match</li>
+                                <li x-show="! matches.length" class="px-3 py-3 text-center text-sm text-white/50">{{ __('auth.modal_no_match') }}</li>
                             </ul>
                         </div>
                         @error('regCountry') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
@@ -774,7 +804,7 @@ new class extends Component {
                             <div x-ref="step2" class="flex w-full shrink-0 flex-col gap-5 px-0.5">
 
                     <div x-data="{ show: false }">
-                        <label for="regPassword" class="mb-1.5 block text-sm font-medium text-white/85">Password</label>
+                        <label for="regPassword" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.password_label') }}</label>
                         <div class="relative">
                             <input
                                 wire:model="regPassword"
@@ -783,19 +813,19 @@ new class extends Component {
                                 required
                                 autocomplete="new-password"
                                 placeholder="••••••••"
-                                class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                                class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 pr-12 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                             >
-                            <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 transition-colors hover:text-blue-300" :aria-label="show ? 'Hide password' : 'Show password'">
+                            <button type="button" @click="show = !show" class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 transition-colors hover:text-blue-300" :aria-label="show ? @js(__('auth.modal_hide_password')) : @js(__('auth.modal_show_password'))">
                                 <svg x-show="!show" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 <svg x-show="show" x-cloak class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.244 7.244L19.5 19.5m-2.876-2.876L13.875 13.875M9.878 9.878a3 3 0 105.249 5.249"/></svg>
                             </button>
                         </div>
-                        <p class="mt-2 text-sm text-white/50">More than 8 characters with upper, lower, numbers and at least one special character</p>
+                        <p class="mt-2 text-sm text-white/50">{{ __('auth.modal_password_hint') }}</p>
                         @error('regPassword') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="regPasswordConfirmation" class="mb-1.5 block text-sm font-medium text-white/85">Confirm password</label>
+                        <label for="regPasswordConfirmation" class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_confirm_password') }}</label>
                         <input
                             wire:model="regPasswordConfirmation"
                             id="regPasswordConfirmation"
@@ -803,7 +833,7 @@ new class extends Component {
                             required
                             autocomplete="new-password"
                             placeholder="••••••••"
-                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                         >
                     </div>
 
@@ -812,17 +842,17 @@ new class extends Component {
                          Three-way segmented toggle - same pattern as the theme
                          picker so the UI reads as one family. --}}
                     <div>
-                        <span class="mb-1.5 block text-sm font-medium text-white/85">Gender</span>
+                        <span class="mb-1.5 block text-sm font-medium text-white/85">{{ __('auth.modal_gender') }}</span>
                         <div class="grid grid-cols-3 gap-1 rounded-[12px] bg-white/5 p-1 ring-1 ring-white/10">
                             @foreach ([
-                                ['value' => 'male',   'label' => 'Male'],
-                                ['value' => 'female', 'label' => 'Female'],
-                                ['value' => 'other',  'label' => 'Other'],
+                                ['value' => 'male',   'label' => __('auth.modal_gender_male')],
+                                ['value' => 'female', 'label' => __('auth.modal_gender_female')],
+                                ['value' => 'other',  'label' => __('auth.modal_gender_other')],
                             ] as $opt)
                                 <button
                                     type="button"
                                     wire:click="$set('regGender', '{{ $opt['value'] }}')"
-                                    class="rounded-[12px] px-3 py-2.5 text-sm font-semibold transition-all active:scale-95 {{ $regGender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-white/65 hover:text-white' }}"
+                                    class="rounded-full px-3 py-2.5 text-sm font-semibold transition-all active:scale-95 {{ $regGender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-white/65 hover:text-white' }}"
                                     aria-pressed="{{ $regGender === $opt['value'] ? 'true' : 'false' }}"
                                 >
                                     {{ $opt['label'] }}
@@ -841,22 +871,25 @@ new class extends Component {
                          code can be pasted in by hand. --}}
                     <div>
                         <label for="regReferral" class="mb-1.5 block text-sm font-medium text-white/85">
-                            Referral code <span class="font-normal text-white/45">(optional)</span>
+                            {{ __('auth.referral_code') }} <span class="font-normal text-white/45">{{ __('auth.modal_optional') }}</span>
                         </label>
                         <input
                             wire:model="regReferral"
                             id="regReferral"
                             type="text"
                             autocomplete="off"
-                            placeholder="Enter a friend's referral code"
-                            class="w-full rounded-[12px] border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20"
+                            placeholder="{{ __('auth.modal_referral_placeholder') }}"
+                            class="w-full rounded-full border-2 border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-blue-400 focus:bg-white/10 focus:ring-2 focus:ring-blue-500/20 focus:border-edge dark:focus:border-edge"
                         >
                         @error('regReferral') <p class="mt-1.5 text-sm text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <label class="flex cursor-pointer items-start gap-3 text-sm text-white/75">
                         <input wire:model="regAcceptedTerms" type="checkbox" required class="mt-1 h-5 w-5 shrink-0 rounded-full border-white/30 bg-white/5 text-blue-500 focus:ring-blue-500/30">
-                        <span>* I declare that I have read and agree to the <a href="{{ route('shop.terms') }}" target="_blank" class="underline underline-offset-2 text-blue-400 hover:text-blue-300">terms of use</a> and <a href="{{ route('shop.privacy') }}" target="_blank" class="underline underline-offset-2 text-blue-400 hover:text-blue-300">privacy notice</a></span>
+                        <span>{!! __('auth.modal_terms_consent', [
+                            'terms' => '<a href="'.e(route('shop.terms')).'" target="_blank" class="underline underline-offset-2 text-blue-400 hover:text-blue-300">'.e(__('auth.modal_terms_link')).'</a>',
+                            'privacy' => '<a href="'.e(route('shop.privacy')).'" target="_blank" class="underline underline-offset-2 text-blue-400 hover:text-blue-300">'.e(__('auth.modal_privacy_link')).'</a>',
+                        ]) !!}</span>
                     </label>
                     @error('regAcceptedTerms') <p class="text-sm text-red-400">{{ $message }}</p> @enderror
 
@@ -864,7 +897,7 @@ new class extends Component {
                     @feature('newsletter_signup')
                     <label class="flex cursor-pointer items-start gap-3 text-sm text-white/75">
                         <input wire:model="regNewsletterOptIn" type="checkbox" class="mt-1 h-5 w-5 shrink-0 rounded-full border-white/30 bg-white/5 text-blue-500 focus:ring-blue-500/30">
-                        <span>Don't miss out on our next coupon drop! Sign me up for exclusive discounts and promo codes</span>
+                        <span>{{ __('auth.modal_newsletter') }}</span>
                     </label>
                     @endfeature
 
@@ -881,18 +914,18 @@ new class extends Component {
 
                     {{-- Wizard nav: Back / Continue, with the real submit only on step 3. --}}
                     <div class="mt-7 flex items-center gap-3">
-                        <button type="button" x-show="step > 1" @click="step--" class="rounded-[12px] border border-white/20 px-5 py-3 text-sm font-bold text-white/85 transition-colors hover:bg-white/10">Back</button>
-                        <button type="button" x-show="step < 3" @click="nextStep()" class="flex-1 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">Continue</button>
-                        <button type="submit" x-show="step === 3" x-cloak class="flex-1 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">
-                            <span wire:loading.remove wire:target="register">Create account</span>
-                            <span wire:loading wire:target="register">Creating account...</span>
+                        <button type="button" x-show="step > 1" @click="step--" class="rounded-full border border-white/20 px-5 py-3 text-sm font-bold text-white/85 transition-colors hover:bg-white/10">{{ __('common.back') }}</button>
+                        <button type="button" x-show="step < 3" @click="nextStep()" class="flex-1 rounded-full bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">{{ __('common.continue') }}</button>
+                        <button type="submit" x-show="step === 3" x-cloak class="flex-1 rounded-full bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700">
+                            <span wire:loading.remove wire:target="register">{{ __('auth.modal_create_account') }}</span>
+                            <span wire:loading wire:target="register">{{ __('auth.modal_creating_account') }}</span>
                         </button>
                     </div>
                 </form>
 
                 <p class="mt-5 pt-5 text-center text-sm text-white/65">
-                    Already have an account?
-                    <button type="button" @click="switchTo('login')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">Log in</button>
+                    {{ __('auth.modal_have_account') }}
+                    <button type="button" @click="switchTo('login')" class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline">{{ __('auth.modal_log_in') }}</button>
                 </p>
             </div>
 
@@ -904,16 +937,14 @@ new class extends Component {
                     </svg>
                 </div>
 
-                <h3 class="mt-5 text-xl font-bold tracking-tight text-white sm:text-2xl">Account created</h3>
+                <h3 class="mt-5 text-xl font-bold tracking-tight text-white sm:text-2xl">{{ __('auth.modal_account_created') }}</h3>
                 <p class="mx-auto mt-2 max-w-sm text-sm text-white/70">
-                    We sent a verification link to
-                    <span class="font-semibold text-white" x-text="registeredEmail"></span>.
-                    Verify your email to start ordering. You can browse in the meantime.
+                    {!! __('auth.modal_verification_sent', ['email' => '<span class="font-semibold text-white" x-text="registeredEmail"></span>']) !!}
                 </p>
 
                 {{-- Resend --}}
                 <div class="mt-5 text-sm">
-                    <span class="text-white/60">Didn't get the email?</span>
+                    <span class="text-white/60">{{ __('auth.modal_no_email') }}</span>
                     <button
                         type="button"
                         wire:click="resendVerification"
@@ -921,18 +952,18 @@ new class extends Component {
                         wire:target="resendVerification"
                         class="ml-1 font-semibold text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="resendVerification">Resend it</span>
-                        <span wire:loading wire:target="resendVerification">Sending...</span>
+                        <span wire:loading.remove wire:target="resendVerification">{{ __('auth.modal_resend') }}</span>
+                        <span wire:loading wire:target="resendVerification">{{ __('auth.modal_sending') }}</span>
                     </button>
-                    <p x-show="resent === true" x-cloak class="mt-2 text-emerald-400">A fresh verification link is on its way.</p>
-                    <p x-show="resent === false" x-cloak class="mt-2 text-amber-400">Please wait a moment before requesting another link.</p>
+                    <p x-show="resent === true" x-cloak class="mt-2 text-emerald-400">{{ __('auth.modal_resent') }}</p>
+                    <p x-show="resent === false" x-cloak class="mt-2 text-amber-400">{{ __('auth.modal_resend_wait') }}</p>
                 </div>
 
                 <a
                     href="{{ route('dashboard') }}"
-                    class="mt-6 flex w-full items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
+                    class="mt-6 flex w-full items-center justify-center rounded-full bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/40 transition-colors hover:bg-blue-700"
                 >
-                    Continue to my account
+                    {{ __('auth.modal_continue_account') }}
                 </a>
             </div>
 

@@ -96,7 +96,7 @@ new class extends Component
                 </div>
 
                 @if (count($this->availableCurrencies()) === 0)
-                    <div class="mt-6 rounded-[12px] bg-zinc-50 px-4 py-6 text-center ring-1 ring-zinc-100">
+                    <div class="mt-6 rounded-[12px] bg-[#f4f6f5] px-4 py-6 text-center">
                         <p class="text-sm font-semibold text-zinc-900">You hold every currency</p>
                         <p class="mt-1 text-xs text-zinc-600">There are no more wallet currencies to add right now.</p>
                     </div>
@@ -122,7 +122,7 @@ new class extends Component
                             x-transition:enter="transition ease-out duration-150"
                             x-transition:enter-start="opacity-0 -translate-y-1"
                             x-transition:enter-end="opacity-100 translate-y-0"
-                            class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
+                            class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto rounded-[12px] bg-[#f4f6f5] p-1 shadow-xl shadow-zinc-900/10"
                             role="listbox"
                         >
                             @foreach ($this->availableCurrencies() as $c)
@@ -132,7 +132,7 @@ new class extends Component
                                     @click="ccyOpen = false"
                                     role="option"
                                     aria-selected="{{ $currency === $c->value ? 'true' : 'false' }}"
-                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
+                                    class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-[#ffffff]' }}"
                                 >
                                     <span>{{ $c->value }} &middot; {{ $c->label() }}</span>
                                     @if ($currency === $c->value)

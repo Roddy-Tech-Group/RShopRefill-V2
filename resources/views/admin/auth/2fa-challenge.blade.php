@@ -7,7 +7,7 @@
 
             {{-- Admin chip --}}
             <div class="flex justify-center">
-                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-blue-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black">
+                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-blue-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black dark:bg-white/10">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                     </svg>
@@ -37,7 +37,7 @@
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 transform scale-100 translate-y-0"
                 x-transition:leave-end="opacity-0 transform scale-90 translate-y-4"
-                class="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl bg-zinc-900 px-4 py-3 text-white shadow-xl sm:bottom-6 sm:right-6"
+                class="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-[12px] bg-zinc-900 px-4 py-3 text-white shadow-xl sm:bottom-6 sm:right-6"
                 style="display: none;"
             >
                 <svg class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -69,7 +69,7 @@
                             autofocus
                             autocomplete="one-time-code"
                             placeholder="Enter 6-digit code"
-                            class="w-full rounded-xl border border-zinc-300 bg-white py-3 px-4 text-center text-xl tracking-[0.25em] text-zinc-900 placeholder:text-zinc-400 placeholder:tracking-normal outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                            class="w-full rounded-[12px] border border-zinc-300 bg-white py-3 px-4 text-center text-xl tracking-[0.25em] text-zinc-900 placeholder:text-zinc-400 placeholder:tracking-normal outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                             maxlength="6"
                         />
                     </div>
@@ -80,7 +80,7 @@
                 <button
                     type="submit"
                     x-bind:disabled="submitting"
-                    class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-75 disabled:cursor-not-allowed"
+                    class="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2.5 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                     <svg x-show="submitting" class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="display: none;">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

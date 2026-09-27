@@ -171,6 +171,37 @@ class CartWebController extends Controller
      * into the customer's chosen currency via the live CurrencyRate. USD is the
      * base — every currency, USD included, is multiplied by its rate_per_usd.
      */
+    /**
+     * The requested display currency, or USD when it is not one this
+     * storefront offers.
+     *
+     * The supported set is the distinct currencies of config('country_currency.map'),
+     * which is exactly what the locale modal can produce: picking a country
+     * picks the currency, and there is no free-text currency field anywhere in
+     * the UI. So a value outside that set never came from our own frontend.
+     *
+     * This is a security boundary, not a nicety. The resolved code is echoed
+     * straight back in the JSON response below, so an unvalidated value is a
+     * 500 waiting to happen: bytes that are not valid UTF-8 make json_encode
+     * throw while the response is being built, which is how a scanner turned
+     * /cart/data and /cart/items into server errors. Validating here also
+     * spares two rate lookups and a CurrencyRate query per junk request.
+     */
+    private function supportedCurrency(?string $currencyCode): string
+    {
+        $code = strtoupper(trim((string) $currencyCode));
+
+        // Shape first: this alone guarantees the value is printable ASCII and
+        // therefore always encodable, whatever the allowlist then decides.
+        if (preg_match('/^[A-Z]{3}$/', $code) !== 1) {
+            return 'USD';
+        }
+
+        $supported = array_flip(array_values(config('country_currency.map', [])));
+
+        return isset($supported[$code]) ? $code : 'USD';
+    }
+
     private function respond(Cart $cart, ?string $guestToken, ?string $currencyCode)
     {
         $cart->load('items.product.category', 'items.variant');
@@ -182,7 +213,7 @@ class CartWebController extends Controller
         // and flag the response so the frontend can show a "prices in USD -
         // rates refreshing" banner, instead of silently showing the customer a
         // stale price they could then check out at.
-        $resolvedCurrency = strtoupper(trim((string) $currencyCode)) ?: 'USD';
+        $resolvedCurrency = $this->supportedCurrency($currencyCode);
         $rateStale = false;
         try {
             $exchangeRate = $this->currencyRateService->resolveRate('USD', $resolvedCurrency);

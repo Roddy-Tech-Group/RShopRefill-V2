@@ -242,7 +242,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                             x-model="search"
                             type="text"
                             placeholder="Search country or code"
-                            class="w-full rounded-[8px] border border-zinc-300 bg-white px-3 py-2.5 text-base text-black placeholder:text-zinc-400 outline-none focus:border-blue-500 sm:py-2 sm:text-sm"
+                            class="w-full rounded-full border-2 border-zinc-300 bg-white px-3 py-2.5 text-base text-black placeholder:text-zinc-400 outline-none focus:border-blue-500 sm:py-2 sm:text-sm focus:border-edge dark:focus:border-edge transition-colors"
                             @keydown.enter.prevent="if (matches.length) choose(matches[0].iso)"
                         >
                     </div>
@@ -280,7 +280,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                         <button
                             type="button"
                             wire:click="$set('gender', '{{ $opt['value'] }}')"
-                            class="rounded-[12px] px-3 py-3 text-sm font-semibold transition-all active:scale-95 sm:py-2.5 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
+                            class="rounded-full px-3 py-3 text-sm font-semibold transition-all active:scale-95 sm:py-2.5 {{ $gender === $opt['value'] ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-600 hover:text-zinc-900' }}"
                             aria-pressed="{{ $gender === $opt['value'] ? 'true' : 'false' }}"
                         >
                             {{ $opt['label'] }}
@@ -303,7 +303,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
                     type="text"
                     autocomplete="off"
                     placeholder="Enter a friend's referral code"
-                    class="w-full rounded-[12px] border border-zinc-300 bg-white px-3.5 py-3 text-base text-black placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 sm:py-2.5 sm:text-sm"
+                    class="w-full rounded-full border-2 border-zinc-300 bg-white px-3.5 py-3 text-base text-black placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 sm:py-2.5 sm:text-sm focus:border-edge dark:focus:border-edge"
                 >
                 @error('referral') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
@@ -326,7 +326,7 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
             <button
                 type="submit"
                 wire:loading.attr="disabled"
-                class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-60 sm:py-2.5"
+                class="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:opacity-60 sm:py-2.5"
             >
                 <span wire:loading.remove wire:target="save">Complete signup</span>
                 <span wire:loading wire:target="save">Saving...</span>

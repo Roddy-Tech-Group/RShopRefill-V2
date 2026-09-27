@@ -65,13 +65,13 @@
         }"
     >
         {{-- ── Hero + search ─────────────────────────────────────── --}}
-        <section class="border-b border-zinc-100 bg-blue-50">
+        <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
             <div class="mx-auto w-full max-w-[1000px] px-4 py-14 text-center sm:px-6 sm:py-20">
-                <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">
                     Help Center
                 </span>
-                <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">How can we help?</h1>
-                <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+                <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">How can we help?</h1>
+                <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                     Search our FAQs or browse a topic below. Still stuck? Our team is one message away.
                 </p>
 
@@ -83,7 +83,7 @@
                         x-model="q"
                         type="search"
                         placeholder="Search for answers (e.g. wallet, eSIM, refund)"
-                        class="w-full rounded-[12px] border border-zinc-200 bg-white py-3.5 pl-12 pr-4 text-sm text-zinc-900 shadow-sm shadow-zinc-900/5 outline-none transition-colors placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
+                        class="w-full rounded-full bg-white py-3.5 pl-12 pr-4 text-sm text-zinc-900 shadow-lg shadow-black/20 outline-none transition-shadow placeholder:text-zinc-500 focus:ring-2 focus:ring-white/40"
                     >
                 </div>
             </div>
@@ -102,9 +102,9 @@
                         <button
                             type="button"
                             @click="pick(@js($topic['cat']))"
-                            class="group flex aspect-square flex-col items-center justify-center gap-4 rounded-[12px] border border-zinc-200 bg-white p-5 text-center transition-all hover:border-blue-300 hover:shadow-md hover:shadow-blue-600/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            class="group flex aspect-square flex-col items-center justify-center gap-4 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] text-center transition-all hover:shadow-md hover:shadow-blue-600/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                         >
-                            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
                                 <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $topic['path'] }}"/>
                                 </svg>
@@ -121,7 +121,7 @@
         </section>
 
         {{-- ── How it works ──────────────────────────────────────── --}}
-        <section id="how-it-works" class="border-y border-zinc-100 bg-zinc-50">
+        <section id="how-it-works" class="bg-zinc-50">
             <div class="mx-auto w-full max-w-[1140px] px-4 py-12 sm:px-6 sm:py-14">
                 <h2 class="text-lg font-bold text-zinc-900">How it works</h2>
                 <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -130,7 +130,7 @@
                         ['2', 'Pay your way', 'Settle with your wallet, card, bank transfer, mobile money or crypto.'],
                         ['3', 'Instant delivery', 'Your codes land in your dashboard and email the moment payment clears.'],
                     ] as [$step, $title, $desc])
-                        <div class="rounded-[12px] bg-white p-5 ring-1 ring-zinc-100">
+                        <div class="rounded-[12px] bg-white p-5">
                             <span class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-blue-600 text-sm font-bold text-white">{{ $step }}</span>
                             <p class="mt-3 text-sm font-bold text-zinc-900">{{ $title }}</p>
                             <p class="mt-1 text-xs leading-relaxed text-zinc-600">{{ $desc }}</p>
@@ -155,7 +155,7 @@
                         <div
                             data-faq="{{ \Illuminate\Support\Str::lower($faq['q'].' '.$faq['a'].' '.$faq['cat']) }}"
                             x-show="q.trim() === '' || $el.dataset.faq.includes(q.trim().toLowerCase())"
-                            class="overflow-hidden rounded-[12px] border border-zinc-200 bg-white"
+                            class="overflow-hidden rounded-[12px] bg-white"
                         >
                             <button
                                 type="button"
@@ -182,7 +182,7 @@
         </section>
 
         {{-- ── Contact ───────────────────────────────────────────── --}}
-        <section id="contact" class="border-t border-zinc-100 bg-blue-600 scroll-mt-24">
+        <section id="contact" class="bg-blue-600 scroll-mt-24">
             <div class="mx-auto w-full max-w-[1140px] px-4 py-14 sm:px-6 sm:py-16">
                 <div class="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
                     <div>
@@ -191,13 +191,13 @@
                             Open Live Chat any time for the fastest help, or send us a message with your order number. Our support team is available 24/7, and you never lose money - every payment is delivered or refunded to your wallet.
                         </p>
                         <div class="mt-6 flex flex-wrap gap-3">
-                            <a href="mailto:{{ $supportEmail }}" class="inline-flex items-center gap-2 rounded-[6px] bg-white px-5 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
+                            <a href="mailto:{{ $supportEmail }}" class="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
                                 </svg>
                                 Email support
                             </a>
-                            <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center gap-2 rounded-[6px] border border-white/40 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
+                            <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10">
                                 Track an order
                             </a>
                         </div>
@@ -218,14 +218,14 @@
                                 <dd class="font-semibold text-white">Within 24 hours</dd>
                             </div>
                         </dl>
-                        <div class="mt-5 flex items-center gap-2 border-t border-white/15 pt-5">
-                            <a href="{{ \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills') }}" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/10 text-white transition-colors hover:bg-white/20">
+                        <div class="mt-5 flex items-center gap-2 pt-5">
+                            <a href="{{ \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills') }}" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
                                 <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                             </a>
-                            <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills') }}" target="_blank" rel="noopener noreferrer" aria-label="X" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/10 text-white transition-colors hover:bg-white/20">
+                            <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/roddytech237') }}" target="_blank" rel="noopener noreferrer" aria-label="X" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
                                 <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
                             </a>
-                            <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/10 text-white transition-colors hover:bg-white/20">
+                            <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
                                 <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.07 1.644.07 4.849 0 3.205-.012 3.584-.07 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
                             </a>
                         </div>

@@ -255,7 +255,7 @@ class extends Component {
     </header>
 
     {{-- Tabs --}}
-    <nav class="mb-4 flex flex-wrap items-center gap-1 rounded-[12px] border border-zinc-100 bg-white p-1 dark:border-zinc-700/60 dark:bg-[#1d3252]">
+    <nav class="mb-4 flex flex-wrap items-center gap-1 rounded-[12px] bg-white p-1 dark:bg-[#1d3252]">
         @foreach ([
             'pending' => 'Pending review',
             'approved' => 'Approved - awaiting payout',
@@ -291,7 +291,7 @@ class extends Component {
                 $isPending = $w->status === 'pending';
                 $isApproved = $w->status === 'approved';
             @endphp
-            <article class="rounded-[12px] border border-zinc-100 bg-white p-4 shadow-sm dark:border-zinc-700/60 dark:bg-[#1d3252]" wire:key="w-{{ $w->id }}">
+            <article class="rounded-[12px] bg-white p-4 shadow-sm dark:bg-[#1d3252]" wire:key="w-{{ $w->id }}">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
@@ -366,7 +366,7 @@ class extends Component {
                         </button>
                     </div>
                     @if ($payingId === $w->id)
-                        <div class="mt-3 rounded-[12px] border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-500/30 dark:bg-blue-500/10">
+                        <div class="mt-3 rounded-[12px] bg-blue-50/40 p-3 dark:bg-blue-500/10">
                             <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-200">Payout reference</label>
                             <p class="text-[11px] text-zinc-500 dark:text-zinc-400">Bank txn id, wallet transfer ref, or mobile-money receipt.</p>
                             <input type="text" wire:model="payoutReference" class="mt-1 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700/60 dark:bg-[#26416b] dark:text-white">

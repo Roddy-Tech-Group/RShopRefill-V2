@@ -40,7 +40,7 @@ class DataExportedMail extends Mailable
                 'when' => $this->when,
                 'device' => $this->device,
                 'securityUrl' => route('dashboard.security'),
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

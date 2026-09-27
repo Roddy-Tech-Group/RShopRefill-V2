@@ -314,6 +314,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Volt::route('press', 'admin.content.press')->name('press');
             Volt::route('reviews', 'admin.content.reviews')->name('reviews');
             Volt::route('faqs', 'admin.content.faqs')->name('faqs');
+
+            // Per-language copy for database-backed content. Lang files cover
+            // the interface; this covers what editors type.
+            Volt::route('translations', 'admin.content.translations')->name('translations');
             Volt::route('rewards', 'admin.content.rewards')->name('rewards');
             Volt::route('rewards/analytics', 'admin.content.rewards-analytics')->name('rewards.analytics');
             Volt::route('rewards/withdrawals', 'admin.content.rewards-withdrawals')->name('rewards.withdrawals');

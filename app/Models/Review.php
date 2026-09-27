@@ -21,6 +21,10 @@ use Illuminate\Support\Facades\DB;
  * @property string $source
  * @property Carbon $reviewed_at
  * @property bool $is_published
+ * @property bool $is_customer_submitted
+ * @property string|null $category The service line the experience prompt asked about
+ * @property int|null $score The prompt's 1-10 answer; `rating` holds it halved for the stars
+ * @property bool $is_anonymous Printed without the author's name on customer-facing surfaces
  * @property int $sort_order
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -42,6 +46,9 @@ class Review extends Model
         'is_published',
         'is_customer_submitted',
         'sort_order',
+        'category',
+        'score',
+        'is_anonymous',
     ];
 
     protected function casts(): array
@@ -50,8 +57,33 @@ class Review extends Model
             'reviewed_at' => 'date',
             'is_published' => 'boolean',
             'is_customer_submitted' => 'boolean',
+            'is_anonymous' => 'boolean',
             'rating' => 'float',
+            'score' => 'integer',
         ];
+    }
+
+    /**
+     * Reviews that have something to say. The experience prompt makes the
+     * comment optional, so a customer can leave a score alone; that still
+     * counts toward ratings, but a card with no text has nothing to show, so
+     * the carousel and the reviews page take only these.
+     */
+    public function scopeWithText(Builder $query): Builder
+    {
+        return $query->whereNotNull('body')->where('body', '!=', '');
+    }
+
+    /** The name a customer-facing surface may print. */
+    public function displayName(): string
+    {
+        return $this->is_anonymous ? __('common.anonymous_customer') : $this->author_name;
+    }
+
+    /** The initials a customer-facing surface may print: an anonymous review carries none of the author's. */
+    public function displayInitials(): string
+    {
+        return $this->is_anonymous ? mb_strtoupper(mb_substr(__('common.anonymous_customer'), 0, 1)) : $this->initials;
     }
 
     /**
@@ -125,6 +157,61 @@ class Review extends Model
         return $query->whereHas('order.items.product', function (Builder $itemQuery) use ($brandKey) {
             $itemQuery->where('brand_key', $brandKey);
         });
+    }
+
+    /**
+     * Average rating and review count per gift-card brand, in ONE query.
+     *
+     * The listing renders a card per brand and there are ~688 of them, so
+     * asking each card for its own rating would be a page of N+1 queries on
+     * top of the variant eager-load the price range already needs. This takes
+     * the page's brand keys and comes back with everything they need.
+     *
+     * The inner select is DISTINCT on (brand, review): an order holding two
+     * gift cards of the same brand joins its one review twice, which would
+     * count it twice and leave the average untouched but the count wrong.
+     *
+     * Only reviews the storefront would actually show are counted - published,
+     * and ours rather than an external platform's - so the number under a
+     * brand always matches the reviews readable on its page.
+     *
+     * @param  iterable<string>  $brandKeys
+     * @return array<string, array{average: float, count: int}>
+     */
+    public static function brandRatings(iterable $brandKeys): array
+    {
+        $keys = array_values(array_unique(array_filter(
+            is_array($brandKeys) ? $brandKeys : iterator_to_array($brandKeys)
+        )));
+
+        if ($keys === []) {
+            return [];
+        }
+
+        $distinct = DB::table('reviews')
+            ->join('orders', 'orders.id', '=', 'reviews.order_id')
+            ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->where('reviews.is_published', true)
+            ->where(function ($query): void {
+                $query
+                    ->where('reviews.is_customer_submitted', true)
+                    ->orWhereNotIn(DB::raw('LOWER(reviews.source)'), self::EXTERNAL_SOURCES);
+            })
+            ->whereIn('products.brand_key', $keys)
+            ->distinct()
+            ->select('products.brand_key', 'reviews.id', 'reviews.rating');
+
+        return DB::query()
+            ->fromSub($distinct, 'brand_reviews')
+            ->groupBy('brand_key')
+            ->select('brand_key', DB::raw('AVG(rating) as average'), DB::raw('COUNT(*) as total'))
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->brand_key => [
+                'average' => round((float) $row->average, 1),
+                'count' => (int) $row->total,
+            ]])
+            ->all();
     }
 
     public function user(): BelongsTo

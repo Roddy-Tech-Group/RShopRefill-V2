@@ -34,6 +34,7 @@ class SendNewsletterBroadcastJob implements ShouldQueue
         public string $subjectLine,
         public string $bodyContent,
         public bool $isHtml = false,
+        public string $imageUrl = '',
     ) {
         // Explicit queue: keeps one workload from starving unrelated ones (bulkhead).
         $this->onQueue('comm-marketing');
@@ -50,17 +51,25 @@ class SendNewsletterBroadcastJob implements ShouldQueue
             ->chunkById(50, function ($chunk) use (&$sent, &$failed) {
                 foreach ($chunk as $subscriber) {
                     try {
-                        // For newsletters, we use a fake model because it's subscriber list, not users.
-                        // Or rather, we use the NewsletterSubscriber as the recipient model.
+                        // The recipient is the NewsletterSubscriber itself, not a
+                        // User: a subscriber is an email address that agreed to
+                        // hear from us and may well have no account.
+                        //
+                        // That makes this the one send in the app whose recipient
+                        // cannot hold a push subscription or a bell feed entry, so
+                        // ChannelResolver resolves email alone for it. It says so
+                        // by checking the recipient rather than the category, which
+                        // is what this comment used to assume and be wrong about.
                         app(CommunicationManager::class)->send(
                             recipient: $subscriber,
                             category: CommunicationCategory::Newsletter,
                             title: $this->subjectLine,
-                            message: $this->subjectLine, // Push/InApp disabled via channel resolver anyway
+                            message: $this->subjectLine,
                             mailable: new NewsletterBroadcastMail(
                                 subjectLine: $this->subjectLine,
                                 bodyContent: $this->bodyContent,
                                 isHtml: $this->isHtml,
+                                imageUrl: $this->imageUrl,
                             ),
                             metadata: [
                                 'is_marketing' => true,

@@ -25,7 +25,7 @@
         .band .doc { color: #1d4ed8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
         .band .meta { color: #64748b; font-size: 8.5px; text-align: right; line-height: 1.6; }
         .sheet { padding: 22px 40px 0; }
-        .hero { background: #f0f6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+        .hero { background: #f4f6f5; border: 1px solid #dfe3e1; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
         .hero .label { color: #3b82f6; font-size: 8px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
         .hero .title { font-size: 18px; font-weight: 700; color: #0c1a2e; margin-top: 2px; }
         .hero .sub { color: #64748b; font-size: 8.5px; margin-top: 4px; line-height: 1.6; }
@@ -54,7 +54,7 @@
                     {{-- JPEG deliberately: DomPDF embeds JPEG without the GD
                          extension. White-flattened for this light header. --}}
                     @if (is_file(public_path('assets/email-logo.jpg')))
-                        <img src="{{ public_path('assets/email-logo.jpg') }}" style="height: 30px;" alt="RShopRefill">
+                        <img src="{{ public_path('assets/email-logo.jpg') }}" style="height: 30px;" alt="RshopRefill">
                     @endif
                     <div class="doc" style="margin-top: 7px;">Personal data export</div>
                 </td>
@@ -71,7 +71,7 @@
             <div class="label">Your data, in one place</div>
             <div class="title">{{ $show($a['name']) }}</div>
             <div class="sub">
-                This document lists the personal data RShopRefill holds about you, as of the date above. You asked for it under your right of access.
+                This document lists the personal data RshopRefill holds about you, as of the date above. You asked for it under your right of access.
                 Keep it safe: it contains your contact details and your transaction history.
             </div>
         </div>

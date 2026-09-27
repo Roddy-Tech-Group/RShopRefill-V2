@@ -119,14 +119,13 @@
             background-color: rgb(255 255 255 / 0.08);
         }
         .order-body:hover::after { display: none; }
-        .order-body:hover { border-radius: 12px; }
     </style>
 
-    <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
-        <div class="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
+    <div class="overflow-hidden rounded-[12px] pb-3 bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
+        <div class="scroll-y-thin overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-600">
 
         {{-- Header pill — light-blue bg, 2px blue ring. --}}
-        <div class="order-row grid mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-400">
+        <div class="order-row grid mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
             <span class="col-order">Order #</span>
             <span>Customer</span>
             <span>Items</span>
@@ -144,7 +143,7 @@
             <a
                 href="{{ route('admin.order', $order) }}"
                 wire:navigate
-                class="order-row order-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252] dark:hover:bg-blue-600/10 dark:hover:ring-blue-400"
+                class="order-row order-body group relative mx-3 cursor-pointer bg-white px-6 py-3 transition-all hover:bg-blue-50 dark:bg-[#1d3252]"
             >
                 {{-- Order # — click-to-copy chip. Stops the link nav so a
                      copy click doesn't open the order page. --}}

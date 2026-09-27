@@ -49,6 +49,15 @@ final class PaymentStripBadges
      * @var list<array{label: string, method: string, img?: string, svg?: string, mono?: bool}>
      */
     private const FIXED = [
+        // Mobile money leads the strip. These are the rails most customers on
+        // this catalogue actually pay with, so they are the first thing the row
+        // shows rather than the eighth.
+        //
+        // Both are drawn inline rather than loaded as files: the global
+        // dark-mode rule inverts SVG images, which would turn MTN's yellow
+        // purple and Orange's orange blue.
+        ['label' => 'MoMo', 'method' => 'mobile_money', 'svg' => 'mtn_momo'],
+        ['label' => 'Orange Money', 'method' => 'mobile_money', 'svg' => 'orange_money'],
         ['label' => 'Visa', 'method' => 'card', 'img' => 'visa.svg'],
         ['label' => 'Mastercard', 'method' => 'card', 'img' => 'mastercard.svg'],
         ['label' => 'Verve', 'method' => 'card', 'svg' => 'verve'],
@@ -56,8 +65,6 @@ final class PaymentStripBadges
         ['label' => 'Discover', 'method' => 'card', 'svg' => 'discover'],
         ['label' => 'Diners Club', 'method' => 'card', 'svg' => 'diners'],
         ['label' => 'Apple Pay', 'method' => 'apple_pay', 'svg' => 'apple_pay'],
-        ['label' => 'MTN Mobile Money', 'method' => 'mobile_money', 'img' => 'MOMO.svg', 'mono' => true],
-        ['label' => 'Orange Money', 'method' => 'mobile_money', 'svg' => 'orange_money'],
         ['label' => 'M-PESA', 'method' => 'mobile_money', 'svg' => 'mpesa'],
         ['label' => 'Airtel Money', 'method' => 'mobile_money', 'svg' => 'airtel_money'],
         ['label' => 'Bank transfer', 'method' => 'bank_transfer', 'svg' => 'bank'],

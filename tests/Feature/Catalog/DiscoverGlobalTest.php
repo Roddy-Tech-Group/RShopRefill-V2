@@ -9,11 +9,15 @@ use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * The "Discover Global" worldwide eSIM is surfaced on the home page + dashboard.
+ * The "Discover Global" worldwide eSIM component. Its plan carousel sat on
+ * the storefront home page, then on the dashboard overview; both were
+ * removed, so nothing renders it today. These tests exercise the component
+ * directly - it is kept ready to mount rather than deleted.
  * EsimStoreController::discoverGlobal() is the shared data source: it returns the
  * global product and its priced plans, or null when it isn't in the catalogue.
  */
@@ -108,7 +112,9 @@ class DiscoverGlobalTest extends TestCase
 
         $first = $catalog->first();
         $this->assertStringContainsString('discover-global', $first['slug']);
-        $this->assertSame('Discover Global USA eSIM', $first['name']);
+        // Sold as "Global", never under the supplier's own product name, which
+        // is a brand a shopper has no reason to know; the grid adds the suffix.
+        $this->assertSame('Global eSIM', $first['name']);
         $this->assertSame(Product::flagUrl('US'), $first['flag']);
         $this->assertTrue($first['popular']);
 
@@ -117,14 +123,18 @@ class DiscoverGlobalTest extends TestCase
         $this->assertFalse($usCard['popular']);
     }
 
-    public function test_home_page_renders_discover_global_section(): void
+    /**
+     * The plan carousel was pulled off the storefront home page. The component
+     * itself is untouched, so this guards the home page specifically rather
+     * than the component.
+     */
+    public function test_home_page_no_longer_renders_the_discover_global_plans(): void
     {
         $this->withoutVite();
         $product = $this->makeGlobalEsim();
 
-        // makeGlobalEsim() seeds a data-only plan; add a voice plan (numeric
-        // voice/sms allowance) so the "Voice eSIMs with a Real +1 USA Number"
-        // group renders alongside the "Data-Only eSIMs" data group.
+        // A voice plan alongside the seeded data-only one, so both plan groups
+        // would render if the section were still on the page.
         ProductVariant::factory()->for($product)->create([
             'currency' => 'USD',
             'face_value' => 10,
@@ -136,25 +146,60 @@ class DiscoverGlobalTest extends TestCase
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('Discover Global USA')
-            ->assertSee('Voice eSIMs with a Real +1 USA Number')
-            ->assertSee('Data-Only eSIMs for Global Travel')
-            ->assertSee('Choose voice if you want the +1 real USA number');
+            ->assertDontSee('Discover Global USA')
+            ->assertDontSee('Voice eSIMs with a Real +1 USA Number')
+            ->assertDontSee('Data-Only eSIMs for Global Travel')
+            ->assertDontSee('Choose voice if you want the +1 real USA number');
+
+        $this->assertStringNotContainsString(
+            'x-home.discover-global',
+            File::get(resource_path('views/welcome.blade.php'))
+        );
+    }
+
+    /** The component itself still works, wherever it is next mounted. */
+    public function test_the_component_still_renders_its_plan_groups(): void
+    {
+        $product = $this->makeGlobalEsim();
+
+        ProductVariant::factory()->for($product)->create([
+            'currency' => 'USD',
+            'face_value' => 10,
+            'retail_price' => 10,
+            'is_available' => true,
+            'is_variable' => false,
+            'metadata' => ['data_limit' => '5 GB', 'duration_days' => 15, 'voice_limit' => 100, 'sms_limit' => 100],
+        ]);
+
+        $html = Blade::render('<x-home.discover-global :contained="true" />');
+
+        $this->assertStringContainsString('Discover Global USA', $html);
+        $this->assertStringContainsString('Voice eSIMs with a Real +1 USA Number', $html);
+        $this->assertStringContainsString('Data-Only eSIMs for Global Travel', $html);
     }
 
     /**
-     * The dashboard renders this inside an off-center column, so it must pass
-     * :contained="true" to drop the carousel's 100vw full-bleed track (w-screen)
-     * - otherwise the track overflows onto the right rail. The home page keeps it.
+     * Mounted inside an off-center column, this must pass :contained="true" to
+     * drop the carousel's 100vw full-bleed track - otherwise it overflows its
+     * neighbour. The dashboard overview needed exactly that before the panel
+     * was taken off it, and the next host will too.
+     *
+     * The anchor is the .full-bleed class, not the w-screen utility: the bleed
+     * moved into CSS (margin-inline: calc(50% - 50vw); width: 100vw) when a
+     * scrollbar-width correction was reverted out of it.
      */
     public function test_contained_carousel_drops_the_full_bleed_track(): void
     {
         $this->makeGlobalEsim();
 
+        // Anchored on the track's class attribute, not the bare word: the
+        // carousel's x-data carries a JS comment mentioning the full-bleed
+        // track, and that renders in both variants.
         $contained = Blade::render('<x-home.discover-global :contained="true" />');
-        $this->assertStringNotContainsString('w-screen', $contained);
+        $this->assertStringNotContainsString('class="full-bleed overflow-x-auto', $contained);
+        $this->assertStringContainsString('class="w-full overflow-x-auto', $contained);
 
         $bleed = Blade::render('<x-home.discover-global />');
-        $this->assertStringContainsString('w-screen', $bleed);
+        $this->assertStringContainsString('class="full-bleed overflow-x-auto', $bleed);
     }
 }

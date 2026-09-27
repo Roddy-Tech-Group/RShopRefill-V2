@@ -2,19 +2,20 @@
     // Terms of Service — customer-facing legal page. Dark-mode safe: backgrounds use
     // remapped classes (bg-white/bg-zinc-50/bg-blue-50 -> navy in dark) while
     // coloured accents (text-red-600 / text-blue-700) read in both themes.
-    // Terms / legal contact is a formal channel - kept on the info@ inbox.
-    $supportEmail = 'info@rshoprefill.com';
+    // support@ is the one mailbox that receives mail; info@ has no inbox, so
+    // anything sent there bounced. MailDomain::replyTo() is that address.
+    $supportEmail = \App\Domain\Communication\Enums\MailDomain::replyTo();
     $lastUpdated = 'August 23, 2026';
 @endphp
 
 <x-layouts.app.header :title="'Terms of Service | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Legal</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Terms of Service</h1>
-            <p class="mt-3 text-sm text-zinc-600">Last updated: {{ $lastUpdated }}</p>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Legal</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">Terms of Service</h1>
+            <p class="mt-3 text-sm text-white/75">Last updated: {{ $lastUpdated }}</p>
         </div>
     </section>
 
@@ -28,7 +29,7 @@
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <li><a href="#acceptance" class="font-medium text-blue-600 hover:underline">1. Acceptance of these Terms</a></li>
@@ -73,7 +74,7 @@
                 <li>One person should hold one account. We may decline, suspend or remove accounts that breach these Terms.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Keep your account secure</p>
@@ -118,7 +119,7 @@
                 before you pay.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Refunds follow our Refund Policy</p>
@@ -140,7 +141,7 @@
                 <li>Infringe our or any third party's intellectual property or other rights.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Breaching these rules can cost you access</p>
@@ -177,7 +178,7 @@
                 but we do not guarantee that it will always be uninterrupted or error-free.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Limitation of liability</p>
@@ -221,7 +222,6 @@
                 or <a href="{{ route('shop.contact') }}" wire:navigate class="font-medium text-blue-600 hover:underline">contact our team</a>.
             </p>
         </section>
-        <x-legal-footer />
     </div>
 
 </x-layouts.app.header>

@@ -1,12 +1,24 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\Languages::direction() }}">
     <head>
         @include('partials.head')
     </head>
+    {{-- Fold the rail before first paint, so a reload never shows the full sidebar
+         snapping shut: the customer's saved collapse, or a shop page whose own
+         category panel sits beside the rail. The store in app.js takes over once
+         Alpine starts (and re-checks on every wire:navigate). --}}
+    <script>
+        (function () {
+            var folded = @json(request()->routeIs('dashboard.shop.gift-cards', 'dashboard.shop.topups', 'dashboard.shop.bills'));
+            var saved = false;
+            try { saved = localStorage.getItem('dashboard.sidebar.collapsed') === '1'; } catch (e) {}
+            if (folded || saved) { document.documentElement.classList.add('dashboard-sidebar-collapsed'); }
+        })();
+    </script>
     {{-- Customer sidebar collapse styling. Mirrors the admin sidebar's CSS
          contract — when the html element carries `dashboard-sidebar-collapsed`,
          the rail shrinks to icons only, labels hide, single items get a
-         tooltip on hover, and group items show a floating submenu popup.
+         tooltip on hover, and group submenus (Shop services) stay hidden.
          The CSS targets `[data-flux-sidebar]` which on this layout is the
          customer sidebar (the admin layout is never on the same page so
          there's no selector collision). --}}
@@ -16,12 +28,8 @@
                 width: 72px !important;
             }
             /* Collapsed: the scroll wrapper keeps scrolling vertically (so every
-               icon stays reachable on short viewports) but clips horizontally;
-               the flyout submenus are position:fixed (placed per-hover by the
-               flyout positioner script below) so they escape that clip instead
-               of forcing the whole rail to overflow:visible, which used to
-               disable scrolling. nav itself stays visible — only the wrapper
-               scrolls. */
+               icon stays reachable on short viewports) but clips horizontally.
+               nav itself stays visible — only the wrapper scrolls. */
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav {
                 overflow: visible !important;
             }
@@ -29,12 +37,21 @@
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
             }
+            /* Collapsed, the rows lose their labels and become a column of bare
+               18px icons, where the expanded list's 2px gap reads as one solid
+               strip. Space them so each icon is its own target. */
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav,
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav .nav-group {
+                gap: 0.375rem !important;
+            }
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav a,
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav button {
                 font-size: 0 !important;
                 justify-content: center !important;
                 padding-left: 0.5rem !important;
                 padding-right: 0.5rem !important;
+                padding-top: 0.5rem !important;
+                padding-bottom: 0.5rem !important;
                 gap: 0 !important;
             }
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav button > span,
@@ -44,7 +61,8 @@
                 margin: 0 auto !important;
             }
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav svg,
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav img {
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav img,
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav .anim-icon {
                 margin: 0 auto !important;
             }
             /* Expandable groups — hide chevron + right-side badges in collapsed
@@ -53,7 +71,8 @@
                an extra <span class="flex"> (the Shop button's NEW pill sits
                inside a row wrapper, not directly under <a>/<button>). */
             html.dashboard-sidebar-collapsed [data-flux-sidebar] nav button > span:last-child > svg,
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav .dash-row-badge {
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav .dash-row-badge,
+            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav .dash-nav-toggle {
                 display: none !important;
             }
             /* Section headings (Shop, Account) collapse to a thin divider so
@@ -86,133 +105,283 @@
             html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] nav a:hover,
             html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] nav button:hover {
                 background-color: #070f1c !important;
-                color: #60a5fa !important;
+                color: #ffffff !important;
                 font-weight: 600 !important;
             }
 
-            /* Tooltip — floats to the right of the icon on hover. Applied to
-               single nav links that carry `data-tip`; group items are handled
-               by the popup rules below. */
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav a {
-                position: relative;
-            }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] nav a[data-tip]:hover::after {
-                content: attr(data-tip);
-                position: absolute;
-                left: calc(100% + 0.625rem);
-                top: 50%;
-                transform: translateY(-50%);
-                background: #18181b;
+            /* Collapsed rail: hovering (or focusing) an icon shows its name in a
+               label beside it. The label is one fixed element on <body>, placed
+               by the rail tooltip script at the foot of this layout. A CSS
+               ::after on the link never showed: the rail's scroll wrapper clips
+               horizontally, so anything past the 72px rail was cut off. */
+            .dash-rail-tip {
+                position: fixed;
+                z-index: 90;
+                opacity: 0;
+                transform: translate(-4px, -50%);
+                pointer-events: none;
+                background: #0c1337;
                 color: #ffffff;
                 font-size: 0.75rem;
                 font-weight: 500;
-                padding: 0.5rem 0.75rem;
+                line-height: 1rem;
+                padding: 0.4rem 0.7rem;
                 border-radius: 8px;
                 white-space: nowrap;
-                pointer-events: none;
                 box-shadow: 0 10px 25px -8px rgba(0, 0, 0, 0.4);
-                z-index: 70;
+                transition: opacity 120ms ease, transform 120ms ease;
             }
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] nav a[data-tip]:hover::after {
+            /* Speech-bubble pointer on the left edge, aimed at the icon: a small
+               square in the bubble's own colour, turned 45 degrees and half
+               tucked under the bubble. */
+            .dash-rail-tip::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: -4px;
+                width: 9px;
+                height: 9px;
+                background-color: inherit;
+                border-radius: 2px;
+                transform: translateY(-50%) rotate(45deg);
+            }
+            .dash-rail-tip.is-visible {
+                opacity: 1;
+                transform: translate(0, -50%);
+            }
+            html.dark .dash-rail-tip {
                 background: #ffffff;
                 color: #18181b;
             }
 
-            /* Brand swap: full wordmark hidden, favicon shown, when collapsed. */
-            html:not(.dashboard-sidebar-collapsed) [data-flux-sidebar] .brand-mark { display: none !important; }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .brand-full { display: none !important; }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .brand-mark { display: flex !important; }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] > a { margin-right: 0 !important; }
+            /* Panel layout. A full-width top bar on the shell colour carries
+               the logo; below it the sidebar and the page form one rounded
+               panel inset 8px from the window edges. The window never scrolls:
+               the page scrolls inside the panel (flux:main), so content can
+               never slide past the panel's corners. Light mode's shell is the
+               deep blue #0c1337; dark keeps the black ground, where hairlines
+               outline the panel instead. */
+            body.dashboard { --dash-shell: #0c1337; --dash-pane-line: transparent; }
+            html.dark body.dashboard { --dash-shell: #000000; --dash-pane-line: rgba(255, 255, 255, 0.08); }
 
-            /* Collapsed brand favicon ships blue (correct on the light sidebar);
-               recolor it to white in dark mode for contrast on the dark sidebar. */
-            html.dark [data-flux-sidebar] .brand-mark img { filter: brightness(0) invert(1); }
+            html:root:has(> body.dashboard) {
+                overflow: hidden;
+                scrollbar-gutter: auto;
+            }
+            html:not(.dark):has(> body.dashboard),
+            html:not(.dark) body.dashboard { background-color: var(--dash-shell); }
+            /* Dark mode: the ground behind the panel and the top bar are pure
+               black, with no grain. Out-ranks app.css's !important grainy
+               ground on the body and on [data-flux-header]. */
+            html.dark:root:has(> body.dashboard) { background-color: #000000; }
+            html.dark:root body.dashboard,
+            html.dark:root body.dashboard > [data-flux-header] {
+                background-color: #000000 !important;
+                background-image: none !important;
+            }
 
+            /* Flux puts the sidebar beside the header when it comes first; the
+               header spans the full width here instead, and the rows are pinned
+               so the body is exactly one screen tall. */
+            html body.dashboard {
+                height: 100dvh;
+                min-height: 0;
+                overflow: hidden;
+                grid-template-rows: 72px minmax(0, 1fr) 0 !important;
+                grid-template-columns: min-content min-content minmax(0, 1fr) min-content !important;
+                grid-template-areas: "header header header header" "sidebar subnav main aside" "sidebar subnav footer aside" !important;
+            }
+            body.dashboard > [data-flux-header] { height: 72px; }
+
+            /* Sub-navigation slot, between the rail and the page. Empty (zero
+               wide) on most pages. A page with its own sub-navigation (the shop
+               category panel) teleports a panel in: the rail folds to icons,
+               the slot opens to 248px in the sidebar's grey with no seam, so
+               rail and panel read as one sidebar, and the panel slides in. */
+            body.dashboard > [data-dash-subnav] {
+                grid-area: subnav;
+                min-height: 0;
+                width: 0;
+                margin-bottom: 8px;
+                overflow: hidden;
+                transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+            body.dashboard > [data-dash-subnav]:has(> *) {
+                width: 248px;
+                background-color: #eaeeec;
+                border-block: 1px solid var(--dash-pane-line);
+            }
+            html.dark body.dashboard > [data-dash-subnav]:has(> *) {
+                background-color: var(--ash);
+                background-image: var(--grain);
+                background-size: 220px 220px;
+            }
+            body.dashboard > [data-dash-subnav] > .dash-subnav-panel {
+                width: 248px;
+                animation: dash-subnav-in 320ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+            }
+            @keyframes dash-subnav-in {
+                from { opacity: 0; transform: translateX(-16px); }
+                to { opacity: 1; transform: none; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                body.dashboard > [data-dash-subnav] { transition: none; }
+                body.dashboard > [data-dash-subnav] > .dash-subnav-panel { animation: none; }
+            }
+            /* The page grid that held the panel as its first column gives the
+               whole width to the catalogue once the panel has moved out. */
+            body.dashboard [data-page-content] .grid:has(> template[data-subnav-teleport]) {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            /* Left pane. Flux writes sticky top/max-height inline for sticky
+               sidebars; the window no longer scrolls, so the grid sizes it. */
+            html body.dashboard > [data-flux-sidebar] {
+                position: relative !important;
+                top: auto !important;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                margin-inline-start: 8px;
+                margin-bottom: 8px;
+                border: 1px solid var(--dash-pane-line);
+                border-inline-end: 0;
+                border-start-start-radius: 24px;
+                border-end-start-radius: 24px;
+            }
+
+            /* Right pane: a rounded, clipping frame that does not scroll itself.
+               Chromium does not clip an element's own scrollbar to that
+               element's rounded corners, so when the pane scrolled, its bar
+               poked out past the top-right curve. The page wrapper inside does
+               the scrolling instead, and the pane's rounded overflow clip keeps
+               that wrapper's bar inside the panel. */
+            body.dashboard > [data-flux-main] {
+                margin-inline-end: 8px;
+                margin-bottom: 8px;
+                min-height: 0;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                border: 1px solid var(--dash-pane-line);
+                border-inline-start: 0;
+                border-start-end-radius: 24px;
+                border-end-end-radius: 24px;
+            }
+            body.dashboard > [data-flux-main] [data-page-content] {
+                flex: 1 1 0%;
+                min-height: 0 !important;
+                overflow-y: auto;
+                /* Clip sideways, never scroll: the overview's wallet band bleeds
+                   past the page padding to the panel's edges, and auto would
+                   turn that bleed into a horizontal scrollbar. */
+                overflow-x: clip;
+                overscroll-behavior: contain;
+                /* The one in-page scroller that keeps a visible bar, since it
+                   replaces the window's (the global rule hides all others).
+                   auto, not thin: a set scrollbar-width/color makes Chromium
+                   draw its native bar with arrow buttons; auto lets the slim
+                   arrow-less ::-webkit-scrollbar styling below apply. */
+                scrollbar-width: auto;
+                scrollbar-color: auto;
+            }
+            @supports not selector(::-webkit-scrollbar) {
+                body.dashboard > [data-flux-main] [data-page-content] {
+                    scrollbar-width: thin;
+                    scrollbar-color: #c4cad6 transparent;
+                }
+            }
+            /* The track stops short of the 24px corners, and the 8px bar paints
+               only a 4px thumb in its middle (transparent border + content-box
+               clip), so it stays slim and floats clear of the panel's edge. The
+               wrapper's own background (the wallpaper veil) paints under the bar. */
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar { display: block; width: 8px; background: transparent; }
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar-button { display: none; }
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar-corner { background: transparent; }
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar-track { background: transparent; margin-top: 24px; margin-bottom: 24px; }
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar-thumb {
+                background-color: #c4cad6;
+                border-radius: 9999px;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            body.dashboard > [data-flux-main] [data-page-content]::-webkit-scrollbar-thumb:hover { background-color: #a0a8b8; }
+
+            /* Content-pane wallpaper (the sidebar keeps its plain grey). The
+               image sits on the pane itself, which never scrolls, so it holds
+               still while the page wrapper scrolls over it. That wrapper lays a
+               solid veil on top (under its own scrollbar too) so text
+               written straight onto the page (titles, subtitles, section
+               headings) stays readable; raise or lower the alpha in
+               --dash-wallpaper-veil to show more or less of the image.
+               Selectors out-rank the dark-mode page-tone rules in app.css,
+               which are !important. */
+            @php
+                // One image per theme, in public/assets, in whichever format it was
+                // saved. No file, no rule: that theme keeps its plain page tone
+                // instead of requesting a missing image. The mtime query busts the
+                // browser cache when a file is replaced.
+                $findWallpaper = fn (array $names) => collect($names)
+                    ->crossJoin(['webp', 'jpg', 'jpeg', 'png', 'avif'])
+                    ->map(fn ($pair) => 'assets/'.$pair[0].'.'.$pair[1])
+                    ->first(fn ($path) => is_file(public_path($path)));
+                $wallpaperUrl = fn (string $path) => asset($path).'?v='.filemtime(public_path($path));
+
+                // Light only. Dark mode keeps the plain dark page tone: a wallpaper
+                // there is a near-black photograph stretched over the whole pane,
+                // which bands and softens under any compression, and it was adding
+                // nothing the flat surface does not already give.
+                $dashWallpaperLight = $findWallpaper(['dashboard-wallpaper-light-mode', 'dashboard-wallpaper']);
+            @endphp
+            @if ($dashWallpaperLight)
+            /* Light: the image is mid-to-dark grey, so a 75% light veil keeps
+               dark page text readable over it. */
+            html:not(.dark) body.dashboard { --dash-wallpaper-veil: rgba(244, 246, 245, 0.75); }
+            html:root:not(.dark) body.dashboard > [data-flux-main] {
+                background-image: url('{{ $wallpaperUrl($dashWallpaperLight) }}') !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+            }
+            html:not(.dark) body.dashboard > [data-flux-main] [data-page-content] {
+                background-color: var(--dash-wallpaper-veil) !important;
+                background-image: none !important;
+            }
+            @endif
+
+            /* The supplied dotted world map sits on the stationary dark pane,
+               behind the scrolling content. Its transparent gaps reveal the
+               existing near-black ground and grain. Keep the full map visible
+               without repeating it, including when the pane is narrower. */
+            html:root.dark body.dashboard > [data-flux-main] {
+                background-color: #1e1e25 !important;
+                background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+                background-size: min(2000px, 125%) auto, 220px 220px !important;
+                background-position: center center, 0 0 !important;
+                background-repeat: no-repeat, repeat !important;
+            }
+            html.dark body.dashboard > [data-flux-main] [data-page-content] {
+                background-color: transparent !important;
+                background-image: none !important;
+            }
             /* Sidebar collapse arrow: hidden until the sidebar is hovered (or the
                button is keyboard-focused), so it only appears when wanted. */
             @media (min-width: 1024px) {
-                /* `html` prefix raises specificity above Flux's `z-20!` so the
-                   sidebar (and the arrow straddling its right edge) sits above the
-                   page header instead of being covered by it. */
-                html [data-flux-sidebar] { z-index: 60 !important; }
+                /* Above the page pane so the arrow on the seam paints over it;
+                   below the top bar (40) so the cart, bell, search and profile
+                   menus drop over the sidebar. */
+                html [data-flux-sidebar] { z-index: 35 !important; }
                 .sidebar-collapse-toggle { opacity: 0; }
                 [data-flux-sidebar]:hover .sidebar-collapse-toggle,
                 .sidebar-collapse-toggle:focus-visible { opacity: 1; }
             }
 
-            /* Collapsed: inline sub-menus disappear inline AND reappear as a
-               polished floating popup on hover, positioned to the right of
-               the icon with a 10px radius matching the project standard. */
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-group {
-                position: relative;
-            }
+            /* Collapsed: the Shop services list does not show at all, neither
+               inline nor as a hover popup beside the icon (that flyout was
+               removed). Pressing the Shop icon opens the shop instead; the
+               list comes back under it once the rail is expanded. */
             html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu {
-                /* Fixed so it escapes the scroll wrapper's overflow clip. left/top
-                   are set on hover by the flyout positioner script (the gap to the
-                   rail is baked into the JS left, replacing the old margin-left). */
-                position: fixed !important;
-                width: 220px !important;
-                padding: 0.5rem !important;
-                background: white !important;
-                border-radius: 10px !important;
-                box-shadow:
-                    0 20px 45px -12px rgba(15, 23, 42, 0.28),
-                    0 0 0 1px rgba(15, 23, 42, 0.06) !important;
-                z-index: 60 !important;
                 display: none !important;
-                margin-top: 0 !important;
-                border-left: 0 !important;
-                padding-left: 0.5rem !important;
-                gap: 0.125rem !important;
-            }
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu {
-                background: #0c1a36 !important;
-                box-shadow:
-                    0 24px 50px -12px rgba(0, 0, 0, 0.75),
-                    0 0 0 1px rgba(255, 255, 255, 0.07) !important;
-            }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu::before {
-                /* Invisible bridge so the pointer can travel without losing :hover. */
-                content: '';
-                position: absolute;
-                left: -0.875rem;
-                top: 0;
-                width: 0.875rem;
-                height: 100%;
-            }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu a,
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu button {
-                font-size: 0.8125rem !important;
-                padding: 0.625rem 0.875rem !important;
-                justify-content: flex-start !important;
-                text-align: left !important;
-                gap: 0.75rem !important;
-                border-radius: 10px !important;
-            }
-            /* The parent rail rule sets `margin: 0 auto` on every nav img/svg
-               to centre it inside the icon-only rail. That auto-margin leaks
-               into the submenu and pushes the label to the opposite side. Pin
-               it back to 0 so icon + label sit tight on the left. */
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu img,
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu svg {
-                margin: 0 !important;
-            }
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu a,
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu button {
-                color: rgba(255, 255, 255, 0.7) !important;
-                background: transparent !important;
-            }
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu a:hover,
-            html.dark.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-submenu button:hover {
-                background: #070f1c !important;
-                color: #60a5fa !important;
-                font-weight: 600 !important;
-            }
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-group:hover .nav-submenu,
-            html.dashboard-sidebar-collapsed [data-flux-sidebar] .nav-group:focus-within .nav-submenu {
-                display: flex !important;
-                height: auto !important;
-                overflow: visible !important;
             }
 
             /* Soft width transition so the rail glides between states. */
@@ -221,19 +390,37 @@
                 overflow: visible !important;
             }
         }
+
+        /* The same map on a phone.
+        
+           Every pane rule above sits inside the 1024px query, so below that
+           width the map did not exist at all rather than being hidden: there
+           was nothing behind the content but the flat surface. On a phone the
+           scrolling surface is the panel, not the pane, so it carries the map
+           instead, sized to the panel's width so the whole world shows rather
+           than a cropped middle band of ocean.
+        
+           Both use the light-filled copy of the file. The original's dots are
+           a single navy fill, near invisible on any dark surface, and an SVG
+           loaded as a background cannot take its colour from CSS. */
+        html.dark .dash-mobile-panel {
+            background-image: url('{{ $wallpaperUrl('assets/dotted-world-map.svg') }}'), var(--grain) !important;
+            background-size: 240% auto, 220px 220px !important;
+            background-position: center 88%, 0 0 !important;
+            background-repeat: no-repeat, repeat !important;
+            /* scroll, not local: the map is attached to the panel's own box, so it
+               stays put while the content scrolls over it, the way the desktop
+               pane holds it. `local` had it riding along with the content. */
+            background-attachment: scroll, scroll !important;
+        }
     </style>
-    <body class="min-h-screen bg-[#eff6ff] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
-
-        <x-ui.app-loader />
-
-        {{-- Floating "Install app" dock (PWA). iOS-aware; hides when installed. --}}
-        <x-ui.install-app />
+    <body class="dashboard min-h-screen bg-[#f4f6f5] text-zinc-900 dark:bg-[#0c1a36] dark:text-white">
 
         {{-- Impersonation banner: shown only when an admin is signed in as this
              customer (admin guard still authenticated). Floating bottom pill so
-             it never disrupts the layout; sits above the mobile bottom nav. --}}
+             it never disrupts the layout. --}}
         @auth('admin')
-            <div class="fixed bottom-20 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30 lg:bottom-4">
+            <div class="fixed bottom-4 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-[12px] bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-900/30">
                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span>Viewing as {{ Auth::user()?->name }}</span>
                 <form method="POST" action="{{ route('impersonation.leave') }}">
@@ -244,7 +431,6 @@
         @endauth
 
         {{-- Translation engine (auto-detect + manual switching from the locale modal) --}}
-        @include('partials.translate-engine')
 
         @php
             $user = Auth::user();
@@ -255,34 +441,39 @@
             // (not the loud bg-blue-600 pill that used to live here); hover =
             // subtle zinc on light, deep-charcoal seam on dark; sub-items use
             // the same shape one indent deeper.
+            // Panel layout rows on the grey sidebar, compact like the reference:
+            // 14px medium labels, 18px icons, ~32px rows, 8px corners, the active
+            // row a white tile. The white is bg-[#ffffff], which dark mode turns
+            // into the card grey the sidebar already is, so the dark active tile
+            // has to force its black (the `!`).
             $navItem = fn (bool $active) => $active
-                ? 'group flex items-center justify-between gap-3 rounded-[20px] bg-zinc-200 px-3 py-3 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                : 'group flex items-center justify-between gap-3 rounded-[20px] px-3 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-transparent! dark:hover:text-white dark:hover:ring-1 dark:hover:ring-[#24364f]';
+                ? 'group flex items-center justify-between gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
+                : 'nav-item group flex items-center justify-between gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-800 transition-colors dark:text-zinc-300';
             $iconCls = fn (bool $active) => $active
-                ? 'h-5 w-5 shrink-0 text-black dark:text-white'
-                : 'h-5 w-5 shrink-0 text-zinc-600 transition-colors';
+                ? 'h-[18px] w-[18px] shrink-0 text-[#0c1337] dark:text-white'
+                : 'h-[18px] w-[18px] shrink-0 text-[#0c1337] transition-colors dark:text-zinc-200';
             $subItem = fn (bool $active) => $active
-                ? 'flex items-center gap-3 rounded-[20px] bg-zinc-200 px-3 py-2.5 text-sm font-semibold text-black dark:bg-black dark:text-white dark:ring-1 dark:ring-white/10 nav-item-active'
-                : 'flex items-center gap-3 rounded-[20px] px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-blue-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-transparent! dark:hover:text-white dark:hover:ring-1 dark:hover:ring-[#24364f]';
-            // Active no longer needs a white invert filter — the soft-blue
-            // tint background keeps icons readable in their natural colour.
-            // Black filter for the idle state keeps mixed-source SVGs visually
-            // uniform across the rail.
-            $imgIconBlack = 'filter: brightness(0) saturate(100%);';
-            $imgIconStyle = fn (bool $active) => $active ? '' : $imgIconBlack;
+                ? 'flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium nav-item-active'
+                : 'nav-item flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors dark:text-zinc-300';
+
+            // One colour for every text badge on a sidebar row (New, the orders
+            // and notifications counts, KYC, Earn): the top bar's dark blue.
+            // A lighter shade of the top bar's dark blue (#0c1337), solid, with
+            // white text: clearly blue on the grey sidebar (the earlier 10% navy
+            // tint read as grey), and still navy rather than a pale light blue.
+            // The same fill reads on the dark sidebar too.
+            $rowBadgeTone = 'bg-[#26358c] text-white';
 
             $ordersCount = $user?->orders()->count() ?? 0;
             // Unread notification count — drives the sidebar/avatar/menu badges.
             // The bell dropdown (<livewire:notifications-menu />) computes its own.
             $notificationCount = $user?->notifications()->whereNull('read_at')->count() ?? 0;
 
-            // Initials avatar fallback when the user has no real photo (Google
-            // picture / uploaded avatar). Deterministic per user, works for
-            // everyone - no gender needed.
-            $defaultAvatar = $user?->initialsAvatar() ?? '';
         @endphp
 
-        <flux:sidebar sticky stashable class="relative hidden w-[256px] m-3 rounded-[14px] border border-zinc-200 bg-[#eff6ff] dark:border-[#24364f] dark:bg-[#0c1a36] lg:flex" style="height: calc(100dvh - 1.5rem); top: 0.75rem;">
+        {{-- Geometry (pane position, corners) lives in the panel layout rules
+             in the <style> block above. Light grey, a step below the page pane. --}}
+        <flux:sidebar sticky stashable class="relative hidden w-[256px] bg-[#eaeeec] dark:bg-[#0c1a36] lg:flex">
             <flux:sidebar.toggle class="lg:hidden" icon="x-mark" />
 
             {{-- Glass round toggle on the seam — mirrors the admin sidebar.
@@ -292,14 +483,14 @@
                 type="button"
                 x-data
                 @click="$store.dashboardSidebar.toggle()"
-                :aria-label="$store.dashboardSidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-                :aria-pressed="$store.dashboardSidebar.collapsed.toString()"
+                :aria-label="$store.dashboardSidebar.isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                :aria-pressed="$store.dashboardSidebar.isCollapsed.toString()"
                 class="sidebar-collapse-toggle absolute right-0 z-30 hidden h-6 w-6 translate-x-1/2 items-center justify-center rounded-full bg-white/25 text-blue-600 border-[2px] border-blue-500 backdrop-blur-2xl backdrop-saturate-200 transition-all hover:bg-white/40 hover:text-blue-700 hover:border-blue-600 active:scale-95 lg:flex dark:bg-transparent dark:text-blue-300 dark:border-blue-400/80 dark:hover:bg-transparent dark:hover:text-blue-200 dark:hover:border-blue-300"
                 style="top: 22px; box-shadow: 0 8px 24px -8px rgba(15, 23, 42, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55);"
             >
                 <svg
                     class="h-3 w-3 transition-transform duration-200"
-                    :class="$store.dashboardSidebar.collapsed ? 'rotate-180' : 'rotate-0'"
+                    :class="$store.dashboardSidebar.isCollapsed ? 'rotate-180' : 'rotate-0'"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
                     aria-hidden="true"
                 >
@@ -307,33 +498,15 @@
                 </svg>
             </button>
 
-            {{-- Brand — full wordmark when expanded, square favicon when collapsed. --}}
-            <a href="{{ route('dashboard') }}" wire:navigate.hover class="mr-5 -ml-1 flex flex-col rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 shrink-0">
-                <span class="brand-full flex h-10 items-center">
-                    <img
-                        src="{{ asset('assets/Rshoprefillslogo.webp') }}"
-                        alt="{{ $siteName }}"
-                        class="h-full w-auto object-contain"
-                    />
-                </span>
-                <span class="brand-mark hidden w-14 flex-col items-center justify-center">
-                    <img
-                        src="{{ asset('assets/favicon.ico') }}"
-                        alt="{{ $siteName }}"
-                        class="h-12 w-12 rounded-full object-contain"
-                    />
-                    <span class="mt-0.5 text-[9px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
-                </span>
-                <span class="brand-full mt-0.5 pl-1 text-[10px] font-medium italic leading-none text-zinc-600 dark:text-zinc-400">Est. 2024</span>
-            </a>
+            {{-- The brand now sits at the left of the full-width top bar. --}}
 
-            {{-- Scrollable middle: only the nav links scroll. Logo above + Newsletter/Need-Help
-                 below stay fixed. min-h-0 lets flex-1 actually shrink and trigger overflow.
+            {{-- Scrollable middle: only the nav links scroll. The Need-Help card
+                 below stays fixed. min-h-0 lets flex-1 actually shrink and trigger overflow.
                  -mr-2 pr-2 hides the scrollbar gutter; the project hides scrollbars site-wide. --}}
             <div class="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
             {{-- Primary nav --}}
-            <nav class="mt-6 flex flex-col gap-1" aria-label="Account">
+            <nav class="mt-1 flex flex-col gap-1" aria-label="Account">
                 @php $active = $isCurrent('dashboard'); @endphp
                 <a href="{{ route('dashboard') }}" wire:navigate.hover data-tip="Overview" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
@@ -346,57 +519,98 @@
             </nav>
 
             {{-- SHOP section (expandable, mirrors admin Products dropdown).
-                 nav-group + nav-submenu classes opt into the collapse-mode
-                 popup CSS so hovering the icon shows the submenu when the
-                 sidebar is collapsed to icons-only. --}}
-            <p class="dash-section-label mt-6 px-3 text-base font-bold text-zinc-900 dark:text-white">Shop</p>
-            <nav class="mt-2 flex flex-col gap-1" aria-label="Shop">
+                 When the sidebar is collapsed to icons the services list stays
+                 hidden (no hover popup); the Shop icon just opens the shop. --}}
+            <p class="dash-section-label mt-5 px-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Shop</p>
+            <nav class="mt-1.5 flex flex-col gap-1" aria-label="Shop">
+                @php
+                    // Services that just launched, from config/dashboard.php. The
+                    // NEW badge used to sit on the Shop row permanently; now it
+                    // appears only while something is listed there.
+                    $newServices = (array) config('dashboard.new_services', []);
+                    $newBadge = 'inline-flex items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide '.$rowBadgeTone;
+
+                    // More Services: the services that sit outside the four core
+                    // categories. It only appears once one of them is switched on,
+                    // and opens the first that is.
+                    $moreServicesHref = collect([
+                        \App\Support\FeatureFlag::on('gomarket', false) ? route('dashboard.shop.gomarket') : null,
+                        \App\Support\FeatureFlag::categoryVisible('flights') ? route('dashboard.shop.flights') : null,
+                        \App\Support\FeatureFlag::categoryVisible('stays') ? route('dashboard.shop.stays') : null,
+                    ])->filter()->first();
+
+                    // The four categories, and nothing below them.
+                    //
+                    // A Gaming row used to sit here, linking to the gift-card
+                    // listing with a category preselected. That listing is the
+                    // heaviest page we serve - every brand for the region, in
+                    // every section - so the row took long enough to land that
+                    // the menu felt broken, and the listing carries the same
+                    // categories as pills where switching is a class toggle on
+                    // markup the browser already holds.
+                    //
+                    // [label, href, feature flag (null = none), new-badge key, active]
+                    $shopSubItems = array_values(array_filter([
+                        ['Gift Cards',     route('dashboard.shop.gift-cards'), 'gift_cards', 'gift_cards', request()->routeIs('dashboard.shop.gift-cards', 'dashboard.shop.brand')],
+                        ['eSIMs',          route('dashboard.shop.esims'),      'esims',      'esims',      request()->routeIs('dashboard.shop.esim*')],
+                        ['Mobile Top-Ups', route('dashboard.shop.topups'),     'topups',     'topups',     request()->routeIs('dashboard.shop.topup*')],
+                        ['Bill Payments',  route('dashboard.shop.bills'),      'bills',      'bills',      request()->routeIs('dashboard.shop.bill*')],
+                        $moreServicesHref ? ['More Services', $moreServicesHref, null, 'more', request()->routeIs('dashboard.shop.gomarket', 'dashboard.shop.flights', 'dashboard.shop.stays')] : null,
+                    ]));
+                @endphp
                 <div
                     x-data="{ expanded: false, locked: false }"
-                    {{-- Force open while collapsed (popup), but restore to closed when
-                         expanded so re-opening the sidebar doesn't leave it stuck open. --}}
-                    x-effect="expanded = $store.dashboardSidebar?.collapsed ? true : false"
-                    @mouseenter="if (! $store.dashboardSidebar?.collapsed) expanded = true"
-                    @mouseleave="if (! locked && ! $store.dashboardSidebar?.collapsed) expanded = false"
-                    @click.outside="if (! $store.dashboardSidebar?.collapsed) { locked = false; expanded = false }"
+                    {{-- Close the list whenever the rail folds or unfolds, so it never
+                         reopens on its own. --}}
+                    x-effect="$store.dashboardSidebar?.isCollapsed; expanded = false; locked = false"
+                    @click.outside="if (! $store.dashboardSidebar?.isCollapsed) { locked = false; expanded = false }"
                     class="nav-group flex flex-col gap-1"
                 >
-                    <button type="button" @click.stop="locked = ! locked; expanded = locked" :aria-expanded="expanded.toString()" class="{{ $navItem(false) }} w-full">
+                    {{-- The whole Shop row is the toggle, as it is in the phone drawer:
+                         pressing anywhere on it drops the services down, and the chevron
+                         at its end turns to say so. Gift Cards leads that list, so the
+                         row no longer needs to be a link itself. Folded to icons, the
+                         list cannot show (see the collapse rules above), so the same
+                         press opens the shop instead. --}}
+                    @php $active = $isCurrent('dashboard.shop.*'); @endphp
+                    <button
+                        type="button"
+                        @click="if ($store.dashboardSidebar?.isCollapsed) { Livewire.navigate(@js(route('dashboard.shop.gift-cards'))) } else { locked = ! locked; expanded = locked }"
+                        :aria-expanded="expanded.toString()"
+                        aria-controls="dash-shop-services"
+                        data-tip="Shop"
+                        class="{{ $navItem($active) }} w-full text-left"
+                    >
                         <span class="flex items-center gap-3">
-                            <img src="{{ asset('assets/' . rawurlencode('Shop.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconBlack }}" loading="lazy">
+                            <x-ui.anim-icon file="Shop.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                             Shop
                         </span>
                         <span class="flex items-center gap-2">
-                            <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30">New</span>
-                            <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 text-zinc-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                            </svg>
+                            @if ($newServices)
+                                <span class="dash-row-badge {{ $newBadge }}">New</span>
+                            @endif
+                            {{-- The round tinted chip is the chevron's resting look: it reads
+                                 as a control at a glance. It hides with the labels when the
+                                 rail folds to icons. --}}
+                            <span class="dash-nav-toggle flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/5 text-[#0c1337] transition-colors dark:bg-white/10 dark:text-zinc-300" aria-hidden="true">
+                                <svg :class="expanded && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </span>
                         </span>
                     </button>
 
                     {{-- Submenu rows are text-only: the parent Shop item carries
                          the icon, repeating one per child just adds noise. --}}
-                    <div x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-3">
-                        <a href="{{ route('dashboard.shop.gift-cards') }}" wire:navigate.hover class="{{ $subItem(false) }}">
-                            All Categories
-                        </a>
-                        @php
-                            // GoMarket is hidden entirely (not greyed) until its
-                            // feature flag is switched on.
-                            $shopSubItems = array_values(array_filter([
-                                ['Buy Gift Cards',  route('dashboard.shop.gift-cards'),      'gift_cards'],
-                                \App\Support\FeatureFlag::on('gomarket', false) ? ['GoMarket', route('dashboard.shop.gomarket'), null] : null,
-                                ['eSIMs',           route('dashboard.shop.esims'),           'esims'],
-                                \App\Support\FeatureFlag::categoryVisible('flights') ? ['Flights', route('dashboard.shop.flights'), null] : null,
-                                \App\Support\FeatureFlag::categoryVisible('stays') ? ['Stays', route('dashboard.shop.stays'), null] : null,
-                                ['Topups & Bills',  route('dashboard.shop.topups'),          'topups'],
-                            ]));
-                        @endphp
-                        @foreach ($shopSubItems as [$label, $href, $flag])
+                    <div id="dash-shop-services" x-show="expanded" x-collapse class="nav-submenu ml-5 flex flex-col gap-0.5 border-l border-zinc-200 pl-3 dark:border-white/10">
+                        @foreach ($shopSubItems as [$label, $href, $flag, $newKey, $subActive])
                             @php $catEnabled = $flag === null || \App\Support\FeatureFlag::on($flag); @endphp
                             @if ($catEnabled)
-                                <a href="{{ $href }}" wire:navigate.hover class="{{ $subItem(false) }}">
+                                <a href="{{ $href }}" wire:navigate.hover class="{{ $subItem($subActive) }} justify-between">
                                     {{ $label }}
+                                    @if (in_array($newKey, $newServices, true))
+                                        <span class="dash-row-badge {{ $newBadge }}">New</span>
+                                    @endif
                                 </a>
                             @else
                                 {{-- Feature off: visible but greyed and non-clickable. --}}
@@ -411,23 +625,33 @@
 
             {{-- ACCOUNT section. dash-section-label class collapses the
                  heading to a thin divider when the sidebar is icon-only. --}}
-            <p class="dash-section-label mt-6 px-3 text-base font-bold text-zinc-900 dark:text-white">Account</p>
-            <nav class="mt-2 flex flex-col gap-1" aria-label="Account management">
+            <p class="dash-section-label mt-5 px-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Account</p>
+            <nav class="mt-1.5 flex flex-col gap-1" aria-label="Account management">
                 @php $active = $isCurrent('dashboard.orders*'); @endphp
                 <a href="{{ route('dashboard.orders') }}" wire:navigate.hover data-tip="Orders" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('order.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
+                        <x-ui.anim-icon file="order.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                         Orders
                     </span>
                     @if ($ordersCount > 0)
-                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-blue-50 px-2 py-0.5 text-[10px] font-bold tabular-nums text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30">{{ $ordersCount > 9 ? '9+' : $ordersCount }}</span>
+                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold tabular-nums {{ $rowBadgeTone }}">{{ $ordersCount > 9 ? '9+' : $ordersCount }}</span>
                     @endif
+                </a>
+
+                {{-- Every eSIM the customer bought, with install details and top-ups
+                     (also active on an eSIM's top-up page). --}}
+                @php $active = request()->routeIs('dashboard.esims', 'dashboard.esim.*'); @endphp
+                <a href="{{ route('dashboard.esims') }}" wire:navigate.hover data-tip="My eSIMs" class="{{ $navItem($active) }}">
+                    <span class="flex items-center gap-3">
+                        <x-ui.anim-icon file="esim.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
+                        My eSIMs
+                    </span>
                 </a>
 
                 @php $active = request()->routeIs('dashboard.wallet'); @endphp
                 <a href="{{ route('dashboard.wallet') }}" wire:navigate.hover data-tip="Wallet" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('Wallet.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
+                        <x-ui.anim-icon file="Wallet.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                         Wallet
                     </span>
                 </a>
@@ -435,7 +659,7 @@
                 @php $active = $isCurrent('dashboard.transactions*'); @endphp
                 <a href="{{ route('dashboard.transactions') }}" wire:navigate.hover data-tip="Transactions" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('transactions.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
+                        <x-ui.anim-icon file="transactions.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                         Transactions
                     </span>
                 </a>
@@ -443,33 +667,39 @@
                 {{-- Profile intentionally omitted from the desktop sidebar — it's
                      reachable via the avatar dropdown (and the mobile menu). --}}
 
-                @php $active = $isCurrent('dashboard.kyc'); @endphp
-                <a href="{{ route('dashboard.kyc') }}" wire:navigate.hover data-tip="Verify Identity" class="{{ $navItem($active) }}">
-                    <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/customer.svg') }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
-                        Verify Identity
-                    </span>
-                    <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30">KYC</span>
-                </a>
-
                 @php $active = $isCurrent('dashboard.security'); @endphp
                 <a href="{{ route('dashboard.security') }}" wire:navigate.hover data-tip="Security" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
+                        <x-ui.anim-icon file="admin access.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                         Security
                     </span>
                 </a>
 
-                @php $active = request()->routeIs('dashboard.notifications'); @endphp
-                <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover data-tip="Notifications" class="{{ $navItem($active) }}">
+                {{-- Highlighted with the orange KYC badge only until identity is
+                     verified. After approval the row reads Identity Verified with a
+                     green check, so it stops asking for something already done. --}}
+                @php
+                    $active = $isCurrent('dashboard.kyc');
+                    $kycVerified = $user?->isKycVerified() ?? false;
+                    $kycLabel = $kycVerified ? 'Identity Verified' : 'Verify Identity';
+                @endphp
+                <a href="{{ route('dashboard.kyc') }}" wire:navigate.hover data-tip="{{ $kycLabel }}" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
-                        Notifications
+                        <x-ui.anim-icon file="customer.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
+                        {{ $kycLabel }}
                     </span>
-                    @if ($notificationCount > 0)
-                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-red-50 px-2 py-0.5 text-[10px] font-bold tabular-nums text-red-700 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">{{ $notificationCount > 9 ? '9+' : $notificationCount }}</span>
+                    @if ($kycVerified)
+                        <span class="dash-row-badge inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white" title="Verified">
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                            <span class="sr-only">Verified</span>
+                        </span>
+                    @else
+                        <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $rowBadgeTone }}">KYC</span>
                     @endif
                 </a>
+
+                {{-- Notifications is not a sidebar row: it lives in the account menu
+                     under the avatar (with the unread count). --}}
 
                 {{-- Saved Cards hidden until the card-vault / gateway tokenisation
                      backend ships (the page is only an empty-state shell today).
@@ -477,18 +707,20 @@
                 @php $active = request()->routeIs('dashboard.saved-cards'); @endphp
                 <a href="{{ route('dashboard.saved-cards') }}" wire:navigate.hover data-tip="Saved Cards" class="{{ $navItem($active) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . 'savedcard.svg') }}" alt="" class="h-5 w-5 shrink-0" style="{{ $imgIconStyle($active) }}" loading="lazy">
+                        <x-ui.anim-icon file="savedcard.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
                         Saved Cards
                     </span>
                 </a>
                 --}}
 
-                <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover data-tip="Rcoin Rewards" class="{{ $navItem(request()->routeIs('dashboard.rewards')) }}">
+                {{-- One row for the rewards page, which covers referrals and Rcoin
+                     together; the separate Referrals link was removed. --}}
+                <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover data-tip="For Partners" class="{{ $navItem(request()->routeIs('dashboard.rewards')) }}">
                     <span class="flex items-center gap-3">
-                        <img src="{{ asset('assets/' . rawurlencode('wallet 2.svg')) }}" alt="" class="h-5 w-5 shrink-0 object-contain" loading="lazy">
-                        Rcoin Rewards
+                        <x-ui.anim-icon file="for-partners.svg" tone="inherit" class="h-[18px] w-[18px] text-[#0c1337] dark:text-zinc-200" />
+                        For Partners
                     </span>
-                    <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">Earn</span>
+                    <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $rowBadgeTone }}">Earn</span>
                 </a>
             </nav>
 
@@ -505,14 +737,14 @@
                 x-data="{ helpOpen: false }"
                 @keydown.escape.window="helpOpen = false"
             >
-                <div class="overflow-hidden rounded-[12px] bg-white ring-1 ring-zinc-200 dark:ring-zinc-700/60">
+                <div class="overflow-hidden rounded-[12px] bg-[#ffffff] dark:ring-1 dark:ring-zinc-700/60">
                     <button
                         type="button"
                         @click="helpOpen = true"
-                        class="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-white/5"
+                        class="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[#f4f6f5] dark:hover:bg-white/5"
                     >
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
-                            <img src="{{ asset('assets/support.svg') }}" alt="" class="h-5 w-5" loading="lazy">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#f4f6f5] text-[#0c1337] dark:bg-blue-500/15 dark:text-blue-200">
+                            <x-ui.anim-icon file="support.svg" tone="inherit" class="h-5 w-5" />
                         </span>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-zinc-900 dark:text-white">Need help?</p>
@@ -520,7 +752,7 @@
                         </div>
                         {{-- Shortcut hint: the global Ctrl+F shortcut opens a support
                              ticket from anywhere on the site (see partials/shortcuts). --}}
-                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] bg-[#f4f6f5] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
                             CTRL <span class="opacity-70">+</span> F
                         </span>
                     </button>
@@ -531,7 +763,7 @@
                         href="https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F"
                         target="_blank"
                         rel="noopener"
-                        class="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-2.5 text-[11px] font-medium text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-emerald-600 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-emerald-400"
+                        class="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-2.5 text-[11px] font-medium text-zinc-600 transition-colors hover:bg-[#f4f6f5] hover:text-emerald-600 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-emerald-400"
                     >
                         <span class="inline-flex items-center gap-1.5">
                             <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -539,7 +771,7 @@
                             </svg>
                             Chat on WhatsApp
                         </span>
-                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded-[12px] bg-[#f4f6f5] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700/60 dark:bg-white/5 dark:text-zinc-300">
                             CTRL <span class="opacity-70">+</span> J
                         </span>
                     </a>
@@ -572,7 +804,7 @@
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                         x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-                        class="w-full max-w-sm rounded-[12px] bg-white p-6 shadow-2xl ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-zinc-700/60"
+                        class="w-full max-w-sm rounded-[12px] bg-white p-6 shadow-2xl dark:bg-[#1d3252] dark:ring-1 dark:ring-zinc-700/60"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div>
@@ -583,9 +815,9 @@
                                 type="button"
                                 @click="helpOpen = false"
                                 aria-label="Close"
-                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/10"
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dde3ee] text-zinc-600 transition-colors hover:bg-[#cdd5e4] hover:text-zinc-900 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20 dark:hover:text-white"
                             >
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
 
@@ -598,7 +830,7 @@
                                 target="_blank"
                                 rel="noopener"
                                 @click="helpOpen = false"
-                                class="group flex items-center gap-3 rounded-[12px] bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:ring-emerald-500/30 dark:hover:bg-emerald-500/25"
+                                class="group flex items-center gap-3 rounded-[12px] bg-emerald-50 px-4 py-3 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:ring-1 dark:ring-emerald-500/30 dark:hover:bg-emerald-500/25"
                             >
                                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-emerald-600 dark:bg-[#0c1a36]">
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -618,7 +850,7 @@
                                 href="{{ route('shop.contact') }}"
                                 wire:navigate.hover
                                 @click="helpOpen = false"
-                                class="group flex items-center gap-3 rounded-[12px] bg-blue-50 px-4 py-3 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/30 dark:hover:bg-blue-500/25"
+                                class="group flex items-center gap-3 rounded-[12px] bg-blue-50 px-4 py-3 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-1 dark:ring-blue-500/30 dark:hover:bg-blue-500/25"
                             >
                                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-blue-600 dark:bg-[#0c1a36] dark:text-blue-300">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
@@ -639,53 +871,243 @@
         {{-- Top header (desktop only). Search is absolutely centered horizontally so it stays middle regardless of cart/profile width on the right. --}}
         {{-- NOTE: no Flux `sticky` prop — it freezes `top` to a JS-read offsetTop and floats
              the bar mid-page when the read races the body grid. `sticky top-0` below is pure CSS. --}}
-        <flux:header class="sticky top-0 z-40 hidden min-h-[64px] items-center gap-3 !border-b-0 bg-[#eff6ff] dark:bg-[#0c1a36] px-4 py-2 sm:px-6 lg:flex">
+        <flux:header class="sticky top-0 z-40 flex items-center gap-2 !border-b-0 bg-[#0c1337] dark:bg-[#0c1a36] px-4 py-2 sm:px-6 lg:gap-3">
 
-            {{-- Search bar (matches storefront home-nav style) with results panel --}}
+            {{-- Phones and tablets: this same header is the top bar, fixed by
+                 app.css, and it leads with the hamburger that opens the sidebar
+                 drawer (at the foot of this layout). The pills to its right are
+                 the desktop ones, unchanged: same controls, same dropdowns. --}}
+            <button
+                type="button"
+                x-data
+                x-on:click="$dispatch('open-mobile-menu')"
+                aria-label="Open menu"
+                class="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition-colors active:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+            >
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+                </svg>
+            </button>
+
+            <flux:spacer />
+
+            {{-- Brand and the referral pull-down. On desktop lg:order-first puts
+                 this group at the left of the bar, beside the (hidden) hamburger.
+                 On phones only the gift chip inside it renders, and it sits here
+                 in the flow: first in the right-hand group, in the slot the
+                 language pill has on desktop. --}}
+            <div class="flex shrink-0 items-center lg:order-first">
+                {{-- The R mark alone (no wordmark, no tagline). The artwork is brand
+                     blue on transparent, so it renders white on the dark bar. --}}
+                <a href="{{ route('dashboard') }}" wire:navigate.hover class="hidden rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:flex" aria-label="{{ $siteName }} dashboard">
+                    <img
+                        src="{{ asset('assets/PWAicon.webp') }}"
+                        alt="{{ $siteName }}"
+                        class="h-9 w-9 object-contain brightness-0 invert"
+                    />
+                </a>
+
+                {{-- Rotating promo pill beside the mark: "Refer & earn up to $N", then
+                     "Earn extra as a partner" (to the partner page), swiping up every
+                     5 seconds (held while hovered, focused, or while the referral
+                     panel is open). Clicking the referral pill pulls down a panel with
+                     the customer's referral link and its Copy button (the same
+                     referral-code component the rewards page uses). The dollar figure
+                     is config, not copy (config/dashboard.php earn_up_to_usd), and the
+                     referral message only runs while Rcoin rewards are switched on. --}}
+                @php
+                    $promoEarnUsd = (int) config('dashboard.earn_up_to_usd', 0);
+                    $promoSlides = array_values(array_filter([
+                        \App\Models\Setting::get('rcoin_enabled', true) && \App\Models\Setting::get('referral_enabled', true)
+                            ? ['label' => $promoEarnUsd > 0 ? 'Refer & earn up to $'.number_format($promoEarnUsd) : 'Refer & earn Rcoin', 'panel' => true, 'icon' => 'gift',
+                               // Brand blue: a tinted pill with a solid blue edge.
+                               'tone' => 'border-[#3d6bff] bg-[#0044ff]/30 group-hover:bg-[#0044ff]/45']
+                            : null,
+                        // Straight to the Partnership program tab of For Partners, not the public affiliates page.
+                        ['label' => 'Become a partner', 'href' => route('dashboard.rewards', ['tab' => 'partners']), 'panel' => false, 'icon' => 'partner',
+                         // Green: the same tinted pill in emerald.
+                         'tone' => 'border-emerald-500 bg-emerald-600/30 group-hover:bg-emerald-600/45'],
+                    ]));
+                    $promoHasPanel = collect($promoSlides)->contains('panel', true);
+                @endphp
+                <div
+                    x-data="{
+                        slide: 0,
+                        count: {{ count($promoSlides) }},
+                        paused: false,
+                        referOpen: false,
+                        timer: null,
+                        init() {
+                            if (this.count < 2) { return; }
+                            this.timer = setInterval(() => {
+                                if (! this.paused && ! this.referOpen) { this.slide = (this.slide + 1) % this.count; }
+                            }, 5000);
+                        },
+                        destroy() { clearInterval(this.timer); },
+                    }"
+                    @click.outside="referOpen = false"
+                    @keydown.escape.window="referOpen = false"
+                    class="relative lg:ml-4"
+                >
+                    @if ($promoHasPanel)
+                        {{-- Phone: the rotating pill has no room, so a gift chip in
+                             the same outline as the other pills pulls the same
+                             referral panel down. It stands where the language
+                             pill stands on desktop, first in the right-hand group. --}}
+                        <button
+                            type="button"
+                            @click="referOpen = ! referOpen"
+                            :aria-expanded="referOpen.toString()"
+                            aria-haspopup="dialog"
+                            aria-label="Refer & earn"
+                            class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+                        >
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+                            </svg>
+                        </button>
+                    @endif
+                    <div
+                        @mouseenter="paused = true"
+                        @mouseleave="paused = false"
+                        @focusin="paused = true"
+                        @focusout="paused = false"
+                        {{-- Clipped to the pill's own height and shape, so a message swiping
+                             up disappears through the top edge while the next one rises in
+                             from below, the two moving together. --}}
+                        class="dash-promo-pill relative hidden h-8 items-center overflow-hidden rounded-full lg:grid"
+                    >
+                        @foreach ($promoSlides as $i => $promo)
+                            {{-- The pill element only moves; its look (and hover colour) sits
+                                 on the inner span, so the hover's colour transition can never
+                                 override the swipe's transform transition. The referral pill
+                                 is a button that opens the panel; the partner pill a link. --}}
+                            @if ($promo['panel'])
+                            <button
+                                type="button"
+                                @click="referOpen = ! referOpen"
+                                :aria-expanded="referOpen.toString()"
+                                aria-haspopup="dialog"
+                            @else
+                            <a
+                                href="{{ $promo['href'] }}"
+                            @endif
+                                x-show="slide === {{ $i }}"
+                                @if ($i > 0) style="display: none;" @endif
+                                x-transition:enter="transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                                x-transition:enter-start="translate-y-full opacity-0"
+                                x-transition:enter-end="translate-y-0 opacity-100"
+                                x-transition:leave="transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                                x-transition:leave-start="translate-y-0 opacity-100"
+                                x-transition:leave-end="-translate-y-full opacity-0"
+                                class="group col-start-1 row-start-1 flex h-8 rounded-full focus:outline-none"
+                            >
+                                <span class="{{ $promo['tone'] }} inline-flex h-full items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold text-white transition-colors group-focus-visible:ring-2 group-focus-visible:ring-inset group-focus-visible:ring-white/60">
+                                @if ($promo['icon'] === 'gift')
+                                    {{-- Gift --}}
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                @else
+                                    {{-- Handshake / partner --}}
+                                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+                                @endif
+                                {{ $promo['label'] }}
+                                @if ($promo['panel'])
+                                    <svg class="h-3.5 w-3.5 shrink-0 transition-transform" :class="referOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                @endif
+                                </span>
+                            @if ($promo['panel'])
+                            </button>
+                            @else
+                            </a>
+                            @endif
+                        @endforeach
+                    </div>
+
+                    @if ($promoHasPanel)
+                        {{-- Referral panel, pulled down from the pill. The card
+                             itself is x-nav.referral-panel, shared with the
+                             storefront nav's "Invite a Friend" pill; only the
+                             anchoring is ours. --}}
+                        <div
+                            x-show="referOpen"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 -translate-y-1"
+                            x-transition:enter-end="opacity-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100 translate-y-0"
+                            x-transition:leave-end="opacity-0 -translate-y-1"
+                            {{-- Stays anchored LEFT under the pill: it is not a
+                                 dashboard-frame-popup, which would pin it to the
+                                 frame's right corner with the other three. The
+                                 class is what app.css keys on to give the shared
+                                 card the same 12px frosted surface here without
+                                 touching the storefront's copy. --}}
+                            class="dashboard-refer-popup absolute left-0 top-full z-50 mt-3"
+                        >
+                            <x-nav.referral-panel
+                                role="dialog"
+                                aria-label="Refer friends, earn Rcoin"
+                                close="referOpen = false"
+                            />
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Language + currency (desktop only): flag, language code and
+                 currency, opening the shared country / language / currency sheet
+                 (the modal at the foot of this layout). The language half renders
+                 server-side from the active locale, like the storefront's region
+                 pill, so it can never name a language the page is not in; country
+                 and currency are the saved locale choices, and the flag follows
+                 locale-updated. Phones do without the pill: the account menu's
+                 Language row opens the same sheet, and the referral chip takes
+                 this slot in the bar. --}}
+            <button
+                type="button"
+                x-data="{
+                    code: 'us',
+                    currency: 'USD',
+                    init() {
+                        try {
+                            this.code = (localStorage.getItem('locale.countryCode') || 'US').toLowerCase();
+                            this.currency = localStorage.getItem('locale.currency') || 'USD';
+                        } catch (e) {}
+                    },
+                }"
+                @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
+                @click="$dispatch('open-locale-modal')"
+                aria-label="{{ __('common.language') }} / {{ __('common.payment_currency') }}"
+                class="hidden h-9 shrink-0 items-center gap-2 rounded-full border-2 border-white/30 pl-1 pr-3 text-[13px] font-semibold text-white transition-colors hover:bg-white/15 lg:flex focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5"
+            >
+                {{-- Eager: the desktop pill is in the bar on arrival. --}}
+                <img :src="'https://flagcdn.com/w40/' + code + '.png'" alt="" width="28" height="28" decoding="async" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20">
+                <span>{{ strtoupper((string) config('localization.supported.'.app()->getLocale().'.short', 'EN')) }} / <span x-text="currency">USD</span></span>
+            </button>
+
+            {{-- Search: a round outlined button (same outline as the cart) in the right-hand group. Clicking it
+                 (or CTRL/CMD + K) drops the same search panel as before, with the
+                 field now at the top of the panel. --}}
             <div
                 x-data="dashboardSearch()"
                 @click.outside="open = false"
                 @keydown.escape.window="open = false"
                 @keydown.window.prevent.ctrl.k="open = true; $nextTick(() => $refs.searchInput.focus())"
                 @keydown.window.prevent.meta.k="open = true; $nextTick(() => $refs.searchInput.focus())"
-                class="relative min-w-0 flex-1 max-w-2xl"
+                class="dashboard-search relative shrink-0"
             >
-                <div
-                    role="search"
-                    @click="$refs.searchInput.focus(); open = true"
-                    :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-400 hover:border-zinc-500'"
-                    class="group flex w-full items-center gap-3 cursor-text rounded-[15px] border-2 bg-[#eff6ff] px-4 py-2 transition-all duration-200"
+                <button
+                    type="button"
+                    @click="open = ! open; if (open) $nextTick(() => $refs.searchInput.focus())"
+                    :aria-expanded="open.toString()"
+                    aria-label="Search products, brands or categories"
+                    class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                 >
-                    <svg class="h-5 w-5 shrink-0 text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    {{-- `readonly` until focus defeats Chrome/password-manager autofill,
-                         which otherwise ignores autocomplete="off" and injects the
-                         user's saved login email here — that auto-filled value tripped
-                         @focus and made the dropdown spring open on every page load. The
-                         field becomes editable the moment the user actually focuses it. --}}
-                    <input
-                        x-ref="searchInput"
-                        x-model="query"
-                        @input="onInput()"
-                        @focus="$el.removeAttribute('readonly'); open = true"
-                        type="search"
-                        name="dashboard_search"
-                        placeholder="Search products, brands or categories"
-                        aria-label="Search products, brands or categories"
-                        readonly
-                        autocomplete="off"
-                        autocorrect="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        data-1p-ignore
-                        data-lpignore="true"
-                        class="flex-1 min-w-0 bg-transparent text-base text-zinc-800 placeholder:text-zinc-600 outline-none"
-                    />
-                    <span class="hidden items-center gap-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 sm:inline-flex">
-                        CTRL <span class="text-zinc-600">+</span> K
-                    </span>
-                </div>
+                </button>
 
                 {{-- Results panel --}}
                 <div
@@ -697,16 +1119,55 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
                     style="display:none;"
-                    class="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+                    class="dashboard-frame-popup dashboard-search-panel absolute right-0 top-full z-50 mt-2 w-[860px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                 >
+                    {{-- Search field --}}
+                    <div role="search" class="px-3 pb-2 pt-3">
+                        <div
+                            @click="$refs.searchInput.focus()"
+                            :class="open ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700'"
+                            class="dashboard-search-field flex cursor-text items-center gap-3 rounded-[15px] border bg-[#f4f6f5] px-4 py-2.5 transition-all duration-200 dark:bg-white/[0.06]"
+                        >
+                        <svg class="h-5 w-5 shrink-0 text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        {{-- `readonly` until focus defeats Chrome/password-manager autofill,
+                             which otherwise ignores autocomplete="off" and injects the
+                             user's saved login email here — that auto-filled value tripped
+                             @focus and made the dropdown spring open on every page load. The
+                             field becomes editable the moment the user actually focuses it. --}}
+                        <input
+                            x-ref="searchInput"
+                            x-model="query"
+                            @input="onInput()"
+                            @focus="$el.removeAttribute('readonly'); open = true"
+                            type="search"
+                            name="dashboard_search"
+                            placeholder="Search products, brands or categories"
+                            aria-label="Search products, brands or categories"
+                            readonly
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                            data-1p-ignore
+                            data-lpignore="true"
+                            class="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 placeholder:text-zinc-500 outline-none dark:text-white"
+                        />
+                        <span class="hidden items-center gap-1 rounded-[6px] bg-[#fdfdfd] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 ring-1 ring-zinc-200 sm:inline-flex dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10">
+                                CTRL <span class="opacity-70">+</span> K
+                            </span>
+                        </div>
+                    </div>
+
                     {{-- Filter tabs --}}
-                    <div class="border-b border-zinc-100 p-3">
+                    <div class="dashboard-search-tabs border-b border-zinc-100 p-3">
                         <div class="flex flex-wrap gap-2">
                             <template x-for="tab in tabs" :key="tab">
                                 <button
                                     type="button"
                                     @click="activeTab = tab"
-                                    :class="activeTab === tab ? 'bg-zinc-900 text-white' : 'bg-zinc-50 text-zinc-700 hover:bg-blue-100 hover:text-blue-700'"
+                                    :class="activeTab === tab ? 'bg-zinc-900 text-white' : 'bg-[#f4f6f5] text-zinc-700 hover:text-blue-700'"
                                     class="rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors"
                                     x-text="tab"
                                 ></button>
@@ -716,7 +1177,7 @@
 
                     {{-- Product & brand results — live catalogue search (2+ characters),
                          same /api/search/brands endpoint as the storefront nav search. --}}
-                    <div x-show="searching" class="p-2">
+                    <div x-show="searching" class="dashboard-search-results p-2">
                         <p class="px-3 pb-1 pt-2 text-xs font-semibold text-zinc-600">Products &amp; brands</p>
 
                         {{-- Loading --}}
@@ -730,9 +1191,9 @@
 
                         {{-- Matches --}}
                         <template x-for="r in results" :key="r.url">
-                            <a :href="r.url" class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-blue-100">
+                            <a :href="r.url" class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-[#f4f6f5]">
                                 <span class="flex min-w-0 items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white ring-1 ring-zinc-200">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#f4f6f5]">
                                         <template x-if="r.logo"><img :src="r.logo" alt="" class="h-full w-full object-cover"></template>
                                         <template x-if="! r.logo"><span class="text-[10px] font-bold uppercase text-zinc-500" x-text="r.name.slice(0, 2)"></span></template>
                                     </span>
@@ -756,7 +1217,7 @@
                         <a
                             x-show="! loading && results.length > 0"
                             :href="'/gift-cards?q=' + encodeURIComponent(query)"
-                            class="mt-1 flex items-center justify-center gap-1.5 rounded-[12px] px-3 py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+                            class="mt-1 flex items-center justify-center gap-1.5 rounded-[12px] px-3 py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-[#f4f6f5]"
                         >
                             See all results
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -766,7 +1227,7 @@
                     </div>
 
                     {{-- Most used — shown until the user starts a product search. --}}
-                    <div x-show="! searching" class="p-2">
+                    <div x-show="! searching" class="dashboard-search-results p-2">
                         <p class="px-3 pb-1 pt-2 text-xs font-semibold text-zinc-600">Most used</p>
 
                         @php
@@ -780,10 +1241,10 @@
                         @endphp
 
                         @foreach ($searchItems as [$title, $subtitle, $icon, $href])
-                            <a href="{{ $href }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-blue-100">
+                            <a href="{{ $href }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-[#f4f6f5]">
                                 <span class="flex items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200">
-                                        <img src="{{ asset('assets/' . rawurlencode($icon)) }}" alt="" class="h-4 w-4" loading="lazy">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f4f6f5]">
+                                        <x-ui.anim-icon :file="$icon" class="h-4 w-4" />
                                     </span>
                                     <span class="leading-tight">
                                         <span class="block text-sm font-semibold text-zinc-900">{{ $title }}</span>
@@ -798,21 +1259,20 @@
                     </div>
 
                     {{-- Help footer --}}
-                    <div class="border-t border-zinc-100 px-4 py-3">
+                    <div class="dashboard-search-footer border-t border-zinc-100 px-4 py-3">
                         <p class="text-xs text-zinc-600">Type above to search products, brands, orders or account settings.</p>
                     </div>
                 </div>
             </div>
 
-            <flux:spacer />
 
             {{-- Cart. State lives in the global Alpine cart store ($store.cart) — the same
                  store the storefront nav uses. The popup drops open automatically when an
                  item is added (store.add sets open = true). --}}
             <div
-                x-data="{ locked: false }"
-                @mouseenter="if (!locked) $store.cart.open = true"
-                @mouseleave="if (!locked) $store.cart.open = false"
+                x-data="{ locked: false, closeTimer: null }"
+                @mouseenter="clearTimeout(closeTimer); if (!locked) $store.cart.open = true"
+                @mouseleave="if (!locked) closeTimer = setTimeout(() => { if (!locked) $store.cart.open = false }, 250)"
                 @click.outside="$store.cart.open = false; locked = false"
                 @keydown.escape.window="$store.cart.open = false; locked = false"
                 class="relative"
@@ -822,16 +1282,18 @@
                     @click="locked = !locked; $store.cart.open = locked"
                     :aria-expanded="$store.cart.open.toString()"
                     aria-haspopup="menu"
-                    class="relative flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-200 text-zinc-900 dark:text-zinc-200 transition-colors hover:bg-blue-600 hover:text-white"
+                    class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5"
                     aria-label="Shopping cart"
                 >
-                    {{-- Masked so the cart glyph inherits the chip's text colour (dark on grey, white on blue hover) - matches the admin header chips. --}}
-                    <span class="h-6 w-6 shrink-0 bg-current" style="-webkit-mask: url('{{ asset('assets/'.rawurlencode('new cart.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/'.rawurlencode('new cart.svg')) }}') center / contain no-repeat;"></span>
+                    {{-- Inline so the cart rolls on hover, in the button's text colour. --}}
+                    {{-- The storefront's cart glyph (x-icons.cart), inside the same
+                         hover-animation wrapper x-ui.anim-icon uses. --}}
+                    <span class="anim-icon anim-icon--cart inline-flex h-6 w-6 shrink-0" aria-hidden="true"><x-icons.cart /></span>
                     <span
                         x-show="$store.cart.count > 0"
                         x-text="$store.cart.count"
                         x-cloak
-                        class="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] bg-blue-600 px-1 text-[10px] font-bold text-white"
+                        class="absolute -top-1 -right-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[5px] bg-blue-600 px-1 text-[9px] font-bold text-white ring-2 ring-white dark:ring-0"
                     ></span>
                 </button>
 
@@ -845,7 +1307,7 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[12px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200"
+                    class="dashboard-frame-popup cart-panel absolute right-0 top-full z-50 mt-2 w-[340px] overflow-hidden rounded-[12px] bg-white/80 px-3 py-2 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                     role="menu"
                 >
                     {{-- Empty state --}}
@@ -865,7 +1327,7 @@
                         <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             <template x-for="item in $store.cart.items" :key="item.id">
                                 <li class="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
-                                    <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
+                                    <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#f4f6f5] shadow-sm">
                                         <template x-if="item.logo">
                                             <img :src="item.logo" alt="" class="h-full w-full object-cover">
                                         </template>
@@ -878,11 +1340,11 @@
                                         <span class="mt-0.5 block text-xs font-semibold text-zinc-700" x-text="$store.cart.pay(item.unit_price)"></span>
                                     </span>
                                     <span class="flex shrink-0 items-center gap-1.5">
-                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Decrease">
+                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-[#f4f6f5] hover:text-zinc-900" aria-label="Decrease">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
                                         </button>
                                         <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900" x-text="item.quantity"></span>
-                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900" aria-label="Increase">
+                                        <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-[#f4f6f5] hover:text-zinc-900" aria-label="Increase">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
                                         </button>
                                     </span>
@@ -890,8 +1352,8 @@
                             </template>
                         </ul>
 
-                        <div class="mt-3 flex gap-2 rounded-[12px] bg-zinc-50 px-3 py-3">
-                            <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false; locked = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white px-4 py-3.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100">
+                        <div class="mt-3 flex gap-2 rounded-[12px] bg-[#f4f6f5] px-3 py-3">
+                            <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false; locked = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white px-4 py-3.5 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-[#f4f6f5]">
                                 View cart
                             </a>
                             <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
@@ -907,20 +1369,19 @@
                  changes the catalog region, which doesn't apply to account pages.
                  The user's own account country is set in profile settings. --}}
 
-            {{-- Notification bell (desktop) — hidden lg:block so it never doubles
-                 up with the mobile hero bell on small screens. 'chip' tone matches
-                 the admin header (square grey chip, fills blue on hover). --}}
-            <div class="hidden lg:block">
-                <livewire:notifications-menu tone="chip" />
-            </div>
+            {{-- The desktop bar carries a bell beside the avatar. Notifications
+                 also stays as a row inside the account menu. --}}
 
             {{-- Profile dropdown.
                  Owns its own dropdown state + a small inline currency picker.
-                 Hovers open the dropdown; clicks lock it open until clicked elsewhere.
+                 Opens and closes on click only (no hover), closes on outside click or Escape.
                  Locale state lives on a separate body-root wrapper around the modal
                  so the modal can render outside flux:header (avoids broken centering
                  from transformed sticky ancestors). The locale chip values here listen
                  to a 'locale-updated' window event dispatched by the modal wrapper. --}}
+            {{-- Separate outlined bell and account controls match the reference. --}}
+            <div class="dashboard-header-controls flex items-center gap-3">
+                <livewire:notifications-menu tone="chip" wire:key="header-notif" />
             <div
                 x-data="{
                     open: false,
@@ -928,21 +1389,23 @@
                     country: 'United States',
                     countryFlag: '🇺🇸',
                     countryCode: 'US',
-                    language: 'English',
                 }"
-                @mouseenter="if (!locked) open = true"
-                @mouseleave="if (!locked) open = false"
+                {{-- Click to open, click again (or outside, or Escape) to close. No
+                     hover-open: the menu holds switches, and a hover menu slipped
+                     shut when the pointer drifted off it mid-toggle. --}}
                 @click.outside="open = false; locked = false"
                 @keydown.escape.window="open = false; locked = false"
-                @locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode; language = $event.detail.language"
+                @locale-updated.window="country = $event.detail.country; countryFlag = $event.detail.countryFlag; countryCode = $event.detail.countryCode"
                 class="relative"
             >
-                {{-- Avatar button. No notification dot here on purpose - the
-                     bell icon to the left of this button already surfaces the
-                     unread count, and doubling the indicator made the chrome
-                     read noisier than the data warranted. --}}
-                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-zinc-200 ring-1 ring-zinc-200 transition-all hover:ring-2 hover:ring-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:ring-zinc-700/60">
-                    <img src="{{ $user?->avatar_url ?: $defaultAvatar }}" alt="{{ $user?->name ?? 'Account' }}" class="h-full w-full object-cover">
+                {{-- Avatar button opens the account menu; the unread count also
+                     appears on that menu's Notifications row. --}}
+                <button type="button" @click="locked = !locked; open = locked" :aria-expanded="open.toString()" aria-label="{{ $user?->name ?? 'Account' }}" class="dashboard-avatar-button relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                    @if ($user?->avatar_url)
+                        <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
+                    @else
+                        <flux:icon.user class="h-6 w-6" />
+                    @endif
                 </button>
 
                 {{-- KYC verified tick on the desktop header avatar. --}}
@@ -959,368 +1422,197 @@
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 -translate-y-1"
                     style="display:none;"
-                    class="absolute right-0 top-full z-50 mt-2 w-[260px] overflow-hidden rounded-2xl bg-[#eff6ff] shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:ring-[#24364f]"
+                    class="dashboard-frame-popup dashboard-account-menu absolute right-0 top-full z-50 mt-3 w-[300px] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-[12px] bg-white/80 backdrop-blur-xl shadow-xl shadow-zinc-900/15"
                     role="menu"
                 >
-                    <div class="border-b border-zinc-200 px-4 py-3">
-                        <p class="truncate text-sm font-semibold text-zinc-900">{{ $user?->name ?? 'Account' }}</p>
-                        <p class="truncate text-xs text-zinc-600">{{ $user?->email ?? '' }}</p>
+                    {{-- Account menu: identity header, then groups split by
+                         edge-to-edge hairlines (account, settings, help,
+                         preferences, log out). A compact list: 40px rows, 14px
+                         labels, 18px muted icons, no tiles, the row's value or
+                         switch at its right edge. --}}
+                    @php
+                        $menuRow = 'dashboard-account-row flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[14px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200';
+                        $menuIcon = 'dashboard-account-row-icon flex items-center gap-3 text-[#0c1337] dark:text-zinc-300';
+                        $menuDivider = 'border-t border-zinc-200/80 dark:border-white/10';
+                        $menuSwitchTrack = 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors';
+                        $menuSwitchKnob = 'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform';
+                        $menuKycVerified = $user?->isKycVerified() ?? false;
+                    @endphp
+
+                    <div class="px-4 pb-3 pt-4">
+                        <p class="truncate text-[15px] font-semibold text-zinc-900 dark:text-white">{{ $user?->name ?? 'Account' }}</p>
+                        <p class="mt-0.5 truncate text-[12px] text-zinc-500 dark:text-zinc-400">{{ $user?->email ?? '' }}</p>
                     </div>
 
-                    @php
-                        // Inline style filter that forces any colored SVG (loaded as <img>) to render as pure black,
-                        // so all menu icons share the same monochrome treatment regardless of their source colors.
-                        $iconBlack = 'filter: brightness(0) saturate(100%);';
-                    @endphp
-                    <div class="p-1.5">
-                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
-                            <img src="{{ asset('assets/user.svg') }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                            Profile
-                        </a>
-                        <a href="{{ route('dashboard.security') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
-                            <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                            Security
-                        </a>
-                        <a href="{{ route('dashboard.appearance') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
-                            <img src="{{ asset('assets/' . rawurlencode('Appearance.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                            Appearance
-                        </a>
+                    <div class="{{ $menuDivider }}"></div>
 
-                        {{-- (Regional country/language switcher removed from the
-                             dashboard - it belongs on shop/category pages only.) --}}
-
-                        <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover class="flex items-center justify-between gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
-                            <span class="flex items-center gap-3">
-                                <img src="{{ asset('assets/' . rawurlencode('notification 2.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                                Notifications
-                            </span>
-                            @if ($notificationCount > 0)
-                                <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] bg-red-500 px-1 text-[10px] font-bold text-white">{{ $notificationCount }}</span>
+                    {{-- Account --}}
+                    <div class="py-1.5">
+                        <a href="{{ route('dashboard.profile') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="user.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Profile</span></span>
+                        </a>
+                        <a href="{{ route('dashboard.kyc') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="customer.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">{{ $menuKycVerified ? 'Identity Verified' : 'Verify Identity' }}</span></span>
+                            @if ($menuKycVerified)
+                                <svg class="h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-label="Verified"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                             @endif
                         </a>
-                        <a href="{{ route('home') }}" wire:navigate.hover class="flex items-center gap-3 rounded-[12px] px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-blue-100" role="menuitem">
-                            <img src="{{ asset('assets/' . rawurlencode('Back to shop.svg')) }}" alt="" class="h-5 w-5 shrink-0" style="{{ $iconBlack }}" loading="lazy">
-                            Back to store
+                        <a href="{{ route('dashboard.rewards') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="for-partners.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">For Partners</span></span>
                         </a>
                     </div>
 
-                    <div class="border-t border-zinc-200 p-1.5">
+                    <div class="{{ $menuDivider }}"></div>
+
+                    {{-- Settings --}}
+                    <div class="py-1.5">
+                        <a href="{{ route('dashboard.security') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="admin access.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Security</span></span>
+                        </a>
+                        <a href="{{ route('dashboard.notifications') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="notification 2.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Notifications</span></span>
+                            @if ($notificationCount > 0)
+                                <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{{ $notificationCount > 9 ? '9+' : $notificationCount }}</span>
+                            @endif
+                        </a>
+                        <a href="{{ route('dashboard.appearance') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Appearance.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Appearance</span></span>
+                        </a>
+                        {{-- Language: shows the language in force and opens the shared
+                             country and language sheet straight on its language list. --}}
+                        <button
+                            type="button"
+                            {{-- Opens the preferences modal on its root pane, where
+                                 language, currency and country sit together, rather
+                                 than deep-linking to the language list alone. --}}
+                            @click="open = false; locked = false; $dispatch('open-locale-modal')"
+                            class="{{ $menuRow }}"
+                            role="menuitem"
+                        >
+                            <span class="{{ $menuIcon }}">
+                                <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802"/></svg>
+                                <span class="text-zinc-800 dark:text-zinc-200">Language</span>
+                            </span>
+                            <span class="text-[13px] font-normal text-zinc-500 dark:text-zinc-400">{{ \App\Support\Languages::nameFor(app()->getLocale()) ?? \App\Support\Languages::defaultName() }}</span>
+                        </button>
+                    </div>
+
+                    <div class="{{ $menuDivider }}"></div>
+
+                    {{-- Help + leaving the dashboard. The arrow marks rows that take you
+                         out of the account area. --}}
+                    <div class="py-1.5">
+                        <a href="{{ route('shop.contact') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="support.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Help &amp; support</span></span>
+                            <svg class="h-4 w-4 shrink-0 text-[#0c1337] dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                        </a>
+                        <a href="{{ route('home') }}" wire:navigate.hover class="{{ $menuRow }}" role="menuitem">
+                            <span class="{{ $menuIcon }}"><x-ui.anim-icon file="Back to shop.svg" tone="inherit" class="h-[18px] w-[18px]" /><span class="text-zinc-800 dark:text-zinc-200">Back to store</span></span>
+                            <svg class="h-4 w-4 shrink-0 text-[#0c1337] dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                        </a>
+                    </div>
+
+                    <div class="{{ $menuDivider }}"></div>
+
+                    {{-- Preferences. Dark mode goes through the theme engine
+                         (window.setTheme, partials/theme-engine), which saves the
+                         choice and fires theme-changed so this switch re-syncs.
+                         Hide balances and Compact mode used to sit here as well
+                         and were removed on request; the wallet figures keep
+                         their own eye toggle. --}}
+                    <div class="py-1.5">
+                        <button
+                            type="button"
+                            x-data="{ dark: window.themeIsDark ? window.themeIsDark() : document.documentElement.classList.contains('dark') }"
+                            x-on:theme-changed.window="dark = $event.detail.dark"
+                            @click="window.rshopThemeReveal($event, dark ? 'light' : 'dark')"
+                            role="menuitemcheckbox"
+                            :aria-checked="dark.toString()"
+                            class="{{ $menuRow }}"
+                        >
+                            <span class="{{ $menuIcon }}">
+                                <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg>
+                                <span class="text-zinc-800 dark:text-zinc-200">Dark mode</span>
+                            </span>
+                            <span :class="dark ? 'bg-[#0c1337]' : 'bg-zinc-300 dark:bg-white/15'" class="theme-static {{ $menuSwitchTrack }}">
+                                <span :class="dark ? 'translate-x-[18px]' : 'translate-x-0.5'" class="{{ $menuSwitchKnob }}"></span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <div class="{{ $menuDivider }}"></div>
+
+                    {{-- Log out --}}
+                    <div class="py-1.5">
                         <form method="POST" action="{{ route('logout') }}" class="w-full">
                             @csrf
-                            <button type="submit" class="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300">
-                                <x-ui.logout-icon class="h-5 w-5" />
+                            <button type="submit" class="dashboard-account-row flex w-full items-center gap-3 px-4 py-2 text-left text-[14px] font-medium text-zinc-800 transition-colors hover:bg-[#f4f6f5] dark:text-zinc-200">
+                                <x-ui.logout-icon class="h-[18px] w-[18px]" />
                                 Log out
                             </button>
                         </form>
                     </div>
                 </div>
             </div>
+            </div>
         </flux:header>
 
+        {{-- Sub-navigation slot beside the rail (see the sub-navigation rules in the
+             <style> block). Pages teleport their own panel in; no whitespace inside,
+             so :has(> *) only matches once a panel has actually arrived. --}}
+        <div data-dash-subnav class="hidden lg:block"></div>
+
         @php
-            // The blue hero shows ONLY on the dashboard overview. Every other dashboard
-            // page uses the slim white inner top bar (hamburger + title + bell) below.
+            // The blue hero (wallet carousel) shows ONLY on the dashboard overview.
+            // Every page shares the same fixed top bar above it: the hamburger on
+            // the left, the round action chips on the right. The hamburger opens
+            // the sidebar drawer, which is the whole mobile navigation - there is
+            // no bottom tab bar and no popup menu any more, and no back affordance:
+            // every destination is one tap away inside the drawer.
             $skipMobileHero = ! request()->routeIs('dashboard');
-
-            // Top chrome placement: the glass nav band and the notification pill
-            // belong to the OVERVIEW alone. Store pages keep only the two shopping
-            // pills - cart and country switcher - floating without a band, because
-            // that is where the cart can be acted on and where the country switcher
-            // changes prices you are about to pay. Task/inner pages (orders,
-            // wallet, settings, ...) get no top chrome at all; the bottom nav bar
-            // is their navigation.
-            $showMobileTopChrome = request()->routeIs('dashboard') || request()->routeIs('dashboard.shop.*');
-
-            // The bell is overview-only furniture, same as the identity strip.
-            $showNotificationChrome = ! $skipMobileHero;
-
-            // No back affordance anywhere: the bottom nav bar is on every page and its
-            // centre Menu FAB opens the full sidebar nav, so every destination is one
-            // tap away without one. Removing it also keeps the top band identical on
-            // every page instead of swapping its left slot per route.
         @endphp
 
         {{-- flux:main is the single main-axis child of Flux's layout container.
              ANYTHING that should stack vertically with the page content (mobile blue hero,
              slim inner-page bar, the page slot) goes INSIDE it — otherwise Flux's flex
              container puts them side-by-side with flux:main on mobile. --}}
-        <flux:main class="!p-0 bg-[#eff6ff] lg:bg-white dark:bg-[#0c1a36] dark:lg:bg-[#0c1a36]">
+        {{-- On desktop this pane is the panel's rounded frame; the page wrapper
+             ([data-page-content]) inside it is the scroll area, and re-announces
+             its scroll on window: app.js closes open dropdowns on window scroll,
+             and the window itself no longer scrolls there. The x-data here gives
+             that listener an Alpine scope. The inner column is capped at 1400px
+             and centred, so pages do not run the full width of wide screens. --}}
+        <flux:main x-data class="!p-0 bg-[#f4f6f5] dark:bg-[#0c1a36] dark:lg:bg-[#0c1a36]">
 
-        {{-- Mobile header (blue hero, visible only on mobile).
-             Pages can extend the blue area by filling the $mobileHero slot
-             (e.g. wallet card on the overview). Inner pages with their own sticky header
-             (settings, password, appearance) skip this hero entirely. --}}
+        {{-- Spacer holding the fixed header's room in normal flow (its height
+             is set in app.css with the header's mobile padding). --}}
+        <div class="lg:hidden" style="height: calc(env(safe-area-inset-top) + 3.75rem);" aria-hidden="true"></div>
+
+        {{-- Below lg the bar's colour runs behind the page and everything from
+             here down sits on it as a panel with rounded top corners, the way
+             the desktop frame lifts its pane off the header (.dash-mobile-panel
+             in app.css). lg:contents removes the wrapper from the desktop
+             layout entirely. --}}
+        <div class="dash-mobile-panel lg:contents" x-data x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))">
         @unless ($skipMobileHero)
-        {{-- Identity strip - OVERVIEW ONLY, a fixed frosted-glass nav; the page
-             scrolls beneath it. Fixed instead of sticky because the
-             pull-to-refresh transform moves sticky ancestors and makes them
-             bounce. The z-[55] chrome pills (flag / cart / bell) float on top
-             of this band, composing one nav. Store and task pages render no
-             band at all - store pages carry only the floating shopping pills. --}}
-        <div class="nav-glass-top fixed inset-x-0 top-0 z-40 px-5 pb-3 lg:hidden" style="padding-top: max(0.75rem, env(safe-area-inset-top));">
-            {{-- Compact identity strip - avatar + small online dot on the left,
-                 notification bell on the right. Replaces the old "Hello /
-                 Welcome back" greeting so the wallet card sits closer to the
-                 top and the product categories get more vertical room. --}}
-            <div class="flex items-center justify-between gap-3 text-zinc-900 dark:text-white">
-                @php $mobileFirstName = strtok(trim((string) ($user?->name ?? '')), ' ') ?: ''; @endphp
-                <div class="flex min-w-0 items-center gap-2.5">
-                    {{-- The avatar taps through to Settings. Pull-to-refresh already
-                         handles reloading fresh wallet / order data, so the tap is
-                         free for the more useful destination. --}}
-                    <a href="{{ route('dashboard.profile') }}" wire:navigate.hover aria-label="Open settings" class="relative inline-flex shrink-0 items-center transition-transform active:scale-95">
-                        <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold uppercase text-blue-700 ring-2 ring-blue-200 dark:bg-white/15 dark:text-white dark:ring-white/30">
-                            @if ($user?->avatar_url)
-                                <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover" loading="lazy">
-                            @else
-                                {{ str($user?->name ?? '?')->substr(0, 1) }}
-                            @endif
-                        </span>
-                        @if (($user?->kyc_status ?? null) === 'verified')
-                            {{-- KYC verified: small blue tick over the avatar. The badge
-                                 has its own white edge so it pops on the blue hero. --}}
-                            <x-ui.verified-badge class="absolute -bottom-1 -right-1 h-4 w-4 drop-shadow-sm" />
-                        @else
-                            <span class="absolute -bottom-1 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#eff6ff] dark:ring-[#0c1a36]" aria-label="Online"></span>
-                        @endif
-                    </a>
-                    {{-- The greeting doubles as a storefront shortcut. The tiny
-                         chip keeps an obvious door back to the storefront for PWA
-                         users, who have no browser address bar to type into. --}}
-                    <a
-                        href="{{ route('home') }}"
-                        wire:navigate.hover
-                        class="flex min-w-0 items-center gap-2 transition-transform active:scale-95"
-                        aria-label="Go to the storefront"
-                    >
-                        <span class="truncate text-base font-semibold">Hi {{ $mobileFirstName }}</span>
-                        <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200 dark:bg-white/20 dark:text-white dark:ring-white/30">Visit site</span>
-                    </a>
-                </div>
-                {{-- The locale / cart / notification chips render in the pinned
-                     floating row (see the mobile top chrome below), so the hero
-                     carries no copy of its own. This spacer keeps the identity
-                     strip clear of the fixed pills above it. --}}
-                <span class="h-10 w-[8.5rem] shrink-0" aria-hidden="true"></span>
-            </div>
-        </div>
-
-        {{-- Spacer holding the glass nav's room in normal flow. --}}
-        <div class="lg:hidden" style="height: calc(max(0.75rem, env(safe-area-inset-top)) + 3.25rem);" aria-hidden="true"></div>
-
-        {{-- Blue hero - overview only, same @unless as the identity strip above.
-             Scrolls away with the page; the floating wallet chip + Top Up button
-             inside <x-slot:mobileHero> take over once the hero leaves the viewport. --}}
-        {{-- Wallet card slot - scrolls with the page (under the glass nav),
-             so the wallet info hits the customer immediately on page load,
-             leaving the rest of the viewport for product categories. --}}
-        <header class="relative z-10 bg-transparent px-5 pb-6 lg:hidden">
+        {{-- The balance area. On the light panel it sits on the panel itself;
+             in the dark theme it is the dashboard's dark blue, the same navy
+             the sidebar marks and the light header wear, so the wallet reads
+             as its own band under the black bar. The panel's curve clips it. --}}
+        <header class="relative z-10 bg-transparent px-5 pt-5 pb-6 dark:bg-[#0c1337] lg:hidden">
             @isset($mobileHero)
-                <div class="mt-3">
+                {{-- Padding on the header, not a margin on the hero: a margin
+                     would collapse through the header's top edge and leave the
+                     panel's curve unpainted above the band. --}}
+                <div>
                     {{ $mobileHero }}
                 </div>
             @endisset
         </header>
         @endunless
 
-        {{-- Mobile cart sheet. The desktop cart popup lives in the lg:flex header
-             (hidden on phones), so on mobile the shared $store.cart.open state needs
-             its own surface. Teleported to <body> and pinned above the mobile bottom
-             nav, it drops open the moment an item is added - mirroring the storefront
-             nav so adding to cart on a phone gives the same feedback. --}}
-        <div x-data>
-            <template x-teleport="body">
-                <div class="lg:hidden">
-                    <div
-                        x-show="$store.cart.open"
-                        x-transition.opacity.duration.150ms
-                        @click="$store.cart.open = false"
-                        style="display:none;"
-                        class="fixed inset-0 z-[80]"
-                    ></div>
-                    <div
-                        x-show="$store.cart.open"
-                        x-transition:enter="transition ease-out duration-150"
-                        x-transition:enter-start="opacity-0 translate-y-2"
-                        x-transition:enter-end="opacity-100 translate-y-0"
-                        x-transition:leave="transition ease-in duration-100"
-                        x-transition:leave-start="opacity-100 translate-y-0"
-                        x-transition:leave-end="opacity-0 translate-y-2"
-                        style="display:none;"
-                        class="fixed inset-x-3 bottom-20 z-[80] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[14px] bg-white/80 px-3 py-2 backdrop-blur-2xl backdrop-saturate-150 shadow-xl shadow-zinc-900/15 ring-1 ring-zinc-200 dark:bg-[#0c1a36]/80 dark:ring-white/10"
-                        role="menu"
-                    >
-                        {{-- Empty state --}}
-                        <div x-show="$store.cart.count === 0" class="flex flex-col items-center px-3 py-5 text-center">
-                            <h3 class="text-xl font-bold text-zinc-900 dark:text-white">Your cart is empty</h3>
-                            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Your cart needs items</p>
-                        </div>
-
-                        {{-- Populated state --}}
-                        <div x-show="$store.cart.count > 0" x-cloak>
-                            <div class="flex items-center justify-between px-3 pt-3">
-                                <h3 class="text-lg font-bold text-zinc-900 dark:text-white">Your cart</h3>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400" x-text="$store.cart.count + ' item' + ($store.cart.count === 1 ? '' : 's')"></span>
-                            </div>
-
-                            <ul class="mt-3 max-h-72 space-y-1 overflow-y-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                <template x-for="item in $store.cart.items" :key="item.id">
-                                    <li class="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
-                                        <span class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white shadow-sm ring-1 ring-zinc-200">
-                                            <template x-if="item.logo">
-                                                <img :src="item.logo" alt="" class="h-full w-full object-cover">
-                                            </template>
-                                            <template x-if="!item.logo">
-                                                <span class="text-sm font-black uppercase text-zinc-700" x-text="item.name.substring(0,2).toUpperCase()"></span>
-                                            </template>
-                                        </span>
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block truncate text-sm font-bold text-zinc-900 dark:text-white" x-text="item.name"></span>
-                                            <span class="mt-0.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300" x-text="$store.cart.pay(item.unit_price)"></span>
-                                        </span>
-                                        <span class="flex shrink-0 items-center gap-1.5">
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity - 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Decrease">
-                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M5 12h14"/></svg>
-                                            </button>
-                                            <span class="w-5 text-center text-sm font-bold tabular-nums text-zinc-900 dark:text-white" x-text="item.quantity"></span>
-                                            <button type="button" @click="$store.cart.setQty(item.id, item.quantity + 1)" class="flex h-7 w-7 items-center justify-center rounded-[12px] text-zinc-600 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white" aria-label="Increase">
-                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
-                                            </button>
-                                        </span>
-                                    </li>
-                                </template>
-                            </ul>
-
-                            <div class="mt-3 flex gap-2 rounded-[12px] bg-zinc-50 dark:bg-white/5 px-3 py-3">
-                                <a href="{{ route('dashboard.shop.cart') }}" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-white dark:bg-white/10 px-4 py-3.5 text-sm font-semibold text-zinc-700 dark:text-zinc-200 ring-1 ring-zinc-200 dark:ring-white/15 transition-colors hover:bg-zinc-100 dark:hover:bg-white/15">
-                                    View cart
-                                </a>
-                                <a :href="'{{ route('dashboard.shop.checkout') }}' + ($store.cart.showUsd ? '?currency=' + $store.cart.currency : '')" wire:navigate.hover @click="$store.cart.open = false" class="flex-1 inline-flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
-                                    Checkout
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </div>
-
-        {{-- Sticky mobile top bar for inner pages (settings, password, appearance).
-             Acts as the single mobile chrome on those pages — title derived from the route
-             so individual pages don't need to render their own sticky header. --}}
-        @if ($skipMobileHero)
-            @php
-                $innerTitle = match (true) {
-                    request()->routeIs('dashboard.orders')        => 'Orders',
-                    request()->routeIs('dashboard.transactions')  => 'Transactions',
-                    request()->routeIs('dashboard.wallet')        => 'Wallet',
-                    request()->routeIs('dashboard.notifications') => 'Notifications',
-                    request()->routeIs('dashboard.saved-cards')   => 'Saved Cards',
-                    request()->routeIs('dashboard.kyc')           => 'Verify Identity',
-                    request()->routeIs('dashboard.rewards')       => 'Rewards',
-                    request()->routeIs('dashboard.security')      => 'Security',
-                    request()->routeIs('dashboard.appearance')    => 'Appearance',
-                    default                                       => 'Settings',
-                };
-            @endphp
-            {{-- Nothing renders in flow here. The back button now lives in the
-                 identity band at the top of this file (it swaps with the avatar),
-                 and the locale / cart / notification pills live in the FIXED chrome
-                 below. Both used to be duplicated here, which made the pills appear
-                 twice on scroll. --}}
-        @endif
-
-            {{-- ─────────────────────────────────────────────────────── --}}
-            {{-- FLOATING TOP CHROME (top cart / country switcher / bell) --}}
-            {{-- Pins to the viewport once the page scrolls past the      --}}
-            {{-- header. Overview + shop pages only; hidden elsewhere.     --}}
-            {{-- ─────────────────────────────────────────────────────── --}}
-            @if ($showMobileTopChrome)
-            {{-- ALWAYS pinned - no scroll-triggered show/hide, so the pills can
-                 never flicker or shake. This row IS the chips: the overview gets
-                 flag + cart + bell floating over its glass band; shop pages get
-                 flag + cart alone, with no band underneath. --}}
-            <div
-                x-data="{
-                    scrolled: false,
-                    country: 'United States',
-                    countryCode: 'US',
-                    language: 'English',
-                    // Hysteresis for the hamburger only: appears past 96px, leaves
-                    // under 40px, so boundary jitter can't toggle it repeatedly.
-                    onScroll() {
-                        const y = window.scrollY;
-                        if (! this.scrolled && y > 96) { this.scrolled = true; }
-                        else if (this.scrolled && y < 40) { this.scrolled = false; }
-                    },
-                    init() {
-                        this.onScroll();
-                        window.addEventListener('scroll', () => this.onScroll(), { passive: true });
-                    },
-                }"
-                @locale-updated.window="country = $event.detail.country; countryCode = $event.detail.countryCode; language = $event.detail.language"
-                class="pointer-events-none fixed inset-x-0 z-[55] flex items-center justify-end gap-2 px-3 lg:hidden"
-                style="top: max(0.5rem, env(safe-area-inset-top));"
-            >
-                {{-- Locale + cart chips (right) - same glass treatment, pinned.
-                     They ride wherever this row renders (overview + shop). The
-                     bell below is additionally scoped to the overview, where the
-                     nav band it visually belongs to lives. --}}
-                <div class="pointer-events-auto flex items-center gap-2" x-data>
-                    {{-- Language + currency toggle (opens the locale modal). --}}
-                    <button
-                        type="button"
-                        x-data="{ code: (localStorage.getItem('locale.countryCode') || 'US').toLowerCase() }"
-                        @locale-updated.window="code = ($event.detail.countryCode || code).toLowerCase()"
-                        x-on:click="$dispatch('open-locale-modal')"
-                        aria-label="Region, language and currency"
-                        class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                    >
-                        <img :src="'https://flagcdn.com/w80/' + code + '.png'" alt="" class="h-full w-full object-cover" loading="lazy">
-                    </button>
-
-                    <a
-                        href="{{ route('dashboard.shop.cart') }}"
-                        wire:navigate.hover
-                        aria-label="Cart"
-                        class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200 transition-colors active:scale-95"
-                    >
-                        <img src="{{ asset('assets/' . rawurlencode('new cart.svg')) }}" alt="" class="h-5 w-5 dark:brightness-0 dark:invert" style="filter: brightness(0) saturate(100%);" loading="lazy">
-                        <span
-                            x-show="$store.cart && $store.cart.count > 0"
-                            x-text="$store.cart ? $store.cart.count : ''"
-                            x-cloak
-                            class="absolute -top-1 -right-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/60 dark:ring-[#0c1a36]"
-                        ></span>
-                    </a>
-                    @if ($showNotificationChrome)
-                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] border border-zinc-200">
-                            <livewire:notifications-menu tone="dark" wire:key="floating-notif-inner" />
-                        </div>
-                    @endif
-                </div>
-            </div>
-            @endif
-
-            {{-- Status-bar / floating-pill spacer for every page that is NOT the
-                 overview. The overview has its own spacer above (it holds the
-                 glass band's room); nothing held room here, so once
-                 viewport-fit=cover made env(safe-area-inset-top) resolve to a
-                 real number the viewport grew upward under the status bar and
-                 these pages had only pt-5 to survive on - the whole page read as
-                 shifted up. Shop pages additionally float the 2.75rem pill row
-                 (flag + cart) over the page with no band beneath it, so they
-                 reserve its height too; task pages only owe the inset. --}}
-            @if ($skipMobileHero)
-                <div
-                    class="lg:hidden"
-                    style="height: {{ $showMobileTopChrome ? 'calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem)' : 'env(safe-area-inset-top)' }};"
-                    aria-hidden="true"
-                ></div>
-            @endif
-
-            <div data-page-content class="flex flex-col bg-[#eff6ff] px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:min-h-full lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
-                <div class="w-full min-w-0 lg:flex-1">
+            <div data-page-content x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))" class="flex min-h-full flex-col bg-[#f4f6f5] px-4 pt-5 pb-10 sm:px-6 sm:pt-6 lg:px-10 lg:py-8 dark:bg-[#0c1a36]">
+                <div class="w-full min-w-0 lg:mx-auto lg:max-w-[1400px] lg:flex-1">
                     {{-- Suspension banner: visible on every dashboard page when the
                          account is suspended. Carries the admin-authored reason +
                          the Request Review button (idempotent — re-clicks are safe). --}}
@@ -1333,7 +1625,7 @@
                     @endauth
 
                     @if (session('account_closure_cancelled'))
-                        <div class="mb-4 rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200" role="status">
+                        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200" role="status">
                             {{ session('account_closure_cancelled') }}
                         </div>
                     @endif
@@ -1348,166 +1640,14 @@
                     @include('partials.kyc-verification-modal')
                 @endauth
 
-                {{-- Footer — Privacy Policy + version + copyright. Mirrors the
-                     admin layout. Full-width so the legal line sits flush with
-                     the page edges. `mt-auto` pins it to the bottom. --}}
-                <footer class="mt-auto hidden w-full pt-12 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[11px] font-semibold text-zinc-600 lg:flex dark:text-zinc-300">
-                    <a href="{{ route('shop.terms') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Terms</a>
-                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <a href="{{ route('shop.refund-policy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Refund Policy</a>
-                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <a href="{{ route('shop.privacy') }}" wire:navigate.hover class="hover:text-zinc-900 dark:hover:text-white">Privacy Policy</a>
-                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <span>version 2.0.0</span>
-                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
-                    <span>©{{ $siteName }} {{ date('Y') }}</span>
-                </footer>
+                {{-- The Terms / Refund Policy / Privacy Policy / version / copyright
+                     footer line was removed from the dashboard at the user's request. --}}
             </div>
+        </div>
         </flux:main>
 
         {{-- Global confirm modal — intercepts any form/button with `data-confirm`. --}}
         <x-confirm-modal />
-
-        {{-- Mobile bottom tab bar (mobile + tablet). Five equal inline tabs:
-             Home, Orders, Menu, Transactions, Profile. The active tab is derived
-             from the current route so the right one highlights on first paint. --}}
-        @php
-            $activeIndex = match (true) {
-                request()->routeIs('dashboard.orders*')       => 1,
-                request()->routeIs('dashboard.transactions*') => 3,
-                request()->routeIs('dashboard.profile')       => 4,
-                request()->routeIs('dashboard.security')      => 4,
-                request()->routeIs('dashboard.appearance')    => 4,
-                default                                       => 0, // dashboard / overview
-            };
-        @endphp
-        @php
-            $tabs = [
-                ['idx' => 0, 'href' => route('dashboard'),              'icon' => 'Home.svg',           'label' => 'Home',         'nav' => true],
-                ['idx' => 1, 'href' => route('dashboard.orders'),       'icon' => 'order.svg',          'label' => 'Orders',       'nav' => true],
-                // index 2 is the Menu button, rendered between the two loops
-                ['idx' => 3, 'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'label' => 'History',      'nav' => true],
-                ['idx' => 4, 'href' => route('dashboard.profile'),      'icon' => 'system setting.svg', 'label' => 'Settings',     'nav' => true],
-            ];
-
-            // Successful (completed) order count - drives the Orders tab badge.
-            $successfulOrderCount = auth()->user()
-                ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
-                : 0;
-        @endphp
-        {{-- Frosted scrim behind the floating nav: as the page scrolls, content
-             blurs + fades into the bottom-bar area instead of showing sharply behind
-             it. Fixed strip below the nav (z-40), masked so the blur eases in from
-             nothing at the top to full at the bottom; never blocks taps. --}}
-        <div
-            aria-hidden="true"
-            class="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 backdrop-blur-md lg:hidden"
-            style="-webkit-mask-image: linear-gradient(to top, #000 38%, transparent); mask-image: linear-gradient(to top, #000 38%, transparent);"
-        ></div>
-
-        {{-- Floating rounded nav bar (neobank style): detached from the edges with
-             a pill highlight behind the active tab. The wrapper's bottom padding
-             keeps it clear of the iOS home indicator. Shown on every page. --}}
-        <div
-            x-data="{
-                active: {{ $activeIndex }},
-                shaking: false,
-                tap() {
-                    // Haptic feedback on supported devices (Android); iOS Safari has
-                    // no Vibration API, so it just no-ops there. The shake gives a
-                    // visual tap response on every device.
-                    try { navigator.vibrate && navigator.vibrate(12); } catch (e) {}
-                    this.shaking = false;
-                    requestAnimationFrame(() => { this.shaking = true; });
-                },
-            }"
-            {{-- The bar is already detached from the edge by design, so it does
-                 not owe the full inset on top of that gap - taking the float's
-                 own 12px back out of the inset keeps it clear of the home
-                 indicator without sitting as high as a flush bar would have to.
-                 The max() floor keeps the original 12px on devices with no
-                 inset at all. --}}
-            class="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(12px,calc(env(safe-area-inset-bottom)_-_12px))] lg:hidden"
-        >
-            <nav
-                class="nav-glass mx-auto max-w-md rounded-full p-1.5"
-                aria-label="Primary"
-                :class="shaking && 'pill-shake'"
-                @animationend="shaking = false"
-            >
-                <div class="relative flex items-stretch">
-                    {{-- Apple-glass sliding pill: one frosted bubble that fills the
-                         bar height and glides to the active tab. Width = one of
-                         five equal columns; translateX(active * 100%) lands it on
-                         the active slot (Menu is slot 2, never an active route). --}}
-                    <span
-                        aria-hidden="true"
-                        class="liquid-pill pointer-events-none absolute -inset-y-1 left-0 w-1/5 rounded-full transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-                        :style="'transform: translateX(' + (active * 100) + '%)'"
-                    ></span>
-
-                    {{-- Tabs 0 + 1 --}}
-                    @foreach (array_slice($tabs, 0, 2) as $t)
-                        <a
-                            href="{{ $t['href'] }}"
-                            @if ($t['nav'] && $t['href'] !== '#') wire:navigate.hover @endif
-                            @click="active = {{ $t['idx'] }}; tap()"
-                            aria-label="{{ $t['label'] }}"
-                            class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                        >
-                            <span class="relative inline-flex">
-                                <span
-                                    aria-hidden="true"
-                                    class="h-6 w-6 transition-colors duration-200"
-                                    :class="active === {{ $t['idx'] }} ? 'bg-blue-600' : 'bg-zinc-900 dark:bg-zinc-300'"
-                                    style="-webkit-mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat; mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat;"
-                                ></span>
-                                {{-- Successful-order count on the Orders tab. Light: small
-                                     pill, dark number. Dark: bigger frosted-glass pill, light text. --}}
-                                @if ($t['idx'] === 1 && $successfulOrderCount > 0)
-                                    <span class="pointer-events-none absolute -top-2 -right-3 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold leading-none text-zinc-900 ring-1 ring-zinc-200 shadow-sm dark:h-5 dark:min-w-[20px] dark:bg-white/15 dark:px-1.5 dark:text-[11px] dark:text-white dark:shadow-none dark:ring-white/25 dark:backdrop-blur-md">{{ $successfulOrderCount > 99 ? '99+' : $successfulOrderCount }}</span>
-                                @endif
-                            </span>
-                            <span class="text-[10px] leading-none transition-colors duration-200" :class="active === {{ $t['idx'] }} ? 'text-blue-600 font-semibold' : 'font-medium text-zinc-700 dark:text-zinc-300'">{{ $t['label'] }}</span>
-                        </a>
-                    @endforeach
-
-                    {{-- Menu — opens the bottom-sheet menu (slot 2). --}}
-                    <button
-                        type="button"
-                        x-on:click="tap(); $dispatch('open-mobile-menu')"
-                        aria-label="Open menu"
-                        class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                    >
-                        <span
-                            aria-hidden="true"
-                            class="h-6 w-6 bg-zinc-900 transition-colors duration-200 dark:bg-zinc-300"
-                            style="-webkit-mask: url('{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}') center / contain no-repeat; mask: url('{{ asset('assets/' . rawurlencode('Hamburger menu.svg')) }}') center / contain no-repeat;"
-                        ></span>
-                        <span class="text-[10px] font-medium leading-none text-zinc-700 dark:text-zinc-300">Menu</span>
-                    </button>
-
-                    {{-- Tabs 2 + 3 --}}
-                    @foreach (array_slice($tabs, 2, 2) as $t)
-                        <a
-                            href="{{ $t['href'] }}"
-                            @if ($t['nav'] && $t['href'] !== '#') wire:navigate.hover @endif
-                            @click="active = {{ $t['idx'] }}; tap()"
-                            aria-label="{{ $t['label'] }}"
-                            class="relative z-10 flex flex-1 flex-col items-center gap-1 py-1.5 transition-transform duration-200 active:scale-95"
-                        >
-                            <span
-                                aria-hidden="true"
-                                class="h-6 w-6 transition-colors duration-200"
-                                :class="active === {{ $t['idx'] }} ? 'bg-blue-600' : 'bg-zinc-900 dark:bg-zinc-300'"
-                                style="-webkit-mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat; mask: url('{{ asset('assets/' . rawurlencode($t['icon'])) }}') center / contain no-repeat;"
-                            ></span>
-                            <span class="text-[10px] leading-none transition-colors duration-200" :class="active === {{ $t['idx'] }} ? 'text-blue-600 font-semibold' : 'font-medium text-zinc-700 dark:text-zinc-300'">{{ $t['label'] }}</span>
-                        </a>
-                    @endforeach
-                </div>
-            </nav>
-        </div>
 
         {{-- Action flashes pop as a floating pill toast (status / success / error /
              wallet_created), so pages don't need their own inline banners. --}}
@@ -1517,18 +1657,18 @@
              Mounted outside flux:header so its position:fixed centers against the viewport
              rather than against a transformed sticky ancestor. Profile dropdown menu items
              dispatch 'open-locale-modal' to open it; we dispatch 'locale-updated' back
-             whenever country / language change so the profile chip values stay in sync. --}}
+             whenever the country changes so the profile chip values stay in sync. --}}
         <div
             x-data="storefrontLocale()"
             x-init="
                 init();
                 // The floating chips, desktop switcher and profile chip are separate
-                // Alpine scopes that default to United States/English and only sync via
-                // this event. Broadcast the persisted values once on load so they show
-                // the saved country/language instead of reverting to USA on every reload.
-                $nextTick(() => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
-                $watch('country',  v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
-                $watch('language', v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode, language: language }));
+                // Alpine scopes that default to United States and only sync via this
+                // event. Broadcast the persisted values once on load so they show the
+                // saved country instead of reverting to USA on every reload. Language
+                // is server state and travels with the page, not with this event.
+                $nextTick(() => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode }));
+                $watch('country',  v => $dispatch('locale-updated', { country: country, countryFlag: countryFlag, countryCode: countryCode }));
             "
             x-on:open-locale-modal.window="localeModalOpen = true"
             @keydown.escape.window="localeModalOpen = false"
@@ -1537,36 +1677,59 @@
             <x-nav.locale-modal />
         </div>
 
-        {{-- Mobile menu popup. Triggered by every mobile hamburger / Menu FAB via the
-             'open-mobile-menu' window event. Renders the sidebar nav as a card grid
-             instead of sliding the Flux sidebar drawer out. lg:hidden so it never shows on desktop. --}}
+        {{-- Mobile sidebar drawer. Opened by the top bar's hamburger (and any
+             other trigger that dispatches 'open-mobile-menu'), it slides in from
+             the left wearing the bar's own colour (navy, black in dark mode),
+             the app logo level with the bar, then the desktop sidebar's rows in
+             three groups. It covers about two thirds of the screen, the page
+             dimmed beside it. lg:hidden so it never shows on desktop, where the
+             real sidebar is. --}}
         @php
-            $mobileMenuItems = array_values(array_filter([
-                ['label' => 'Home',          'href' => route('dashboard'),           'icon' => 'Home.svg',           'tone' => 'bg-blue-500',     'nav' => true],
-                ['label' => 'Shop',          'href' => route('dashboard.shop.gift-cards'), 'icon' => 'Shop.svg',           'tone' => 'bg-pink-500',     'nav' => true],
-                ['label' => 'Orders',        'href' => route('dashboard.orders'),    'icon' => 'order.svg',          'tone' => 'bg-sky-500',      'nav' => true],
-                ['label' => 'Wallet',        'href' => route('dashboard.wallet'),    'icon' => 'Wallet.svg',         'tone' => 'bg-emerald-500',  'nav' => true],
-                ['label' => 'Transactions',  'href' => route('dashboard.transactions'), 'icon' => 'transactions 1.svg', 'tone' => 'bg-teal-500',  'nav' => true],
-                ['label' => 'Settings',      'href' => route('dashboard.profile'),   'icon' => 'system setting.svg', 'tone' => 'bg-indigo-500',   'nav' => true],
-                ['label' => 'Verify (KYC)',  'href' => route('dashboard.kyc'),       'icon' => 'customer.svg',       'tone' => 'bg-amber-500',    'nav' => true],
-                ['label' => 'Security',      'href' => route('dashboard.security'),  'icon' => 'admin access.svg',   'tone' => 'bg-violet-500',   'nav' => true],
-                ['label' => 'Appearance',    'href' => route('dashboard.appearance'),'icon' => 'Appearance.svg',     'tone' => 'bg-fuchsia-500',  'nav' => true],
-                ['label' => 'Notifications', 'href' => route('dashboard.notifications'), 'icon' => 'notification 2.svg', 'tone' => 'bg-amber-500',    'nav' => true],
-                // Saved Cards hidden until the card-vault backend ships (see routes/web.php).
-                // ['label' => 'Saved Cards',   'href' => route('dashboard.saved-cards'),   'icon' => 'savedcard.svg',      'tone' => 'bg-rose-500',     'nav' => true],
+            // Completed orders drive the badge on the Orders row, as on the
+            // desktop sidebar.
+            $completedOrderCount = auth()->user()
+                ? (int) auth()->user()->orders()->where('order_status', \App\Domain\Order\Enums\OrderStatus::Completed)->count()
+                : 0;
+
+            $drawerItems = [
+                ['label' => 'Overview',      'href' => route('dashboard'),                 'icon' => 'Home.svg',           'active' => request()->routeIs('dashboard'),               'nav' => true],
+                // Shop does not navigate: tapping it drops the categories down
+                // beneath it (the desktop sidebar's $shopSubItems, same order
+                // and gating), open already when the customer is on one.
+                ['label' => 'Shop',          'href' => route('dashboard.shop.gift-cards'), 'icon' => 'Shop.svg',           'active' => request()->routeIs('dashboard.shop.*'),        'nav' => true, 'expands' => true],
+                ['label' => 'Orders',        'href' => route('dashboard.orders'),          'icon' => 'order.svg',          'active' => request()->routeIs('dashboard.orders*'),       'nav' => true, 'badge' => $completedOrderCount],
+                ['label' => 'My eSIMs',      'href' => route('dashboard.esims'),           'icon' => 'esim.svg',           'active' => request()->routeIs('dashboard.esims'),         'nav' => true],
+                ['label' => 'Wallet',        'href' => route('dashboard.wallet'),          'icon' => 'Wallet.svg',         'active' => request()->routeIs('dashboard.wallet'),        'nav' => true],
+                ['label' => 'Transactions',  'href' => route('dashboard.transactions'),    'icon' => 'transactions 1.svg', 'active' => request()->routeIs('dashboard.transactions*'), 'nav' => true],
+                // The account rows sit under an "Account" label, the last two
+                // under "More"; the label is drawn when the group changes.
+                ['label' => 'Settings',      'href' => route('dashboard.profile'),         'icon' => 'system setting.svg', 'active' => request()->routeIs('dashboard.profile'),       'nav' => true, 'group' => 'Account'],
+                ['label' => 'Security',      'href' => route('dashboard.security'),        'icon' => 'admin access.svg',   'active' => request()->routeIs('dashboard.security'),      'nav' => true, 'group' => 'Account'],
+                ['label' => 'Verify (KYC)',  'href' => route('dashboard.kyc'),             'icon' => 'customer.svg',       'active' => request()->routeIs('dashboard.kyc'),           'nav' => true, 'group' => 'Account'],
+                ['label' => 'Appearance',    'href' => route('dashboard.appearance'),      'icon' => 'Appearance.svg',     'active' => request()->routeIs('dashboard.appearance'),    'nav' => true, 'group' => 'Account'],
+                ['label' => 'Notifications', 'href' => route('dashboard.notifications'),   'icon' => 'notification 2.svg', 'active' => request()->routeIs('dashboard.notifications'), 'nav' => true, 'group' => 'Account'],
                 // The rewards page is the Rcoin programme (cashback, referrals,
-                // withdrawals, conversion) - the tile carries the Rcoin name,
-                // not the old "Referrals" alias that hid it.
-                ['label' => 'Rcoin',         'href' => route('dashboard.rewards'),    'icon' => 'wallet 2.svg',        'tone' => 'bg-yellow-500',   'nav' => true],
-                ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'tone' => 'bg-cyan-500', 'nav' => false],
-            ]));
+                // withdrawals, conversion); the row carries the partner name.
+                ['label' => 'For Partners',  'href' => route('dashboard.rewards'),         'icon' => 'for-partners.svg',   'active' => request()->routeIs('dashboard.rewards'),       'nav' => true, 'group' => 'More'],
+                ['label' => 'Support',       'href' => 'https://wa.me/19402386229?text=Hello%20Rshoprefill%20can%20i%20get%20help%3F', 'icon' => 'support.svg', 'active' => false, 'nav' => false, 'group' => 'More'],
+            ];
+
+            // Drawer rows: 14px semibold on the bar's colour, 18px icons, 10px
+            // corners, the current page on a soft white tile. The colours are
+            // app.css's (.dash-drawer), so dark mode's remaps cannot touch them.
+            $drawerRow = fn (bool $active) => 'dash-drawer-row flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-[15px] font-semibold transition-colors'.($active ? ' dash-drawer-row-active' : '');
+            $drawerIcon = 'h-5 w-5 shrink-0';
+            // The categories under Shop: a size down, text only (the Shop row
+            // carries the icon), the current one on the same soft tile.
+            $drawerSubRow = fn (bool $active) => 'dash-drawer-subrow flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-sm font-medium transition-colors'.($active ? ' dash-drawer-subrow-active' : '');
         @endphp
-        {{-- Mobile menu wrapper: `contents` removes the div from Flux's grid layout so it
-             doesn't push flux:sidebar/header/main into an unexpected row. --}}
+        {{-- `contents` keeps the wrapper out of Flux's grid so it cannot push
+             flux:sidebar/header/main into an unexpected row. --}}
         <div
             x-data="{ menuOpen: false }"
             x-on:open-mobile-menu.window="$nextTick(() => menuOpen = true)"
             x-on:keydown.escape.window="menuOpen = false"
+            x-on:livewire:navigated.window="menuOpen = false"
             x-effect="menuOpen ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
             class="contents lg:hidden"
         >
@@ -1585,88 +1748,184 @@
                 aria-hidden="true"
             ></div>
 
-            {{-- Bottom-sheet panel (full width, slides up from below) --}}
-            <div
+            {{-- The drawer: the bar's colour, slid in from the left. --}}
+            <aside
                 x-show="menuOpen"
                 x-transition:enter="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                x-transition:enter-start="translate-y-full"
-                x-transition:enter-end="translate-y-0"
-                x-transition:leave="transition-transform duration-250 ease-in"
-                x-transition:leave-start="translate-y-0"
-                x-transition:leave-end="translate-y-full"
+                x-transition:enter-start="-translate-x-full"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition-transform duration-200 ease-in"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="-translate-x-full"
                 style="display: none;"
-                class="modal-norise fixed inset-x-3 bottom-3 z-[70] max-h-[85vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
+                class="dash-drawer fixed inset-y-0 left-0 z-[70] flex w-[min(69vw,270px)] flex-col"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="mobile-menu-title"
+                aria-label="Menu"
             >
-                {{-- Drag handle (visual affordance) --}}
-                <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300 dark:bg-white/25"></span>
+                {{-- Logo row: as tall as the bar, so the logo sits level with the
+                     bar's chips and the close button beside the panel. The logo
+                     is drawn white (app.css) on the panel's dark colour.
+
+                     The rule under it separates the brand from the destinations.
+                     white/20 rather than the usual white/10: this panel is navy
+                     in light and pure black in dark, and at 10 percent a hairline
+                     disappears entirely on black, the same way the header chips
+                     did. One value covers both themes because both are dark. --}}
+                <div class="dash-drawer-head flex shrink-0 items-center border-b border-white/20 px-4">
+                    <a href="{{ route('dashboard') }}" wire:navigate.hover @click="menuOpen = false" class="flex items-center rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="{{ $siteName }} dashboard">
+                        {{-- The full logo (mark + wordmark), the file the storefront
+                             header shows from md up. --}}
+                        <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-12 w-auto object-contain">
+                    </a>
                 </div>
 
-                <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
-                    {{-- Header — app-native pattern: title alone, no X button. Dismissed
-                         via tap-outside (backdrop), Esc key, or the drag handle above. --}}
-                    <h2 id="mobile-menu-title" class="mb-5 text-lg font-bold text-zinc-900 dark:text-white">Menu</h2>
-
-                    {{-- Card grid, staggered entrance --}}
-                    <div class="skeleton-stagger-fast grid grid-cols-4 gap-3">
-                        @foreach ($mobileMenuItems as $i => $item)
-                            <a
-                                href="{{ $item['href'] }}"
-                                @if ($item['nav'] && $item['href'] !== '#') wire:navigate.hover @endif
-                                @click="menuOpen = false"
-                                style="--i: {{ $i }}"
-                                class="group flex flex-col items-center justify-center gap-2 rounded-[6px] px-2 py-3 text-center transition-transform duration-200 active:scale-95"
-                            >
-                                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
-                                    <img src="{{ asset('assets/' . rawurlencode($item['icon'])) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
-                                </span>
-                                <span class="text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">{{ $item['label'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-
-                    {{-- Logout footer --}}
-                    <form method="POST" action="{{ route('logout') }}" class="mt-5 border-t border-zinc-100 pt-4">
-                        @csrf
-                        <button
-                            type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                {{-- The rows, grouped: the main destinations, then Account, then More. --}}
+                <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6 pt-3" aria-label="Menu">
+                    @php $drawerGroup = null; @endphp
+                    @foreach ($drawerItems as $item)
+                        @if (($item['group'] ?? null) !== $drawerGroup)
+                            @php $drawerGroup = $item['group']; @endphp
+                            <p class="dash-drawer-label mb-1 mt-5 px-3 text-[13px] font-semibold">{{ $drawerGroup }}</p>
+                        @endif
+                        @if ($item['expands'] ?? false)
+                            {{-- Shop: the row is a button. Tapping it drops the categories
+                                 down beneath it; the chevron turns to say so. The list
+                                 starts open on a shop page so the current category shows.
+                                 The current category, not the Shop row, is the page. --}}
+                            <div x-data="{ shopOpen: @js($item['active']) }" class="flex flex-col gap-0.5">
+                                <button
+                                    type="button"
+                                    @click="shopOpen = ! shopOpen"
+                                    :aria-expanded="shopOpen.toString()"
+                                    aria-controls="dash-drawer-shop-categories"
+                                    class="{{ $drawerRow($item['active']) }} w-full text-left"
+                                >
+                                    <span class="flex min-w-0 items-center gap-3">
+                                        <x-ui.anim-icon :file="$item['icon']" tone="inherit" :class="$drawerIcon" />
+                                        <span class="truncate">{{ $item['label'] }}</span>
+                                    </span>
+                                    <svg :class="shopOpen && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <div id="dash-drawer-shop-categories" x-show="shopOpen" x-collapse class="ml-5 flex flex-col gap-0.5 border-l border-white/10 pl-3">
+                                    @foreach ($shopSubItems as [$label, $href, $flag, $newKey, $subActive])
+                                        @if ($flag === null || \App\Support\FeatureFlag::on($flag))
+                                            <a
+                                                href="{{ $href }}"
+                                                wire:navigate.hover
+                                                @click="menuOpen = false"
+                                                class="{{ $drawerSubRow($subActive) }}"
+                                                @if ($subActive) aria-current="page" @endif
+                                            >
+                                                <span class="truncate">{{ $label }}</span>
+                                                @if (in_array($newKey, $newServices, true))
+                                                    <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New</span>
+                                                @endif
+                                            </a>
+                                        @else
+                                            {{-- Feature off: listed but greyed and not a link, as on desktop. --}}
+                                            <span class="{{ $drawerSubRow(false) }} cursor-not-allowed opacity-50" aria-disabled="true" title="Temporarily unavailable">
+                                                <span class="truncate">{{ $label }}</span>
+                                            </span>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                            @continue
+                        @endif
+                        <a
+                            href="{{ $item['href'] }}"
+                            @if ($item['nav']) wire:navigate.hover @else target="_blank" rel="noopener" @endif
+                            @click="menuOpen = false"
+                            class="{{ $drawerRow($item['active']) }}"
+                            @if ($item['active']) aria-current="page" @endif
                         >
-                            <x-ui.logout-icon class="h-4 w-4" />
-                            Log out
-                        </button>
-                    </form>
-                </div>
-            </div>
+                            <span class="flex min-w-0 items-center gap-3">
+                                <x-ui.anim-icon :file="$item['icon']" tone="inherit" :class="$drawerIcon" />
+                                <span class="truncate">{{ $item['label'] }}</span>
+                            </span>
+                            @if (($item['badge'] ?? 0) > 0)
+                                <span class="dash-row-badge inline-flex items-center whitespace-nowrap rounded-[5px] bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}</span>
+                            @endif
+                        </a>
+                    @endforeach
+                </nav>
+            </aside>
+
+            {{-- Close: outside the panel, on the backdrop beside its top edge,
+                 level with the bar's chips and the logo. Tapping the backdrop
+                 closes too. --}}
+            <button
+                type="button"
+                x-show="menuOpen"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="menuOpen = false"
+                style="display: none; left: calc(min(69vw, 270px) + 0.75rem); top: calc(env(safe-area-inset-top) + 0.75rem);"
+                aria-label="Close menu"
+                class="dash-drawer-close fixed z-[70] flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors active:bg-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
 
         {{-- PWA pull-to-refresh (standalone mode only). --}}
+        {{-- Rate-your-experience prompt. Asks a signed-in customer once a day,
+             after the admin-set delay, until they have answered. Gated by
+             features.experience_prompt_enabled so it can be switched off
+             without a deploy; the flag ships off. --}}
+        @feature('experience_prompt')
+            <livewire:experience-prompt />
+        @endfeature
+
         <x-pull-to-refresh />
 
-        {{-- Collapsed-sidebar flyout positioner. In collapsed mode the submenu
-             popups are position:fixed so they escape the now-scrollable rail's
-             overflow clip; on hover we pin each .nav-submenu beside its icon
-             using live viewport coords (so it lands correctly even after the
-             rail has been scrolled). Delegated + guarded so wire:navigate never
-             double-binds. --}}
+        {{-- Collapsed-rail tooltip: shows a sidebar link's name (its data-tip)
+             beside the icon on hover or keyboard focus, only while the rail is
+             collapsed. One fixed element on <body>, placed from the link's live
+             position, so the rail's overflow clip cannot hide it. Delegated and
+             guarded so wire:navigate never double-binds; the element is rebuilt
+             if a navigation swapped the body out from under it. --}}
         <script>
             (function () {
-                if (window.__sidebarFlyoutInit) { return; }
-                window.__sidebarFlyoutInit = true;
-                const GAP = 14; // px gap from the rail edge (~0.875rem bridge)
-                document.addEventListener('pointerover', function (e) {
-                    if (! document.documentElement.classList.contains('dashboard-sidebar-collapsed')) { return; }
-                    const group = e.target.closest && e.target.closest('[data-flux-sidebar] .nav-group');
-                    if (! group) { return; }
-                    const sub = group.querySelector('.nav-submenu');
-                    if (! sub) { return; }
-                    const r = group.getBoundingClientRect();
-                    sub.style.top = r.top + 'px';
-                    sub.style.left = (r.right + GAP) + 'px';
-                });
+                if (window.__dashRailTipInit) { return; }
+                window.__dashRailTipInit = true;
+
+                let tip = null;
+                const linkFor = (target) => target && target.closest
+                    ? target.closest('[data-flux-sidebar] nav :is(a, button)[data-tip]')
+                    : null;
+
+                const show = (link) => {
+                    if (! document.documentElement.classList.contains('dashboard-sidebar-collapsed')) { return hide(); }
+                    if (! tip || ! document.body.contains(tip)) {
+                        tip = document.createElement('div');
+                        tip.className = 'dash-rail-tip';
+                        tip.setAttribute('role', 'tooltip');
+                        document.body.appendChild(tip);
+                    }
+                    const r = link.getBoundingClientRect();
+                    tip.textContent = link.getAttribute('data-tip');
+                    tip.style.top = (r.top + r.height / 2) + 'px';
+                    // 12px clear of the icon leaves room for the bubble's pointer.
+                    tip.style.left = (r.right + 12) + 'px';
+                    tip.classList.add('is-visible');
+                };
+                const hide = () => { if (tip) { tip.classList.remove('is-visible'); } };
+
+                document.addEventListener('pointerover', (e) => { const link = linkFor(e.target); link ? show(link) : hide(); });
+                document.addEventListener('focusin', (e) => { const link = linkFor(e.target); link ? show(link) : hide(); });
+                document.addEventListener('focusout', hide);
+                document.addEventListener('scroll', hide, true);
+                document.addEventListener('livewire:navigating', hide);
             })();
         </script>
 

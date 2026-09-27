@@ -2,6 +2,7 @@
 
 namespace App\Domain\Communication\Mail\Security;
 
+use App\Domain\Communication\Enums\MailDomain;
 use App\Models\SiteSetting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -37,8 +38,8 @@ class EmailChangedMail extends Mailable
             with: [
                 'name' => $this->name,
                 'newEmailMasked' => $this->newEmailMasked,
-                'supportEmail' => 'info@rshoprefill.com',
-                'siteName' => SiteSetting::get('site.name', 'RshopRefills'),
+                'supportEmail' => MailDomain::replyTo(),
+                'siteName' => SiteSetting::get('site.name', 'RshopRefill'),
             ]
         );
     }

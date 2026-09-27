@@ -1,9 +1,9 @@
-<x-emails.layout :mail-message="$message ?? null" title="New device signed into your account" preheader="We noticed a new sign-in to your RShopRefill account.">
+<x-emails.layout :mail-message="$message ?? null" title="New device signed into your account" preheader="We noticed a new sign-in to your RshopRefill account.">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">New Device Detected</h1>
 
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">Hi {{ $device->user->name }},</p>
 
-    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">We noticed a new sign-in to your RShopRefill account.</p>
+    <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">We noticed a new sign-in to your RshopRefill account.</p>
 
     <div style="margin:0 0 24px; padding:16px; background:#f4f4f5; border-radius:12px;">
         <ul style="margin:0; padding:0; list-style:none; font-size:15px; color:#3f3f46; line-height:1.6;">

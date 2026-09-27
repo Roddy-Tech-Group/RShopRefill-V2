@@ -4,19 +4,23 @@
 use App\Jobs\SendNewsletterBroadcastJob;
 use App\Domain\Communication\Mail\Marketing\NewsletterBroadcastMail;
 use App\Models\NewsletterSubscriber;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.admin')]
 #[Title('Newsletter')]
 class extends Component {
+    use WithFileUploads;
     use WithPagination;
 
     #[Url(except: '')]
@@ -42,6 +46,17 @@ class extends Component {
      *  there instead of the live subscriber list. */
     #[Validate('nullable|email|max:150')]
     public string $testEmail = '';
+
+    /** Hosted campaign image, stored relative to public/assets/
+     *  (e.g. "newsletter/june-update-a1b2c3d4.png"). Rendered as the banner
+     *  above the body in both plain-text and HTML campaigns. */
+    public string $imagePath = '';
+
+    /** File-picker binding. Hosting runs the moment a file is picked rather
+     *  than at send time, so the admin has a real URL to paste into HTML
+     *  content while still composing. Cleared once the copy lands. */
+    #[Validate('nullable|image|mimes:png,jpg,jpeg,webp,gif|max:5120')]
+    public $imageUpload = null;
 
     #[Computed]
     public function counts(): array
@@ -69,7 +84,7 @@ class extends Component {
             'status'            => 'unsubscribed',
             'unsubscribed_at'   => now(),
         ]);
-        session()->flash('status', 'Subscriber removed from list.');
+        $this->dispatch('toast', message: 'Subscriber removed from list.');
         unset($this->counts);
     }
 
@@ -79,14 +94,70 @@ class extends Component {
             'status'            => 'active',
             'unsubscribed_at'   => null,
         ]);
-        session()->flash('status', 'Subscriber re-activated.');
+        $this->dispatch('toast', message: 'Subscriber re-activated.');
         unset($this->counts);
+    }
+
+    /**
+     * Copy a freshly picked image into public/assets/newsletter/ and remember
+     * its relative path. Matches how blog / press / hero-card art is hosted,
+     * so campaign images are served straight off the web root - no storage
+     * symlink sitting in the path of an email that has already gone out.
+     */
+    public function updatedImageUpload(): void
+    {
+        $this->validateOnly('imageUpload');
+
+        if (! $this->imageUpload) {
+            return;
+        }
+
+        $extension = strtolower($this->imageUpload->getClientOriginalExtension() ?: 'png');
+        // Slug the subject for a recognisable filename, but fall back after
+        // slugging too - a subject written in a non-latin script slugs to ''.
+        $filename = (Str::slug($this->subject) ?: 'newsletter').'-'.Str::random(8).'.'.$extension;
+        $destination = public_path('assets/newsletter');
+
+        if (! File::isDirectory($destination)) {
+            File::makeDirectory($destination, 0755, true);
+        }
+
+        File::copy($this->imageUpload->getRealPath(), $destination.DIRECTORY_SEPARATOR.$filename);
+
+        $this->imagePath = 'newsletter/'.$filename;
+        $this->imageUpload = null;
+        unset($this->imageUrl);
+    }
+
+    /**
+     * Absolute URL of the hosted image - what the email carries, and what the
+     * admin copies to hand-place inside HTML content.
+     */
+    #[Computed]
+    public function imageUrl(): string
+    {
+        return $this->imagePath === '' ? '' : asset('assets/'.$this->imagePath);
+    }
+
+    /**
+     * Drop the image from this campaign. Deliberately leaves the file on disk:
+     * once a URL has shipped in an email it must never start 404ing, and from
+     * here we can't tell whether this campaign - or an earlier one - already
+     * sent it.
+     */
+    public function detachImage(): void
+    {
+        $this->imagePath = '';
+        $this->imageUpload = null;
+        $this->resetValidation('imageUpload');
+        unset($this->imageUrl);
     }
 
     public function openCompose(): void
     {
-        $this->reset(['subject', 'body', 'isHtml', 'testEmail']);
+        $this->reset(['subject', 'body', 'isHtml', 'testEmail', 'imagePath', 'imageUpload']);
         $this->resetValidation();
+        unset($this->imageUrl);
         $this->showCompose = true;
     }
 
@@ -114,10 +185,11 @@ class extends Component {
                 subjectLine: $this->subject,
                 bodyContent: $this->body,
                 isHtml: $this->isHtml,
+                imageUrl: $this->imageUrl,
             ));
-            session()->flash('status', 'Test email sent to '.$this->testEmail);
+            $this->dispatch('toast', message: 'Test email sent to '.$this->testEmail);
         } catch (\Throwable $e) {
-            session()->flash('error', 'Test send failed: '.$e->getMessage());
+            $this->dispatch('toast', message: 'Test send failed: '.$e->getMessage(), isError: true);
         }
     }
 
@@ -180,7 +252,7 @@ class extends Component {
 
         $recipients = NewsletterSubscriber::where('status', 'active')->count();
         if ($recipients === 0) {
-            session()->flash('error', 'No active subscribers to send to.');
+            $this->dispatch('toast', message: 'No active subscribers to send to.', isError: true);
             return;
         }
 
@@ -188,9 +260,10 @@ class extends Component {
             subjectLine: $this->subject,
             bodyContent: $this->body,
             isHtml: $this->isHtml,
+            imageUrl: $this->imageUrl,
         );
 
-        session()->flash('status', 'Broadcast queued. Sending to '.number_format($recipients).' active subscribers in the background.');
+        $this->dispatch('toast', message: 'Broadcast queued. Sending to '.number_format($recipients).' active subscribers in the background.');
         $this->closeCompose();
     }
 
@@ -217,13 +290,6 @@ class extends Component {
     <x-slot:subheading>Manage email subscribers and broadcast campaigns to your list.</x-slot:subheading>
 
     <div class="flex flex-col gap-6">
-
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
-        @if (session('error'))
-            <div class="rounded-[12px] bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">{{ session('error') }}</div>
-        @endif
 
         {{-- Compose button — primary action above the KPI strip. --}}
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -265,7 +331,7 @@ class extends Component {
                 ['label' => 'Active',        'value' => $this->counts['active'],       'dot' => 'bg-emerald-500'],
                 ['label' => 'Unsubscribed', 'value' => $this->counts['unsubscribed'], 'dot' => 'bg-zinc-400'],
             ] as $stat)
-                <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -305,7 +371,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm" style="border-spacing: 0 6px;">
                     <thead>
@@ -340,7 +406,7 @@ class extends Component {
                                     @if ($sub->status === 'active')
                                         <button
                                             wire:click="unsubscribe({{ $sub->id }})"
-                                            wire:confirm="Remove this subscriber from the list?"
+                                            data-confirm="Remove this subscriber from the list?" data-confirm-tone="danger" data-confirm-text="Remove"
                                             type="button"
                                             class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25"
                                         >Unsubscribe</button>
@@ -400,6 +466,61 @@ class extends Component {
                             class="mt-1.5 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-white"
                         >
                         @error('subject') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Campaign image. Hosted on pick (not on send) so the URL
+                         below is live immediately and can be pasted into HTML
+                         content as well as riding above the body automatically. --}}
+                    <div>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Image</label>
+                        <div class="mt-1.5 flex items-start gap-3">
+                            <div class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 dark:bg-[#0c1a36]">
+                                @if ($imagePath)
+                                    <img src="{{ $this->imageUrl }}" alt="" class="h-full w-full object-cover">
+                                @else
+                                    <span class="text-[10px] text-zinc-500 dark:text-zinc-400">No image</span>
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <input
+                                    wire:model="imageUpload"
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/gif"
+                                    class="block w-full text-xs text-zinc-700 file:mr-3 file:rounded-[12px] file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 dark:text-zinc-300"
+                                >
+                                <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400" wire:loading.remove wire:target="imageUpload">
+                                    PNG, JPG, WebP or GIF, up to 5MB. Sits above your message in the email. PNG or JPG travels furthest - Outlook on Windows won't render WebP.
+                                </p>
+                                <p class="mt-1 text-[11px] font-medium text-blue-600" wire:loading wire:target="imageUpload">Uploading...</p>
+                                @error('imageUpload') <p class="mt-1 text-[11px] font-medium text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        @if ($imagePath)
+                            <div class="mt-2 flex items-center gap-2" x-data="{ copied: false }">
+                                <input
+                                    type="text"
+                                    readonly
+                                    value="{{ $this->imageUrl }}"
+                                    onfocus="this.select()"
+                                    class="min-w-0 flex-1 rounded-[12px] border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-[11px] text-zinc-700 outline-none dark:border-zinc-700/60 dark:bg-[#0c1a36] dark:text-zinc-300"
+                                >
+                                <button
+                                    type="button"
+                                    @click="navigator.clipboard.writeText(@js($this->imageUrl)); copied = true; setTimeout(() => copied = false, 1500)"
+                                    class="inline-flex shrink-0 items-center rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                                >
+                                    <span x-show="! copied">Copy URL</span>
+                                    <span x-show="copied" x-cloak class="text-green-600">Copied</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="detachImage"
+                                    class="inline-flex shrink-0 items-center rounded-[12px] px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#26416b]"
+                                >Remove</button>
+                            </div>
+                            <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Hosted permanently at this URL. Removing it here only detaches it from this campaign - the file stays up so already-sent emails keep working.</p>
+                        @endif
                     </div>
 
                     {{-- Format toggle: plain text vs HTML --}}
@@ -489,7 +610,7 @@ class extends Component {
                             type="submit"
                             wire:loading.attr="disabled"
                             wire:target="broadcast"
-                            wire:confirm="Broadcast this newsletter to {{ $this->counts['active'] }} active subscribers? This cannot be undone."
+                            data-confirm="Broadcast this newsletter to {{ $this->counts['active'] }} active subscribers? This cannot be undone." data-confirm-title="Send newsletter" data-confirm-tone="warning" data-confirm-text="Send"
                             class="inline-flex items-center gap-2 rounded-[12px] bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                         >
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">

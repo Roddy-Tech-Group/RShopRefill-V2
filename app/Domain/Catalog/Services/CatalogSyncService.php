@@ -5,6 +5,10 @@ namespace App\Domain\Catalog\Services;
 use App\Domain\Catalog\Providers\ProviderInterface;
 use App\Models\CatalogSyncRun;
 use App\Models\ProductVariant;
+use App\Support\GiftCardCategories;
+use App\Support\TaggedCache;
+use Illuminate\Cache\TaggableStore;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -72,6 +76,15 @@ class CatalogSyncService
             $run->increment('items_failed', $failedItems);
         }
 
+        // A page that changed anything invalidates what the storefront caches
+        // about the catalogue: the nav menus' category and popular lists, and
+        // the brand pages' country lists. Without this a brand synced into
+        // stock is absent from the menus until the cache ages out, which reads
+        // as a sync that did not work.
+        if ($processedItems > 0) {
+            $this->forgetCatalogCache();
+        }
+
         // Prefer explicit page metadata (Airalo), then a "next" link, then fall back
         // to offset math against the total (Zendit).
         if (isset($meta['current_page'], $meta['last_page'])) {
@@ -89,6 +102,37 @@ class CatalogSyncService
             'has_more' => $hasMore,
             'total' => $total,
         ];
+    }
+
+    /**
+     * Drop the storefront's cached views of the catalogue.
+     *
+     * On a store that supports tags this clears the catalog tag, which is
+     * every one of them. On a store that does not - file, database - tagging
+     * degrades to the default store, and flushing THAT would empty the whole
+     * cache: sessions, settings, rates, everything the site holds. So there it
+     * names the keys it knows instead, and the rest age out on their own.
+     *
+     * Never lets a cache problem fail a sync. The rows are already written by
+     * the time this runs and every entry has a TTL behind it, so the worst a
+     * failure here costs is an hour of a stale menu.
+     */
+    private function forgetCatalogCache(): void
+    {
+        try {
+            if (Cache::getStore() instanceof TaggableStore) {
+                TaggedCache::for(['catalog'])->flush();
+
+                return;
+            }
+
+            GiftCardCategories::forgetNavMenus();
+        } catch (\Throwable $e) {
+            Log::warning('Catalog cache flush failed after sync', [
+                'provider' => $this->provider->getProviderName(),
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

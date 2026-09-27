@@ -95,7 +95,7 @@ class extends Component {
                 ['label' => 'Data running low', 'value' => $this->counts['data_low'], 'dot' => 'bg-amber-500'],
                 ['label' => 'Refunded', 'value' => $this->counts['refunded'], 'dot' => 'bg-purple-500'],
             ] as $stat)
-                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:ring-zinc-700/60">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -137,7 +137,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead class="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-600 dark:bg-[#0c1a36] dark:text-zinc-400">
@@ -152,7 +152,7 @@ class extends Component {
                     </thead>
                     <tbody class="divide-inset">
                         @forelse ($esims as $esim)
-                            <tr wire:key="esim-{{ $esim->id }}" class="transition-colors hover:bg-zinc-50 dark:hover:bg-[#26416b]/40">
+                            <tr wire:key="esim-{{ $esim->id }}" class="transition-colors hover:bg-blue-50 dark:hover:bg-[#26416b]/40">
                                 <td class="max-w-[260px] px-5 py-3">
                                     <p class="truncate font-semibold text-zinc-900 dark:text-white">{{ $esim->orderItem?->product?->name ?? 'eSIM' }}</p>
                                     <p class="truncate text-xs text-zinc-500 dark:text-zinc-400">{{ $esim->package_name }} · {{ $esim->purchased_at->format('M j, Y') }}</p>

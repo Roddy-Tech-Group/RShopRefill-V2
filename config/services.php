@@ -47,7 +47,7 @@ return [
     'resend' => [
         'key' => env('RESEND_KEY'),
         'from_address' => env('MAIL_FROM_ADDRESS', 'noreply@rshoprefills.com'),
-        'from_name' => env('MAIL_FROM_NAME', 'RshopRefills'),
+        'from_name' => env('MAIL_FROM_NAME', 'RshopRefill'),
         // Resend allows 10 requests/second per account; the throttle in front
         // of every send shares this ceiling across all queue workers.
         'max_requests_per_second' => (int) env('RESEND_MAX_REQUESTS_PER_SECOND', 8),
@@ -127,7 +127,7 @@ return [
         'sandbox_case' => env('NOWPAYMENTS_SANDBOX_CASE'),
 
         // ZERO underpayment tolerance is a deliberate business rule, not a default
-        // we inherited: RShopRefills margins are often cents, so absorbing even a
+        // we inherited: RshopRefill margins are often cents, so absorbing even a
         // 1% shortfall can erase the profit on an order. A payment is settled only
         // when actually_paid >= pay_amount, compared in CRYPTO terms. Anything less
         // is held as PartiallyPaid for the top-up flow and is never auto-fulfilled.

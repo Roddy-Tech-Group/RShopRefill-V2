@@ -20,7 +20,7 @@ class EmailOtpMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your RShopRefills Authentication Code',
+            subject: 'Your RshopRefill Authentication Code',
         );
     }
 

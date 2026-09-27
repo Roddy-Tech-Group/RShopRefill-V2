@@ -7,6 +7,7 @@ use App\Domain\Security\Events\OtpRequested;
 use App\Domain\Security\Services\DeviceTrustManager;
 use App\Domain\Security\Services\LoginCountryGuard;
 use App\Domain\Security\Services\SessionSecurityManager;
+use App\Http\Controllers\Security\DeviceVerificationController;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
@@ -118,7 +119,11 @@ class EvaluateLoginRiskListener
             $throttleKey = 'otp_throttle_'.$user->id;
             $attemptsKey = 'otp_attempts_'.$user->id;
 
-            Cache::put('device_otp_'.$user->id, $otp, now()->addMinutes(10));
+            // One lifetime for the code, its stamp and the page's clock, declared
+            // once on the controller that verifies it.
+            $expiresAt = now()->addMinutes(DeviceVerificationController::OTP_TTL_MINUTES);
+            Cache::put('device_otp_'.$user->id, $otp, $expiresAt);
+            Cache::put('device_otp_expires_'.$user->id, $expiresAt->timestamp, $expiresAt);
             Cache::put($throttleKey, now()->addSeconds(60)->timestamp, now()->addSeconds(60));
             Cache::put($attemptsKey, 1, now()->addHours(24));
 

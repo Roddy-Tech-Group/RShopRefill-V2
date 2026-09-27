@@ -69,6 +69,17 @@ class FundingVerificationService
             // funding whose display currency differed from the wallet currency a
             // false TAMPER: card charged, funding failed, wallet never credited.
             $expectedAmount = (float) ($funding->requested_amount ?: $funding->amount);
+            $expectedCurrency = strtoupper($funding->display_currency ?: $funding->currency->value);
+
+            // One step further for a mobile-money top-up on a converted rail
+            // (a dollar wallet funded over MTN or Orange): the rail is asked
+            // for CFA francs, not the display figure. The attempt records that
+            // request, and the gateway answers in it.
+            $charged = $this->chargedFiguresFor($funding);
+            if ($charged !== null) {
+                [$expectedAmount, $expectedCurrency] = $charged;
+            }
+
             if ($flwAmount < $expectedAmount) {
                 Log::error('TAMPER DETECTED: Flutterwave verified amount is lower than charged', [
                     'reference' => $funding->reference,
@@ -79,7 +90,6 @@ class FundingVerificationService
                 return false;
             }
 
-            $expectedCurrency = strtoupper($funding->display_currency ?: $funding->currency->value);
             if ($expectedCurrency !== $flwCurrency) {
                 Log::error('TAMPER DETECTED: Flutterwave verified currency mismatch', [
                     'reference' => $funding->reference,
@@ -110,6 +120,27 @@ class FundingVerificationService
         // gateway implementing PaymentProviderInterface works without another
         // bespoke branch here.
         return $this->verifyViaPaymentAttempt($funding, $provider, $providerName);
+    }
+
+    /**
+     * What the attempt behind this funding asked the gateway to charge, when
+     * that differs from the funding's own figures (pay_currency / pay_amount
+     * are set by the provider at charge time). Null when nothing was converted.
+     *
+     * @return array{0: float, 1: string}|null
+     */
+    private function chargedFiguresFor(WalletFunding $funding): ?array
+    {
+        $attempt = PaymentAttempt::where('payable_type', WalletFunding::class)
+            ->where('payable_id', $funding->id)
+            ->latest('created_at')
+            ->first();
+
+        if (! $attempt || $attempt->pay_currency === null || $attempt->pay_amount === null) {
+            return null;
+        }
+
+        return [(float) $attempt->pay_amount, strtoupper((string) $attempt->pay_currency)];
     }
 
     /**

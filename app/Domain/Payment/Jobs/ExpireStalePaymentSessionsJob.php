@@ -6,6 +6,7 @@ use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Services\PaymentSessionService;
+use App\Domain\Payment\Support\GatewayRateLimit;
 use App\Domain\Payment\Support\NowPaymentsStatus;
 use App\Domain\PaymentInsights\Services\RefusedCardRecorder;
 use App\Domain\Shared\Enums\FundingStatus;
@@ -20,6 +21,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 
 /**
  * Sweep PaymentSessions past their expires_at whose Order / WalletFunding never
@@ -120,6 +122,19 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
     /** The longest an in-flight crypto session is kept open by extension. */
     private const IN_FLIGHT_MAX_HOURS = 24;
 
+    /**
+     * Gateway calls this sweep may make in one run. Each last-chance
+     * verification is one or two calls, made back to back; a backlog of a
+     * few hundred stale sessions used to become a burst the gateway answers
+     * with 429s, and every customer paying at that moment shared the
+     * penalty. Sessions past the budget wait for the next run, five minutes
+     * on, oldest first.
+     */
+    public const MAX_GATEWAY_CHECKS_PER_RUN = 40;
+
+    /** A breath between gateway checks, so the run is a trickle rather than a burst. */
+    private const GATEWAY_CHECK_SPACING_MS = 150;
+
     public function handle(
         PaymentSessionService $paymentSessionService,
         OrderService $orderService
@@ -141,6 +156,7 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                     });
             })
             ->with('paymentAttempt.order', 'paymentAttempt.payable')
+            ->orderBy('expires_at')
             ->get();
 
         if ($stale->isEmpty()) {
@@ -148,6 +164,8 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         }
 
         $expired = 0;
+        $gatewayChecks = 0;
+        $deferred = 0;
 
         foreach ($stale as $session) {
             try {
@@ -181,6 +199,21 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
                     // exactly the stranded settlement VerifyPaymentJob now
                     // finishes. Only Failed is final here.
                     && $attempt->payment_status !== PaymentStatus::Failed) {
+                    // The gateway budget. A gateway that has asked us to slow
+                    // down, or a run that has spent its calls, leaves the
+                    // session exactly as it is for the next pass: a session
+                    // must never be expired without its last-chance check.
+                    if (GatewayRateLimit::isCoolingDown($attempt->gateway) || $gatewayChecks >= self::MAX_GATEWAY_CHECKS_PER_RUN) {
+                        $deferred++;
+
+                        continue;
+                    }
+
+                    if ($gatewayChecks > 0) {
+                        Sleep::usleep(self::GATEWAY_CHECK_SPACING_MS * 1000);
+                    }
+                    $gatewayChecks++;
+
                     try {
                         dispatch_sync(new VerifyPaymentJob($attempt));
                     } catch (\Throwable $e) {
@@ -311,6 +344,10 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
 
         if ($expired > 0) {
             Log::info("ExpireStalePaymentSessionsJob: expired {$expired} stale session(s).");
+        }
+
+        if ($deferred > 0) {
+            Log::info("ExpireStalePaymentSessionsJob: left {$deferred} session(s) for the next run (gateway budget or cool-down).");
         }
     }
 

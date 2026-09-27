@@ -47,7 +47,7 @@
         </div>
 
         {{-- The exact PDF, inline. What you see is what Download saves. --}}
-        <div class="overflow-hidden rounded-[12px] ring-1 ring-zinc-200 shadow-sm dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] shadow-sm">
             <iframe
                 src="{{ route('admin.order.report.pdf', $order) }}"
                 title="Order report preview"

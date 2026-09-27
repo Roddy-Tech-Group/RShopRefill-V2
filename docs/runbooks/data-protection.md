@@ -1,6 +1,6 @@
 # Data protection runbook
 
-How we handle a privacy request or incident, end to end. The system does most of the work; this is the people process around it. Owner: the Data Protection Officer (DPO mailbox: `info@rshoprefill.com`, as published on the privacy page).
+How we handle a privacy request or incident, end to end. The system does most of the work; this is the people process around it. Owner: the Data Protection Officer (DPO mailbox: `support@rshoprefill.com`, as published on the privacy page; `info@` has no inbox).
 
 Deadlines below are the ones we hold ourselves to. NDPA 2023 sets response deadlines that sources read as 7 to 30 days; we work to 7.
 

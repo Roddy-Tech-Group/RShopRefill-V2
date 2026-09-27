@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
+use Database\Seeders\EsimFaqSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -117,6 +118,9 @@ class EsimDetailPageTest extends TestCase
         $this->withoutVite();
 
         $this->esimRegion();
+        // The FAQ comes from the faqs table ("eSIMs" topic), so the section
+        // only renders once that topic exists.
+        $this->seed(EsimFaqSeeder::class);
 
         $this->get(route('shop.esim', 'united-states-data-esim'))
             ->assertOk()
@@ -128,7 +132,7 @@ class EsimDetailPageTest extends TestCase
             ->assertSee('Check compatibility')
             ->assertSee('Why travelers choose RshopRefills eSIMs')
             ->assertSee('Frequently asked questions')
-            ->assertSee("All purchases are final unless you don't receive your order", false)
+            ->assertSee('What is an eSIM?')
             ->assertSee('Buy now');
     }
 
@@ -185,13 +189,14 @@ class EsimDetailPageTest extends TestCase
 
         $this->esimRegion();
 
-        // First-visit "where are you going?" modal, gated to one appearance per
-        // session, using the World Cup hero illustration.
-        $this->get(route('shop.esims'))
-            ->assertOk()
-            ->assertSee('rshopEsimTip', false)   // once-per-session gate
-            ->assertSee('Where are you going')    // the travel hook
-            ->assertSee('Find my eSIM');          // dismiss CTA
+        // The first-visit "where are you going?" modal left with the World Cup
+        // advert (the landing leads with the catalogue itself now), so the
+        // once-per-session gate and its copy must not come back.
+        $response = $this->get(route('shop.esims'))->assertOk();
+        $html = $response->getContent();
+
+        $this->assertFalse(str_contains($html, 'rshopEsimTip'), 'the first-visit gate is back');
+        $this->assertFalse(str_contains($html, 'Where are you going'), 'the first-visit nudge copy is back');
     }
 
     public function test_the_esims_landing_accepts_a_scope_filter(): void
@@ -305,16 +310,18 @@ class EsimDetailPageTest extends TestCase
 
         $this->esimRegion();
 
-        // The plan-selection buy bar now slides in from the top of the viewport
-        // (fixed, offset just below the live nav height), so it sits clear of
-        // the nav and the dashboard's bottom tab bar. Storefront shares it.
-        $this->actingAs(User::factory()->create())
-            ->get(route('dashboard.shop.esim', 'united-states-data-esim'))
-            ->assertOk()
-            ->assertSee('fixed inset-x-0 z-[100]', false);
+        // The top buy banner is gone: "Get eSIM" opens a purchase sheet
+        // (EsimPurchaseModalTest holds its shape). Both surfaces render the
+        // same sheet, and neither pins a bar over the plans any more.
+        foreach ([
+            fn () => $this->actingAs(User::factory()->create())->get(route('dashboard.shop.esim', 'united-states-data-esim')),
+            fn () => $this->get(route('shop.esim', 'united-states-data-esim')),
+        ] as $request) {
+            $html = $request()->assertOk()->getContent();
 
-        $this->get(route('shop.esim', 'united-states-data-esim'))
-            ->assertOk()
-            ->assertSee('fixed inset-x-0 z-[100]', false);
+            $this->assertTrue(str_contains($html, 'aria-labelledby="buy-title"'), 'the purchase sheet is missing');
+            $this->assertTrue(str_contains($html, 'showBuy: false,'), 'the purchase sheet has no state to open');
+            $this->assertFalse(str_contains($html, 'fixed inset-x-0 z-[100]'), 'the old top buy banner is back');
+        }
     }
 }

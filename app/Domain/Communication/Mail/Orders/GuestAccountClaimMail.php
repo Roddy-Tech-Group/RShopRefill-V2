@@ -30,7 +30,7 @@ class GuestAccountClaimMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Claim your '.$brand.' account to track your order',

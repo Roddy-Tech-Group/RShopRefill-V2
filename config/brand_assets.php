@@ -14,6 +14,7 @@
 return [
     'logos' => [
         'Apple' => 'apple.webp',
+        'DiscordNitro' => 'discord-nitro.webp',
         'Amazon' => 'amazon.webp',
         'AmazonPrime' => 'amazon.webp',
         'GooglePlay' => 'googleplay.webp',
@@ -35,6 +36,12 @@ return [
         'MTN' => 'mtn.webp',
         'Orange' => 'orange.webp',
         'Camtel' => 'camtel.png',
+        // Nigeria's other three networks. Zendit sends no logo_url for any of
+        // them, so without these rows the tiles fall back to a flat colour.
+        // Note the key is NineMobile, not 9mobile.
+        'Glo' => 'glo.jpg',
+        'Airtel' => 'airtel.jpg',
+        'NineMobile' => 'ninemobile.jpg',
         'Att' => 'at&t-prepaid_2_300x190.webp',
         'Boost' => 'boost-mobile_300x190.webp',
         'Cricket' => 'cricket-wireless_300x190.webp',

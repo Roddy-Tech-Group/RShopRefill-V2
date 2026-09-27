@@ -3,7 +3,7 @@
         {{-- KPI grid --}}
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
             
-            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5">
+            <div class="relative flex flex-col overflow-hidden rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5">
                 <div class="relative z-10 flex flex-1 flex-col">
                     <div class="flex items-start justify-between gap-2">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-blue-100 text-blue-600 sm:h-11 sm:w-11">
@@ -18,7 +18,7 @@
                 </div>
             </div>
 
-            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5">
+            <div class="relative flex flex-col overflow-hidden rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5">
                 <div class="relative z-10 flex flex-1 flex-col">
                     <div class="flex items-start justify-between gap-2">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-purple-100 text-purple-600 sm:h-11 sm:w-11">
@@ -33,7 +33,7 @@
                 </div>
             </div>
 
-            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5">
+            <div class="relative flex flex-col overflow-hidden rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5">
                 <div class="relative z-10 flex flex-1 flex-col">
                     <div class="flex items-start justify-between gap-2">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-orange-100 text-orange-600 sm:h-11 sm:w-11">
@@ -48,7 +48,7 @@
                 </div>
             </div>
 
-            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5">
+            <div class="relative flex flex-col overflow-hidden rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5">
                 <div class="relative z-10 flex flex-1 flex-col">
                     <div class="flex items-start justify-between gap-2">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-emerald-100 text-emerald-600 sm:h-11 sm:w-11">
@@ -69,7 +69,7 @@
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
             {{-- Latest Tickets --}}
-            <div class="min-w-0 overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="min-w-0 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
                 <div class="flex items-center justify-between border-b border-zinc-200 p-5">
                     <div class="flex items-center gap-2">
                         <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -80,14 +80,14 @@
                     <a href="{{ route('admin.support-tickets') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View All</a>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="inset-divide w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-600">
+                <div class="overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">User</th>
-                                <th class="px-5 py-3 font-semibold">Subject</th>
-                                <th class="px-5 py-3 font-semibold">Status</th>
-                                <th class="px-5 py-3 text-right font-semibold">Date</th>
+                                <th class="">User</th>
+                                <th class="">Subject</th>
+                                <th class="">Status</th>
+                                <th class="text-right">Date</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -97,11 +97,11 @@
                                     <td class="px-5 py-3 text-zinc-600 truncate max-w-[150px]">{{ $ticket->subject ?: 'No Subject' }}</td>
                                     <td class="px-5 py-3">
                                         @if($ticket->status === 'new')
-                                            <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">New</span>
+                                            <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">New</span>
                                         @elseif($ticket->status === 'read')
-                                            <span class="inline-flex items-center rounded-md bg-zinc-50 px-2 py-1 text-[10px] font-medium text-zinc-600 ring-1 ring-inset ring-zinc-500/10">Read</span>
+                                            <span class="inline-flex items-center rounded-full bg-zinc-50 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-600">Read</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-[10px] font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Resolved</span>
+                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-semibold text-green-700">Resolved</span>
                                         @endif
                                     </td>
                                     <td class="px-5 py-3 text-right text-zinc-500">{{ $ticket->created_at->diffForHumans() }}</td>
@@ -117,7 +117,7 @@
             </div>
 
             {{-- Latest Users --}}
-            <div class="min-w-0 overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="min-w-0 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/5">
                 <div class="flex items-center justify-between border-b border-zinc-200 p-5">
                     <div class="flex items-center gap-2">
                         <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -128,13 +128,13 @@
                     <a href="{{ route('admin.customers') }}" class="rounded-[12px] border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50">View All</a>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="inset-divide w-full text-left text-[11px]">
-                        <thead class="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-600">
+                <div class="overflow-x-auto p-3">
+                    <table class="w-full text-left text-[11px] admin-table admin-table-compact">
+                        <thead class="">
                             <tr>
-                                <th class="px-5 py-3 font-semibold">User</th>
-                                <th class="px-5 py-3 font-semibold">Status</th>
-                                <th class="px-5 py-3 text-right font-semibold">Registered</th>
+                                <th class="">User</th>
+                                <th class="">Status</th>
+                                <th class="text-right">Registered</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -154,11 +154,11 @@
                                     </td>
                                     <td class="px-5 py-3">
                                         @if ($user->banned_at)
-                                            <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700 ring-1 ring-inset ring-red-600/10">Banned</span>
+                                            <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700">Banned</span>
                                         @elseif ($user->suspended_at)
-                                            <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">Suspended</span>
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">Suspended</span>
                                         @else
-                                            <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Active</span>
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">Active</span>
                                         @endif
                                     </td>
                                     <td class="px-5 py-3 text-right text-zinc-500">{{ $user->created_at->diffForHumans() }}</td>

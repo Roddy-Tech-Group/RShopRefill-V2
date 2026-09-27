@@ -168,7 +168,7 @@ class extends Component {
                 afterState: collect($payload)->only($auditable)->toArray(),
                 metadata: ['password_changed' => filled($this->password)],
             );
-            session()->flash('status', $this->name . ' updated.');
+            $this->dispatch('toast', message: $this->name . ' updated.');
         } else {
             $admin = Admin::create($payload);
 
@@ -177,7 +177,7 @@ class extends Component {
                 model: $admin,
                 afterState: collect($payload)->only($auditable)->toArray(),
             );
-            session()->flash('status', $this->name . ' created.');
+            $this->dispatch('toast', message: $this->name . ' created.');
         }
 
         $this->resetForm();
@@ -191,7 +191,7 @@ class extends Component {
         $currentAdminId = auth()->guard('admin')->id();
 
         if ($id === $currentAdminId) {
-            session()->flash('error', 'You cannot deactivate your own account.');
+            $this->dispatch('toast', message: 'You cannot deactivate your own account.', isError: true);
             return;
         }
 
@@ -213,7 +213,7 @@ class extends Component {
         $currentAdminId = auth()->guard('admin')->id();
 
         if ($id === $currentAdminId) {
-            session()->flash('error', 'You are already logged in as this admin.');
+            $this->dispatch('toast', message: 'You are already logged in as this admin.', isError: true);
             return null;
         }
 
@@ -267,14 +267,6 @@ class extends Component {
 
     <div class="flex flex-col gap-6">
 
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
-
-        @if (session('error'))
-            <div class="rounded-[12px] bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30">{{ session('error') }}</div>
-        @endif
-
         {{-- Header action --}}
         <div class="flex items-center justify-end">
             <button
@@ -290,7 +282,7 @@ class extends Component {
         </div>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead class="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-600 dark:bg-[#0c1a36] dark:text-zinc-400">
@@ -314,7 +306,7 @@ class extends Component {
                                 };
                                 $isSelf = auth()->guard('admin')->id() === $admin->id;
                             @endphp
-                            <tr class="transition-colors hover:bg-zinc-50 dark:hover:bg-[#26416b]/40">
+                            <tr class="transition-colors hover:bg-blue-50 dark:hover:bg-[#26416b]/40">
                                 <td class="px-5 py-3">
                                     <div class="flex items-center gap-3">
                                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
@@ -423,7 +415,7 @@ class extends Component {
                     @else
                         <div>
                             <label class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Section access</label>
-                            <div class="mt-2 grid grid-cols-1 gap-1.5 rounded-[12px] border border-zinc-200 p-3 sm:grid-cols-2 dark:border-zinc-700/60">
+                            <div class="mt-2 grid grid-cols-1 gap-1.5 rounded-[12px] p-3 sm:grid-cols-2">
                                 @foreach ($this->sections as $key => $label)
                                     <label class="flex items-center gap-2 rounded-[8px] px-2 py-1.5 transition-colors hover:bg-zinc-50 dark:hover:bg-[#26416b]">
                                         <input type="checkbox" value="{{ $key }}" wire:model="permissions" class="h-4 w-4 cursor-pointer accent-blue-600">

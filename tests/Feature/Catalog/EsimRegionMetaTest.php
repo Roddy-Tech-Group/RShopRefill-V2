@@ -33,7 +33,8 @@ class EsimRegionMetaTest extends TestCase
     public function test_worldwide_products_are_global(): void
     {
         $this->assertSame('global', EsimStoreController::regionMeta('WW', 'esim-ww-discover-global', 'Global eSIM')['scope']);
-        $this->assertSame('Discover Global', EsimStoreController::regionMeta('WW', 'esim-ww-discover-global', 'Global eSIM')['name']);
+        // Sold as "Global", never under the supplier's own product name.
+        $this->assertSame('Global', EsimStoreController::regionMeta('WW', 'esim-ww-discover-global', 'Global eSIM')['name']);
 
         // Zendit's empty-country catch-all.
         $zendit = EsimStoreController::regionMeta('', 'esim', ' Data eSIM');

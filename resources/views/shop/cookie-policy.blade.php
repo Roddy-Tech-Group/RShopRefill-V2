@@ -9,11 +9,11 @@
 <x-layouts.app.header :title="'Cookie Policy | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Cookies</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Cookie Policy</h1>
-            <p class="mt-3 text-sm text-zinc-600">Last updated: {{ $lastUpdated }}</p>
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Cookies</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">Cookie Policy</h1>
+            <p class="mt-3 text-sm text-white/75">Last updated: {{ $lastUpdated }}</p>
         </div>
     </section>
 
@@ -28,7 +28,7 @@
         </p>
 
         {{-- On this page --}}
-        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5 ring-1 ring-zinc-100" aria-label="On this page">
+        <nav class="mt-7 rounded-[12px] bg-zinc-50 p-5" aria-label="On this page">
             <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">On this page</p>
             <ol class="mt-3 space-y-2 text-sm">
                 <li><a href="#what" class="font-medium text-blue-600 hover:underline">1. What are cookies</a></li>
@@ -57,7 +57,7 @@
                 We use four main groups of cookies. Here is what each one does.
             </p>
 
-            <div class="mt-5 overflow-x-auto rounded-[12px] ring-1 ring-zinc-100">
+            <div class="mt-5 overflow-x-auto rounded-[12px]">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-zinc-50">
                         <tr>
@@ -65,7 +65,7 @@
                             <th class="px-4 py-3 font-semibold text-zinc-900">What it does</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-100">
+                    <tbody>
                         <tr>
                             <td class="px-4 py-3 font-medium text-zinc-900">Essential</td>
                             <td class="px-4 py-3 text-zinc-600">Keep you signed in, secure your session, and run core features like the cart and checkout. These cannot be turned off.</td>
@@ -90,7 +90,7 @@
                 </table>
             </div>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">Essential cookies are always on</p>
@@ -122,7 +122,7 @@
                 <li><span class="font-semibold text-zinc-900">Our cookie settings.</span> Use the cookie settings link in the footer to reopen the consent banner and change your choice at any time.</li>
             </ul>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-zinc-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-red-600">Blocking essential cookies breaks core features</p>
@@ -140,7 +140,7 @@
                 agree with them.
             </p>
 
-            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4 ring-1 ring-zinc-100">
+            <div class="my-5 flex items-start gap-3 rounded-[12px] bg-blue-50 p-4">
                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
                 <div>
                     <p class="text-sm font-bold text-blue-700">We do not sell your personal data</p>
@@ -159,7 +159,6 @@
                 or <a href="{{ route('shop.contact') }}" wire:navigate class="font-medium text-blue-600 hover:underline">contact our team</a>.
             </p>
         </section>
-        <x-legal-footer />
     </div>
 
 </x-layouts.app.header>

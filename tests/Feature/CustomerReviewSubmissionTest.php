@@ -95,7 +95,20 @@ class CustomerReviewSubmissionTest extends TestCase
         $this->assertFalse($review->is_published);
         $this->assertTrue($review->is_customer_submitted);
         $this->assertSame($user->id, $review->user_id);
-        $this->assertSame('RshopRefills', $review->source);
+        // The source column is a label naming who collected the review, and for
+        // our own submissions that label is the brand's own name. The brand is
+        // now written "RshopRefill", singular: it is what APP_NAME carries, it
+        // matches the rshoprefill.com domain the site has always been served
+        // from, and it is the only own-website option the admin review form
+        // offers, which validates source against in:Trustpilot,Google,RshopRefill.
+        // This assertion still expected the older plural "RshopRefills" and was
+        // left behind when the name was corrected across the application. Only
+        // the spelling moved: Review::scopeOwnCollected decides what reaches the
+        // storefront by asking whether the source is one of the external
+        // platforms, so no filtering depends on this exact string. What the
+        // assertion really pins is that a customer submission is stamped with
+        // our own brand and never inherits a platform's name.
+        $this->assertSame('RshopRefill', $review->source);
         $this->assertSame('DO', $review->initials);
         $this->assertSame(5, (int) $review->rating);
     }

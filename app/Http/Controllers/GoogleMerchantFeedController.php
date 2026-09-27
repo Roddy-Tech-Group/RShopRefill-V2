@@ -83,20 +83,20 @@ class GoogleMerchantFeedController extends Controller
                 'availability' => 'in_stock',
                 'price' => number_format($priceUsd, 2, '.', '').' USD',
                 'condition' => 'new',
-                'brand' => config('app.name', 'RshopRefills'),
+                'brand' => config('app.name', 'RshopRefill'),
                 'google_product_category' => 'Electronics > Communications > Telephony > Mobile Phone Accessories > SIM Cards',
                 'identifier_exists' => 'no',
             ]);
         }
 
-        $name = $this->xml(config('app.name', 'RshopRefills'));
+        $name = $this->xml(config('app.name', 'RshopRefill'));
         $home = $this->xml(url('/'));
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>{$name} - Travel eSIMs</title>
+    <title>{$name} - eSIMs</title>
     <link>{$home}</link>
     <description>Travel data eSIMs with instant delivery, from {$name}.</description>
 {$items}  </channel>

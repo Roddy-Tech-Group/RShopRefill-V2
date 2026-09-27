@@ -4,10 +4,17 @@
          with Light / Dark / Auto options. Use in nav bars and other tight
          spaces where an inline segmented control would crowd the layout.
          Supports `drop="down"` (default) or `drop="up"` for the panel side.
+         The panel rows are sm/20px-icon sized - the old xs/16px rows were
+         cramped for a menu people read rather than scan.
 
        variant="segmented": always-visible inline pill with Light / Dark /
-         Auto as three segments inside a blue-bordered chip. Use in the
-         footer and any surface that has room for a labelled control.
+         Auto as three segments. It wears the locale chip's hairline ring
+         (ring, not border, so both land at 32px tall) because the two sit in
+         the same footer row. Use where a "Theme" label already sits beside it.
+
+       variant="labelled": Theme: Light | System | Dark, in words. Use where the
+         control stands alone - three bare marks with nothing naming them is a
+         row of glyphs, not a setting.
 
      Both share the same window.setTheme backing and stay in sync via the
      `theme-changed` window event, so picking a theme from one updates any
@@ -22,9 +29,9 @@
     // (components/icons/theme-*). Inline SVGs inherit currentColor, so the
     // same icon recolors automatically on light, dark, and selected rows.
     $themeChoices = [
-        ['value' => 'light',  'label' => 'Light', 'icon' => 'icons.theme-light'],
-        ['value' => 'dark',   'label' => 'Dark',  'icon' => 'icons.theme-dark'],
-        ['value' => 'system', 'label' => 'Auto',  'icon' => 'icons.theme-auto'],
+        ['value' => 'light',  'label' => __('common.theme_light'), 'icon' => 'icons.theme-light'],
+        ['value' => 'dark',   'label' => __('common.theme_dark'), 'icon' => 'icons.theme-dark'],
+        ['value' => 'system', 'label' => __('common.theme_auto'), 'icon' => 'icons.theme-auto'],
     ];
 @endphp
 
@@ -40,47 +47,80 @@
     @media (prefers-reduced-motion: reduce) { .theme-toggle-pop { animation: none; } }
 </style>
 
-@if ($variant === 'segmented')
+@if ($variant === 'labelled')
+    {{-- Labelled selector: Theme: Light | System | Dark.
+
+         The segmented variant is three marks and nothing else, which reads as a
+         row of glyphs unless something beside it says "Theme". Where the control
+         stands alone, the words have to be on it. --}}
+    <div
+        x-data="{
+            choice: (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system')),
+            pick(v, e) {
+                this.choice = v;
+                // Same switching style as the dashboard: a circular reveal from
+                // the click point, degrading to a plain switch where View
+                // Transitions are missing or motion is reduced.
+                if (window.rshopThemeReveal) { window.rshopThemeReveal(e || null, v); }
+                else if (window.setTheme) { window.setTheme(v); }
+            },
+        }"
+        x-on:theme-changed.window="choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
+        {{ $attributes->class('inline-flex w-fit items-center gap-2 text-sm') }}
+        role="radiogroup"
+        aria-label="{{ __('common.theme') }}"
+    >
+        <span class="font-medium text-zinc-600 dark:text-zinc-400">{{ __('common.theme_label') }}</span>
+
+        <div class="inline-flex items-center gap-1 rounded-full bg-[#f4f6f5] p-1 dark:bg-white/10">
+            @foreach ([['light', __('common.theme_light')], ['system', __('common.theme_system')], ['dark', __('common.theme_dark')]] as [$value, $label])
+                <button
+                    type="button"
+                    @click="pick('{{ $value }}', $event)"
+                    :class="choice === '{{ $value }}'
+                        ? 'bg-[#ffffff] font-semibold text-zinc-900 shadow-sm dark:bg-white/20 dark:text-white'
+                        : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
+                    class="rounded-full px-3 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    :aria-checked="(choice === '{{ $value }}').toString()"
+                    role="radio"
+                >{{ $label }}</button>
+            @endforeach
+        </div>
+    </div>
+@elseif ($variant === 'segmented')
     {{-- ── Segmented chip (Light / Dark / Auto) ─────────────────────── --}}
     <div
         x-data="{
             choice: (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system')),
-            softDark: (window.pureDarkOn ? ! window.pureDarkOn() : false),
             switching: false,
-            pick(v) {
+            pick(v, e) {
                 this.choice = v;
-                if (window.setTheme) { window.setTheme(v); }
+                // Same switching style as the dashboard: a circular reveal from
+                // the click point, degrading to a plain switch where View
+                // Transitions are missing or motion is reduced.
+                if (window.rshopThemeReveal) { window.rshopThemeReveal(e || null, v); }
+                else if (window.setTheme) { window.setTheme(v); }
                 this.switching = true;
                 clearTimeout(this._popTimer);
                 this._popTimer = setTimeout(() => this.switching = false, 650);
             },
-            toggleSoft() {
-                this.softDark = ! this.softDark;
-                // Pure black is the default, so the stored pure-dark flag is the inverse.
-                if (window.setPureDark) { window.setPureDark(! this.softDark); }
-                if (this.softDark && window.themeIsDark && ! window.themeIsDark()) {
-                    this.choice = 'dark';
-                    if (window.setTheme) { window.setTheme('dark'); }
-                }
-            },
         }"
         x-on:theme-changed.window="choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
-        x-on:pure-dark-changed.window="softDark = (window.pureDarkOn ? ! window.pureDarkOn() : false)"
-        {{ $attributes->class('inline-flex w-fit items-center gap-0.5 rounded-[12px] border border-blue-400 p-0.5 dark:border-blue-500/60') }}
+        {{ $attributes->class('inline-flex w-fit items-center gap-0.5 rounded-full p-0.5 ring-1 ring-zinc-200') }}
         role="radiogroup"
-        aria-label="Theme"
+        aria-label="{{ __('common.theme') }}"
     >
         @foreach ($themeChoices as $opt)
             <button
                 type="button"
-                @click="pick('{{ $opt['value'] }}')"
+                @click="pick('{{ $opt['value'] }}', $event)"
                 :class="[
                     choice === '{{ $opt['value'] }}'
                         ? 'text-blue-600 dark:text-blue-300'
                         : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300',
                     switching && choice === '{{ $opt['value'] }}' ? 'theme-toggle-pop' : '',
                 ].join(' ')"
-                class="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors duration-150"
+                class="flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-150"
                 :aria-checked="(choice === '{{ $opt['value'] }}').toString()"
                 role="radio"
                 aria-label="{{ $opt['label'] }}"
@@ -89,23 +129,6 @@
                 <x-dynamic-component :component="$opt['icon']" class="h-4 w-4" />
             </button>
         @endforeach
-        {{-- Soft dark: navy palette opt-in (dark mode is pure black by default),
-             divided off after the three theme segments. Blue when active; turning
-             it on forces dark so the change is visible. --}}
-        <span class="mx-0.5 h-5 w-px shrink-0 bg-blue-400/40 dark:bg-blue-500/50" aria-hidden="true"></span>
-        <button
-            type="button"
-            @click="toggleSoft()"
-            :class="softDark ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'"
-            class="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors duration-150"
-            :aria-pressed="softDark.toString()"
-            aria-label="Soft dark"
-            title="Soft dark"
-        >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
-            </svg>
-        </button>
     </div>
 @else
     {{-- ── Dropdown (sun/moon trigger + popup panel) ─────────────────── --}}
@@ -120,28 +143,21 @@
             open: false,
             locked: false,
             switching: false,
-            softDark: (window.pureDarkOn ? ! window.pureDarkOn() : false),
-            pick(v) {
+            pick(v, e) {
                 this.choice = v;
-                if (window.setTheme) { window.setTheme(v); }
+                // Same switching style as the dashboard: a circular reveal from
+                // the click point, degrading to a plain switch where View
+                // Transitions are missing or motion is reduced.
+                if (window.rshopThemeReveal) { window.rshopThemeReveal(e || null, v); }
+                else if (window.setTheme) { window.setTheme(v); }
                 this.open = false;
                 this.locked = false;
                 this.switching = true;
                 clearTimeout(this._popTimer);
                 this._popTimer = setTimeout(() => this.switching = false, 650);
             },
-            toggleSoft() {
-                this.softDark = ! this.softDark;
-                // Pure black is the default, so the stored pure-dark flag is the inverse.
-                if (window.setPureDark) { window.setPureDark(! this.softDark); }
-                if (this.softDark && window.themeIsDark && ! window.themeIsDark()) {
-                    this.choice = 'dark';
-                    if (window.setTheme) { window.setTheme('dark'); }
-                }
-            },
         }"
         x-on:theme-changed.window="dark = $event.detail.dark; choice = (window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'))"
-        x-on:pure-dark-changed.window="softDark = (window.pureDarkOn ? ! window.pureDarkOn() : false)"
         @mouseenter="open = true"
         @mouseleave="if (! locked) open = false"
         @click.outside="open = false; locked = false"
@@ -152,8 +168,8 @@
             type="button"
             @click="locked = ! locked; open = locked"
             :aria-expanded="open.toString()"
-            aria-label="Theme"
-            title="Theme"
+            aria-label="{{ __('common.theme') }}"
+            title="{{ __('common.theme') }}"
             :class="switching ? 'theme-toggle-pop' : ''"
             {{ $attributes->class('inline-flex items-center justify-center transition-colors') }}
         >
@@ -176,42 +192,26 @@
             x-transition:leave="transition ease-in duration-100"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 {{ $offStart }}"
-            class="absolute right-0 {{ $panelPos }} z-50 w-max overflow-hidden rounded-[5px] bg-white/70 backdrop-blur-md shadow-xl shadow-zinc-900/10 ring-2 ring-blue-400 dark:bg-[#1d3252]/70 dark:ring-blue-500/60"
+            class="absolute right-0 {{ $panelPos }} z-50 w-max overflow-hidden rounded-[10px] bg-white/70 backdrop-blur-md shadow-xl shadow-zinc-900/10 ring-1 ring-zinc-200 dark:bg-[#1d3252]/70 dark:ring-white/10"
             role="menu"
-            aria-label="Theme"
+            aria-label="{{ __('common.theme') }}"
         >
-            <div class="p-0.5">
+            <div class="p-1">
                 @foreach ($themeChoices as $opt)
                     <button
                         type="button"
-                        @click="pick('{{ $opt['value'] }}')"
+                        @click="pick('{{ $opt['value'] }}', $event)"
                         :class="choice === '{{ $opt['value'] }}'
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-[#0c1337] text-white dark:bg-[#fdfdfd] dark:text-[#0c1337]'
                             : 'text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-[#26416b]'"
-                        class="flex w-full items-center gap-2 whitespace-nowrap rounded-[5px] py-1.5 pl-2 pr-4 text-left text-xs font-medium transition-colors"
+                        class="flex w-full items-center gap-2.5 whitespace-nowrap rounded-[7px] py-2 pl-2.5 pr-5 text-left text-sm font-medium transition-colors"
                         role="menuitemradio"
                         :aria-checked="(choice === '{{ $opt['value'] }}').toString()"
                     >
-                        <x-dynamic-component :component="$opt['icon']" class="h-4 w-4" />
+                        <x-dynamic-component :component="$opt['icon']" class="h-5 w-5" />
                         <span>{{ $opt['label'] }}</span>
                     </button>
                 @endforeach
-                {{-- Soft dark: navy palette opt-in (dark mode is pure black by
-                     default). Highlights blue when active; enabling it forces dark. --}}
-                <div class="my-0.5 h-px bg-zinc-200/70 dark:bg-white/10" aria-hidden="true"></div>
-                <button
-                    type="button"
-                    @click="toggleSoft()"
-                    :class="softDark ? 'bg-blue-600 text-white' : 'text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-[#26416b]'"
-                    class="flex w-full items-center gap-2 whitespace-nowrap rounded-[5px] py-1.5 pl-2 pr-4 text-left text-xs font-medium transition-colors"
-                    role="menuitemcheckbox"
-                    :aria-checked="softDark.toString()"
-                >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
-                    </svg>
-                    <span>Soft dark</span>
-                </button>
             </div>
         </div>
     </div>

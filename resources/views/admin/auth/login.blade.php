@@ -7,7 +7,7 @@
 
             {{-- Admin chip --}}
             <div class="flex justify-center">
-                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-blue-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black">
+                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-blue-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black dark:bg-white/10">
                     <img src="{{ asset('assets/' . rawurlencode('admin access.svg')) }}" alt="" class="no-dark-invert h-3.5 w-3.5" loading="lazy">
                     Administrator
                 </span>
@@ -27,7 +27,6 @@
 
             {{-- Heading --}}
             <h1 class="mt-2 text-center text-2xl font-bold tracking-tight text-zinc-900">Admin Access</h1>
-            <p class="mt-1 text-center text-sm text-zinc-600">Sign in to the {{ $siteName }} administration panel.</p>
 
             {{-- Status flash --}}
             <x-auth-session-status class="mt-4 text-center" :status="session('status')" />
@@ -124,10 +123,6 @@
                 <span>Protected administrative area. All sign-ins are logged.</span>
             </div>
 
-            {{-- Back to customer login --}}
-            <div class="mt-3 flex justify-center text-sm">
-                <a href="{{ route('login') }}" wire:navigate class="font-medium text-zinc-600 transition-colors hover:text-blue-700">Not an admin? Sign in to your customer account</a>
-            </div>
 
         </div>
     </div>

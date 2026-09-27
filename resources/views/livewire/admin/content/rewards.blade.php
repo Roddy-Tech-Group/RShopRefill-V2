@@ -145,7 +145,7 @@ class extends Component {
     {{-- Master kill-switch is rendered standalone at the top because it's
          the most impactful setting on the page. --}}
     @php $masterRow = ['key' => 'rcoin_enabled', 'label' => 'Rcoin engine', 'help' => 'When OFF no rewards are awarded, no redemptions accepted, no referrals counted. Storefront copy (the "earn X Rcoin" lines, the redeem toggle and the marketing page) auto-hides too. Existing balances stay spendable from the Rewards dashboard.']; @endphp
-    <section class="mb-6 flex items-start justify-between gap-4 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-2 ring-blue-500 dark:bg-[#1d3252] dark:ring-blue-400">
+    <section class="mb-6 flex items-start justify-between gap-4 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
         <div>
             <h2 class="text-sm font-bold text-zinc-900 dark:text-white">{{ $masterRow['label'] }}</h2>
             <p class="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{{ $masterRow['help'] }}</p>
@@ -158,14 +158,14 @@ class extends Component {
 
     @foreach ($this->groups() as $groupName => $rows)
         @if ($groupName === 'General') @continue @endif {{-- General's only field (rcoin_enabled) is the master switch above. --}}
-        <section class="mb-5 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <section class="mb-5 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             {{-- Header pill --}}
-            <header class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+            <header class="mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 dark:bg-white/5">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $groupName }}</h2>
             </header>
-            <div class="divide-inset">
+            <div class="divide-inset pb-3">
                 @foreach ($rows as $row)
-                    <div class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] sm:flex-row sm:items-center sm:justify-between dark:hover:bg-blue-600/15 dark:hover:ring-blue-400" wire:key="setting-{{ $row['key'] }}">
+                    <div class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 sm:flex-row sm:items-center sm:justify-between" wire:key="setting-{{ $row['key'] }}">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
                                 <label for="set-{{ $row['key'] }}" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $row['label'] }}</label>
@@ -175,7 +175,7 @@ class extends Component {
                                         x-init="setTimeout(() => show = false, 1500)"
                                         x-show="show"
                                         x-transition.opacity
-                                        class="inline-flex items-center gap-1 rounded-[5px] bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
+                                        class="inline-flex items-center gap-1 rounded-[5px] bg-emerald-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                                     >
                                         <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                         Saved

@@ -78,7 +78,7 @@ class ReviewController extends Controller
             'initials' => $initials,
             'body' => trim($validated['body']),
             'rating' => (int) $validated['rating'],
-            'source' => 'RshopRefills',
+            'source' => 'RshopRefill',
             'reviewed_at' => now()->toDateString(),
             'is_published' => false,
             'is_customer_submitted' => true,

@@ -1,4 +1,4 @@
-<x-emails.layout :mail-message="$message ?? null" title="Your Authentication Code" preheader="Your one-time verification code for RShopRefills.">
+<x-emails.layout :mail-message="$message ?? null" title="Your Authentication Code" preheader="Your one-time verification code for RshopRefill.">
     <h1 style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:800; color:#0c1a2e;">Verification Code</h1>
 
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">

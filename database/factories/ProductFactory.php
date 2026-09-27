@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,6 +19,9 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
+            // products.category_id is NOT NULL; a factory product gets a
+            // category of its own unless the test hands it one.
+            'category_id' => Category::factory(),
             'provider_name' => 'test',
             'provider_reference' => $this->faker->uuid,
             'brand_key' => 'TestBrand',

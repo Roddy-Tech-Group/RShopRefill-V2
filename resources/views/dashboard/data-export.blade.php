@@ -3,14 +3,14 @@
 <head>
     @include('partials.head')
 </head>
-<body class="min-h-screen bg-[#eff6ff] text-zinc-900 antialiased dark:bg-[#0c1a36] dark:text-zinc-100">
+<body class="min-h-screen bg-[#f4f6f5] text-zinc-900 antialiased dark:bg-[#0c1a36] dark:text-zinc-100">
 
 <div class="relative flex min-h-screen items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="relative z-10 w-full max-w-md">
-        <div class="overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-[#122343] sm:p-10">
+        <div class="overflow-hidden rounded-[12px] bg-white p-8 shadow-sm dark:bg-[#122343] sm:p-10">
 
             <div class="mb-8 flex justify-center">
-                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-[#f4f6f5] text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                     </svg>
@@ -23,16 +23,6 @@
                     We sent a 6-digit code to <span class="font-semibold text-zinc-900 dark:text-white">{{ $maskedEmail }}</span>. Enter it to confirm it is you, and your PDF will download.
                 </p>
             </div>
-
-            @if (session('status'))
-                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
-                     x-transition:leave="transition ease-in duration-300"
-                     x-transition:leave-start="opacity-100 transform translate-y-0"
-                     x-transition:leave-end="opacity-0 transform -translate-y-2"
-                     class="mt-4 rounded-lg bg-green-50 p-4 text-sm text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                    {{ session('status') }}
-                </div>
-            @endif
 
             @foreach (['resend' => 'amber', 'data_export' => 'red'] as $field => $tone)
                 @error($field)
@@ -49,7 +39,7 @@
                     <label for="otp" class="sr-only">Verification code</label>
                     <div class="relative">
                         <input id="otp" name="otp" type="text" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="------" autocomplete="one-time-code" autofocus
-                            class="block w-full rounded-[12px] border border-zinc-200 bg-zinc-50 px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f] dark:bg-[#0c1a36] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20">
+                            class="block w-full rounded-[12px] border border-zinc-200 bg-[#f4f6f5] px-4 py-4 text-center text-3xl font-mono tracking-[0.5em] text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 dark:border-[#24364f] dark:bg-[#0c1a36] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20">
                         @error('otp')
                             <div class="absolute -bottom-6 left-0 right-0 text-center">
                                 <p class="text-xs font-medium text-red-500 dark:text-red-400">{{ $message }}</p>

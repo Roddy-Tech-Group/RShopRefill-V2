@@ -28,7 +28,7 @@
             <div class="flex gap-1">
                 @foreach (['30' => '30 days', '90' => '90 days', 'all' => 'All time'] as $value => $label)
                     <a href="{{ route('admin.users.feedback', ['window' => $value]) }}"
-                       class="rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors {{ $window === $value ? 'bg-blue-600 text-white' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300' }}">
+                       class="rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-colors {{ $window === $value ? 'bg-blue-600 text-white' : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-300' }}">
                         {{ $label }}
                     </a>
                 @endforeach
@@ -42,7 +42,7 @@
     <div class="space-y-6">
         {{-- Reason counts as labelled magnitude bars: one hue, value labels
              on every row (short list, so labels beat a tooltip here). --}}
-        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <h2 class="mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Why customers say they leave</h2>
             <div class="space-y-3">
                 @foreach (AccountClosureFeedback::REASONS as $key => $label)
@@ -60,7 +60,7 @@
             </div>
         </div>
 
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <h2 class="border-b border-zinc-100 px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:border-white/10 dark:text-zinc-400">In their own words</h2>
             @forelse ($comments as $feedback)
                 <div class="border-b border-zinc-100 px-5 py-3.5 last:border-0 dark:border-white/10">

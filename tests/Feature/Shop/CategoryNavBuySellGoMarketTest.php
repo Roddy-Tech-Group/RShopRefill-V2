@@ -7,11 +7,16 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The gift-cards category tab reads "Buy Gift Cards", and the GoMarket
- * coming-soon teaser sits behind its feature flag (features.gomarket_enabled,
- * seeded off): hidden from the nav and homepage while off, but its page stays
- * reachable by URL. Gift card trading ("Sell Gift Cards") was removed from
- * the product entirely, so its page must be gone outright.
+ * The GoMarket coming-soon teaser sits behind its feature flag
+ * (features.gomarket_enabled, seeded off): hidden from the nav and homepage
+ * while off, but its page stays reachable by URL. Gift card trading ("Sell
+ * Gift Cards") was removed from the product entirely, so its page must be
+ * gone outright.
+ *
+ * The gift-cards entry reads "Gift Cards". It was "Buy Gift Cards" in
+ * x-home.category-tiles, which the home page no longer renders - the four
+ * cards come from x-home.category-cards, which labels them from
+ * navigation.gift_cards.
  */
 class CategoryNavBuySellGoMarketTest extends TestCase
 {
@@ -39,7 +44,7 @@ class CategoryNavBuySellGoMarketTest extends TestCase
         // Trading is removed outright, so "Sell Gift Cards" must never appear.
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('Buy Gift Cards')
+            ->assertSee(__('navigation.gift_cards'))
             ->assertDontSee('Sell Gift Cards')
             ->assertDontSee('GoMarket');
     }
@@ -52,13 +57,13 @@ class CategoryNavBuySellGoMarketTest extends TestCase
 
         $html = $this->get(route('home'))
             ->assertOk()
-            ->assertSee('Buy Gift Cards')
+            ->assertSee(__('navigation.gift_cards'))
             ->assertSee('GoMarket')
             ->assertDontSee('Sell Gift Cards')
             ->getContent();
 
-        // Order: Buy Gift Cards, then GoMarket.
-        $buy = strpos($html, 'Buy Gift Cards');
+        // Order: the gift-cards entry, then GoMarket.
+        $buy = strpos($html, __('navigation.gift_cards'));
         $market = strpos($html, 'GoMarket');
 
         $this->assertNotFalse($buy);

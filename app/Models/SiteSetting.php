@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +36,20 @@ class SiteSetting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
+        // A single page can ask for the same feature flag dozens of times from
+        // the layout, nav, footer and checkout method guards. The shared cache
+        // is database-backed in production, so Cache::remember() is still a
+        // query even on a hit. Keep the raw result on the current request after
+        // the first lookup.
+        $request = self::memoizableRequest();
+        $memoKey = self::requestMemoKey($key);
+
+        if ($request && $request->attributes->has($memoKey)) {
+            $memoized = $request->attributes->get($memoKey);
+
+            return $memoized !== null ? $memoized : $default;
+        }
+
         try {
             $cached = Cache::remember(
                 self::cacheKey($key),
@@ -50,7 +65,49 @@ class SiteSetting extends Model
             return $default;
         }
 
+        $request?->attributes->set($memoKey, $cached);
+
         return $cached !== null ? $cached : $default;
+    }
+
+    /**
+     * The request a lookup may be remembered on, or null when there is none.
+     *
+     * Only a ROUTED request qualifies, and that is the whole guard. A console
+     * process - phpunit, artisan, a queue worker, Horizon - is given one
+     * synthetic Request at boot by SetRequestForConsole and never given
+     * another, so memoizing against it is memoizing for the life of the
+     * process: a Horizon worker runs for up to an hour (config/horizon.php),
+     * and it would answer every read of a flag with whatever that flag said
+     * when the worker first asked. An admin turning payment insights off would
+     * not reach the workers until they recycled. A real HTTP request has a
+     * route by the time anything reads a setting, and dies at the end of it,
+     * which is the lifetime this memo was meant to have.
+     */
+    private static function memoizableRequest(): ?Request
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = app('request');
+
+        return $request instanceof Request && $request->route() !== null ? $request : null;
+    }
+
+    /**
+     * Drop a setting from every layer that holds it.
+     *
+     * Anything that changes a row behind the model's back - a query-builder
+     * write, a rolled-back transaction, a test tearing its fixture down - must
+     * come through here, because forgetting the shared cache alone leaves the
+     * current request answering from its memo.
+     */
+    public static function forget(string $key): void
+    {
+        Cache::forget(self::cacheKey($key));
+
+        self::memoizableRequest()?->attributes->remove(self::requestMemoKey($key));
     }
 
     /**
@@ -92,7 +149,11 @@ class SiteSetting extends Model
             ['value' => $value, 'group' => $group, 'description' => $description],
         );
 
-        Cache::forget(self::cacheKey($key));
+        // Drops the memo rather than writing the new value into it, so a read
+        // later in this request goes back to the row. That matters when the
+        // write is inside a transaction that then rolls back: the memo would
+        // otherwise keep serving a value the database never kept.
+        self::forget($key);
 
         if ($existedBefore && $key === 'features.gift_cards_enabled') {
             $isTruthy = fn ($val) => in_array(strtolower((string) $val), ['on', 'true', '1'], true);
@@ -169,5 +230,10 @@ class SiteSetting extends Model
     private static function cacheKey(string $key): string
     {
         return 'site_setting:'.$key;
+    }
+
+    private static function requestMemoKey(string $key): string
+    {
+        return 'memo:site_setting:'.sha1($key);
     }
 }

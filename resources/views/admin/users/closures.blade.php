@@ -29,27 +29,27 @@
 
     <div class="space-y-6">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-[12px] bg-white p-5 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 dark:bg-[#1d3252]">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Closures in grace period</p>
                 <p class="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">{{ number_format($pending->count()) }}</p>
             </div>
-            <div class="rounded-[12px] bg-white p-5 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 dark:bg-[#1d3252]">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Accounts closed all-time</p>
                 <p class="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">{{ number_format($closedTotal) }}</p>
                 <p class="mt-1 text-xs text-zinc-400">last: {{ $fmtDate($lastAnonymised) }}</p>
             </div>
-            <div class="rounded-[12px] bg-white p-5 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 dark:bg-[#1d3252]">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Identities in compliance hold</p>
                 <p class="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">{{ number_format($identitiesHeld) }}</p>
                 <p class="mt-1 text-xs text-zinc-400">first purge due: {{ $fmtDate($nextIdentityPurge) }}</p>
             </div>
-            <div class="rounded-[12px] bg-white p-5 ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="rounded-[12px] bg-white p-5 dark:bg-[#1d3252]">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Exit feedback collected</p>
                 <p class="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">{{ number_format($feedbackTotal) }}</p>
             </div>
         </div>
 
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <h2 class="border-b border-zinc-100 px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:border-white/10 dark:text-zinc-400">Pending Closure</h2>
             @forelse ($pending as $user)
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4 last:border-0 dark:border-white/10">
@@ -66,7 +66,7 @@
                               data-confirm-text="Cancel closure"
                               data-confirm-tone="success">
                             @csrf
-                            <button type="submit" class="rounded-[10px] bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100">
+                            <button type="submit" class="rounded-[12px] bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100">
                                 Cancel closure
                             </button>
                         </form>

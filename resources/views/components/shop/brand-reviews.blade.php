@@ -9,26 +9,26 @@
 
 @php
     $brandReviews = $brandKey
-        ? \App\Models\Review::published()->ownCollected()->forBrand($brandKey)->with('user:id,kyc_status')->ordered()->get()
+        ? \App\Models\Review::published()->ownCollected()->withText()->forBrand($brandKey)->with('user:id,kyc_status,avatar_url')->ordered()->get()
         : collect();
 @endphp
 
 @if ($brandReviews->isNotEmpty())
     <section
-        aria-label="{{ $brandName }} customer reviews"
+        aria-label="{{ __('products.reviews_heading', ['brand' => $brandName]) }}"
         x-data="customerReviewsCarousel()"
         x-init="$nextTick(() => { setup(); })"
         @resize.window.debounce.200ms="setup()"
         x-on:livewire:navigated.window="$nextTick(() => { setup(); })"
     >
         <div x-ref="header" class="mb-4 flex items-center justify-between gap-4">
-            <h2 class="text-lg font-bold text-zinc-900 sm:text-xl dark:text-white">What customers say about {{ $brandName }}</h2>
+            <h2 class="text-lg font-bold text-zinc-900 sm:text-xl dark:text-white">{{ __('giftcards.brand_reviews_heading', ['brand' => $brandName]) }}</h2>
             <div class="flex shrink-0 items-center gap-2">
                 <button
                     type="button"
                     @click="prev()"
-                    aria-label="Show previous reviews"
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    aria-label="{{ __('giftcards.reviews_show_previous') }}"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M15 6l-6 6 6 6"/>
@@ -37,8 +37,8 @@
                 <button
                     type="button"
                     @click="next()"
-                    aria-label="Show more reviews"
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                    aria-label="{{ __('giftcards.reviews_show_next') }}"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M9 6l6 6-6 6"/>

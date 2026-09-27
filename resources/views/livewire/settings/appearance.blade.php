@@ -10,8 +10,8 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
 <div class="mx-auto flex max-w-3xl flex-col gap-6">
     {{-- Page heading --}}
     <div class="text-center sm:text-left">
-        <h1 class="text-2xl font-bold tracking-tight text-black sm:text-3xl">Appearance</h1>
-        <p class="mt-1 text-sm text-zinc-600">Choose how {{ $siteName }} looks for you. System matches your device setting.</p>
+        <h1 class="text-2xl font-bold tracking-tight text-black sm:text-3xl">{{ __('common.appearance') }}</h1>
+        <p class="mt-1 text-sm text-zinc-600">{{ __('common.appearance_intro', ['site' => $siteName]) }}</p>
     </div>
 
     {{-- Theme picker. Hand-rolled segmented control instead of flux:radio.group
@@ -20,37 +20,64 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
          link uses). The radio group is bound to window.setTheme via Alpine so
          it persists through reloads, exactly like the old flux variant did. --}}
     <div
-        x-data="{ theme: window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system'), softDark: window.pureDarkOn ? ! window.pureDarkOn() : false }"
+        x-data="{ theme: window.themeChoice ? window.themeChoice() : (localStorage.getItem('theme') || 'system')}"
         x-init="
             $watch('theme', v => window.setTheme(v));
-            $watch('softDark', v => { window.setPureDark(! v); if (v && ! window.themeIsDark()) theme = 'dark'; });
         "
-        class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer border border-zinc-200 shadow-md shadow-zinc-900/[0.06] transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white dark:shadow-none"
+        class="rounded-[12px] bg-[#eff6ff] p-6 dash-shimmer shadow-md shadow-zinc-900/[0.06] dark:shadow-none"
     >
         <div class="mb-5">
-            <h2 class="text-base font-semibold text-black">Theme</h2>
-            <p class="mt-0.5 text-xs text-zinc-600">Switch between light and dark mode, or follow your system.</p>
+            <h2 class="text-base font-semibold text-black">{{ __('common.theme') }}</h2>
+            <p class="mt-0.5 text-xs text-zinc-600">{{ __('common.theme_hint') }}</p>
         </div>
 
+        {{-- The chosen option is a solid tile, not an outline, and it is styled
+             from aria-checked in plain CSS. Alpine already sets that attribute,
+             and a rule per theme cannot lose the specificity tie that stacked
+             dark: variants fall into, which is what left this control looking
+             unset in dark mode. --}}
+        <style>
+            /* The solid tile is one thumb that slides between the options; the
+               options themselves only change colour. */
+            .theme-thumb { background-color: #0c1337; }
+            html.dark .theme-thumb { background-color: #fdfdfd; }
+            .theme-option[aria-checked="true"] { color: #ffffff; }
+            html.dark .theme-option[aria-checked="true"] { color: #0c1337; }
+            .theme-option:not([aria-checked="true"]):hover { background-color: rgba(12, 19, 55, 0.06); color: #0c1337; }
+            html.dark .theme-option:not([aria-checked="true"]):hover { background-color: rgba(255, 255, 255, 0.08); color: #ffffff; }
+        </style>
+        @php
+            $themeOptions = [
+                ['value' => 'light',  'label' => __('common.theme_light'), 'icon' => 'icons.theme-light'],
+                ['value' => 'dark',   'label' => __('common.theme_dark'), 'icon' => 'icons.theme-dark'],
+                ['value' => 'system', 'label' => __('common.theme_auto'), 'icon' => 'icons.theme-auto'],
+            ];
+        @endphp
         <div
             role="radiogroup"
-            aria-label="Theme"
-            class="grid grid-cols-3 gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-[#0c1a36]"
+            aria-label="{{ __('common.theme') }}"
+            {{-- The slide is armed one tick after the first paint, so the thumb
+                 lands on the saved choice without animating in from the left. --}}
+            x-data="{ slide: false }"
+            x-init="$nextTick(() => slide = true)"
+            class="relative grid grid-cols-3 gap-1 rounded-[12px] bg-zinc-100 p-1 dark:bg-white/5"
         >
-            @foreach ([
-                ['value' => 'light',  'label' => 'Light', 'icon' => 'icons.theme-light'],
-                ['value' => 'dark',   'label' => 'Dark',  'icon' => 'icons.theme-dark'],
-                ['value' => 'system', 'label' => 'Auto',  'icon' => 'icons.theme-auto'],
-            ] as $opt)
+            {{-- The thumb: one column wide (three columns, two 0.25rem gaps
+                 inside the 0.25rem padding), moved by the chosen option's index
+                 across a column plus a gap. --}}
+            <span
+                aria-hidden="true"
+                class="theme-thumb pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-[12px] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                :class="slide && 'transition-transform'"
+                :style="'transform: translateX(calc(' + {!! "['".implode("','", array_column($themeOptions, 'value'))."']" !!}.indexOf(theme) + ' * (100% + 0.25rem)))'"
+            ></span>
+            @foreach ($themeOptions as $opt)
                 <button
                     type="button"
                     role="radio"
                     @click="theme = '{{ $opt['value'] }}'"
                     :aria-checked="(theme === '{{ $opt['value'] }}').toString()"
-                    :class="theme === '{{ $opt['value'] }}'
-                        ? 'text-black ring-1 ring-blue-400 dark:text-white dark:ring-blue-500/60'
-                        : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'"
-                    class="inline-flex items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-sm font-semibold transition-colors"
+                    class="theme-option relative z-10 inline-flex items-center justify-center gap-2 rounded-[12px] px-4 py-2.5 text-sm font-semibold text-zinc-600 transition-colors duration-300 dark:text-zinc-400"
                 >
                     {{-- Inline animated SVG inherits currentColor, so it follows
                          the button's own text colour in every state. --}}
@@ -60,26 +87,5 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
             @endforeach
         </div>
 
-        {{-- Soft dark (navy). Dark mode is pure black by default; flipping this on
-             swaps it for the softer navy palette (and switches to dark right away
-             so the change is visible). Saved locally via window.setPureDark, which
-             stores the inverse - the theme engine drops `.pure-dark` from <html>. --}}
-        <div class="mt-5 flex items-center justify-between gap-4 border-t border-zinc-200 pt-5 dark:border-zinc-700">
-            <div class="min-w-0">
-                <p class="text-sm font-semibold text-black dark:text-white">Soft dark</p>
-                <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">Use the softer navy palette instead of pure black. Dark mode is pure black by default.</p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                @click="softDark = ! softDark"
-                :aria-checked="softDark.toString()"
-                aria-label="Soft dark"
-                :class="softDark ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'"
-                class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 ring-black/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:ring-white/10"
-            >
-                <span :class="softDark ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
-            </button>
-        </div>
     </div>
 </div>

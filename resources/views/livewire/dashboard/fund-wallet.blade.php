@@ -425,6 +425,11 @@ new class extends Component
         paymentState: 'idle', // idle, select_method, card_input, action_pin, action_otp, action_3ds, awaiting_transfer, awaiting_confirmation, momo_input, processing, success, error
         errorMessage: '',
         actionMessage: '',
+        // The mobile money waiting panel's dial code and steps, and why a
+        // payment failed by reason code, both as on the checkout wizard.
+        momoApproval: null,
+        failureCopy: @js(\App\Domain\Payment\Support\CustomerFailureCopy::map()),
+        failureCode: null,
         bankDetails: null,
         pollInterval: null,
         verifying: false,
@@ -459,16 +464,33 @@ new class extends Component
                 this.startBackoff(this.initialHold.wait_seconds);
             }
 
-            if (!document.getElementById('flutterwave-v3')) {
-                let script = document.createElement('script');
-                script.id = 'flutterwave-v3';
-                script.src = 'https://checkout.flutterwave.com/v3.js';
-                // Blocked/failed SDK loads are reported when the customer
-                // actually tries to pay (no session exists yet at page load).
-                script.onerror = () => { window.__flwSdkLoadFailed = true; };
-                document.head.appendChild(script);
-            }
+            // The checkout SDK loads when the funding panel opens, not with the
+            // page: it pulls a script and a checkout frame from the gateway on
+            // every dashboard visit, and this component is mounted once per
+            // wallet, on a page most visits never fund from.
+            this.$watch('open', (isOpen) => { if (isOpen) { this.loadCheckoutSdk(); } });
             this.detectApplePay();
+        },
+
+        // Resolves once the SDK is on the page (or has failed to load: the pay
+        // path checks for the global and reports that case itself). One shared
+        // promise for every mounted wallet, so the script is fetched once.
+        loadCheckoutSdk() {
+            if (! window.__flwSdkReady) {
+                window.__flwSdkReady = new Promise((resolve) => {
+                    if (typeof FlutterwaveCheckout !== 'undefined') { resolve(); return; }
+                    let script = document.getElementById('flutterwave-v3');
+                    if (! script) {
+                        script = document.createElement('script');
+                        script.id = 'flutterwave-v3';
+                        script.src = 'https://checkout.flutterwave.com/v3.js';
+                        document.head.appendChild(script);
+                    }
+                    script.addEventListener('load', () => resolve());
+                    script.addEventListener('error', () => { window.__flwSdkLoadFailed = true; resolve(); });
+                });
+            }
+            return window.__flwSdkReady;
         },
 
         startBackoff(seconds) {
@@ -748,6 +770,7 @@ new class extends Component
         async paySession(method, dataPayload = {}) {
             this.paymentState = 'processing';
             this.errorMessage = '';
+            this.failureCode = null;
             try {
                 let body = {
                     method: method,
@@ -803,7 +826,8 @@ new class extends Component
                 setTimeout(() => { window.location.reload(); }, 2000);
             } else if (status === 'failed') {
                 this.paymentState = 'error';
-                this.errorMessage = sessionData.payment_payload?.failure_reason || 'Transaction could not be completed.';
+                this.failureCode = sessionData.payment_payload?.failure_code || null;
+                this.errorMessage = this.failureCopy[sessionData.payment_payload?.failure_code] || sessionData.payment_payload?.failure_reason || @js(__('checkout.transaction_not_completed'));
             } else if (status === 'awaiting_payment') {
                 const inlineData = sessionData.payment_payload?.inline;
                 if (inlineData) {
@@ -839,13 +863,18 @@ new class extends Component
                 this.startStatusPolling();
             } else if (status === 'awaiting_confirmation') {
                 this.paymentState = 'awaiting_confirmation';
-                this.actionMessage = sessionData.payment_payload?.message || 'Please accept the billing prompt on your device.';
+                this.actionMessage = sessionData.payment_payload?.message || @js(__('checkout.momo_accept_prompt'));
+                this.momoApproval = sessionData.payment_payload?.approval || null;
                 this.startStatusPolling();
             }
         },
 
-        openFlutterwaveInline(data) {
+        async openFlutterwaveInline(data) {
             const self = this;
+
+            // The SDK starts loading when the panel opens; a quick customer can
+            // reach this before it has landed, so wait for it here.
+            await this.loadCheckoutSdk();
 
             // Ad blockers / CDN failures leave the SDK undefined — report a
             // terminal frontend failure instead of throwing.
@@ -942,7 +971,8 @@ new class extends Component
                     } else if (data.status === 'failed') {
                         clearInterval(this.pollInterval);
                         this.paymentState = 'error';
-                        this.errorMessage = data.payment_payload?.failure_reason || 'Transaction failed.';
+                        this.failureCode = data.payment_payload?.failure_code || null;
+                        this.errorMessage = this.failureCopy[data.payment_payload?.failure_code] || data.payment_payload?.failure_reason || @js(__('checkout.transaction_failed'));
                     }
                 } catch (e) {}
             }, 4500);
@@ -1177,8 +1207,21 @@ new class extends Component
     @email-verification-required.window="if (open) onEmailNotice($event.detail)"
     class="shrink-0"
 >
-    {{-- Trigger. `full` = desktop wallet-card button; `compact` = mobile hero "Top Up". --}}
-    @if ($variant === 'compact')
+    {{-- Trigger. `full` = desktop wallet-card button; `compact` = the white
+         pill for a blue card; `sheet` = the small blue pill on the mobile
+         wallet sheet's white rows. --}}
+    @if ($variant === 'sheet')
+        <button
+            type="button"
+            @click="open = true"
+            class="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors active:bg-blue-700"
+        >
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+            </svg>
+            Top Up
+        </button>
+    @elseif ($variant === 'compact')
         <button
             type="button"
             @click="open = true"
@@ -1193,7 +1236,7 @@ new class extends Component
         <button
             type="button"
             @click="open = true"
-            class="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+            class="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-[#f4f6f5]"
         >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
@@ -1263,7 +1306,7 @@ new class extends Component
                         x-transition:leave="transition ease-in duration-100"
                         x-transition:leave-start="opacity-100 translate-y-0"
                         x-transition:leave-end="opacity-0 -translate-y-1"
-                        class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[12px] border border-zinc-200 bg-[#eff6ff] p-1 shadow-xl shadow-zinc-900/10"
+                        class="absolute left-0 right-0 z-20 mt-1.5 max-h-60 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-[12px] bg-[#f4f6f5] p-1 shadow-xl shadow-zinc-900/10"
                         role="listbox"
                     >
                         @foreach (self::fundableCurrencies() as $c)
@@ -1273,7 +1316,7 @@ new class extends Component
                                 @click="ccyOpen = false"
                                 role="option"
                                 aria-selected="{{ $currency === $c->value ? 'true' : 'false' }}"
-                                class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-zinc-100' }}"
+                                class="flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors {{ $currency === $c->value ? 'bg-blue-50 text-blue-700' : 'text-zinc-700 hover:bg-[#ffffff]' }}"
                             >
                                 <span>{{ $c->value }} &middot; {{ $c->label() }}</span>
                                 @if ($currency === $c->value)
@@ -1289,7 +1332,7 @@ new class extends Component
                 {{-- Amount --}}
                 <label class="mt-4 block text-xs font-semibold text-zinc-700">Amount</label>
                 <div class="mt-1.5 flex items-stretch overflow-hidden rounded-[12px] border border-zinc-200 bg-white transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15">
-                    <span class="flex shrink-0 items-center border-r border-zinc-200 bg-zinc-50 px-3 text-sm font-semibold text-zinc-600">{{ $this->symbol() }}</span>
+                    <span class="flex shrink-0 items-center border-r border-zinc-200 bg-[#f4f6f5] px-3 text-sm font-semibold text-zinc-600">{{ $this->symbol() }}</span>
                     <input
                         type="number"
                         step="any"
@@ -1373,7 +1416,7 @@ new class extends Component
 
                     {{-- Same notice checkout shows when a rail is dark. --}}
                     <template x-if="draft?.down_rails?.length">
-                        <div class="mb-4 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5 ring-1 ring-amber-200">
+                        <div class="mb-4 flex items-start gap-2.5 rounded-[12px] bg-amber-50 p-3.5">
                             <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.02 13.9A1.5 1.5 0 0 0 3.57 20h16.86a1.5 1.5 0 0 0 1.3-2.24l-8.02-13.9a1.5 1.5 0 0 0-2.6 0z"/>
                             </svg>
@@ -1394,10 +1437,10 @@ new class extends Component
                                 :aria-disabled="method.enabled === false ? 'true' : 'false'"
                                 :class="method.enabled === false
                                     ? 'cursor-not-allowed opacity-50 grayscale'
-                                    : 'hover:border-blue-500 hover:bg-blue-50/30'"
-                                class="flex items-center gap-3 w-full p-4 border border-zinc-200 rounded-[12px] text-left transition duration-150"
+                                    : 'hover:shadow-lg hover:shadow-zinc-900/[0.10] dark:hover:border-zinc-500'"
+                                class="flex items-center gap-3 w-full p-4 bg-[#f4f6f5] rounded-[12px] text-left transition-shadow duration-150"
                             >
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-zinc-100 ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/15">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#ffffff] dark:bg-white/5 dark:ring-1 dark:ring-white/15">
                                     {{-- Icon by method.type. Falls back to first 2 letters when no icon.
                                          Card + Apple Pay are monochrome: force black in light, white in dark. --}}
                                     <template x-if="methodIcon(method.type)">
@@ -1424,7 +1467,7 @@ new class extends Component
                 <!-- Card Details Form -->
                 <div x-show="paymentState === 'card_input'">
                     <div class="flex items-center gap-2 mb-4">
-                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1">
+                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 transition-colors hover:text-zinc-800 text-xs flex items-center gap-1">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
                         </button>
                     </div>
@@ -1452,7 +1495,7 @@ new class extends Component
                                         class="w-full rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 pr-16 tabular-nums"
                                     >
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-[12px] tracking-wider uppercase bg-zinc-100 text-zinc-500 border border-zinc-200" 
+                                        <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded-[12px] tracking-wider uppercase bg-[#f4f6f5] text-zinc-500 border border-zinc-200" 
                                               x-text="cardBrand === 'unknown' ? 'Card' : cardBrand"
                                               :class="{
                                                   'bg-blue-50 text-blue-600 border-blue-200': cardBrand === 'visa',
@@ -1496,21 +1539,26 @@ new class extends Component
                                 </div>
                             </div>
 
-                            <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
+                            <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 mt-2">
                                 Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                             </button>
                         </div>
                     @else
-                        <div class="rounded-[12px] border border-zinc-200 bg-zinc-50 p-4 text-center dark:border-white/10 dark:bg-white/5">
+                        <div class="rounded-[12px] bg-[#f4f6f5] p-4 text-center dark:bg-white/5">
                             {{-- White chips keep the brand logos legible on the dark
                                  modal panel; no-dark-invert stops the global image
                                  dark-mode filter from recolouring the SVGs. Mirrors
-                                 the checkout payment block. --}}
+                                 the checkout payment block.
+
+                                 keep-light is what keeps the chip white. bg-[#ffffff] became the
+                                 dashboard card marker in the light redesign and dark mode repaints
+                                 that class to the card grey, which would leave a navy Visa wordmark
+                                 sitting on a near-black plate. --}}
                             <div class="flex justify-center gap-3 mb-3">
-                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                <span class="flex h-9 items-center rounded-[6px] keep-light bg-[#ffffff] px-2 dark:ring-1 dark:ring-white/20">
                                     <img src="/assets/visa.svg" alt="Visa" class="no-dark-invert h-6 object-contain">
                                 </span>
-                                <span class="flex h-9 items-center rounded-[6px] bg-white px-2 ring-1 ring-zinc-200 dark:ring-white/20">
+                                <span class="flex h-9 items-center rounded-[6px] keep-light bg-[#ffffff] px-2 dark:ring-1 dark:ring-white/20">
                                     <img src="/assets/mastercard.svg" alt="Mastercard" class="no-dark-invert h-6 object-contain">
                                 </span>
                             </div>
@@ -1518,7 +1566,7 @@ new class extends Component
                                 Secure and encrypted payment with bank-level security.
                             </p>
                         </div>
-                        <button type="button" @click="paySession('card', {})" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-4">
+                        <button type="button" @click="paySession('card', {})" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 mt-4">
                             Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                         </button>
                     @endif
@@ -1530,7 +1578,7 @@ new class extends Component
                     <p class="text-xs text-zinc-600 mb-4">Enter your card 4-digit security PIN to authorize payment.</p>
                     <div class="space-y-4">
                         <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                             Confirm PIN
                         </button>
                     </div>
@@ -1542,7 +1590,7 @@ new class extends Component
                     <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
                     <div class="space-y-4">
                         <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <button type="button" @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                             Verify OTP
                         </button>
                     </div>
@@ -1553,11 +1601,11 @@ new class extends Component
                     <h3 class="text-sm font-bold text-zinc-900 mb-2">Secure Verification</h3>
                     <p class="text-xs text-zinc-600 mb-4">Please complete the secure authentication inside the window below.</p>
 
-                    <div class="w-full overflow-hidden rounded-[12px] border border-zinc-200 bg-zinc-50 h-[55vh] min-h-[400px] max-h-[520px]">
+                    <div class="w-full overflow-hidden rounded-[12px] bg-[#f4f6f5] h-[55vh] min-h-[400px] max-h-[520px]">
                         <iframe :src="session?.payment_payload?.redirect_url" class="h-full w-full border-0" allow="payment"></iframe>
                     </div>
 
-                    <button @click="verifyPayment()" :disabled="verifying" class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                    <button @click="verifyPayment()" :disabled="verifying" class="mt-4 flex w-full items-center justify-center gap-2 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60">
                         <svg x-show="verifying" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1570,7 +1618,7 @@ new class extends Component
                 <!-- Mobile Money input -->
                 <div x-show="paymentState === 'momo_input'">
                     <div class="flex items-center gap-2 mb-4">
-                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1">
+                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 transition-colors hover:text-zinc-800 text-xs flex items-center gap-1">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
                         </button>
                     </div>
@@ -1595,7 +1643,7 @@ new class extends Component
                             </div>
                         </div>
 
-                        <button type="button" @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        <button type="button" @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                             Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                         </button>
                     </div>
@@ -1604,7 +1652,7 @@ new class extends Component
                 <!-- Crypto Input -->
                 <div x-show="paymentState === 'crypto_input'">
                     <div class="flex items-center gap-2 mb-4">
-                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1">
+                        <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 transition-colors hover:text-zinc-800 text-xs flex items-center gap-1">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
                         </button>
                     </div>
@@ -1620,7 +1668,7 @@ new class extends Component
                     <div class="mt-1.5 grid grid-cols-4 gap-2 mb-4">
                         @forelse ($cryptoCoins as $coin)
                             <button type="button" @click="selectCoin('{{ strtolower($coin->code) }}')"
-                                class="flex flex-col items-center gap-1 rounded-[12px] border bg-white px-2 py-2.5 transition-colors border-zinc-200 hover:border-blue-500 hover:bg-blue-50">
+                                class="flex flex-col items-center gap-1 rounded-[12px] bg-[#f4f6f5] px-2 py-2.5 transition-shadow hover:shadow-lg hover:shadow-zinc-900/[0.10] dark:hover:border-zinc-500">
                                 @if ($coin->iconUrl())
                                     <img src="{{ $coin->iconUrl() }}" alt="" class="h-6 w-6 rounded-[12px]">
                                 @else
@@ -1636,7 +1684,7 @@ new class extends Component
                         Pick a coin and continue. The next step shows the exact wallet address and amount to send.
                     </p>
                     @else
-                        <div class="rounded-[12px] border border-amber-200 bg-amber-50 p-4">
+                        <div class="rounded-[12px] bg-amber-50 p-4">
                             <p class="text-xs font-semibold text-amber-900">
                                 Crypto top-ups start at {{ $this->cryptoMinimumLabel() }}. You entered {{ $this->symbol() }}{{ number_format((float) $this->amount, 2) }}.
                             </p>
@@ -1656,7 +1704,7 @@ new class extends Component
                             <h3 class="text-sm font-bold text-zinc-900 mb-2">Virtual Bank Transfer</h3>
                             <p class="text-xs text-zinc-600 mb-4">Please make a transfer to the temporary virtual account below:</p>
 
-                            <div class="bg-zinc-50 border border-zinc-200 rounded-[12px] p-4 space-y-3">
+                            <div class="bg-[#f4f6f5] rounded-[12px] p-4 space-y-3">
                                 <div class="flex justify-between items-center text-xs">
                                     <span class="text-zinc-500">Bank Name</span>
                                     <span class="font-bold text-zinc-900" x-text="bankDetails?.bank_name"></span>
@@ -1665,7 +1713,7 @@ new class extends Component
                                     <span class="text-zinc-500">Account Number</span>
                                     <div class="flex items-center gap-1.5">
                                         <span class="font-bold text-zinc-900 text-sm" x-text="bankDetails?.account_number"></span>
-                                        <button type="button" @click="copyToClipboard(bankDetails?.account_number)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold">Copy</button>
+                                        <button type="button" @click="copyToClipboard(bankDetails?.account_number)" class="text-blue-600 transition-colors hover:text-blue-800 text-[10px] font-semibold">Copy</button>
                                     </div>
                                 </div>
                                 <div class="flex justify-between items-center text-xs">
@@ -1686,9 +1734,12 @@ new class extends Component
                             <h3 class="text-sm font-bold text-zinc-900 text-center mb-2">Crypto Payment Details</h3>
                             <p class="text-xs text-zinc-600 text-center mb-4">Send the exact amount of cryptocurrency shown to the address below:</p>
 
-                            <div class="flex flex-col items-center gap-4 bg-zinc-50 p-4 border border-zinc-200 rounded-[12px] shadow-inner">
+                            <div class="flex flex-col items-center gap-4 bg-[#f4f6f5] p-4 rounded-[12px] shadow-inner">
                                 <!-- QR Code -->
-                                <div class="flex shrink-0 flex-col items-center rounded-[12px] bg-white p-3 border border-zinc-150 shadow-sm">
+                                {{-- keep-light for the same reason as the card chips above, with a
+                                     scanner rather than an eye reading it: a QR is dark modules on a
+                                     light quiet zone, so the plate under it has to stay white. --}}
+                                <div class="flex shrink-0 flex-col items-center rounded-[12px] keep-light bg-[#ffffff] p-3 shadow-sm">
                                     {{-- Rendered by us. This used to call a third-party image
                                          service, which sent the customer's deposit address
                                          off-site and would have let a compromise there swap
@@ -1713,7 +1764,7 @@ new class extends Component
                                     <div>
                                         <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Amount to Send</span>
                                         <div class="flex items-center gap-2">
-                                            <span class="font-extrabold text-zinc-900 text-sm tracking-wider tabular-nums bg-white px-2 py-1 rounded-[12px] border border-zinc-150" x-text="session?.payment_payload?.pay_amount"></span>
+                                            <span class="font-extrabold text-zinc-900 text-sm tracking-wider tabular-nums bg-[#ffffff] px-2 py-1 rounded-[12px]" x-text="session?.payment_payload?.pay_amount"></span>
                                             <span class="font-bold text-zinc-600 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
                                             <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_amount, 'amount_crypto')" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold bg-blue-50 px-2 py-1 rounded-[12px] transition-all">
                                                 Copy
@@ -1747,11 +1798,11 @@ new class extends Component
 
                 <!-- Mobile money push prompt -->
                 <div x-show="paymentState === 'awaiting_confirmation'">
-                    <h3 class="text-sm font-bold text-zinc-900 mb-2">Authorize on Phone</h3>
-                    <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
+                    <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('checkout.momo_authorize_title') }}</h3>
+                    <p class="text-xs leading-relaxed text-zinc-600 mb-4" x-text="actionMessage"></p>
 
-                    <div class="flex flex-col items-center py-6 text-center">
-                        <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 ring-8 ring-blue-100/50 mb-4">
+                    <div class="flex flex-col items-center py-4 text-center">
+                        <span class="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#f4f6f5] ring-8 ring-blue-100/50 mb-4">
                             <svg class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                             </svg>
@@ -1760,8 +1811,21 @@ new class extends Component
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                         </svg>
-                        <p class="text-xs font-semibold text-zinc-800 mt-3">Verifying payment authorization...</p>
+                        <p class="text-xs font-semibold text-zinc-800 mt-3">{{ __('checkout.momo_verifying') }}</p>
                     </div>
+
+                    {{-- No prompt? The operator's dial code and steps, as on the checkout wizard. --}}
+                    <div x-show="momoApproval" x-cloak class="mt-2 rounded-[12px] bg-[#f4f6f5] p-4 text-left" data-momo-approval>
+                        <p class="text-xs font-bold text-zinc-900">{{ __('checkout.momo_no_prompt_title') }}</p>
+                        <p class="mt-1 text-xs leading-relaxed text-zinc-600" x-text="@js(__('checkout.momo_no_prompt_dial')).replace(':code', momoApproval?.code || '').replace(':network', momoApproval?.network || '')"></p>
+                        <p class="mt-2 font-mono text-2xl font-black tracking-[0.2em] text-blue-600" x-text="momoApproval?.code"></p>
+                        <ol class="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-zinc-600">
+                            <template x-for="step in (momoApproval?.steps || [])" :key="step">
+                                <li x-text="step"></li>
+                            </template>
+                        </ol>
+                    </div>
+                    <p class="mt-3 text-center text-[11px] text-zinc-500">{{ __('checkout.momo_keep_open') }}</p>
                 </div>
 
                 <!-- Processing state -->
@@ -1788,7 +1852,9 @@ new class extends Component
                     <h3 class="mt-4 text-sm font-bold text-zinc-900">Payment Failed</h3>
                     <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
 
-                    <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                    @include('shop._payment-failure-help', ['methodVar' => 'selectedMethod'])
+
+                    <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-[#f4f6f5] px-5 py-2.5 text-xs font-semibold text-zinc-800 transition-colors hover:bg-zinc-200">
                         Try Another Method
                     </button>
                 </div>
@@ -1847,7 +1913,7 @@ new class extends Component
         <div x-transition class="relative w-full max-w-md rounded-[12px] bg-white p-6 text-center shadow-2xl shadow-zinc-900/25" role="dialog" aria-modal="true">
             {{-- Identity step-up --}}
             <div x-show="riskKind === 'kyc'" class="flex flex-col items-center py-2">
-                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#f4f6f5]">
                     <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>
@@ -1855,10 +1921,10 @@ new class extends Component
                 </div>
                 <h3 class="mt-4 text-sm font-bold text-zinc-900">Quick verification needed</h3>
                 <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="kycMessage"></p>
-                <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                <button type="button" @click="verifyIdentity()" class="mt-6 rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
                     Verify
                 </button>
-                <button type="button" @click="closeRiskOverlay()" class="mt-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-700">
+                <button type="button" @click="closeRiskOverlay()" class="mt-2.5 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-700">
                     Not now
                 </button>
             </div>
@@ -1872,7 +1938,7 @@ new class extends Component
                 </div>
                 <h3 class="mt-4 text-sm font-bold text-zinc-900">One moment</h3>
                 <p class="mt-1.5 text-xs text-zinc-600 px-4" x-text="holdMessage"></p>
-                <button type="button" @click="closeRiskOverlay()" class="mt-6 rounded-[12px] bg-zinc-100 px-6 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                <button type="button" @click="closeRiskOverlay()" class="mt-6 rounded-[12px] bg-[#f4f6f5] px-6 py-2.5 text-xs font-semibold text-zinc-800 transition-colors hover:bg-zinc-200">
                     Got it
                 </button>
             </div>
@@ -1894,10 +1960,10 @@ new class extends Component
                         type="button"
                         @click="resendVerification()"
                         :disabled="resendRemaining > 0 || resendBusy"
-                        class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="rounded-[12px] px-5 py-2.5 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-300 transition-colors hover:bg-[#f4f6f5] disabled:cursor-not-allowed disabled:opacity-50"
                         x-text="resendBusy ? 'Sending...' : (resendRemaining > 0 ? 'Resend ' + resendLabel(resendRemaining) : 'Resend email')"
                     ></button>
-                    <button type="button" @click="closeRiskOverlay()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white hover:bg-blue-700">
+                    <button type="button" @click="closeRiskOverlay()" class="rounded-[12px] bg-blue-600 px-8 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
                         Got it
                     </button>
                 </div>

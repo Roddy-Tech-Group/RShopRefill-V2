@@ -10,7 +10,7 @@
     // Brand name from the admin "Site -> name" setting. Read inline (like the
     // social links below) so it is certain in every mail-render scope without
     // depending on a view composer firing. Falls back to the literal brand.
-    $siteName = \App\Models\SiteSetting::get('site.name', 'RshopRefills');
+    $siteName = \App\Models\SiteSetting::get('site.name', 'RshopRefill');
     // Same setting the contact page and support widgets use, so changing the
     // support number in admin changes it in every email too.
     $supportWhatsApp = preg_replace('/\D+/', '', (string) \App\Models\SiteSetting::get('contact.whatsapp_number', '19402386229')) ?: '19402386229';
@@ -33,7 +33,7 @@
         body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
         img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        body { margin: 0 !important; padding: 0 !important; width: 100% !important; background: #eff6ff; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; background: #f4f6f5; }
         a { color: #2563eb; }
         .em-btn:hover { background: #1d4ed8 !important; }
         @media only screen and (max-width: 620px) {
@@ -42,12 +42,12 @@
         }
     </style>
 </head>
-<body style="margin:0; padding:0; background:#eff6ff;">
+<body style="margin:0; padding:0; background:#f4f6f5;">
     @if ($preheader)
-        <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#eff6ff; opacity:0;">{{ $preheader }}</div>
+        <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#f4f6f5; opacity:0;">{{ $preheader }}</div>
     @endif
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f5;">
         <tr>
             <td align="center" style="padding:32px 16px;">
 
@@ -95,7 +95,7 @@
                         <td class="em-pad" style="padding:24px 40px 8px; text-align:center; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; color:#71717a; font-size:12px; line-height:1.7;">
                             <p style="margin:0 0 12px;">
                                 <a href="{{ \App\Models\SiteSetting::get('social.facebook', 'https://facebook.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Facebook</a>
-                                <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">X</a>
+                                <a href="{{ \App\Models\SiteSetting::get('social.x', 'https://x.com/roddytech237') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">X</a>
                                 <a href="{{ \App\Models\SiteSetting::get('social.tiktok', 'https://tiktok.com/@rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">TikTok</a>
                                 <a href="{{ \App\Models\SiteSetting::get('social.instagram', 'https://instagram.com/rshoprefills') }}" style="color:#2563eb; text-decoration:none; margin:0 7px;">Instagram</a>
                             </p>

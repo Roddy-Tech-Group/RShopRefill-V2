@@ -8,7 +8,7 @@
     {{-- ── KPI cards (5 across on lg, 2 on sm, 3 on md) ──────────── --}}
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
         @for ($i = 0; $i < 5; $i++)
-            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-5 {{ $i === 4 ? 'sm:col-span-2 md:col-span-3 lg:col-span-1' : '' }}" style="--i: {{ $i }}">
+            <div class="relative flex flex-col overflow-hidden rounded-[20px] bg-white p-4 shadow-sm shadow-zinc-900/5 sm:p-5 {{ $i === 4 ? 'sm:col-span-2 md:col-span-3 lg:col-span-1' : '' }}" style="--i: {{ $i }}">
                 <div class="flex items-start justify-between gap-2">
                     <x-skeleton class="h-10 w-10 sm:h-11 sm:w-11" rounded="rounded-[12px]" />
                     <x-skeleton shape="circle" class="h-12 w-12" />
@@ -24,7 +24,7 @@
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
         {{-- Best Selling Countries map placeholder --}}
-        <div class="flex min-w-0 flex-col overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="flex min-w-0 flex-col overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5">
             <div class="flex items-start justify-between gap-3">
                 <x-skeleton class="h-5 w-48" />
                 <x-skeleton class="h-7 w-24" rounded="rounded-[12px]" />
@@ -41,7 +41,7 @@
              with faint area fills) so the swap-in does not feel like a
              different widget. Built from two inline SVGs sized to the same
              ~h-56 box the real chart occupies. --}}
-        <div class="flex min-w-0 flex-col overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+        <div class="flex min-w-0 flex-col overflow-hidden rounded-[20px] bg-white p-5 shadow-sm shadow-zinc-900/5">
             <div class="flex items-start justify-between gap-3">
                 <div class="space-y-2">
                     <x-skeleton class="h-5 w-32" />
@@ -109,14 +109,19 @@
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
         @for ($table = 0; $table < 2; $table++)
-            <div class="overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100">
+            <div class="overflow-hidden rounded-[20px] bg-white shadow-sm shadow-zinc-900/5">
                 <div class="flex items-center justify-between gap-3 p-5">
                     <x-skeleton class="h-5 w-40" />
                     <x-skeleton class="h-3.5 w-16" />
                 </div>
 
+                {{-- Mirrors the real tables: Latest Users renders 12 rows and
+                     Latest Transactions 10 (the query default). The two differ
+                     because transaction rows are taller, and both cards share
+                     one height. The counts have to agree with the real tables
+                     or the cards visibly change height when the data swaps in. --}}
                 <div class="skeleton-stagger-fast border-t border-zinc-100">
-                    @for ($i = 0; $i < 5; $i++)
+                    @for ($i = 0; $i < ($table === 0 ? 12 : 10); $i++)
                         <div class="flex items-center gap-3 px-5 py-3.5 {{ $i > 0 ? 'border-t border-zinc-100' : '' }}" style="--i: {{ $i }}">
                             <x-skeleton class="h-9 w-9 shrink-0" rounded="rounded-[12px]" />
                             <div class="min-w-0 flex-1 space-y-2">

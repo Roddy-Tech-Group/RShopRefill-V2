@@ -57,8 +57,11 @@ class PaymentAttempt extends Model
         'expires_at',
         'metadata',
 
-        // Crypto settlement facts. Projected out of metadata->crypto so they can
-        // be queried, indexed and reconciled against a gateway settlement export.
+        // Settlement facts for a payment made in a currency other than the
+        // attempt's: crypto (the coin and how much of it), and mobile money on
+        // a converted rail (a USD order charged in CFA francs). Projected out
+        // of metadata so they can be queried, indexed and reconciled against a
+        // gateway settlement export.
         'pay_currency',
         'pay_amount',
         'actually_paid',
@@ -234,6 +237,33 @@ class PaymentAttempt extends Model
             in_array($this->gateway, ['nowpayments', 'crypto'], true) => 'Crypto payment',
             $this->gateway === 'wallet' => 'Wallet payment',
             default => 'Card payment',
+        };
+    }
+
+    /**
+     * The channel this attempt went through, in customer words: "Mobile
+     * Money", "Card", "Bank transfer", "Crypto", "Wallet". Never a provider
+     * name. The recorded method is trusted first, then whatever the gateway
+     * reported in its payload, then the gateway family.
+     */
+    public function customerGatewayLabel(): string
+    {
+        $method = PaymentMethodNormaliser::normalise($this->payment_method)
+            ?? PaymentMethodNormaliser::fromGatewayPayload($this->verification_payload)
+            ?? PaymentMethodNormaliser::fromGatewayPayload($this->webhook_payload)
+            ?? PaymentMethodNormaliser::normalise($this->gateway);
+
+        return match ($method) {
+            'mobile_money' => 'Mobile Money',
+            'mobile_wallet' => 'Mobile wallet',
+            'bank_transfer' => 'Bank transfer',
+            'pay_with_bank' => 'Bank app',
+            'bank_qr' => 'Bank QR',
+            'ussd' => 'USSD',
+            'apple_pay' => 'Apple Pay',
+            'crypto' => 'Crypto',
+            'wallet' => 'Wallet',
+            default => 'Card',
         };
     }
 }

@@ -28,7 +28,10 @@ final class SupportedPaymentMethods
         // Every other currency answers "Currency not supported for Apple Pay"
         // before the merchant is even looked at (sandbox-verified 2026-09-10),
         // so offering the tile there was a guaranteed failure.
-        'USD' => ['card', 'apple_pay', 'crypto', 'wallet'],
+        // Mobile money on USD rides the Francophone rail in CFA francs (see
+        // MobileMoneyRail): a dollar order can be paid over MTN or Orange
+        // without the customer switching currency first.
+        'USD' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
         'EUR' => ['card', 'crypto', 'wallet', 'pay_with_bank'],
         'GBP' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
         'NGN' => ['card', 'apple_pay', 'bank_transfer', 'crypto', 'wallet', 'ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'],

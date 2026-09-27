@@ -37,7 +37,7 @@ class AdminMobileMenuTest extends TestCase
 
         foreach ([
             'Campaigns', 'Pricing Rules',
-            'Hero Sections', 'Hero Cards', 'Blog Posts', 'Press', 'Reviews', 'FAQs',
+            'Hero Sections', 'Blog Posts', 'Press', 'Reviews', 'FAQs',
             'Rcoin Rewards', 'Rcoin Analytics', 'Rcoin Payouts',
             'API Settings', 'Audit Log',
         ] as $label) {

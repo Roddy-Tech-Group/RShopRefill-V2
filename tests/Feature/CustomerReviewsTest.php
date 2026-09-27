@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Review;
+use App\Models\SiteSetting;
 use Database\Seeders\ReviewSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -84,7 +85,7 @@ class CustomerReviewsTest extends TestCase
 
         $this->assertSame(0, Review::count());
         // It still seeds the aggregate the nav badge and score card read.
-        $this->assertNotNull(\App\Models\SiteSetting::get('reviews.aggregate.rating'));
+        $this->assertNotNull(SiteSetting::get('reviews.aggregate.rating'));
     }
 
     /**
@@ -110,16 +111,30 @@ class CustomerReviewsTest extends TestCase
         $this->assertContains(Review::where('author_name', 'Mislabelled')->value('id'), $shown->all());
     }
 
-    /** The slot that used to flip aggregate scores now collects for Trustpilot. */
-    public function test_the_carousel_leads_with_a_trustpilot_collector_card(): void
+    /**
+     * The slot that used to flip aggregate scores now collects reviews through
+     * Trustpilot's own TrustBox. Nothing in the card draws the brand itself -
+     * no star, no wordmark, no "on Trustpilot" copy: their guidelines ask that
+     * only the widget carries it. The profile link stays as the widget's
+     * no-script fallback.
+     */
+    public function test_the_carousel_leads_with_a_review_collector_card(): void
     {
         $this->withoutVite();
         config()->set('services.trustpilot.profile_url', 'https://www.trustpilot.com/review/example.com');
+        config()->set('services.trustpilot.business_unit_id', 'unit-123');
 
-        $this->get('/')
-            ->assertOk()
-            ->assertSee('Review us on Trustpilot')
-            ->assertSee('https://www.trustpilot.com/review/example.com');
+        $response = $this->get('/')->assertOk();
+
+        $response->assertSee('Review us');
+        $response->assertSee('class="trustpilot-widget"', false);
+        $response->assertSee('data-businessunit-id="unit-123"', false);
+        $response->assertSee('tp.widget.bootstrap.min.js', false);
+        $response->assertSee('https://www.trustpilot.com/review/example.com');
+
+        $response->assertDontSee('Review us on Trustpilot');
+        $response->assertDontSee('<span class="text-base font-bold text-zinc-900">Trustpilot</span>', false);
+        $response->assertDontSee('text-emerald-500', false);
     }
 
     public function test_homepage_falls_back_gracefully_when_no_reviews_exist(): void

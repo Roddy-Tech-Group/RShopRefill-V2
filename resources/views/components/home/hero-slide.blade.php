@@ -24,7 +24,7 @@
 
     <div class="relative z-10 mx-auto flex min-h-[420px] max-w-[1200px] flex-col items-center justify-center px-3 py-14 text-center sm:min-h-[520px] sm:px-10 sm:py-24 lg:px-14">
         @if ($section->title)
-            <h2 style="font-family: 'Urbanist', sans-serif;" class="mx-auto max-w-[900px] text-[40px] font-extrabold leading-[1.1] {{ $hasMedia ? 'text-white' : 'text-zinc-900 dark:text-white' }} sm:text-5xl md:text-6xl lg:text-[64px]">
+            <h2 class="mx-auto max-w-[900px] text-[40px] leading-[1.1] {{ $hasMedia ? 'text-white' : 'text-zinc-900 dark:text-white' }} sm:text-5xl md:text-6xl lg:text-[64px]">
                 {{ $section->title }}
             </h2>
         @endif
@@ -37,7 +37,7 @@
 
         @if ($section->cta_label && $section->cta_url)
             <div class="mt-8">
-                <a href="{{ $section->cta_url }}" class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
+                <a href="{{ $section->cta_url }}" class="inline-flex items-center rounded-full bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-transform hover:-translate-y-0.5 hover:bg-blue-700">
                     {{ $section->cta_label }}
                 </a>
             </div>

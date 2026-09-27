@@ -55,7 +55,7 @@
             <div class="mt-6 rounded-[12px] bg-amber-50 p-6 text-center ring-1 ring-amber-200">
                 <p class="text-base font-semibold text-amber-900">Wallet PIN Required</p>
                 <p class="mt-1 text-sm text-amber-700">You must set up a Wallet Transaction PIN before you can top up using your wallet balance.</p>
-                <a href="{{ route('dashboard.security') }}" class="mt-4 inline-flex items-center gap-1.5 rounded-[12px] bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700">
+                <a href="{{ route('dashboard.security') }}" class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700">
                     Set up PIN in Settings
                 </a>
             </div>
@@ -77,7 +77,18 @@
                     this.walletPin = '';
                     this.pinModalOpen = true;
                     setTimeout(() => this.$refs.pinInput.focus(), 100);
-                }
+                },
+                init() {
+                    // Freeze the page behind the PIN modal, so a wallet payment
+                    // cannot be typed over a page that is still scrolling.
+                    this.$watch('pinModalOpen', (isOpen) => {
+                        if (isOpen) {
+                            window.rshopScrollLock?.lock();
+                        } else {
+                            window.rshopScrollLock?.unlock();
+                        }
+                    });
+                },
             }">
                 @foreach ($sorted as $pkg)
                     @php
@@ -128,11 +139,11 @@
                                     <input type="hidden" name="package_id" :value="selectedPkgId">
                                     <input type="hidden" name="net_price" :value="selectedNetPrice">
                                     
-                                    <input type="password" name="wallet_pin" x-model="walletPin" x-ref="pinInput" maxlength="4" required class="mt-2 block w-full rounded-[12px] border border-zinc-300 px-3 py-3 text-center text-xl tracking-[0.5em] text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-2xl" placeholder="••••">
+                                    <input type="password" name="wallet_pin" x-model="walletPin" x-ref="pinInput" maxlength="4" required class="mt-2 block w-full rounded-full border-2 border-zinc-300 px-3 py-3 text-center text-xl tracking-[0.5em] text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-2xl focus:border-edge dark:focus:border-edge transition-colors" placeholder="••••">
                                     
                                     <div class="mt-6 flex items-center justify-end gap-3">
-                                        <button type="button" @click="pinModalOpen = false" class="rounded-[12px] bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200">Cancel</button>
-                                        <button type="submit" :disabled="walletPin.length !== 4" class="rounded-[12px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50">Confirm Top-up</button>
+                                        <button type="button" @click="pinModalOpen = false" class="rounded-full bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200">Cancel</button>
+                                        <button type="submit" :disabled="walletPin.length !== 4" class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50">Confirm Top-up</button>
                                     </div>
                                 </form>
                             </div>

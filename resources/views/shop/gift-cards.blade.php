@@ -58,10 +58,21 @@
             }
         }))
         ->when($country !== '', fn ($q) => $q->where('country_code', $country))
-        ->when($currency !== '', fn ($q) => $q->where('currency_code', $currency))
-        // Precise subcategory filter: match products that have at least one
-        // VARIANT in this subcategory, not just the product's representative one.
-        ->when($sub !== '', fn ($q) => $q->whereHas('variants', fn ($qq) => $qq->whereHas('subcategory', fn ($qqq) => $qqq->where('slug', $sub))));
+        ->when($currency !== '', fn ($q) => $q->where('currency_code', $currency));
+
+    // Everything above WITHOUT the subcategory filter, kept so the sidebar can
+    // ask which categories have stock in this country. Taking that from the
+    // grid's own results would not work: once a subcategory is picked, the
+    // grid holds only that one, and the menu would collapse to a single entry.
+    $filtersIgnoringSubcategory = clone $baseFilters;
+
+    // NOT filtered by subcategory any more. The listing renders every category
+    // as its own section and the client switches between them, so the products
+    // for all of them have to be here. ?subcategory= still decides which
+    // section is showing on arrival - it is now a view concern, not a query.
+    //
+    // This costs nothing: the "All gift cards" view already loaded every brand,
+    // so a deep-linked category is the same payload it always was.
 
     // Pluck one representative Product id per brand_key. With ~692 unique brands this is
     // a cheap single SELECT. Prefer the US variant as the representative (matches the
@@ -76,7 +87,12 @@
         ->whereIn('id', $representativeIds)
         ->with(['variants:id,product_id,currency,retail_price,cost_price,face_value,min_amount,max_amount,is_variable,is_available']);
 
-    if ($sort === 'name-asc') {
+    if ($sort === 'recent') {
+        // Newest first. The menu's "Recently Added" links here; without this
+        // branch the parameter would fall through to popularity and the link
+        // would quietly do nothing.
+        $productsQuery->orderByDesc('created_at')->orderByDesc('id');
+    } elseif ($sort === 'name-asc') {
         $productsQuery->orderBy('name');
     } elseif ($sort === 'name-desc') {
         $productsQuery->orderByDesc('name');
@@ -114,16 +130,58 @@
     // two consecutive pages while another never appears at all.
     $productsQuery->orderBy('id');
 
-    // Paginated: this listing renders one card per brand_key, which is ~688 brands,
-    // and each card eager-loads variants out of an 18k-row table to compute its price
-    // range. Rendering all of them on one uncached, anonymous-accessible page made this
-    // the heaviest request in the app. withQueryString keeps the country, subcategory
-    // and search filters attached to the page links.
-    $products = $productsQuery->paginate(60)->withQueryString();
+    // Unpaginated query: one Product per brand_key, so every matching brand is
+    // available to the category sections and the total shown below the flat grid.
+    //
+    // It stays a fixed number of queries rather than N+1: the variants come back
+    // in one eager-load and the ratings in one rollup, both keyed by the full
+    // result set. Tile images past the first ten load lazily, so the browser
+    // fetches them as the visitor scrolls rather than all at once.
+    //
+    // This is still one of the heaviest anonymous requests in the app. The flat
+    // "All gift cards" grid below limits its duplicate tile markup by default;
+    // ?brands=all opts into rendering its complete copy of the catalogue.
+    $products = $productsQuery->get();
+
+    // Categories that actually have something to sell under the current
+    // filters. A category with no stock in the chosen country is not listed at
+    // all - it was a menu entry whose only destination was the empty state.
+    $stockedSubcategoryIds = DB::table('product_variants')
+        ->whereIn('product_id', (clone $filtersIgnoringSubcategory)->select('id'))
+        ->whereNotNull('subcategory_id')
+        ->distinct()
+        ->pluck('subcategory_id');
 
     $subcategories = $giftCardsCategory
-        ? Subcategory::where('category_id', $giftCardsCategory->id)->orderBy('name')->get(['name', 'slug'])
+        ? Subcategory::where('category_id', $giftCardsCategory->id)
+            ->whereIn('id', $stockedSubcategoryIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug'])
         : collect();
+
+    // Which categories each brand belongs to, for the section-per-category
+    // layout below. One query for the page, keyed by brand.
+    //
+    // Read off the VARIANTS' subcategory, not the product's own column: that
+    // is what the subcategory FILTER matches on, so a brand lands in exactly
+    // the sections whose filter would return it. The product-level column
+    // holds only its representative subcategory, which would drop a brand from
+    // every other category it actually sells in.
+    //
+    // A brand spanning several categories appears in each of them - browsing
+    // by category should find it wherever a shopper looks, and a tile is
+    // cheap to repeat.
+    $brandSubcategories = collect();
+    if ($products->isNotEmpty()) {
+        $brandSubcategories = DB::table('product_variants')
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
+            ->whereIn('products.id', $products->pluck('id'))
+            ->whereNotNull('product_variants.subcategory_id')
+            ->distinct()
+            ->get(['products.brand_key', 'product_variants.subcategory_id'])
+            ->groupBy('brand_key')
+            ->map(fn ($rows) => $rows->pluck('subcategory_id')->unique()->all());
+    }
 
     // Green tint for the trust-badge icons (instant delivery / refund policy).
     $greenTint = 'filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(394%) hue-rotate(105deg) brightness(92%) contrast(87%);';
@@ -148,6 +206,15 @@
     // US is the default region — USD, USA products only. Selecting a country
     // narrows to that region; the clear-X resets back to the US default.
     $countryFiltered = $country !== '' && $country !== 'US';
+
+    // Nothing at all for this country, as opposed to a search or category that
+    // happened to match nothing. $stockedSubcategoryIds already answers this:
+    // it is built from the country / currency / search filters WITHOUT the
+    // subcategory clause, so an empty set means the country is bare rather
+    // than the visitor having narrowed too far.
+    $countryHasNoCatalogue = $country !== ''
+        && $search === ''
+        && $stockedSubcategoryIds->isEmpty();
 
     $availableCurrencies = Product::query()
         ->when($giftCardsCategory, fn ($q) => $q->where('category_id', $giftCardsCategory->id))
@@ -197,11 +264,157 @@
         return $shopRoute('gift-cards', $params);
     };
 
+    // ALWAYS grouped, even when a category is deep-linked. Every section is on
+    // the page, so switching between them is a class toggle rather than a
+    // request - and a deep link just starts with one of them showing.
+    $groupByCategory = $subcategories->isNotEmpty() && $products->isNotEmpty();
+
+    // The curated row that opens the page. Ordered as configured, not
+    // alphabetically - it is a shop window rather than an index - and built by
+    // key lookup so a brand the catalogue lacks is skipped, not left as a gap.
+    $featuredKeys = config('popular_brands.featured', []);
+
+    // Keyed case-insensitively: the catalogue stores PlayStation as
+    // "Playstation", and an exact match dropped it from the row without a
+    // trace. The database compares case-insensitively, so every check said the
+    // brand was present - only PHP's array lookup disagreed.
+    $byBrand = $products->keyBy(fn ($product) => strtolower($product->brand_key));
+    $featured = collect($featuredKeys)
+        ->map(fn ($key) => $byBrand[strtolower($key)] ?? null)
+        ->filter()
+        ->values();
+
+    $sections = collect();
+    if ($groupByCategory) {
+        // Supplier subcategories no longer render as sections - the curated set
+        // above IS the category list. Anything they held that no curated
+        // category claims still reaches the page through the "More gift cards"
+        // sweep below, so nothing is lost.
+        $sections = collect()
+            ->map(fn ($subcategory) => [
+                'name' => $subcategory->name,
+                'slug' => $subcategory->slug,
+                'products' => $products->filter(
+                    fn ($product) => in_array(
+                        $subcategory->id,
+                        $brandSubcategories[$product->brand_key] ?? [],
+                        false
+                    )
+                ),
+            ])
+            ->filter(fn ($section) => $section['products']->isNotEmpty())
+            ->values();
+
+        // Curated categories next: shopper-facing groupings the supplier
+        // taxonomy has no equivalent for. They sit between the featured row and
+        // the synced subcategories, and a brand appearing here still appears
+        // under whatever the supplier filed it as further down.
+        $curatedSections = \App\Support\GiftCardCategories::curated($products);
+
+        foreach ($curatedSections->reverse() as $curated) {
+            $sections->prepend([
+                'name' => $curated['name'],
+                'slug' => $curated['slug'],
+                'products' => $curated['products'],
+            ]);
+        }
+
+        // Featured leads, before the alphabetical categories.
+        if ($featured->isNotEmpty()) {
+            $sections->prepend([
+                'name' => __('products.popular_brands_heading'),
+                'slug' => 'popular',
+                'products' => $featured,
+            ]);
+        }
+
+        /*
+         * "More Gift Cards" - everything sellable here that no category claims.
+         *
+         * 723 of the catalogue's 1,327 brand-country records carry no curated
+         * category, and only 7 of 58 countries are fully covered. Without this
+         * section those brands are reachable by search or a direct link and
+         * nothing else, which is not browsing.
+         *
+         * Derived, never stored: it is defined as the remainder, so a brand
+         * leaves the moment a category claims it and no cleanup is needed.
+         *
+         * Keyed on brand AND country. The same brand is a different product in
+         * a different country - different denominations, different redemption
+         * rules - so brand_key alone would collapse two real cards into one.
+         * $products is already filtered to the selected country, but the key
+         * stays explicit so it cannot silently become wrong if that changes.
+         */
+        $keyOf = fn ($product) => strtolower($product->brand_key).'|'.strtoupper((string) $product->country_code);
+
+        // The featured row is excluded: it is a shop window over brands that
+        // each still belong to a real category, so counting it here would hide
+        // a genuinely unfiled brand behind its appearance in that row.
+        $claimed = $sections
+            ->reject(fn ($section) => $section['slug'] === 'popular')
+            ->pluck('products')
+            ->flatten()
+            ->map($keyOf)
+            ->unique()
+            ->flip();
+
+        $unclaimed = $products
+            ->reject(fn ($product) => $claimed->has($keyOf($product)))
+            // Same brand+country twice cannot render twice, whatever upstream does.
+            ->unique($keyOf)
+            // Ranked where we have a signal - the admin's popular and featured
+            // flags, then the curated leader list - and alphabetical after
+            // that, so an unranked tail is still predictable rather than
+            // arbitrary database order.
+            ->sortBy([
+                fn ($product) => $product->is_popular ? 0 : 1,
+                fn ($product) => $product->is_featured ? 0 : 1,
+                fn ($product) => array_search($product->brand_key, config('popular_brands.keys', []), true) === false ? 1 : 0,
+                fn ($product) => Product::brandDisplayName($product->brand_key),
+            ])
+            ->values();
+
+        if ($unclaimed->isNotEmpty()) {
+            $sections->push([
+                'name' => __('products.more_gift_cards'),
+                // A real slug, so the section is filterable and linkable like
+                // any other rather than being a dead heading.
+                'slug' => 'more',
+                'products' => $unclaimed,
+            ]);
+        }
+    }
+
+    // How many brands the catch-all holds, for the menu entry below - the
+    // sections are built after this point.
+    $moreCount = $sections->firstWhere('slug', 'more')['products'] ?? collect();
+    $moreCount = $moreCount instanceof \Illuminate\Support\Collection ? $moreCount->count() : 0;
+
     // Subcategory links for the shared sidebar — "All" first, then each subtype.
     $sidebarSubItems = array_merge(
-        [['label' => 'All gift cards', 'url' => $filterUrl(['subcategory' => null]), 'active' => $sub === '']],
-        $subcategories->map(fn ($s) => [
+        [['label' => __('products.all_gift_cards'), 'slug' => '', 'url' => $filterUrl(['subcategory' => null]), 'active' => $sub === '']],
+        // Featured sits directly under "All", ahead of the alphabetical list.
+        // Short label here - the long heading belongs on the section, not in a
+        // 268px menu column.
+        $featured->isNotEmpty()
+            ? [['label' => __('products.popular_brands'), 'slug' => 'popular', 'url' => $filterUrl(['subcategory' => 'popular']), 'active' => $sub === 'popular']]
+            : [],
+        // Curated categories, in configured order, before the synced ones.
+        \App\Support\GiftCardCategories::curated($products)->map(fn ($c) => [
+            'label' => $c['name'],
+            'slug' => $c['slug'],
+            'url' => $filterUrl(['subcategory' => $c['slug']]),
+            'active' => $sub === $c['slug'],
+        ])->all(),
+        // "More Gift Cards" closes the menu when it has anything in it, so the
+        // section is reachable from the sidebar and the sheet, not only by
+        // scrolling to the bottom of the page.
+        $moreCount > 0
+            ? [['label' => __('products.more_gift_cards'), 'slug' => 'more', 'url' => $filterUrl(['subcategory' => 'more']), 'active' => $sub === 'more']]
+            : [],
+        collect()->map(fn ($s) => [
             'label' => $s->name,
+            'slug' => $s->slug,
             'url' => $filterUrl(['subcategory' => $s->slug]),
             'active' => $sub === $s->slug,
         ])->all()
@@ -209,81 +422,111 @@
 
 @endphp
 
-<x-shop.layout title="Gift Cards | {{ $siteName }}">
+<x-shop.layout :title="__('giftcards.page_title', ['site' => $siteName])">
 
-    <section class="min-h-full rounded-[15px] bg-[#eff6ff]">
-        <div class="mx-auto w-full max-w-[1550px] px-4 py-8 sm:px-6 lg:px-8">
+    {{-- No radius: this is the page slab, edge to edge, not a card. Rounded
+         corners on it left the page ground showing through above and below. --}}
+    <section class="min-h-full bg-[#eff6ff]">
+        {{-- Inside the dashboard the frame pads the page itself (16px a side on a
+             phone, what the overview gets), so the wrapper adds none of its own:
+             with both, the listing ran 16px narrower than the overview each side. --}}
+        <div class="mx-auto w-full max-w-[1550px] {{ $inDash ? '' : 'px-4 py-8 sm:px-6 lg:px-8' }}">
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr] lg:gap-8">
+            {{-- The category filter scope wraps BOTH menus and the sections: the
+                 sidebar and the mobile sheet are siblings of the main column, so
+                 a scope inside that column would leave their bindings undefined. --}}
+            <div
+                class="grid grid-cols-1 gap-6 lg:grid-cols-[268px_1fr] lg:gap-8 scroll-mt-32"
+                x-data="{
+                    activeCategory: @js($sub),
+
+                    /*
+                     * Rewrite the URL rather than navigate. The view stays
+                     * shareable and reloadable, and Back still works, without
+                     * fetching markup the page already holds.
+                     */
+                    select(slug) {
+                        this.activeCategory = slug;
+
+                        try {
+                            const url = new URL(window.location.href);
+                            if (slug) {
+                                url.searchParams.set('subcategory', slug);
+                            } else {
+                                url.searchParams.delete('subcategory');
+                            }
+                            window.history.pushState({ subcategory: slug }, '', url.toString());
+                        } catch (e) {}
+
+                        // A category further down the page would otherwise open
+                        // scrolled past its own heading.
+                        this.$el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    },
+                }"
+                @category-filtered.window="select($event.detail.slug)"
+                {{-- Back / Forward move between categories too, since each one
+                     pushed a history entry. --}}
+                @popstate.window="activeCategory = new URL(window.location.href).searchParams.get('subcategory') || ''"
+            >
 
                 {{-- Shared category sidebar — same component on every storefront. --}}
-                <x-shop.category-sidebar active="gift-cards" :sub-items="$sidebarSubItems" />
+                <x-shop.category-sidebar active="gift-cards" :sub-items="$sidebarSubItems" :show-categories="false" :client-filter="$groupByCategory" />
 
-                {{-- Main column --}}
-                <div>
+                {{-- Main column.
+
+                     min-w-0 is load-bearing: a grid item defaults to
+                     min-width:auto and will not shrink below its content, so a
+                     horizontally scrolling child widens this column instead of
+                     scrolling inside it. --}}
+                <div class="min-w-0">
                     {{-- Mobile category picker (dark pill + slide-up sheet). Replaces
                          the hidden desktop sidebar at < sm so customers can hop between
                          categories without leaving the page. --}}
                     <div class="mb-4 sm:hidden">
-                        <x-shop.category-picker active="gift-cards" :sub-items="$sidebarSubItems" />
+                        <x-shop.category-picker active="gift-cards" :sub-items="$sidebarSubItems" :show-categories="false" :client-filter="$groupByCategory" />
                     </div>
 
-                    {{-- Heading + search row --}}
-                    <div class="mb-6 flex flex-col gap-3 sm:grid sm:grid-cols-3 sm:items-center sm:gap-4">
-                        <div class="hidden sm:block">
-                            <h1 class="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Gift Cards</h1>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-zinc-700">
-                                <span class="flex items-center gap-1.5">
-                                    <img src="{{ asset('assets/' . rawurlencode('instant delivery.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Instant Delivery
-                                </span>
-                                <a href="{{ route('shop.refund-policy') }}" wire:navigate class="flex items-center gap-1.5 underline-offset-2 transition-colors hover:text-blue-600 hover:underline">
-                                    <img src="{{ asset('assets/' . rawurlencode('Fair Redund Policy.webp')) }}" alt="" class="h-4 w-4 object-contain" style="{{ $greenTint }}" loading="lazy">
-                                    Clear Refund Policy
-                                </a>
-                            </div>
-                        </div>
-
-                        {{-- Global product search (all categories) - centered middle column. --}}
-                        <x-shop.product-search class="sm:max-w-sm sm:justify-self-center" />
-
-                        {{-- Modern segmented sort selector. URL-driven so the choice survives reloads;
-                             each pill is a real <a> that updates ?sort= while preserving other filters. --}}
-                        <div class="inline-flex shrink-0 items-center rounded-[12px] bg-zinc-200 p-1 sm:justify-self-end" role="tablist" aria-label="Sort gift cards">
-                            @foreach ([
-                                ['value' => 'popular',   'label' => 'Popularity'],
-                                ['value' => 'name-asc',  'label' => 'A → Z'],
-                                ['value' => 'name-desc', 'label' => 'Z → A'],
-                            ] as $opt)
-                                <a
-                                    href="{{ $filterUrl(['sort' => $opt['value'] === 'popular' ? null : $opt['value']]) }}"
-                                    wire:navigate
-                                    role="tab"
-                                    aria-selected="{{ $sort === $opt['value'] ? 'true' : 'false' }}"
-                                    class="inline-flex items-center justify-center rounded-[12px] px-3 py-1.5 text-xs font-semibold transition-all {{ $sort === $opt['value'] ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-white/70 hover:text-zinc-900' }}"
-                                >
-                                    {{ $opt['label'] }}
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
+                    {{-- No page h1: the first section carries that heading now,
+                         and the same sentence twice on one screen reads as a
+                         mistake. The sidebar names the page for screen readers. --}}
 
                     {{-- Mobile/tablet subcategory pill row (sidebar hidden below lg) --}}
                     @if ($subcategories->isNotEmpty())
                         <div class="-mx-1 mb-6 hidden overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block lg:hidden">
                             <div class="flex w-max items-center gap-2">
+                                {{-- Third menu onto the same filter, so it switches in
+                                     place like the sidebar and the sheet. href stays real
+                                     for middle-click and for JS off. --}}
+                                @php
+                                    $pillBase = 'inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors';
+                                    $pillOn = 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900';
+                                    $pillOff = 'bg-white text-zinc-700 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10';
+                                @endphp
+
                                 <a
                                     href="{{ $filterUrl(['subcategory' => null]) }}"
-                                    wire:navigate
-                                    class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === '' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                    @if ($groupByCategory)
+                                        @click.prevent="$dispatch('category-filtered', { slug: '' })"
+                                        :class="activeCategory === '' ? @js($pillOn) : @js($pillOff)"
+                                        class="{{ $pillBase }}"
+                                    @else
+                                        wire:navigate
+                                        class="{{ $pillBase }} {{ $sub === '' ? $pillOn : $pillOff }}"
+                                    @endif
                                 >
-                                    All gift cards
+                                    {{ __('products.all_gift_cards') }}
                                 </a>
                                 @foreach ($subcategories as $s)
                                     <a
                                         href="{{ $filterUrl(['subcategory' => $s->slug]) }}"
-                                        wire:navigate
-                                        class="inline-flex shrink-0 items-center rounded-[12px] px-4 py-1.5 text-xs font-semibold transition-colors {{ $sub === $s->slug ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200' }}"
+                                        @if ($groupByCategory)
+                                            @click.prevent="$dispatch('category-filtered', { slug: @js($s->slug) })"
+                                            :class="activeCategory === @js($s->slug) ? @js($pillOn) : @js($pillOff)"
+                                            class="{{ $pillBase }}"
+                                        @else
+                                            wire:navigate
+                                            class="{{ $pillBase }} {{ $sub === $s->slug ? $pillOn : $pillOff }}"
+                                        @endif
                                     >
                                         {{ $s->name }}
                                     </a>
@@ -298,8 +541,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
                             </svg>
                             <div>
-                                <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Gift cards are temporarily unavailable</p>
-                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">You can browse the catalog, but purchases are paused right now. Please check back soon.</p>
+                                <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('products.category_unavailable') }}</p>
+                                <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/70">{{ __('giftcards.purchases_paused_hint') }}</p>
                             </div>
                         </div>
                     @endunless
@@ -307,105 +550,283 @@
                     {{-- Product grid. Skeleton overlay removed — it was rendering misaligned with the real
                          grid and flashing on every navigation. wire:navigate transitions are fast enough
                          without a synthetic loading state. --}}
+                    @php
+                        // One rollup for the whole page rather than a query per
+                        // card - see Review::brandRatings().
+                        $brandRatings = \App\Models\Review::brandRatings($products->pluck('brand_key'));
+                    @endphp
+
                     <div>
                         @if ($products->isNotEmpty())
-                            <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                                @foreach ($products as $product)
-                                    @php
-                                        $variants   = $product->variants;
-                                        $available  = $variants->where('is_available', true);
-                                        $isOut      = $variants->isNotEmpty() && $available->isEmpty();
-                                        // Out of stock = no available variant OR the admin's product-level flag.
-                                        $outOfStock = $isOut || $product->is_out_of_stock;
-                                        // Not buyable = category off OR out of stock. The card then renders
-                                        // greyed and inert (an <a> with no href does not navigate).
-                                        $notBuyable = ! $categoryEnabled || $outOfStock;
-                                        // Min-to-max range across ALL denominations (fixed + variable), in the product's currency.
-                                        $priceLabel = $product->priceRangeLabel();
-                                        $logoSrc    = Product::brandLogoUrl($product->brand_key, $product->logo_url);
-                                    @endphp
-                                    <li>
-                                        <a
-                                            @if (! $notBuyable) href="{{ $shopRoute('brand', ['brandSlug' => Product::brandSlug($product->brand_key), 'country' => $product->country_code]) }}" wire:navigate @endif
-                                            @class([
-                                                'card-3d-scene group block focus:outline-none',
-                                                'pointer-events-none opacity-60 grayscale' => $notBuyable,
-                                            ])
-                                            aria-label="{{ Product::brandDisplayName($product->brand_key) }}"
-                                            @if ($notBuyable) aria-disabled="true" @endif
-                                        >
-                                            {{-- Logo tile. bg uses a literal hex so the dark-mode
-                                                 remap keeps it white — brand logos are drawn for a
-                                                 light tile and vanish on a dark one. --}}
-                                            <div
-                                                class="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] bg-[#ffffff] shadow-sm ring-1 ring-zinc-200"
-                                            >
-                                                @if ($logoSrc)
-                                                    {{-- The first ~10 tiles (the two rows above the fold on a 5-col
-                                                         desktop grid) load eagerly with a high fetch priority so the
-                                                         page paints its logos immediately; everything below defers with
-                                                         lazy loading. decoding=async keeps logo decode off the main
-                                                         thread, and the intrinsic 16:10 size prevents any reflow. --}}
-                                                    <img
-                                                        src="{{ $logoSrc }}"
-                                                        alt="{{ Product::brandDisplayName($product->brand_key) }}"
-                                                        width="320" height="200"
-                                                        class="h-full w-full object-cover"
-                                                        loading="{{ $loop->index < 10 ? 'eager' : 'lazy' }}"
-                                                        @if ($loop->index < 5) fetchpriority="high" @endif
-                                                        decoding="async"
-                                                    >
-                                                @else
-                                                    <span class="text-2xl font-black tracking-tight text-[#3f3f46]">
-                                                        {{ str(Product::brandDisplayName($product->brand_key))->substr(0, 2)->upper() }}
-                                                    </span>
-                                                @endif
+                            @php
+                                // Everything a tile needs, resolved once per product.
+                                // Sections repeat a brand that sells in more than one
+                                // category, so this must not be recomputed per section.
+                                $tileFor = function ($product) use ($brandRatings, $categoryEnabled, $shopRoute) {
+                                    $available = $product->variants->where('is_available', true);
+                                    // Out of stock = no available variant OR the admin's product-level flag.
+                                    $outOfStock = ($product->variants->isNotEmpty() && $available->isEmpty())
+                                        || $product->is_out_of_stock;
 
-                                                @if ($outOfStock)
-                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-zinc-900/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-                                                        Out of stock
-                                                    </span>
-                                                @elseif (! $categoryEnabled)
-                                                    <span class="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white bg-amber-500/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
-                                                        Unavailable
-                                                    </span>
-                                                @elseif ($product->is_popular)
-                                                    {{-- Round pill with a soft fuchsia glow halo. --}}
-                                                    <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-fuchsia-500 bg-fuchsia-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-fuchsia-600 shadow-[0_0_12px_rgba(217,70,239,0.55)] backdrop-blur-sm">Popular</span>
-                                                @elseif ($product->is_featured)
-                                                    {{-- Round pill with a soft amber glow halo. --}}
-                                                    <span class="absolute left-2 top-2 inline-flex items-center rounded-full border border-amber-500 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.6)] backdrop-blur-sm">Featured</span>
-                                                @endif
+                                    return [
+                                        // Not buyable = category off OR out of stock. The tile
+                                        // then renders greyed and inert.
+                                        'notBuyable' => ! $categoryEnabled || $outOfStock,
+                                        'outOfStock' => $outOfStock,
+                                        'categoryEnabled' => $categoryEnabled,
+                                        // Min-to-max across ALL denominations, in the product's currency.
+                                        'priceLabel' => $product->priceRangeLabel(),
+                                        'logoSrc' => Product::brandLogoUrl($product->brand_key, $product->logo_url),
+                                        // Absent until a brand has been reviewed - the caption
+                                        // then shows no rating rather than a zero.
+                                        'rating' => $brandRatings[$product->brand_key] ?? null,
+                                        'href' => $shopRoute('brand', [
+                                            'brandSlug' => Product::brandSlug($product->brand_key),
+                                            'country' => $product->country_code,
+                                        ]),
+                                    ];
+                                };
 
-                                            </div>
+                                // Counts tiles across the WHOLE page, not per section:
+                                // it decides which images load eagerly, and each section
+                                // restarting would eagerly load ten logos per heading.
+                                $tileIndex = 0;
+                            @endphp
 
-                                            {{-- Caption — brand name + the real min-to-max denomination range. --}}
-                                            <div class="mt-2 px-0.5">
-                                                <p class="truncate text-[13px] font-bold leading-tight text-zinc-900">{{ Product::brandDisplayName($product->brand_key) }}</p>
-                                                @if ($priceLabel)
-                                                    <p class="mt-0.5 truncate text-[14px] text-zinc-600">{{ $priceLabel }}</p>
-                                                @endif
-                                            </div>
-                                        </a>
-                                    </li>
+                            @if ($groupByCategory)
+
+                                {{-- A section per category, so "All gift cards" is still
+                                     browsable: 285 unlabelled tiles in one grid is a wall,
+                                     and the whole point of showing them all at once is that
+                                     you can find something in it.
+
+                                     A brand selling across several categories appears in
+                                     each - someone browsing Gaming should find it there
+                                     whether or not it also sells under Entertainment. --}}
+                                @foreach ($sections as $section)
+                                    <x-shop.category-section
+                                        :title="$section['name']"
+                                        :id="'cat-'.$loop->index"
+                                        :slug="$section['slug']"
+                                    >
+                                        {{-- No chunking: the section lays the tiles out
+                                             three rows deep and pages sideways, so the
+                                             row count holds at every breakpoint. --}}
+                                        @foreach ($section['products'] as $product)
+                                            @php $tile = $tileFor($product); @endphp
+                                            <x-shop.brand-tile
+                                                :product="$product"
+                                                :index="$tileIndex++"
+                                                :href="$tile['href']"
+                                                :rating="$tile['rating']"
+                                                :price-label="$tile['priceLabel']"
+                                                :logo-src="$tile['logoSrc']"
+                                                :out-of-stock="$tile['outOfStock']"
+                                                :category-enabled="$tile['categoryEnabled']"
+                                                :not-buyable="$tile['notBuyable']"
+                                            />
+                                        @endforeach
+                                    </x-shop.category-section>
                                 @endforeach
-                            </ul>
 
-                            @if ($products->hasPages())
-                                <div class="mt-8">
-                                    {{ $products->links() }}
-                                </div>
+                                {{-- Everything, flat. See the note on the
+                                     component-free grid below: this is the
+                                     "just show me all of them" view, so it
+                                     carries no category headings at all. --}}
+                                @php
+                                    // How many of the flat grid's tiles are RENDERED, as
+                                    // opposed to revealed.
+                                    //
+                                    // This grid used to render the whole catalogue, every
+                                    // tile wrapped in `<template x-if="index < limit">` with
+                                    // limit starting at 30. The reveal was instant, but the
+                                    // other ~650 tiles were still built by Blade, sent down
+                                    // the wire and parsed by the browser on every single
+                                    // visit, for content almost nobody scrolls to. Measured
+                                    // on this page: 722 tiles at ~1,614 bytes each, and the
+                                    // page came to 1.73 MB with a 4.7s render.
+                                    //
+                                    // Four reveals' worth are rendered now. Anyone who wants
+                                    // the whole list follows the link at the end, which comes
+                                    // back with ?brands=all and renders the lot, so nothing
+                                    // is unreachable and the default visit pays for a
+                                    // fraction of it.
+                                    $flatShowAll = request()->query('brands') === 'all';
+                                    $flatProducts = $flatShowAll ? $products : $products->take(120);
+                                @endphp
+                                <section
+                                    class="mt-20"
+                                    aria-labelledby="all-gift-cards"
+                                    x-show="activeCategory === ''"
+                                    x-data="{
+                                        /* `rendered` is the ceiling the reveal can reach,
+                                           `total` is the whole catalogue. They differ unless
+                                           the page was asked for every brand, and the copy
+                                           below reports both honestly. */
+                                        limit: 30,
+                                        rendered: {{ $flatProducts->count() }},
+                                        total: {{ $products->count() }},
+
+                                        more() {
+                                            this.limit = Math.min(this.rendered, this.limit + 30);
+                                        },
+                                    }"
+                                >
+                                    {{-- Heavier than a category heading: this is a
+                                         section of the page, not another entry in
+                                         the list above it. --}}
+                                    <h2 id="all-gift-cards" class="mb-6 text-[32px] font-extrabold leading-[38px] tracking-tight text-zinc-900 dark:text-white">
+                                        {{ __('products.all_gift_cards') }}
+                                    </h2>
+
+                                    <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+                                        @foreach ($flatProducts as $product)
+                                            @php $tile = $tileFor($product); @endphp
+                                            <template x-if="{{ $loop->index }} < limit">
+                                                <x-shop.brand-tile
+                                                    :product="$product"
+                                                    :index="99"
+                                                    :href="$tile['href']"
+                                                    :rating="$tile['rating']"
+                                                    :price-label="$tile['priceLabel']"
+                                                    :logo-src="$tile['logoSrc']"
+                                                    :out-of-stock="$tile['outOfStock']"
+                                                    :category-enabled="$tile['categoryEnabled']"
+                                                    :not-buyable="$tile['notBuyable']"
+                                                />
+                                            </template>
+                                        @endforeach
+                                    </ul>
+
+                                    {{-- How many of the catalogue are on screen,
+                                         then the control that adds to it. The
+                                         count reads as a progress report on the
+                                         button below it rather than a claim that
+                                         everything is already here. --}}
+                                    @php
+                                        [$beforeShown, $rest] = explode(':shown', __('products.showing_out_of'), 2);
+                                        [$between, $after] = explode(':total', $rest, 2);
+                                    @endphp
+
+                                    <div class="mt-10 flex flex-col items-center gap-4">
+                                        <p class="text-[14px] font-bold text-zinc-900 dark:text-white">
+                                            {{ $beforeShown }}<span x-text="Math.min(limit, total)"></span>{{ $between }}<span x-text="total"></span>{{ $after }}
+                                        </p>
+
+                                        <div class="h-1.5 w-56 overflow-hidden rounded-full bg-[#dee3e1] dark:bg-white/10" role="presentation">
+                                            <span
+                                                class="block h-full rounded-full bg-[#0c1a36] transition-[width] duration-300 ease-out dark:bg-white"
+                                                :style="'width: ' + Math.round((Math.min(limit, total) / total) * 100) + '%'"
+                                            ></span>
+                                        </div>
+
+                                        {{-- The request-a-product form, not the contact page:
+                                             it files the ask as a product request, which is
+                                             what a shopper who reached the end of the list has. --}}
+                                        <p class="text-[14px] text-zinc-700 dark:text-zinc-300">
+                                            {{ __('products.didnt_find') }}
+                                            <a
+                                                href="{{ route('shop.request-product') }}"
+                                                wire:navigate
+                                                class="font-semibold text-zinc-900 underline decoration-1 underline-offset-4 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+                                            >{{ __('products.request_a_product') }}</a>
+                                        </p>
+
+                                        {{-- Reveal while tiles are still rendered and waiting. --}}
+                                        <div class="mt-2" x-show="limit < rendered">
+                                            <button
+                                                type="button"
+                                                @click="more()"
+                                                class="inline-flex items-center rounded-full bg-zinc-900 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                            >
+                                                {{ __('products.see_more') }}
+                                            </button>
+                                        </div>
+
+                                        {{-- The rendered set is exhausted but the catalogue
+                                             is not. A link rather than another reveal,
+                                             because the remaining tiles were never sent:
+                                             this comes back with every brand rendered.
+                                             wire:navigate keeps it an in-place swap.
+                                             Hidden entirely once ?brands=all has been
+                                             followed, since there is nothing left to ask
+                                             for. --}}
+                                        @unless ($flatShowAll)
+                                            <div class="mt-2" x-show="limit >= rendered && rendered < total" x-cloak>
+                                                <a
+                                                    href="{{ request()->fullUrlWithQuery(['brands' => 'all']) }}#all-gift-cards"
+                                                    wire:navigate
+                                                    class="inline-flex items-center rounded-full bg-zinc-900 px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                                >
+                                                    {{ __('products.see_more') }}
+                                                </a>
+                                            </div>
+                                        @endunless
+                                    </div>
+                                </section>
+
+                            @else
+                                {{-- No categories to group by at all - a single grid is
+                                     all there is to show. --}}
+                                <ul class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+                                    @foreach ($products as $product)
+                                        @php $tile = $tileFor($product); @endphp
+                                        <x-shop.brand-tile
+                                            :product="$product"
+                                            :index="$tileIndex++"
+                                            :href="$tile['href']"
+                                            :rating="$tile['rating']"
+                                            :price-label="$tile['priceLabel']"
+                                            :logo-src="$tile['logoSrc']"
+                                            :out-of-stock="$tile['outOfStock']"
+                                            :category-enabled="$tile['categoryEnabled']"
+                                            :not-buyable="$tile['notBuyable']"
+                                        />
+                                    @endforeach
+                                </ul>
                             @endif
 
                         @else
                             <div class="rounded-[12px] bg-white px-6 py-20 text-center ring-1 ring-zinc-200">
-                                <img src="{{ asset('assets/' . rawurlencode('Empty state.webp')) }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
-                                <p class="mt-4 text-base font-semibold text-zinc-900">No gift cards match these filters</p>
-                                <p class="mt-1 text-sm text-zinc-600">Try clearing the search or pick a different category.</p>
-                                @if ($search !== '' || $countryFiltered || $sub !== '')
-                                    <a href="{{ $shopRoute('gift-cards') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700">
-                                        Clear all filters
-                                    </a>
+                                <img src="{{ asset('assets/empty-state-blue.webp') }}" alt="" class="mx-auto block h-44 w-auto object-contain" loading="lazy">
+                                @if ($countryHasNoCatalogue)
+                                    {{-- The country is bare, so nothing the visitor did
+                                         caused this. Naming it is the whole message, and
+                                         "clear all filters" would be misleading - there is
+                                         nothing to clear. The way out is the locale
+                                         switcher, which is where country lives. --}}
+                                    <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">
+                                        {{ __('products.no_gift_cards_in_country', ['country' => $currentCountryName ?? $country]) }}
+                                    </p>
+                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                        {{ __('products.no_gift_cards_in_country_hint') }}
+                                    </p>
+
+                                    @include('shop._empty-state-back', ['switcher' => false])
+
+                                    <div class="mt-3 flex items-center justify-center">
+                                        {{-- Opens the same locale sheet the nav pill does.
+                                             `.stop` for the reason the footer chip needs it:
+                                             without it the click bubbles, the backdrop
+                                             appears under the cursor, and the same click
+                                             closes the sheet again. --}}
+                                        <button
+                                            type="button"
+                                            x-data
+                                            @click.stop="$dispatch('open-locale-modal'); localeModalOpen = true"
+                                            class="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                        >
+                                            {{ __('products.switch_country') }}
+                                        </button>
+                                    </div>
+                                @else
+                                    <p class="mt-4 text-base font-semibold text-zinc-900 dark:text-white">{{ __('products.no_products') }}</p>
+                                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ __('products.no_products_hint') }}</p>
+                                    @if ($search !== '' || $countryFiltered || $sub !== '')
+                                        <a href="{{ $shopRoute('gift-cards') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                                            {{ __('products.clear_all_filters') }}
+                                        </a>
+                                    @endif
                                 @endif
                             </div>
                         @endif
@@ -415,5 +836,32 @@
 
         </div>
     </section>
+
+    {{-- FAQ. The storefront only: this is the page a first-time visitor lands on
+         from search, and the questions it answers (region locking, how fast a
+         code arrives, where to find it afterwards) are exactly what stops them
+         buying. A signed-in customer in the dashboard has already crossed that
+         bridge, and the page there is a shopping surface, not a landing page.
+
+         Questions come from the faqs table through <x-home.faq>, the same
+         component and the same admin editor as the homepage, scoped to the two
+         topics that answer a gift card shopper. Nothing is written here, so the
+         copy can never drift from /faq. --}}
+    @if (! $inDash)
+        {{-- This page's FAQ needs a visible strip of page ground before the
+             footer. Other FAQ callers keep their own existing boundary. --}}
+        <div class="bg-[#eff6ff] pb-3 sm:pb-4 lg:pb-5">
+            {{-- top-margin="" and the row above dropping its mb-16: together
+                 those two were a measured 160px of empty page between the last
+                 "See more" and the first question. --}}
+            <x-home.faq
+                :topics="['Gift Cards']"
+                :limit="12"
+                heading-id="gift-cards-faq-heading"
+                :grow-from="1100"
+                top-margin=""
+            />
+        </div>
+    @endif
 
 </x-shop.layout>

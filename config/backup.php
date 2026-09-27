@@ -153,14 +153,14 @@ return [
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-                'name' => env('MAIL_FROM_NAME', 'RShopRefills Operations'),
+                'name' => env('MAIL_FROM_NAME', 'RshopRefill Operations'),
             ],
         ],
 
         'slack' => [
             'webhook_url' => env('OPS_SLACK_WEBHOOK_URL', ''),
             'channel' => null,
-            'username' => 'RShopRefills Backups',
+            'username' => 'RshopRefill Backups',
             'icon' => null,
         ],
 

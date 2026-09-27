@@ -89,6 +89,32 @@ class Order extends Model
         return $this->hasMany(PaymentAttempt::class);
     }
 
+    /**
+     * The channel the customer paid through, in customer words. Never a
+     * provider name. The paid attempt knows best; failing one, the latest
+     * attempt of any state; an order that never held an attempt (a wallet
+     * purchase, or a legacy row) answers from its own method.
+     */
+    public function customerGatewayLabel(): string
+    {
+        // Ids are time-ordered UUIDs: a tie within one second still has a
+        // definite newest.
+        $attempts = $this->paymentAttempts->sortBy([['created_at', 'desc'], ['id', 'desc']]);
+
+        $attempt = $attempts->first(fn (PaymentAttempt $attempt) => $attempt->payment_status === PaymentStatus::Paid)
+            ?? $attempts->first();
+
+        if ($attempt !== null) {
+            return $attempt->customerGatewayLabel();
+        }
+
+        return match ($this->payment_method) {
+            'wallet' => 'Wallet',
+            'crypto' => 'Crypto',
+            default => 'Card',
+        };
+    }
+
     // ────────────────────────────────────────────────────────────
     //  Admin-facing USD accessors
     //

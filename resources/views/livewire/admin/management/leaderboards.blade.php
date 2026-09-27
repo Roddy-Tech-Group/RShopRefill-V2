@@ -60,7 +60,7 @@ class extends Component {
 <x-slot:heading>Leaderboards</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
     $usd = fn ($amount) => \App\Domain\Shared\Services\Money::codeAmount((float) $amount, 'USD');
     $when = fn (?string $ts) => $ts ? \Illuminate\Support\Carbon::parse($ts)->diffForHumans() : '—';
 
@@ -120,13 +120,13 @@ class extends Component {
                         <span class="mt-0.5 shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:bg-white/10 dark:text-zinc-400">current</span>
                     @endunless
                 </header>
-                <div class="flex-1 divide-y divide-zinc-100 dark:divide-white/10">
+                <div class="flex-1 divide-y divide-zinc-100 pb-3 dark:divide-white/10">
                     @forelse ($rows as $index => $row)
                         <a
                             href="{{ route('admin.customer', $row['user']['id']) }}"
                             wire:navigate
                             @if ($index >= 5) x-show="expanded" x-cloak @endif
-                            class="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-zinc-50 dark:hover:bg-white/5"
+                            class="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-blue-50"
                         >
                             <span class="w-5 shrink-0 text-center text-[12px] font-bold tabular-nums {{ $index < 3 ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400' }}">{{ $index + 1 }}</span>
                             <img src="{{ $row['user']['avatar'] }}" alt="" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-white/10" loading="lazy">

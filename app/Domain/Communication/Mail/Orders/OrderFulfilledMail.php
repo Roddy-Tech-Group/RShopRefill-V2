@@ -28,7 +28,7 @@ class OrderFulfilledMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Your digital product is ready! - '.$brand,

@@ -7,11 +7,11 @@
 <x-layouts.app.header :title="'Blog | '.$siteName">
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}
-    <section class="border-b border-zinc-100 bg-blue-50">
+    <section class="bg-[#0c1337] dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-[1140px] px-4 py-14 text-center sm:px-6 sm:py-20">
-            <span class="inline-flex items-center gap-2 rounded-[5px] bg-blue-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Blog</span>
-            <h1 class="mt-5 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">Guides, tips and stories</h1>
-            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base">
+            <span class="inline-flex items-center gap-2 rounded-[5px] bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white">Blog</span>
+            <h1 class="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">Guides, tips and stories</h1>
+            <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
                 Practical advice on getting the most out of {{ $siteName }}, from crypto and eSIMs to security and savings.
             </p>
         </div>
@@ -25,7 +25,7 @@
                     <a href="{{ route('shop.blog.show', $post->slug) }}" wire:navigate class="group block">
                         {{-- Same image treatment as the single-post view: clean, full-width,
                              natural aspect (no blue box, padding, or fixed height). --}}
-                        <div class="overflow-hidden rounded-[12px] ring-1 ring-zinc-100">
+                        <div class="overflow-hidden rounded-[12px]">
                             <img src="{{ $img($post->image) }}" alt="" class="h-auto w-full object-contain" loading="lazy">
                         </div>
                         <p class="mt-4 text-xs font-bold uppercase tracking-wider text-blue-600">{{ $post->category }}</p>

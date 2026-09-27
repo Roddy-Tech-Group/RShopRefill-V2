@@ -109,6 +109,53 @@ class FailureReasonClassifier
         ['transaction limit', FailureCategory::Customer, 'limit_exceeded', true],
         ['address verification', FailureCategory::Customer, 'avs_failed', true],
 
+        // Mobile money verdicts: the operator's prose relayed by the gateway
+        // in processor_response. Before the transport bucket, because "timed
+        // out waiting for customer" is a customer who never approved, not a
+        // gateway that hung, and before the generic "declined".
+        ['not enough balance', FailureCategory::Customer, 'insufficient_funds', true],
+        ['low balance', FailureCategory::Customer, 'insufficient_funds', true],
+        ['insufficient wallet', FailureCategory::Customer, 'insufficient_funds', true],
+        ['daily limit', FailureCategory::Customer, 'limit_exceeded', true],
+        ['exceeds the limit', FailureCategory::Customer, 'limit_exceeded', true],
+        ['above the limit', FailureCategory::Customer, 'limit_exceeded', true],
+        ['amount exceeds', FailureCategory::Customer, 'limit_exceeded', true],
+        ['maximum amount', FailureCategory::Customer, 'limit_exceeded', true],
+        ['wrong pin', FailureCategory::Customer, 'incorrect_pin', true],
+        // Only the customer's own refusal of the prompt. "Declined by
+        // issuer" is a bank decline and stays one.
+        ['did not approve', FailureCategory::Customer, 'prompt_declined', true],
+        ['not approved by', FailureCategory::Customer, 'prompt_declined', true],
+        ['rejected by customer', FailureCategory::Customer, 'prompt_declined', true],
+        ['rejected by user', FailureCategory::Customer, 'prompt_declined', true],
+        ['rejected by subscriber', FailureCategory::Customer, 'prompt_declined', true],
+        ['declined by customer', FailureCategory::Customer, 'prompt_declined', true],
+        ['declined by user', FailureCategory::Customer, 'prompt_declined', true],
+        ['declined by subscriber', FailureCategory::Customer, 'prompt_declined', true],
+        ['customer declined', FailureCategory::Customer, 'prompt_declined', true],
+        ['user declined', FailureCategory::Customer, 'prompt_declined', true],
+        ['subscriber declined', FailureCategory::Customer, 'prompt_declined', true],
+        ['cancelled by customer', FailureCategory::Customer, 'prompt_declined', true],
+        ['cancelled by user', FailureCategory::Customer, 'prompt_declined', true],
+        ['canceled by customer', FailureCategory::Customer, 'prompt_declined', true],
+        ['canceled by user', FailureCategory::Customer, 'prompt_declined', true],
+        ['waiting for customer', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['did not respond', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['no response from', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['not authorized in time', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['authorization timed out', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['authorisation timed out', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['transaction expired', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['request expired', FailureCategory::Customer, 'prompt_timed_out', true],
+        ['not registered', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['unregistered', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['no mobile money account', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['invalid subscriber', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['subscriber not found', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['invalid msisdn', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['invalid phone', FailureCategory::Customer, 'mobile_account_not_found', true],
+        ['account not found', FailureCategory::Customer, 'mobile_account_not_found', true],
+
         // Crypto prose (NOWPayments messages)
         ['minimal amount', FailureCategory::Customer, 'below_minimum_amount', true],
         ['less than the minimal', FailureCategory::Customer, 'below_minimum_amount', true],
@@ -194,6 +241,9 @@ class FailureReasonClassifier
         'card_restricted' => 'Card restricted for this purchase',
         'limit_exceeded' => 'Card limit exceeded',
         'avs_failed' => 'Address verification failed',
+        'prompt_declined' => 'Customer declined the phone prompt',
+        'prompt_timed_out' => 'Phone prompt not approved in time',
+        'mobile_account_not_found' => 'No mobile money account for that number',
         'user_cancelled' => 'Customer cancelled',
         'session_expired' => 'Session expired (abandoned)',
         'crypto_quote_expired' => 'Crypto quote expired unpaid',
@@ -257,8 +307,17 @@ class FailureReasonClassifier
         }
 
         // 2 · Prose patterns over the best text available: the gateway's own
-        // words first, then whatever reason we were handed.
-        foreach ([$providerCode, $providerMessage, $reason] as $text) {
+        // words, and only when it left none, whatever reason we were handed.
+        // The reason is the customer's sentence, and once the gateway has
+        // spoken, that sentence is written FROM the verdict: grading it would
+        // grade our own copy ("check your balance and daily limit" reads as a
+        // limit failure) instead of admitting the gateway's words are new.
+        $texts = [$providerCode, $providerMessage];
+        if ($providerCode === null && $providerMessage === null) {
+            $texts[] = $reason;
+        }
+
+        foreach ($texts as $text) {
             if ($text === null || $text === '') {
                 continue;
             }

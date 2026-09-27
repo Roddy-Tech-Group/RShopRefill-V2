@@ -174,8 +174,8 @@ window.rshopKyc = (function () {
             environment: smile.environment === 'production' ? 'live' : 'sandbox',
             partner_details: {
                 partner_id: String(smile.partner_id || ''),
-                name: 'RShopRefill',
-                logo_url: '{{ asset('assets/Rshoprefillslogo.webp') }}',
+                name: 'RshopRefill',
+                logo_url: '{{ asset('assets/logo.webp').'?v=4' }}',
                 policy_url: '{{ route('shop.privacy') }}',
                 theme_color: '#2563eb',
             },

@@ -1,3 +1,30 @@
+// ── Viewport content width, measured ─────────────────────────────────────────
+// `.full-bleed` must span the page's usable width. Two earlier attempts were
+// both wrong for the same underlying reason:
+//
+//   100vw               counts the scrollbar, so tracks overhang it.
+//   body.clientWidth    GROWS when anything overflows, so a track that is too
+//                       wide makes the next measurement wider still. A loop.
+//
+// A fixed-position probe is immune to both. Its containing block is the
+// viewport itself, so its width is the usable area regardless of how wide the
+// document content happens to be, and it cannot feed back into itself.
+const publishPageWidth = () => {
+    if (!document.body) { return; }
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;top:0;left:0;right:0;height:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(probe);
+    const w = Math.round(probe.getBoundingClientRect().width);
+    probe.remove();
+    if (w > 0) {
+        document.documentElement.style.setProperty('--page-w', `${w}px`);
+    }
+};
+if (document.body) { publishPageWidth(); }
+else { document.addEventListener('DOMContentLoaded', publishPageWidth); }
+window.addEventListener('resize', publishPageWidth);
+window.addEventListener('livewire:navigated', publishPageWidth);
+
 // Flatpickr — modern date picker used by admin forms (e.g. coupon expiry).
 // Exposed on window so Alpine x-init expressions can call flatpickr() directly.
 import flatpickr from 'flatpickr';
@@ -418,26 +445,28 @@ const ILLOS = {
             return tweens;
         },
     },
-    payout: {
+    delivery: {
+        // Mirrors the completed-order screen. Content settles after entering;
+        // only the success badge and surrounding sparks move during the idle.
         set: (g) => {
-            g.set('#isx-card', { y: 46, opacity: 0 });
-            g.set('#isx-medal', { scale: 0, transformOrigin: '50% 50%' });
-            g.set('#isx-check', { strokeDasharray: 52, strokeDashoffset: 52 });
-            g.set('.isx-line-l', { scaleX: 0, transformOrigin: '100% 50%' });
-            g.set('.isx-line-r', { scaleX: 0, transformOrigin: '0% 50%' });
-            g.set('.isx-dot', { scale: 0, transformOrigin: '50% 50%' });
+            g.set('#idl-phone', { y: 10, opacity: 0 });
+            g.set('#idl-badge', { scale: 0, transformOrigin: '50% 50%' });
+            g.set('#idl-check', { strokeDasharray: 24, strokeDashoffset: 24 });
+            g.set('#idl-heading, #idl-download, #idl-credentials, #idl-actions', { opacity: 0 });
+            g.set('#idl-card', { y: 8, opacity: 0 });
+            g.set('.idl-spark', { opacity: 0 });
         },
-        build: (tl) => tl.to('#isx-card', { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out' })
-            .to('#isx-medal', { scale: 1, duration: 0.55, ease: 'back.out(2)' }, '-=0.25')
-            .to('#isx-check', { strokeDashoffset: 0, duration: 0.45, ease: 'power2.out' })
-            .to('.isx-line-l, .isx-line-r', { scaleX: 1, duration: 0.4, ease: 'power3.out', stagger: 0.05 }, '-=0.2')
-            .to('.isx-dot', { scale: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.08 }, '-=0.2'),
+        build: (tl) => tl
+            .to('#idl-phone', { y: 0, opacity: 1, duration: 0.55, ease: 'power3.out' })
+            .to('#idl-badge', { scale: 1, duration: 0.5, ease: 'back.out(1.5)' }, '-=0.25')
+            .to('#idl-check', { strokeDashoffset: 0, duration: 0.3, ease: 'power2.out' }, '-=0.15')
+            .to('#idl-heading, #idl-download', { opacity: 1, duration: 0.35, stagger: 0.08 }, '-=0.2')
+            .to('#idl-card', { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out' }, '-=0.1')
+            .to('#idl-credentials, #idl-actions', { opacity: 1, duration: 0.3, stagger: 0.12 }, '-=0.15')
+            .to('.idl-spark', { opacity: 1, duration: 0.45, stagger: 0.08 }, '-=0.3'),
         idle: (g) => [
-            // Pulse the medal + shimmer the speed lines, but DON'T float the card:
-            // it holds the <text>, and continuously sub-pixel-transforming text makes
-            // the letters shimmer/shake. Keeping the card still keeps the text crisp.
-            g.to('#isx-medal', { scale: 1.04, duration: 1.5, yoyo: true, repeat: -1, ease: 'sine.inOut' }),
-            g.to('.isx-line-l, .isx-line-r', { opacity: 0.5, duration: 1, yoyo: true, repeat: -1, ease: 'sine.inOut', stagger: 0.15 }),
+            g.to('#idl-badge', { scale: 1.045, duration: 1.8, yoyo: true, repeat: -1, ease: 'sine.inOut' }),
+            g.to('.idl-spark', { opacity: 0.3, duration: 1.8, yoyo: true, repeat: -1, stagger: 0.25, ease: 'sine.inOut' }),
         ],
     },
 };
@@ -551,7 +580,7 @@ document.addEventListener('livewire:navigated', bootAll);
 
 /**
  * Shared locale Alpine component used by both the storefront and customer-dashboard
- * layouts. Owns: locale modal open state, country (name + flag + ISO code), language,
+ * layouts. Owns: locale modal open state, country (name + flag + ISO code),
  * and currency (code + symbol). Persists to localStorage so the user's preferences
  * survive page navigation. When the user changes country or currency AND they're on
  * a shop page that supports those URL filters (currently /gift-cards), it pushes
@@ -632,22 +661,49 @@ document.addEventListener('alpine:init', () => {
     // so both shells get the same UX (glass toggle, icon-only rail, hover
     // popups). Separate localStorage key so the two layouts remember
     // independently. CSS rules live in resources/views/components/layouts/dashboard.blade.php.
+    //
+    // `folded` is a second, page-level reason to show the icon rail: a page with
+    // its own sub-navigation (the shop category panel, teleported next to the
+    // rail) folds it so the two read as one sidebar. It is never saved, so the
+    // customer's own collapse preference comes back on every other page. The
+    // arrow on a folded page simply unfolds it for that visit.
     window.Alpine.store('dashboardSidebar', {
         collapsed: false,
+        folded: false,
+        get isCollapsed() {
+            return this.collapsed || this.folded;
+        },
         init() {
             try { this.collapsed = localStorage.getItem('dashboard.sidebar.collapsed') === '1'; } catch (e) {}
+            this.folded = this._pageHasSubnav();
             this._sync();
         },
         toggle() {
+            if (this.folded) {
+                this.folded = false;
+                this._sync();
+                return;
+            }
             this.collapsed = ! this.collapsed;
             try { localStorage.setItem('dashboard.sidebar.collapsed', this.collapsed ? '1' : '0'); } catch (e) {}
             this._sync();
         },
+        _pageHasSubnav() {
+            return !! document.querySelector('template[data-subnav-teleport]');
+        },
         _sync() {
-            document.documentElement.classList.toggle('dashboard-sidebar-collapsed', this.collapsed);
+            document.documentElement.classList.toggle('dashboard-sidebar-collapsed', this.isCollapsed);
         },
     });
     window.Alpine.store('dashboardSidebar').init();
+
+    // wire:navigate swaps the page without re-running store init, so re-read
+    // whether the new page carries a sub-navigation panel.
+    document.addEventListener('livewire:navigated', () => {
+        const store = window.Alpine.store('dashboardSidebar');
+        store.folded = store._pageHasSubnav();
+        store._sync();
+    });
 
     /**
      * Customer-dashboard preferences. Persisted in localStorage so each customer's
@@ -694,6 +750,9 @@ document.addEventListener('alpine:init', () => {
         open: false,         // nav popup visibility
         loading: false,
         hydrated: false,     // true once the first /cart/data fetch resolves
+        // Unit-label templates in the page's language (":amount card"), set by
+        // x-nav.account-cart from the lang files. Empty means the English below.
+        labels: {},
 
         _csrf() {
             return document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -738,11 +797,16 @@ document.addEventListener('alpine:init', () => {
             if (!item || !item.face_label) {
                 return '';
             }
-            const suffix = {
-                'esims': ' eSIM',
-                'mobile-airtime': ' top-up',
-                'bill-payments': ' bill payment',
-            }[item.category_slug] ?? ' card';
+            const kind = {
+                'esims': 'esim',
+                'mobile-airtime': 'topup',
+                'bill-payments': 'bill',
+            }[item.category_slug] ?? 'card';
+            const template = this.labels[kind];
+            if (template) {
+                return template.replace(':amount', item.face_label);
+            }
+            const suffix = { esim: ' eSIM', topup: ' top-up', bill: ' bill payment', card: ' card' }[kind];
             return item.face_label + suffix;
         },
 
@@ -752,7 +816,14 @@ document.addEventListener('alpine:init', () => {
             if (this.currency === 'USD') {
                 return this.usd(n);
             }
-            return this.currencySymbol + ' ' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            // CFA francs do not use minor units in customer-facing prices.
+            // Rounding here keeps checkout totals from displaying values such
+            // as "XAF 3,109.6" while leaving two-decimal currencies untouched.
+            const zeroDecimal = ['XAF', 'XOF'].includes(this.currency);
+            return this.currencySymbol + ' ' + n.toLocaleString('en-US', {
+                minimumFractionDigits: zeroDecimal ? 0 : 2,
+                maximumFractionDigits: zeroDecimal ? 0 : 2,
+            });
         },
 
         // Format a USD amount.
@@ -919,6 +990,45 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
+ * Hand a pay-currency choice made on a product page to the rest of the site.
+ *
+ * These are the two statements the locale modal's Save makes for currency, and
+ * the ones checkout's own currency control used to make before it was removed:
+ * write the choice, then announce it so the cart re-prices. Checkout reads
+ * locale.currency through the cart store, so this is what carries "pay in
+ * naira", chosen beside a card's price, through to the page that charges for
+ * it.
+ *
+ * Returns false and writes nothing for a code outside `supported`. That guard
+ * is why a coin can never land here: coin codes are three letters like a
+ * currency, the display-currency middleware would take one, and the nav pill
+ * would end up reading EN / BTC.
+ *
+ * @param {string} code      Three-letter currency code.
+ * @param {?string} symbol   Its symbol, for the pill and the cart's own labels.
+ * @param {string[]} supported Codes checkout can actually charge in.
+ * @returns {boolean} Whether the choice was taken.
+ */
+window.rshopSetPayCurrency = function (code, symbol, supported) {
+    code = String(code || '').toUpperCase();
+
+    if (! Array.isArray(supported) || ! supported.includes(code)) {
+        return false;
+    }
+
+    try {
+        localStorage.setItem('locale.currency', code);
+        localStorage.setItem('locale.currencySymbol', symbol || code);
+    } catch (_) {
+        // Storage blocked: checkout opens in whatever it opened in before.
+    }
+
+    window.dispatchEvent(new CustomEvent('currency-changed', { detail: { currency: code } }));
+
+    return true;
+};
+
+/**
  * Open Google OAuth in a centred popup window instead of full-page redirect.
  * The popup lands on /auth/popup-complete after sign-in (success or failure);
  * that page postMessages back here and closes itself. We listen for the
@@ -968,6 +1078,11 @@ window.rshopOpenGoogleOAuth = function (href) {
  * with a small debounce, renders a dropdown of matching brands while the user
  * types. Pressing Enter submits the form to /gift-cards?q= for the full
  * results page.
+ *
+ * Focusing the field with nothing typed opens the panel on "Popular searches"
+ * instead of staying shut. Same endpoint with an empty q, which answers with the
+ * curated Popular row (Product::popularForRegion), so the list is real catalogue
+ * data rather than a static set of names.
  */
 window.navBrandSearch = function () {
     return {
@@ -975,18 +1090,151 @@ window.navBrandSearch = function () {
         results: [],
         open: false,
         loading: false,
+        // The popular list is fetched at most once per page and kept, so
+        // focus/blur/clear cycles do not re-request it.
+        popular: [],
+        popularLoaded: false,
+        showingPopular: false,
+        // Last few queries this browser ran. Local only - a search history is
+        // the visitor's, so it never leaves the device.
+        recent: [],
         _debounce: null,
         _aborter: null,
+        // Section headings and row types in the page's language, keyed by the
+        // API's type names. x-nav.search-panel fills this from the lang files;
+        // the English here is only what shows if a mount never passes them.
+        labels: {},
+
+        /** The translated name for a result row's type. */
+        typeLabel(type) {
+            return (this.labels.types && this.labels.types[type]) || type;
+        },
+
+        /** Result rows in display order, split into labelled sections. */
+        get groups() {
+            const order = ['Gift card', 'Mobile top-up', 'Bill payment', 'eSIM', 'Page', 'Country'];
+            const heading = Object.assign({
+                'Gift card': 'Gift Cards',
+                'Mobile top-up': 'Mobile Refill',
+                'Bill payment': 'Bill Payments',
+                'eSIM': 'eSIMs',
+                'Page': 'Suggestions',
+                'Country': 'Change Country',
+            }, this.labels.groups || {});
+
+            return order
+                .map((type) => ({
+                    type,
+                    label: heading[type],
+                    rows: this.results.filter((r) => r.type === type),
+                }))
+                .filter((g) => g.rows.length > 0);
+        },
+
+        readRecent() {
+            try {
+                const raw = localStorage.getItem('rshop.recentSearches');
+                this.recent = raw ? JSON.parse(raw).slice(0, 5) : [];
+            } catch (_) {
+                this.recent = [];
+            }
+        },
+
+        /** Record a query the visitor actually ran. Newest first, de-duped, capped at 5. */
+        rememberQuery(q) {
+            q = (q || '').trim();
+            if (q.length < 2) return;
+
+            try {
+                const next = [q, ...this.recent.filter((r) => r.toLowerCase() !== q.toLowerCase())].slice(0, 5);
+                localStorage.setItem('rshop.recentSearches', JSON.stringify(next));
+                this.recent = next;
+            } catch (_) { /* private mode - the feature is a convenience, not a requirement */ }
+        },
+
+        clearRecent() {
+            try { localStorage.removeItem('rshop.recentSearches'); } catch (_) {}
+            this.recent = [];
+        },
+
+        /** Clicking a recent term re-runs it rather than only filling the field. */
+        useRecent(q) {
+            this.query = q;
+            this.showingPopular = false;
+            this.open = true;
+            this.loading = true;
+            this.fetchResults(q);
+        },
+
+        /**
+         * Pick a country from the "Change Country" group.
+         *
+         * Writes the same five properties the locale modal sets. This component
+         * is nested inside the storefrontLocale() scope, and Alpine's merged
+         * scope proxy assigns through to whichever object in the chain owns the
+         * key - so these land on the shared locale state, exactly as the modal's
+         * own handler does, and its watchers persist + reload from there.
+         */
+        pickCountry(row) {
+            this.country = row.name;
+            this.countryFlag = row.flag;
+            this.countryCode = row.country;
+            this.currency = row.currency;
+            this.currencySymbol = row.currencySymbol;
+            this.open = false;
+        },
+
+        /** Focus or click on the field. Typed query reopens its results; empty opens Popular. */
+        onFocus() {
+            this.readRecent();
+
+            if (this.query.trim().length >= 2) {
+                this.open = true;
+                return;
+            }
+            this.showPopular();
+        },
+
+        async showPopular() {
+            this.showingPopular = true;
+
+            if (this.popularLoaded) {
+                this.results = this.popular;
+                this.open = this.popular.length > 0;
+                return;
+            }
+
+            this.open = true;
+            this.loading = true;
+
+            try {
+                const res = await fetch('/api/search/brands?q=', {
+                    headers: { 'Accept': 'application/json' },
+                });
+                this.popular = res.ok ? await res.json() : [];
+            } catch (err) {
+                this.popular = [];
+            } finally {
+                this.popularLoaded = true;
+                this.results = this.popular;
+                this.loading = false;
+                this.open = this.popular.length > 0;
+            }
+        },
 
         onInput() {
             const q = this.query.trim();
             if (q.length < 2) {
-                this.results = [];
-                this.open = false;
-                this.loading = false;
+                // Falling back to Popular rather than closing: the panel is
+                // already open and shutting it on every backspace past two
+                // characters reads as a flicker.
                 if (this._aborter) this._aborter.abort();
+                clearTimeout(this._debounce);
+                this.loading = false;
+                this.showPopular();
                 return;
             }
+            this.showingPopular = false;
             this.open = true;
             this.loading = true;
             clearTimeout(this._debounce);
@@ -1009,6 +1257,9 @@ window.navBrandSearch = function () {
                     return;
                 }
                 this.results = await res.json();
+                // Only remembered once a query returned something - half-typed
+                // prefixes on the way to a real search are not history.
+                if (this.results.length > 0) this.rememberQuery(q);
             } catch (err) {
                 if (err.name === 'AbortError') return; // expected when typing fast
                 this.results = [];
@@ -1019,12 +1270,65 @@ window.navBrandSearch = function () {
 
         clear() {
             this.query = '';
-            this.results = [];
-            this.open = false;
             this.loading = false;
             this.$refs.search.focus();
+            // Back to Popular, not to an empty panel - the field still has focus.
+            this.showPopular();
         },
     };
+};
+
+/**
+ * Theme switch with a circular reveal. The new theme opens out as a circle from
+ * the control that was pressed, growing until it covers the screen, the same
+ * way in both directions (to dark and to light).
+ *
+ * Uses the View Transitions API: the browser snapshots the page, the theme is
+ * applied (window.setTheme, partials/theme-engine), and the new snapshot is
+ * clipped to a circle that grows from the click point. CSS transitions are
+ * paused for that frame (html.theme-switching) so the new snapshot shows the
+ * finished colours rather than a hover or colour fade caught half way.
+ * Browsers without the API, and reduced-motion users, get the plain switch.
+ *
+ * @param {MouseEvent|KeyboardEvent|null} event the click (its position is the circle's centre)
+ * @param {'light'|'dark'|'system'} choice
+ */
+window.rshopThemeReveal = function (event, choice) {
+    const apply = () => window.setTheme && window.setTheme(choice);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (! document.startViewTransition || reduced) {
+        apply();
+        return;
+    }
+
+    // Keyboard activation reports 0,0; centre on the pressed control instead.
+    let x = event && event.clientX;
+    let y = event && event.clientY;
+    if (! x && ! y && event && event.currentTarget && event.currentTarget.getBoundingClientRect) {
+        const r = event.currentTarget.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+    }
+    if (! x && ! y) {
+        x = window.innerWidth / 2;
+        y = window.innerHeight / 2;
+    }
+
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const root = document.documentElement;
+
+    root.classList.add('theme-switching');
+    const transition = document.startViewTransition(apply);
+
+    transition.ready.then(() => {
+        root.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+            { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', pseudoElement: '::view-transition-new(root)' }
+        );
+    }).catch(() => {});
+
+    transition.finished.finally(() => root.classList.remove('theme-switching'));
 };
 
 /**
@@ -1271,9 +1575,17 @@ window.storefrontLocale = function () {
         country:        read('country',        'United States'),
         countryFlag:    read('countryFlag',    '🇺🇸'),
         countryCode:    read('countryCode',    'US'),
-        language:       read('language',       'English'),
         currency:       read('currency',       'USD'),
         currencySymbol: read('currencySymbol', '$'),
+
+        // The language the SERVER rendered this page in. Laravel owns it now
+        // (every offered language has its own lang directory), so the server
+        // value wins and localStorage is only the paint-before-hydrate copy.
+        // Reading storage first used to be right while a browser widget owned
+        // the choice; it is exactly wrong now, because a stale entry would
+        // name a language the page is not actually in.
+        language:       (typeof window !== 'undefined' && window.rshopLanguage)
+                            || read('language', 'English'),
 
         activeCategory: 'Gift Cards',
 
@@ -1282,11 +1594,21 @@ window.storefrontLocale = function () {
                 try { localStorage.setItem('locale.' + key, val ?? ''); } catch (_) {}
             };
 
+            // `locale.language` is kept in step with the server rather than
+            // dropped or trusted. The server is authoritative again now the
+            // translate widget is gone, so storage is refreshed from it on
+            // every load; that way the nav pill paints the right name before
+            // hydration and can never disagree with the page it labels.
+
+            // Mirror the server's language into storage for the next paint.
+            try {
+                if (window.rshopLanguage) { localStorage.setItem('locale.language', window.rshopLanguage); }
+            } catch (_) {}
+
             // Persist each piece independently.
             this.$watch('country',        save('country'));
             this.$watch('countryFlag',    save('countryFlag'));
             this.$watch('countryCode',    save('countryCode'));
-            this.$watch('language',       save('language'));
             this.$watch('currency',       save('currency'));
             this.$watch('currencySymbol', save('currencySymbol'));
 
@@ -1310,8 +1632,15 @@ window.storefrontLocale = function () {
                     if (this.countryCode) url.searchParams.set('country', this.countryCode);
                     else url.searchParams.delete('country');
 
-                    if (this.currency) url.searchParams.set('currency', this.currency);
-                    else url.searchParams.delete('currency');
+                    // display_currency, NOT currency: ?currency= is the gift-card
+                    // listing's own catalogue FILTER, so writing the locale's
+                    // currency there hid every product not priced in it - picking
+                    // a country from the search panel cut the listing from 756
+                    // tiles to 70. ?display_currency= converts the prices instead
+                    // and leaves the catalogue whole, which is what the locale
+                    // modal has always sent.
+                    if (this.currency) url.searchParams.set('display_currency', this.currency);
+                    else url.searchParams.delete('display_currency');
 
                     // Checkout hard-reloads (payment scripts + server-side rate math);
                     // everywhere else uses Livewire's fast SPA navigation when available.
@@ -1334,29 +1663,9 @@ window.storefrontLocale = function () {
                 window.dispatchEvent(new CustomEvent('currency-changed'));
             });
 
-            // NOTE: the locale modal dispatches `language-changed` itself when a
-            // language is picked (works regardless of which Alpine scope the modal
-            // is mounted in - storefront vs dashboard). We intentionally do NOT
-            // dispatch it from this watcher to avoid a double trigger / double reload.
         },
     };
 };
-
-/**
- * Smooth SPA page transitions. On every Livewire navigation the new page's main
- * content slides in from the right (see `.page-enter` in app.css), giving the
- * app-like feel of the menu modal opening rather than a hard reload. We restart
- * the CSS animation by removing the class, forcing a reflow, then re-adding it.
- */
-document.addEventListener('livewire:navigated', () => {
-    document.querySelectorAll('[data-page-content]').forEach((el) => {
-        el.classList.remove('page-enter');
-        void el.offsetWidth; // reflow so the animation replays on every navigation
-        el.classList.add('page-enter');
-        // Drop the class once it finishes so no transform lingers on the content.
-        el.addEventListener('animationend', () => el.classList.remove('page-enter'), { once: true });
-    });
-});
 
 /**
  * Mobile-instant navigation. Livewire prefetches `wire:navigate.hover` links on
@@ -1725,7 +2034,7 @@ window.bestSellingCountriesMap = function (payload) {
             // every lookup return undefined, which SVG paints BLACK - the
             // "black country" bug.) Four brand-blue intensity tiers; _values()
             // buckets each country's USD total into one of them.
-            return { t1: '#93c5fd', t2: '#60a5fa', t3: '#3b82f6', t4: '#1d4ed8' };
+            return { t1: '#c9d0cd', t2: '#a3aaa7', t3: '#3b82f6', t4: '#1d4ed8' };
         },
 
         // Numeric USD totals per country for the current view + continent
@@ -1972,7 +2281,7 @@ function buildGlassTooltipRenderer(dark, valueFormatter) {
 
 window.salesCostChart = function (series) {
     const SALES_COLOR = '#34d399'; // emerald-400
-    const COST_COLOR  = '#60a5fa'; // blue-400
+    const COST_COLOR  = '#a3aaa7'; // neutral grey (no light blue in the app)
 
     return {
         chart: null,
@@ -2381,7 +2690,7 @@ window.confirmModal = function () {
  */
 window.reportChart = function (series, chartType) {
     const SALES_COLOR = '#34d399'; // emerald-400
-    const COST_COLOR = '#60a5fa';  // blue-400
+    const COST_COLOR = '#a3aaa7';  // neutral grey (no light blue in the app)
 
     return {
         chart: null,
@@ -2675,6 +2984,73 @@ window.umAreaChart = function (payload) {
         destroy() {
             if (this.chart) { this.chart.destroy(); this.chart = null; }
             if (this.$refs.canvas) { this.$refs.canvas.innerHTML = ''; }
+        },
+    };
+};
+
+/**
+ * A product's review list: how many are shown, and in what order.
+ *
+ * Every review is already in the page, so this only hides the ones past the
+ * cursor and gives each a CSS order under the chosen sort. Nothing is fetched
+ * and nothing is re-rendered, which keeps the reviews readable with scripting
+ * off and leaves them in the HTML for search engines.
+ *
+ * Every label it prints comes from the page, so the list speaks the visitor's
+ * language like the rest of the markup around it.
+ *
+ *   x-data="productReviews(rows, labels)"  where a row is { i, rating, at } and
+ *   labels is { sorts: {key: text}, showing: 'text with :shown and :total' }.
+ */
+window.productReviews = function (rows = [], labels = {}) {
+    return {
+        rows,
+        perPage: 10,
+        shown: 10,
+        sort: 'relevant',
+        sorts: labels.sorts || {},
+        showing: labels.showing || '',
+
+        get total() {
+            return this.rows.length;
+        },
+
+        /** The rows in the chosen order, which is also the order they are placed in. */
+        get ranked() {
+            const rows = [...this.rows];
+
+            if (this.sort === 'newest') {
+                rows.sort((a, b) => b.at - a.at);
+            } else if (this.sort === 'highest') {
+                rows.sort((a, b) => b.rating - a.rating || b.at - a.at);
+            } else if (this.sort === 'lowest') {
+                rows.sort((a, b) => a.rating - b.rating || b.at - a.at);
+            }
+
+            return rows;
+        },
+
+        /** Where a review sits under the current sort, as its CSS order. */
+        place(index) {
+            return this.ranked.findIndex((row) => row.i === index);
+        },
+
+        shows(index) {
+            return this.place(index) < this.shown;
+        },
+
+        more() {
+            this.shown = Math.min(this.shown + this.perPage, this.total);
+        },
+
+        showingLabel() {
+            return this.showing
+                .replace(':shown', Math.min(this.shown, this.total).toLocaleString())
+                .replace(':total', this.total.toLocaleString());
+        },
+
+        progress() {
+            return `${Math.round(Math.min(this.shown, this.total) / this.total * 100)}%`;
         },
     };
 };

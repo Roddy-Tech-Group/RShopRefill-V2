@@ -114,20 +114,20 @@ class extends Component {
     <div class="flex flex-col gap-6">
 
         @forelse ($this->providerCards as $card)
-            <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+            <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
 
                 {{-- Provider header pill --}}
-                <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+                <div class="mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 dark:bg-white/5">
                     <h2 class="text-sm font-bold text-blue-700 dark:text-blue-300">{{ $card['label'] }}</h2>
                     @if ($card['blurb'])
                         <p class="mt-0.5 text-[11px] text-blue-700/70 dark:text-blue-300/70">{{ $card['blurb'] }}</p>
                     @endif
                 </div>
 
-                <ul class="divide-inset">
+                <ul class="divide-inset pb-3">
                     @foreach ($card['settings'] as $setting)
                         @php $displayVal = $this->displayValue($setting->value); @endphp
-                        <li class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] sm:flex-row sm:items-center sm:gap-6 dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
+                        <li class="group relative mx-3 flex flex-col gap-3 px-5 py-4 transition-all hover:bg-blue-50 sm:flex-row sm:items-center sm:gap-6">
                             {{-- Key + description --}}
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
@@ -187,7 +187,7 @@ class extends Component {
 
             </div>
         @empty
-            <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+            <div class="rounded-[12px] bg-white p-12 text-center shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                 <p class="text-sm font-semibold text-zinc-900 dark:text-white">No integration keys seeded yet</p>
                 <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Run <code class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan migrate</code> to seed the inventory of supported partners.</p>
             </div>

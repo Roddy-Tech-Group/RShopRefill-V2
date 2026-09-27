@@ -14,6 +14,14 @@ export default defineConfig({
     ],
     server: {
         cors: true,
+        // Bind IPv4 explicitly. Left to itself Vite resolved `localhost` to the
+        // IPv6 loopback and listened on [::1] ONLY, so the tags it injects point
+        // at http://[::1]:5173/… and any browser that does not use IPv6 loopback
+        // for that request silently fails to load app.js. Nothing errors visibly;
+        // Alpine just never boots, and every x-data island on the page quietly
+        // degrades - the OTP boxes stop advancing and pasting, dropdowns stop
+        // opening. Pinning 127.0.0.1 keeps the dev asset URL on IPv4.
+        host: '127.0.0.1',
     },
     build: {
         // apexcharts is a single ~560 kB library. We already load it lazily (only

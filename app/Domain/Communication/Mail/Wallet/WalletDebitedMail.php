@@ -22,7 +22,7 @@ class WalletDebitedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $brand = SiteSetting::get('site.name', 'RshopRefills');
+        $brand = SiteSetting::get('site.name', 'RshopRefill');
 
         return new Envelope(
             subject: 'Wallet Debit Notification - '.$brand,

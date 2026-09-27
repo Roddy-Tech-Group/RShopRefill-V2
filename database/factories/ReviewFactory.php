@@ -37,4 +37,32 @@ class ReviewFactory extends Factory
     {
         return $this->state(fn (): array => ['source' => $platform]);
     }
+
+    /**
+     * An answer to the experience prompt: pending, flagged as a customer
+     * submission, carrying the 1-10 score with the rating halved for the stars.
+     */
+    public function fromPrompt(int $score = 9, ?string $category = null): static
+    {
+        return $this->state(fn (): array => [
+            'score' => $score,
+            'rating' => $score / 2,
+            'category' => $category,
+            'is_published' => false,
+            'is_customer_submitted' => true,
+            'source' => 'RshopRefill',
+        ]);
+    }
+
+    /** Printed without the author's name on customer-facing surfaces. */
+    public function anonymous(): static
+    {
+        return $this->state(fn (): array => ['is_anonymous' => true]);
+    }
+
+    /** A score with nothing said: counts toward ratings, never reaches a card. */
+    public function scoreOnly(): static
+    {
+        return $this->state(fn (): array => ['body' => null]);
+    }
 }

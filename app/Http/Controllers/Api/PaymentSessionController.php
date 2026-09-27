@@ -78,12 +78,20 @@ class PaymentSessionController extends Controller
             'paymentAttempt:id,user_id,order_id,payment_status,pay_currency,pay_amount,actually_paid,settlement_delta,purchase_id',
             'paymentAttempt.order',
         ])
-            ->select('id', 'status', 'expires_at', 'confirmed_at', 'failed_at', 'payment_attempt_id')
+            ->select('id', 'status', 'expires_at', 'confirmed_at', 'failed_at', 'payment_attempt_id', 'payment_payload')
             ->findOrFail($id);
 
         $this->authorizeSessionAccess($session);
 
         $attempt = $session->paymentAttempt;
+
+        // Only the failure fields of the payload travel on the poll: it is the
+        // one channel that can tell a waiting customer why their phone prompt
+        // or card was refused, and the rest of the payload is not its business.
+        $failure = $session->status === 'failed' ? [
+            'failure_reason' => $session->payment_payload['failure_reason'] ?? null,
+            'failure_code' => $session->payment_payload['failure_code'] ?? null,
+        ] : null;
 
         return response()->json([
             'id' => $session->id,
@@ -91,6 +99,7 @@ class PaymentSessionController extends Controller
             'is_expired' => $session->expires_at ? $session->expires_at->isPast() : false,
             'confirmed_at' => $session->confirmed_at?->toIso8601String(),
             'failed_at' => $session->failed_at?->toIso8601String(),
+            'payment_payload' => $failure,
             'underpayment' => $attempt && $attempt->isUnderpaid() ? [
                 'expected' => (string) $attempt->pay_amount,
                 'received' => (string) $attempt->actually_paid,

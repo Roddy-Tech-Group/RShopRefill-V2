@@ -1,4 +1,5 @@
 @php
+    use App\Domain\Payment\Support\CustomerFailureCopy;
     use App\Models\Product;
 
     /** @var \App\Models\Order $order */
@@ -21,44 +22,50 @@
     // to say "you can try checking out again" and offer no way to do it, which
     // is where the recovery email's retry link landed.
     $declinedUnpaid = $status->value === 'failed' && $paymentValue !== 'paid';
+    // Why the last payment was refused, in this reader's language, when the
+    // session recorded a reason. Read at render time so a customer who paid
+    // in one language and reads the order in another gets the latter.
+    $failureLine = $declinedUnpaid
+        ? CustomerFailureCopy::forSessionPayload($heroAttempt?->paymentSession?->payment_payload)
+        : null;
 
     // Status-driven hero copy + colour. The order is `pending` straight after
     // checkout while payment is verified, then moves through the fulfillment engine.
     $ui = match ($status->value) {
         'completed' => [
             'tone' => 'emerald', 'icon' => 'check',
-            'title' => 'Your order is complete',
-            'line'  => 'Your redemption codes are ready below and have been emailed to you.',
+            'title' => __('orders.hero_completed_title'),
+            'line'  => __('orders.hero_completed_line'),
         ],
         'partially_completed' => [
             'tone' => 'amber', 'icon' => 'clock',
-            'title' => 'Your order is partially complete',
-            'line'  => 'Some items are ready below. The rest are still being processed and will be emailed shortly.',
+            'title' => __('orders.hero_partial_title'),
+            'line'  => __('orders.hero_partial_line'),
         ],
         'processing' => [
             'tone' => 'blue', 'icon' => 'clock',
-            'title' => 'Payment received',
-            'line'  => 'We are fulfilling your order. Codes land in your email the moment each item is ready.',
+            'title' => __('orders.hero_processing_title'),
+            'line'  => __('orders.hero_processing_line'),
         ],
         'failed' => [
             'tone' => 'red', 'icon' => 'cross',
-            'title' => 'This order could not be completed',
-            'line'  => 'Your payment did not go through and no charge was taken. You can try checking out again.',
+            'title' => __('orders.hero_failed_title'),
+            'line'  => __('orders.hero_failed_line'),
         ],
         'cancelled' => [
             'tone' => 'zinc', 'icon' => 'cross',
-            'title' => 'This order was cancelled',
-            'line'  => 'No payment was taken for this order.',
+            'title' => __('orders.hero_cancelled_title'),
+            'line'  => __('orders.hero_cancelled_line'),
         ],
         'requires_attention' => [
             'tone' => 'amber', 'icon' => 'clock',
-            'title' => 'We are reviewing your order',
-            'line'  => 'This order needs a quick review. Our team will update you by email shortly.',
+            'title' => __('orders.hero_review_title'),
+            'line'  => __('orders.hero_review_line'),
         ],
         default => [
             'tone' => 'amber', 'icon' => 'clock',
-            'title' => 'Thank you, your order is placed',
-            'line'  => 'We are confirming your payment. Your redemption codes are emailed as soon as it clears.',
+            'title' => __('orders.hero_placed_title'),
+            'line'  => __('orders.hero_placed_line'),
         ],
     };
 
@@ -67,14 +74,14 @@
     if ($awaitingPayment) {
         $ui = [
             'tone' => 'amber', 'icon' => 'clock',
-            'title' => 'Complete your payment',
-            'line'  => 'Your items are reserved but not yet paid for. Finish your payment to receive them.',
+            'title' => __('orders.hero_unpaid_title'),
+            'line'  => __('orders.hero_unpaid_line'),
         ];
     } elseif ($expiredCheckout) {
         $ui = [
             'tone' => 'zinc', 'icon' => 'cross',
-            'title' => 'This checkout expired',
-            'line'  => 'You were not charged. Your items are still available if you would like to try again.',
+            'title' => __('orders.hero_expired_title'),
+            'line'  => __('orders.hero_expired_line'),
         ];
     }
 
@@ -95,11 +102,16 @@
         default               => 'bg-amber-50 text-amber-700 ring-amber-200',
     };
 
+    // The enum's label() is English-only, so the badge reads
+    // orders.status_{value}; a state added later without a key keeps label().
+    $statusKey = 'orders.status_'.$status->value;
+    $statusLabel = \Illuminate\Support\Facades\Lang::has($statusKey) ? __($statusKey) : $status->label();
+
     // Customer-facing payment label only — the gateway/provider name is never shown.
     // The order stores wallet / flutterwave / crypto; card + mobile money both
     // settle through Flutterwave, so they surface as the generic "Card".
-    $methodLabels  = ['wallet' => 'Wallet', 'crypto' => 'Crypto', 'flutterwave' => 'Card'];
-    $paymentMethod = $methodLabels[$order->payment_method] ?? 'Card';
+    $methodLabels  = ['wallet' => __('orders.method_wallet'), 'crypto' => __('orders.method_crypto'), 'flutterwave' => __('orders.method_card')];
+    $paymentMethod = $methodLabels[$order->payment_method] ?? __('orders.method_card');
     $deliveryEmail = $order->metadata['delivery_email'] ?? auth()->user()?->email;
 
     // Per-order category mix — drives which "what happens next" copy + which
@@ -135,7 +147,7 @@
     $shopRoute = fn (string $name, $params = []) => route(($inDashboard ? 'dashboard.shop.' : 'shop.').$name, $params);
 @endphp
 
-<x-shop.layout :title="'Order ' . $order->order_number . ' | '.$siteName">
+<x-shop.layout :title="__('orders.order') . ' ' . $order->order_number . ' | '.$siteName">
 
 @if ($status->value === 'completed')
     {{-- ── Clean success view for completed orders ──────────────────────
@@ -143,6 +155,10 @@
          the original detailed view only for non-completed states below. --}}
     @php
         $tpProfileUrl = config('services.trustpilot.profile_url');
+        // The review collector widget's public ids, and the platform name as
+        // the reviews page labels it (a setting, never a literal).
+        $tp = config('services.trustpilot');
+        $reviewPlatform = (string) \App\Models\SiteSetting::get('reviews.aggregate.source', 'Trustpilot');
         $groupedItemsSuccess = $order->items->groupBy('product_variant_id');
 
         // Supplier-issued redemption steps captured at fulfillment (plain text
@@ -159,7 +175,7 @@
                 $stepBrandKey = $orderItem->product_snapshot['brand_key'] ?? null;
 
                 return [
-                    'brand' => $stepBrandKey ? Product::brandDisplayName($stepBrandKey) : ($orderItem->product_snapshot['name'] ?? 'Your card'),
+                    'brand' => $stepBrandKey ? Product::brandDisplayName($stepBrandKey) : ($orderItem->product_snapshot['name'] ?? __('orders.card_fallback_name')),
                     'steps' => (string) $steps,
                 ];
             })
@@ -167,6 +183,11 @@
             ->unique(fn ($row) => $row['brand'].'|'.$row['steps'])
             ->values();
     @endphp
+
+    {{-- TrustBox bootstrap. Loaded once; the collector widget below renders into it. --}}
+    @if ($tpProfileUrl)
+        <script type="text/javascript" src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>
+    @endif
 
     <div class="min-h-full bg-zinc-50 dark:bg-[#0c1a36]">
         <div class="mx-auto w-full max-w-sm px-4 py-8 sm:py-10">
@@ -176,8 +197,8 @@
                  all celebrate identically. --}}
             <div class="text-center">
                 <x-success-tick />
-                <h1 class="mt-5 text-2xl font-bold text-zinc-900 dark:text-white">Order completed</h1>
-                <p class="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">Thank you for your purchase</p>
+                <h1 class="mt-5 text-2xl font-bold text-zinc-900 dark:text-white">{{ __('orders.success_heading') }}</h1>
+                <p class="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{{ __('orders.success_thanks') }}</p>
             </div>
 
             {{-- Download as CSV --}}
@@ -186,7 +207,7 @@
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
                     </svg>
-                    Download as CSV
+                    {{ __('orders.download_csv') }}
                 </a>
             </div>
 
@@ -195,6 +216,9 @@
                  same gift-card look shows on both surfaces. --}}
             @php
                 $countryNamesSuccess = array_flip(config('countries.codes', []));
+                // Visible credential labels. The English array keys below stay
+                // as they are because they also build each pill's wire:key.
+                $credLabels = ['Code' => __('orders.credential_code'), 'Pin' => __('orders.credential_pin')];
             @endphp
             <div class="mt-6 space-y-4">
                 @foreach ($groupedItemsSuccess as $variantItems)
@@ -203,7 +227,7 @@
                             $snap = $item->product_snapshot ?? [];
                             $vsnap = $item->variant_snapshot ?? [];
                             $brandKey = $snap['brand_key'] ?? null;
-                            $name = $brandKey ? \App\Models\Product::brandDisplayName($brandKey) : ($snap['name'] ?? 'Item');
+                            $name = $brandKey ? \App\Models\Product::brandDisplayName($brandKey) : ($snap['name'] ?? __('orders.item_fallback_name'));
                             $logo = \App\Models\Product::brandLogoUrl($brandKey, $snap['logo_url'] ?? null);
                             $faceVal = $vsnap['face_value'] ?? null;
                             $faceCur = $vsnap['currency'] ?? ($snap['currency_code'] ?? 'USD');
@@ -259,7 +283,7 @@
                                         <span class="text-3xl font-black uppercase {{ $brandDark ? 'text-white/70' : 'text-zinc-400' }}">{{ str($name)->substr(0, 2)->upper() }}</span>
                                     @endif
                                     @unless ($logo && \App\Models\Product::logoCarriesName($brandKey))
-                                        <p class="truncate text-sm font-bold {{ $cardInk }}">For {{ $name }}</p>
+                                        <p class="truncate text-sm font-bold {{ $cardInk }}">{{ __('orders.card_for_brand', ['brand' => $name]) }}</p>
                                     @endunless
                                 </div>
                                 <div class="shrink-0 text-right">
@@ -280,8 +304,8 @@
 
                             @if ($qrUrl)
                                 <div class="flex flex-col items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white p-4">
-                                    <img src="{{ $qrUrl }}" alt="eSIM activation QR code" class="h-44 w-44 object-contain" loading="lazy">
-                                    <p class="text-center text-xs font-medium text-zinc-600">Scan this QR from another device to install your eSIM.</p>
+                                    <img src="{{ $qrUrl }}" alt="{{ __('orders.esim_qr_alt') }}" class="h-44 w-44 object-contain" loading="lazy">
+                                    <p class="text-center text-xs font-medium text-zinc-600">{{ __('orders.esim_scan_hint') }}</p>
                                 </div>
                             @elseif ($phone)
                                 <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3">
@@ -291,7 +315,7 @@
                                         </svg>
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $phoneCredited ? 'Credited to' : 'Will be credited to' }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $phoneCredited ? __('orders.topup_credited_to') : __('orders.topup_will_be_credited_to') }}</p>
                                         <p class="truncate text-base font-bold tabular-nums text-zinc-900">{{ $phone }}</p>
                                     </div>
                                 </div>
@@ -299,19 +323,19 @@
                                 <div class="space-y-2">
                                     @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
                                         <div class="flex items-center gap-2 rounded-full border border-zinc-100 bg-white px-3.5 py-2" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
-                                            <span class="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
+                                            <span class="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabels[$credLabel] }}</span>
                                             <span class="min-w-0 flex-1 truncate text-xs font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                             <button
                                                 type="button"
                                                 x-data="{ copied: false }"
                                                 @click="navigator.clipboard.writeText(@js($credValue)); copied = true; setTimeout(() => copied = false, 1500)"
                                                 class="shrink-0 text-zinc-400 transition-colors hover:text-blue-600"
-                                                aria-label="Copy {{ $credLabel }}"
+                                                aria-label="{{ __('orders.copy_credential', ['label' => $credLabels[$credLabel]]) }}"
                                             >
                                                 <svg x-show="!copied" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"/>
                                                 </svg>
-                                                <span x-show="copied" x-cloak class="text-xs font-bold text-emerald-600">Copied</span>
+                                                <span x-show="copied" x-cloak class="text-xs font-bold text-emerald-600">{{ __('common.copied') }}</span>
                                             </button>
                                         </div>
                                     @endforeach
@@ -321,7 +345,7 @@
                                     <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
-                                    Your code appears here once payment clears.
+                                    {{ __('orders.code_pending') }}
                                 </div>
                             @endif
                         </div>
@@ -340,10 +364,10 @@
                 {{-- Side-by-side text links --}}
                 <div class="mt-3 flex items-center justify-center gap-8 text-xs">
                     <button type="button" @click="toggle('redeem')" :class="open === 'redeem' ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'" class="transition-colors hover:text-blue-700 dark:hover:text-blue-300">
-                        Redeem instructions
+                        {{ __('orders.redeem_instructions') }}
                     </button>
                     <button type="button" @click="toggle('terms')" :class="open === 'terms' ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'" class="transition-colors hover:text-blue-700 dark:hover:text-blue-300">
-                        Terms and conditions
+                        {{ __('orders.terms_and_conditions') }}
                     </button>
                 </div>
 
@@ -356,42 +380,73 @@
                         <p class="mt-1 whitespace-pre-line">{{ $supplierStep['steps'] }}</p>
                     @endforeach
                     @if ($orderHasGiftCards)
-                        <p class="{{ $supplierRedeemSteps->isNotEmpty() ? 'mt-3 ' : '' }}font-semibold text-zinc-900 dark:text-white">Gift cards</p>
+                        <p class="{{ $supplierRedeemSteps->isNotEmpty() ? 'mt-3 ' : '' }}font-semibold text-zinc-900 dark:text-white">{{ __('orders.redeem_gift_cards_heading') }}</p>
                         <ol class="ml-4 mt-1 list-decimal space-y-1">
-                            <li>Visit the brand's redemption page (e.g. apple.com/redeem for Apple, amazon.com/gc for Amazon).</li>
-                            <li>Sign in or create an account in the matching region.</li>
-                            <li>Enter the PIN/code above exactly as shown - codes are case-sensitive and single-use.</li>
-                            <li>The balance is added to your account immediately.</li>
+                            <li>{{ __('orders.redeem_gift_cards_step_1') }}</li>
+                            <li>{{ __('orders.redeem_gift_cards_step_2') }}</li>
+                            <li>{{ __('orders.redeem_gift_cards_step_3') }}</li>
+                            <li>{{ __('orders.redeem_gift_cards_step_4') }}</li>
                         </ol>
                     @endif
                     @if ($orderHasEsims)
-                        <p class="{{ $orderHasGiftCards ? 'mt-3' : '' }} font-semibold text-zinc-900 dark:text-white">eSIMs</p>
+                        <p class="{{ $orderHasGiftCards ? 'mt-3' : '' }} font-semibold text-zinc-900 dark:text-white">{{ __('orders.redeem_esims_heading') }}</p>
                         <ol class="ml-4 mt-1 list-decimal space-y-1">
-                            <li>Open Settings on iOS (or your device's mobile network settings on Android).</li>
-                            <li>Go to Cellular or Mobile Data, then "Add eSIM" / "Add cellular plan".</li>
-                            <li>Scan the QR code shown on the card above.</li>
-                            <li>Follow the prompts to label and activate. The plan starts on first network connection in the destination country.</li>
+                            <li>{{ __('orders.redeem_esims_step_1') }}</li>
+                            <li>{{ __('orders.redeem_esims_step_2') }}</li>
+                            <li>{{ __('orders.redeem_esims_step_3') }}</li>
+                            <li>{{ __('orders.redeem_esims_step_4') }}</li>
                         </ol>
                     @endif
                     @if ($orderHasTopups)
-                        <p class="{{ $orderHasGiftCards || $orderHasEsims ? 'mt-3' : '' }} font-semibold text-zinc-900 dark:text-white">Mobile top-ups</p>
-                        <p class="mt-1">The top-up has been credited directly to the phone number shown above - no further action needed. If the credit does not appear within 15 minutes, contact support with this order number.</p>
+                        <p class="{{ $orderHasGiftCards || $orderHasEsims ? 'mt-3' : '' }} font-semibold text-zinc-900 dark:text-white">{{ __('orders.redeem_topups_heading') }}</p>
+                        <p class="mt-1">{{ __('orders.redeem_topups_body') }}</p>
                     @endif
                 </div>
 
                 <div x-show="open === 'terms'" x-collapse x-cloak class="mt-3 overflow-hidden rounded-[12px] bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-100 dark:bg-[#1d3252] dark:text-zinc-300 dark:ring-zinc-700/60">
                     <ul class="ml-4 list-disc space-y-1">
-                        <li>Codes are equivalent to cash. {{ $siteName }} cannot reissue codes that have been viewed, shared or used.</li>
+                        <li>{{ __('orders.terms_codes_cash', ['site' => $siteName]) }}</li>
                         @if ($orderHasEsims)
-                            <li>eSIM data plans activate on first network connection. The validity period (where applicable) starts from that point.</li>
+                            <li>{{ __('orders.terms_esims') }}</li>
                         @endif
                         @if ($orderHasTopups)
-                            <li>Mobile top-ups are non-refundable once credited to the destination phone number.</li>
+                            <li>{{ __('orders.terms_topups') }}</li>
                         @endif
-                        <li>For the full legal terms see our <a href="{{ route('shop.terms') }}" wire:navigate class="text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">Terms and Conditions</a>.</li>
+                        <li>{!! __('orders.terms_full_legal', [
+                            'link' => '<a href="'.route('shop.terms').'" wire:navigate class="text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">'.e(__('orders.terms_full_legal_link')).'</a>',
+                        ]) !!}</li>
                     </ul>
                 </div>
             </div>
+
+            {{-- Review collector for the platform that hosts our public reviews,
+                 right under the delivered card while the purchase is fresh. The
+                 TrustBox is the only branding of theirs on the page, as their
+                 guidelines ask; the native form beneath collects for our own wall. --}}
+            @if ($tpProfileUrl)
+                <div class="mt-10 rounded-[12px] bg-white p-5 text-center shadow-sm shadow-zinc-900/5 dark:bg-[#1d3252] dark:shadow-none sm:p-6" data-trustbox>
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] bg-emerald-100 dark:bg-emerald-500/15">
+                        <svg class="h-6 w-6 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+                        </svg>
+                    </div>
+                    <h2 class="mt-4 text-lg font-bold text-zinc-900 dark:text-white">{{ __('reviews.review_us') }}</h2>
+                    <p class="mx-auto mt-1 max-w-xs text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{{ __('reviews.collector_body') }}</p>
+                    <div class="mt-5 flex justify-center">
+                        <div class="inline-flex overflow-hidden rounded-[12px] bg-white shadow-md shadow-zinc-900/20">
+                            <div class="trustpilot-widget"
+                                data-locale="{{ $tp['locale'] }}"
+                                data-template-id="{{ $tp['review_collector_template_id'] }}"
+                                data-businessunit-id="{{ $tp['business_unit_id'] }}"
+                                data-style-height="52px"
+                                data-style-width="240px"
+                                data-token="{{ $tp['review_collector_token'] }}">
+                                <a href="{{ $tpProfileUrl }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline">{{ __('reviews.review_fallback') }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- Native review prompt, tied to this order so the rating rolls up
                  under every gift card bought in it. Shared with the public
@@ -402,7 +457,7 @@
 
             {{-- Back to dashboard --}}
             <div class="mt-10 text-center">
-                <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-[12px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">View all my orders</a>
+                <a href="{{ route('dashboard.orders') }}" wire:navigate class="inline-flex items-center rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-blue-700">{{ __('orders.view_all_orders') }}</a>
             </div>
 
             {{-- Reviews for the brand(s) just bought - the same per-brand
@@ -432,7 +487,7 @@
 <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:py-10">
 
     {{-- Status hero --}}
-    <section class="rounded-[12px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8">
+    <section class="rounded-[12px] bg-white p-6 text-center shadow-sm shadow-zinc-900/5 sm:p-8">
         <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-[12px] {{ $tone['bg'] }} ring-8 {{ $tone['ring'] }}">
             <svg class="h-8 w-8 {{ $tone['fg'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" aria-hidden="true">
                 @if ($ui['icon'] === 'check')
@@ -447,25 +502,30 @@
 
         <h1 class="mt-5 text-2xl font-bold text-zinc-900">{{ $ui['title'] }}</h1>
         <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">{{ $ui['line'] }}</p>
+        @if ($failureLine)
+            <p class="mx-auto mt-2 max-w-md text-sm font-semibold leading-relaxed text-red-600" data-failure-line>{{ $failureLine }}</p>
+        @endif
 
         {{-- The unpaid checkout's way back in. The cart survives until payment
              confirms and checkout re-entry is idempotent, so this lands the
              customer on the same live session rather than a duplicate order. --}}
         @if ($awaitingPayment || $expiredCheckout || $declinedUnpaid)
             <a href="{{ $shopRoute('checkout') }}"
-                class="mt-5 inline-flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
-                {{ $awaitingPayment ? 'Complete payment' : 'Try again' }}
+                class="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-blue-700">
+                {{ $awaitingPayment ? __('orders.complete_payment') : __('common.try_again') }}
             </a>
         @endif
 
         <div class="mt-4 inline-flex items-center gap-2 rounded-[12px] bg-zinc-50 px-4 py-1.5 ring-1 ring-zinc-200">
-            <span class="text-xs font-medium text-zinc-500">Order</span>
+            <span class="text-xs font-medium text-zinc-500">{{ __('orders.order') }}</span>
             <span class="text-sm font-bold tabular-nums text-zinc-900">{{ $order->order_number }}</span>
         </div>
 
         @if ($deliveryEmail)
             <p class="mt-3 text-sm text-zinc-600">
-                A confirmation has been sent to <span class="font-semibold text-zinc-900">{{ $deliveryEmail }}</span>
+                {!! __('orders.confirmation_sent_to', [
+                    'email' => '<span class="font-semibold text-zinc-900">'.e($deliveryEmail).'</span>',
+                ]) !!}
             </p>
         @endif
     </section>
@@ -495,6 +555,10 @@
                 paymentState: 'select_method', // select_method, card_input, action_pin, action_otp, action_3ds, awaiting_transfer, awaiting_confirmation, momo_input, processing, success, error
                 errorMessage: '',
                 actionMessage: '',
+                // Why a payment failed, by the session's reason code, in this
+                // customer's language (see the checkout wizard).
+                failureCopy: @js(CustomerFailureCopy::map()),
+                failureCode: null,
                 bankDetails: null,
                 pollInterval: null,
 
@@ -506,7 +570,7 @@
                         this.startStatusPolling();
                     } else if (this.session.status === 'awaiting_confirmation') {
                         this.paymentState = 'awaiting_confirmation';
-                        this.actionMessage = this.session.payment_payload?.message || 'Please authorize payment on your mobile money device.';
+                        this.actionMessage = this.session.payment_payload?.message || @js(__('orders.pay_momo_authorize'));
                         this.startStatusPolling();
                     } else if (this.session.status === 'awaiting_customer_action') {
                         const action = this.session.payment_payload?.action;
@@ -514,7 +578,7 @@
                             this.paymentState = 'action_pin';
                         } else if (action === 'otp') {
                             this.paymentState = 'action_otp';
-                            this.actionMessage = this.session.payment_payload?.message || 'Enter verification code';
+                            this.actionMessage = this.session.payment_payload?.message || @js(__('orders.pay_otp_prompt'));
                         } else if (action === 'redirect') {
                             this.paymentState = 'action_3ds';
                             this.startStatusPolling();
@@ -572,6 +636,7 @@
                 async paySession(method, dataPayload = {}) {
                     this.paymentState = 'processing';
                     this.errorMessage = '';
+                    this.failureCode = null;
                     try {
                         let body = {
                             method: method,
@@ -599,19 +664,19 @@
                         try {
                             resData = await response.json();
                         } catch (jsonErr) {
-                            resData = { message: 'Server error (' + response.status + '): ' + response.statusText };
+                            resData = { message: @js(__('orders.pay_error_server')).replace(':status', response.status).replace(':text', response.statusText) };
                         }
 
                         if (!response.ok) {
                             this.paymentState = 'error';
-                            this.errorMessage = resData.message || 'Payment initiation failed.';
+                            this.errorMessage = resData.message || @js(__('orders.pay_error_initiation'));
                             return;
                         }
 
                         this.handlePayResponse(resData.data || resData);
                     } catch (err) {
                         this.paymentState = 'error';
-                        this.errorMessage = 'Network connection failed. Please check your internet.';
+                        this.errorMessage = @js(__('orders.pay_error_network'));
                     }
                 },
 
@@ -624,7 +689,8 @@
                         setTimeout(() => { window.location.reload(); }, 2000);
                     } else if (status === 'failed') {
                         this.paymentState = 'error';
-                        this.errorMessage = sessionData.payment_payload?.failure_reason || 'Transaction could not be completed.';
+                        this.failureCode = sessionData.payment_payload?.failure_code || null;
+                        this.errorMessage = this.failureCopy[sessionData.payment_payload?.failure_code] || sessionData.payment_payload?.failure_reason || @js(__('orders.pay_error_incomplete'));
                     } else if (status === 'awaiting_customer_action') {
                         const action = sessionData.payment_payload?.action;
                         if (action === 'pin') {
@@ -633,7 +699,7 @@
                         } else if (action === 'otp') {
                             this.paymentState = 'action_otp';
                             this.otpValue = '';
-                            this.actionMessage = sessionData.payment_payload?.message || 'Verification code sent';
+                            this.actionMessage = sessionData.payment_payload?.message || @js(__('orders.pay_otp_sent'));
                         } else if (action === 'redirect') {
                             this.paymentState = 'action_3ds';
                             this.startStatusPolling();
@@ -644,7 +710,7 @@
                         this.startStatusPolling();
                     } else if (status === 'awaiting_confirmation') {
                         this.paymentState = 'awaiting_confirmation';
-                        this.actionMessage = sessionData.payment_payload?.message || 'Please accept the billing prompt on your device.';
+                        this.actionMessage = sessionData.payment_payload?.message || @js(__('orders.pay_momo_accept_prompt'));
                         this.startStatusPolling();
                     }
                 },
@@ -662,7 +728,8 @@
                             } else if (data.status === 'failed') {
                                 clearInterval(this.pollInterval);
                                 this.paymentState = 'error';
-                                this.errorMessage = data.payment_payload?.failure_reason || 'Transaction failed.';
+                                this.failureCode = data.payment_payload?.failure_code || null;
+                                this.errorMessage = this.failureCopy[data.payment_payload?.failure_code] || data.payment_payload?.failure_reason || @js(__('orders.pay_error_failed'));
                             }
                         } catch (e) {}
                     }, 4500);
@@ -670,15 +737,15 @@
 
                 copyToClipboard(text) {
                     navigator.clipboard.writeText(text);
-                    alert('Copied to clipboard!');
+                    alert(@js(__('orders.pay_copied_alert')));
                 }
             }"
-            class="mt-6 rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-8"
+            class="mt-6 rounded-[12px] bg-white p-6 shadow-sm shadow-zinc-900/5 sm:p-8"
         >
             <!-- Select Method -->
             <div x-show="paymentState === 'select_method'">
-                <h3 class="text-base font-bold text-zinc-900 text-center">Complete Your Payment</h3>
-                <p class="text-xs text-zinc-500 text-center mb-6">Choose your preferred payment method below to complete order #{{ $order->order_number }}.</p>
+                <h3 class="text-base font-bold text-zinc-900 text-center">{{ __('orders.pay_heading') }}</h3>
+                <p class="text-xs text-zinc-500 text-center mb-6">{{ __('orders.pay_choose_method', ['number' => $order->order_number]) }}</p>
 
                 <div class="grid grid-cols-1 gap-3">
                     <template x-for="method in session?.available_methods" :key="method.type">
@@ -704,77 +771,77 @@
             <div x-show="paymentState === 'card_input'">
                 <div class="flex items-center gap-2 mb-4">
                     <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> {{ __('common.back') }}
                     </button>
                 </div>
-                <h3 class="text-sm font-bold text-zinc-900 mb-4">Enter Card Details</h3>
-                
+                <h3 class="text-sm font-bold text-zinc-900 mb-4">{{ __('orders.pay_card_heading') }}</h3>
+
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-zinc-700">Cardholder Name</label>
-                        <input type="text" x-model="cardDetails.card_holder" placeholder="e.g. John Doe" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_cardholder_name') }}</label>
+                        <input type="text" x-model="cardDetails.card_holder" placeholder="{{ __('orders.pay_cardholder_placeholder') }}" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-zinc-700">Card Number</label>
-                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_card_number') }}</label>
+                        <input type="text" @input="formatCardNumber" x-model="cardDetails.card_number" maxlength="19" placeholder="0000 0000 0000 0000" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div class="grid grid-cols-3 gap-3">
                         <div class="col-span-2">
-                            <label class="block text-xs font-semibold text-zinc-700">Expiry (MM/YY)</label>
+                            <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_expiry') }}</label>
                             <div class="flex gap-2">
-                                <input type="text" x-model="cardDetails.expiry_month" placeholder="MM" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
-                                <input type="text" x-model="cardDetails.expiry_year" placeholder="YY" maxlength="2" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                                <input type="text" x-model="cardDetails.expiry_month" placeholder="{{ __('orders.pay_expiry_month_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
+                                <input type="text" x-model="cardDetails.expiry_year" placeholder="{{ __('orders.pay_expiry_year_placeholder') }}" maxlength="2" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
                             </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-zinc-700 text-center">CVV</label>
-                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center">
+                            <input type="password" x-model="cardDetails.cvv" placeholder="123" maxlength="4" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 text-center focus:border-edge dark:focus:border-edge transition-colors">
                         </div>
                     </div>
 
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
-                        Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 mt-2">
+                        {{ __('orders.pay_button') }} <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
             </div>
 
             <!-- Card Auth: PIN Challenge -->
             <div x-show="paymentState === 'action_pin'">
-                <h3 class="text-sm font-bold text-zinc-900 mb-2">Card PIN Required</h3>
-                <p class="text-xs text-zinc-600 mb-4">Enter your card 4-digit security PIN to authorize payment.</p>
+                <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_pin_heading') }}</h3>
+                <p class="text-xs text-zinc-600 mb-4">{{ __('orders.pay_pin_help') }}</p>
                 <div class="space-y-4">
-                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                        Confirm PIN
+                    <input type="password" x-model="pinValue" maxlength="4" placeholder="••••" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        {{ __('orders.pay_pin_confirm') }}
                     </button>
                 </div>
             </div>
 
             <!-- Card Auth: OTP Challenge -->
             <div x-show="paymentState === 'action_otp'">
-                <h3 class="text-sm font-bold text-zinc-900 mb-2">OTP Verification</h3>
+                <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_otp_heading') }}</h3>
                 <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
                 <div class="space-y-4">
-                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-[12px] border border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900">
-                    <button @click="paySession('card', cardDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                        Verify OTP
+                    <input type="text" x-model="otpValue" placeholder="123456" class="w-full rounded-full border-2 border-zinc-200 px-3 py-3 text-center text-lg font-bold tracking-widest text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
+                    <button @click="paySession('card', cardDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        {{ __('orders.pay_otp_verify') }}
                     </button>
                 </div>
             </div>
 
             <!-- Card Auth: 3D Secure Redirect -->
             <div x-show="paymentState === 'action_3ds'">
-                <h3 class="text-sm font-bold text-zinc-900 mb-2">Secure Verification</h3>
-                <p class="text-xs text-zinc-600 mb-4">Please complete the secure authentication inside the window below.</p>
+                <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_3ds_heading') }}</h3>
+                <p class="text-xs text-zinc-600 mb-4">{{ __('orders.pay_3ds_help') }}</p>
                 
                 <div class="w-full border border-zinc-200 rounded-[12px] overflow-hidden bg-zinc-50" style="height: 380px;">
                     <iframe :src="session?.payment_payload?.redirect_url" class="w-full h-full border-0"></iframe>
                 </div>
 
-                <button @click="startStatusPolling()" class="w-full mt-4 rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                    I Have Completed Payment
+                <button @click="startStatusPolling()" class="w-full mt-4 rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                    {{ __('orders.pay_3ds_done') }}
                 </button>
             </div>
 
@@ -782,20 +849,20 @@
             <div x-show="paymentState === 'momo_input'">
                 <div class="flex items-center gap-2 mb-4">
                     <button type="button" @click="paymentState = 'select_method'" class="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Back
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> {{ __('common.back') }}
                     </button>
                 </div>
-                <h3 class="text-sm font-bold text-zinc-900 mb-4">Mobile Money Details</h3>
+                <h3 class="text-sm font-bold text-zinc-900 mb-4">{{ __('orders.pay_momo_heading') }}</h3>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-zinc-700">Phone Number</label>
-                        <input type="text" x-model="momoDetails.phone_number" placeholder="e.g. 237670000000" class="w-full mt-1.5 rounded-[12px] border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900">
+                        <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_momo_phone') }}</label>
+                        <input type="text" x-model="momoDetails.phone_number" placeholder="{{ __('orders.pay_momo_phone_placeholder') }}" class="w-full mt-1.5 rounded-full border-2 border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-900 focus:border-edge dark:focus:border-edge transition-colors">
                     </div>
 
                     <div x-show="(selectedMethod?.supported_networks ?? []).length > 0">
-                        <label class="block text-xs font-semibold text-zinc-700">Network</label>
+                        <label class="block text-xs font-semibold text-zinc-700">{{ __('orders.pay_momo_network') }}</label>
                         <div class="relative mt-1.5">
-                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-[12px] border border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15">
+                            <select x-model="momoDetails.network" class="w-full appearance-none rounded-full border-2 border-zinc-200 bg-white py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:border-edge dark:focus:border-edge">
                                 <template x-for="net in selectedMethod?.supported_networks" :key="net">
                                     <option :value="net" x-text="net"></option>
                                 </template>
@@ -806,8 +873,8 @@
                         </div>
                     </div>
 
-                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-[12px] bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
-                        Pay <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
+                    <button @click="paySession('mobile_money', momoDetails)" class="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                        {{ __('orders.pay_button') }} <span x-text="session?.display_currency + ' ' + Number(session?.amount).toFixed(2)"></span>
                     </button>
                 </div>
             </div>
@@ -817,27 +884,27 @@
                 <!-- If Bank Transfer details -->
                 <template x-if="selectedMethod?.type === 'bank_transfer' || session?.payment_payload?.bank_details">
                     <div>
-                        <h3 class="text-sm font-bold text-zinc-900 mb-2">Virtual Bank Transfer</h3>
-                        <p class="text-xs text-zinc-600 mb-4">Please make a transfer to the temporary virtual account below:</p>
+                        <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_bank_heading') }}</h3>
+                        <p class="text-xs text-zinc-600 mb-4">{{ __('orders.pay_bank_help') }}</p>
 
                         <div class="bg-zinc-50 border border-zinc-200 rounded-[12px] p-4 space-y-3">
                             <div class="flex justify-between items-center text-xs">
-                                <span class="text-zinc-500">Bank Name</span>
+                                <span class="text-zinc-500">{{ __('orders.pay_bank_name') }}</span>
                                 <span class="font-bold text-zinc-900" x-text="bankDetails?.bank_name"></span>
                             </div>
                             <div class="flex justify-between items-center text-xs">
-                                <span class="text-zinc-500">Account Number</span>
+                                <span class="text-zinc-500">{{ __('orders.pay_bank_account_number') }}</span>
                                 <div class="flex items-center gap-1.5">
                                     <span class="font-bold text-zinc-900 text-sm" x-text="bankDetails?.account_number"></span>
-                                    <button type="button" @click="copyToClipboard(bankDetails?.account_number)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold">Copy</button>
+                                    <button type="button" @click="copyToClipboard(bankDetails?.account_number)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold">{{ __('common.copy') }}</button>
                                 </div>
                             </div>
                             <div class="flex justify-between items-center text-xs">
-                                <span class="text-zinc-500">Account Name</span>
+                                <span class="text-zinc-500">{{ __('orders.pay_bank_account_name') }}</span>
                                 <span class="font-bold text-zinc-900" x-text="bankDetails?.account_name"></span>
                             </div>
                             <div class="flex justify-between items-center text-xs border-t border-zinc-200 pt-2">
-                                <span class="text-zinc-500">Amount</span>
+                                <span class="text-zinc-500">{{ __('orders.pay_bank_amount') }}</span>
                                 <span class="font-extrabold text-blue-700 text-sm" x-text="session?.currency + ' ' + Number(bankDetails?.amount || session?.amount).toFixed(2)"></span>
                             </div>
                         </div>
@@ -847,8 +914,8 @@
                 <!-- If Crypto details -->
                 <template x-if="selectedMethod?.type === 'crypto' || session?.payment_payload?.qr_payload">
                     <div>
-                        <h3 class="text-sm font-bold text-zinc-900 text-center mb-2">Crypto Payment Details</h3>
-                        <p class="text-xs text-zinc-600 text-center mb-4">Send the exact amount of cryptocurrency shown to the address below:</p>
+                        <h3 class="text-sm font-bold text-zinc-900 text-center mb-2">{{ __('orders.pay_crypto_heading') }}</h3>
+                        <p class="text-xs text-zinc-600 text-center mb-4">{{ __('orders.pay_crypto_help') }}</p>
 
                         <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start bg-zinc-50 p-4 border border-zinc-200 rounded-[12px]">
                             <!-- QR Code -->
@@ -859,32 +926,32 @@
                                      the address shown for an attacker's. --}}
                                 <img
                                     :src="session?.id ? ('/api/payment-sessions/' + session.id + '/crypto-qr') : ''"
-                                    alt="Payment QR code"
+                                    alt="{{ __('orders.pay_crypto_qr_alt') }}"
                                     class="h-28 w-28 object-contain"
                                 />
-                                <span class="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400">Scan to pay</span>
+                                <span class="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400">{{ __('orders.pay_crypto_scan') }}</span>
                             </div>
 
                             <!-- Details -->
                             <div class="flex-1 w-full space-y-2 text-xs">
                                 <div>
-                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Cryptocurrency</span>
+                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_currency') }}</span>
                                     <div class="flex items-center gap-1.5">
                                         <span class="rounded-[12px] bg-blue-50 px-2 py-0.5 font-bold text-blue-700 uppercase" x-text="session?.payment_payload?.pay_currency || 'btc'"></span>
-                                        <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="'Network: ' + (session?.payment_payload?.network || 'bitcoin')"></span>
+                                        <span class="text-[10px] font-medium text-zinc-500 uppercase" x-text="@js(__('orders.pay_crypto_network')).replace(':network', session?.payment_payload?.network || 'bitcoin')"></span>
                                     </div>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Amount to Send</span>
+                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_amount') }}</span>
                                     <span class="font-bold text-zinc-900 text-sm" x-text="session?.payment_payload?.pay_amount"></span>
                                     <span class="font-bold text-zinc-500 uppercase" x-text="session?.payment_payload?.pay_currency"></span>
                                     <span class="block text-[10px] text-zinc-500">Network fees included. Send this exact amount.</span>
                                 </div>
                                 <div>
-                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Deposit Address</span>
+                                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{{ __('orders.pay_crypto_address') }}</span>
                                     <div class="mt-1 flex items-center gap-1">
-                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-[12px] text-[10px] text-zinc-800 font-mono select-all outline-none">
-                                        <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold shrink-0">Copy</button>
+                                        <input type="text" readonly :value="session?.payment_payload?.pay_address" class="w-full bg-zinc-100 px-2 py-1 rounded-full text-[10px] text-zinc-800 font-mono select-all outline-none border-2 border-zinc-200 dark:border-white/10 focus:border-edge dark:focus:border-edge transition-colors">
+                                        <button type="button" @click="copyToClipboard(session?.payment_payload?.pay_address)" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold shrink-0">{{ __('common.copy') }}</button>
                                     </div>
                                 </div>
                             </div>
@@ -897,14 +964,14 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
-                    <p class="text-xs font-semibold text-zinc-800 mt-2">Waiting for transfer...</p>
-                    <p class="text-[10px] text-zinc-500 mt-1">Status updates automatically. This temporary reference expires in 30 minutes.</p>
+                    <p class="text-xs font-semibold text-zinc-800 mt-2">{{ __('orders.pay_waiting_transfer') }}</p>
+                    <p class="text-[10px] text-zinc-500 mt-1">{{ __('orders.pay_waiting_transfer_help') }}</p>
                 </div>
             </div>
 
             <!-- Mobile money push prompt -->
             <div x-show="paymentState === 'awaiting_confirmation'">
-                <h3 class="text-sm font-bold text-zinc-900 mb-2">Authorize on Phone</h3>
+                <h3 class="text-sm font-bold text-zinc-900 mb-2">{{ __('orders.pay_authorize_heading') }}</h3>
                 <p class="text-xs text-zinc-600 mb-4" x-text="actionMessage"></p>
 
                 <div class="flex flex-col items-center py-6 text-center">
@@ -917,7 +984,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
-                    <p class="text-xs font-semibold text-zinc-800 mt-3">Verifying payment authorization...</p>
+                    <p class="text-xs font-semibold text-zinc-800 mt-3">{{ __('orders.pay_verifying') }}</p>
                 </div>
             </div>
 
@@ -927,52 +994,54 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <p class="mt-4 text-sm font-bold text-zinc-900">Processing transaction...</p>
-                <p class="mt-1 text-xs text-zinc-500">Please do not close this window.</p>
+                <p class="mt-4 text-sm font-bold text-zinc-900">{{ __('orders.pay_processing') }}</p>
+                <p class="mt-1 text-xs text-zinc-500">{{ __('orders.pay_do_not_close') }}</p>
             </div>
 
             <!-- Success state: the same animated tick as the order-complete
                  hero so the customer sees one consistent celebration. -->
             <div x-show="paymentState === 'success'" class="flex flex-col items-center py-10 text-center">
                 <x-success-tick />
-                <h3 class="mt-5 text-2xl font-bold text-zinc-900 dark:text-white">Payment complete</h3>
-                <p class="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">Your order status is refreshing now.</p>
+                <h3 class="mt-5 text-2xl font-bold text-zinc-900 dark:text-white">{{ __('orders.pay_complete_heading') }}</h3>
+                <p class="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{{ __('orders.pay_complete_help') }}</p>
             </div>
 
             <!-- Error state: animated red cross, the tick's counterpart. -->
             <div x-show="paymentState === 'error'" class="flex flex-col items-center py-6 text-center">
                 <x-error-cross />
-                <h3 class="mt-4 text-sm font-bold text-zinc-900">Payment Failed</h3>
+                <h3 class="mt-4 text-sm font-bold text-zinc-900">{{ __('orders.pay_failed_heading') }}</h3>
                 <p class="mt-1.5 text-xs text-red-600 px-4" x-text="errorMessage"></p>
-                
-                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-[12px] bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
-                    Try Another Method
+
+                @include('shop._payment-failure-help', ['methodVar' => 'selectedMethod'])
+
+                <button type="button" @click="paymentState = 'select_method'" class="mt-6 rounded-full bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-200">
+                    {{ __('orders.pay_try_another') }}
                 </button>
             </div>
         </section>
     @endif
 
     {{-- Order summary --}}
-    <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
+    <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6">
         <div class="flex items-center justify-between">
-            <h2 class="text-lg font-bold text-zinc-900">Order summary</h2>
+            <h2 class="text-lg font-bold text-zinc-900">{{ __('checkout.order_summary') }}</h2>
             <span class="inline-flex items-center rounded-[12px] px-2.5 py-1 text-xs font-bold ring-1 {{ $statusBadge }}">
-                {{ $awaitingPayment ? 'Awaiting payment' : ($expiredCheckout ? 'Expired' : $status->label()) }}
+                {{ $awaitingPayment ? __('orders.status_awaiting_payment') : ($expiredCheckout ? __('orders.status_expired') : $statusLabel) }}
             </span>
         </div>
 
         {{-- Meta rows --}}
         <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
             <div>
-                <dt class="text-xs font-medium text-zinc-500">Date placed</dt>
+                <dt class="text-xs font-medium text-zinc-500">{{ __('orders.date_placed') }}</dt>
                 <dd class="mt-0.5 font-semibold text-zinc-900">{{ ($order->placed_at ?? $order->created_at)->format('M j, Y') }}</dd>
             </div>
             <div>
-                <dt class="text-xs font-medium text-zinc-500">Payment method</dt>
+                <dt class="text-xs font-medium text-zinc-500">{{ __('checkout.payment_method') }}</dt>
                 <dd class="mt-0.5 font-semibold text-zinc-900">{{ $paymentMethod }}</dd>
             </div>
             <div>
-                <dt class="text-xs font-medium text-zinc-500">Items</dt>
+                <dt class="text-xs font-medium text-zinc-500">{{ __('orders.items') }}</dt>
                 <dd class="mt-0.5 font-semibold text-zinc-900">{{ $order->items->count() }}</dd>
             </div>
         </dl>
@@ -988,7 +1057,7 @@
                     // product_snapshot is the catalog Product captured at order time.
                     $snap     = $firstItem->product_snapshot ?? [];
                     $brandKey = $snap['brand_key'] ?? null;
-                    $name     = $brandKey ? Product::brandDisplayName($brandKey) : ($snap['name'] ?? 'Item');
+                    $name     = $brandKey ? Product::brandDisplayName($brandKey) : ($snap['name'] ?? __('orders.item_fallback_name'));
                     $logo     = Product::brandLogoUrl($brandKey, $snap['logo_url'] ?? null);
                     // Snapshot didn't always include the category before today, so
                     // fall back to the live FK relation for historical orders.
@@ -998,9 +1067,9 @@
                     // Pending copy varies by product: top-ups credit a phone,
                     // eSIMs deliver a QR, gift cards email a code.
                     $itemPendingCopy = match (true) {
-                        $itemIsTopup => 'Credited to your phone once payment clears',
-                        $itemIsEsim  => 'eSIM QR delivered once payment clears',
-                        default      => 'Code emailed once payment clears',
+                        $itemIsTopup => __('orders.pending_topup'),
+                        $itemIsEsim  => __('orders.pending_esim'),
+                        default      => __('orders.pending_code'),
                     };
                     $itemMeta = (array) ($item->metadata ?? []);
                     $itemRecipientPhone = is_scalar($itemMeta['recipient_phone'] ?? null)
@@ -1020,13 +1089,13 @@
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-bold text-zinc-900">{{ $name }}</p>
                         <p class="mt-0.5 text-xs text-zinc-600">
-                            Qty {{ $groupQty }} &middot; {{ $money($firstItem->display_amount) }} each
+                            {{ __('orders.line_qty', ['qty' => $groupQty]) }} &middot; {{ __('orders.line_each', ['price' => $money($firstItem->display_amount)]) }}
                         </p>
                         {{-- Render redemption details for each individual unit (each has its own unique code) --}}
                         @foreach ($variantItems as $item)
                             @if (! empty($item->fulfillment_payload))
                                 <div class="mt-2 rounded-[12px] bg-zinc-50 px-3 py-2 ring-1 ring-zinc-200">
-                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $groupQty > 1 ? 'Code ' . ($loop->iteration) . ' of ' . $groupQty : 'Redemption details' }}</p>
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $groupQty > 1 ? __('orders.code_n_of_total', ['current' => $loop->iteration, 'total' => $groupQty]) : __('orders.redemption_details') }}</p>
                                     
                                     @if(!empty($item->fulfillment_payload['phone_number']))
                                         <div class="mt-2 mb-2 flex items-center gap-2 rounded-[12px] bg-blue-100 px-3 py-2 text-blue-800">
@@ -1039,7 +1108,7 @@
 
                                     @if(!empty($item->fulfillment_payload['qrcode_url']))
                                         <div class="mt-2 mb-2">
-                                            <img src="{{ $item->fulfillment_payload['qrcode_url'] }}" alt="eSIM QR" class="h-32 w-32 rounded-[12px] bg-white p-2 ring-1 ring-zinc-200">
+                                            <img src="{{ $item->fulfillment_payload['qrcode_url'] }}" alt="{{ __('orders.esim_qr_short_alt') }}" class="h-32 w-32 rounded-[12px] bg-white p-2 ring-1 ring-zinc-200">
                                         </div>
                                     @endif
 
@@ -1059,7 +1128,7 @@
                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
-                                Fulfillment failed
+                                {{ __('orders.fulfillment_failed') }}
                             </p>
                         @elseif ($variantItems->every(fn ($i) => empty($i->fulfillment_payload)))
                             <p class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-zinc-500">
@@ -1079,13 +1148,13 @@
         {{-- Totals --}}
         <div class="mt-1 space-y-2 border-t border-zinc-100 pt-4 text-sm">
             <div class="flex items-center justify-between text-base font-bold text-zinc-900">
-                <span>Total paid</span>
+                <span>{{ __('orders.total_paid') }}</span>
                 <span class="tabular-nums">{{ $money($order->total_amount) }}</span>
             </div>
             @if ($rcoinEnabled)
                 <div class="flex items-center justify-between pt-1 text-zinc-600">
                     <span class="inline-flex items-center gap-1.5">
-                        Points earned
+                        {{ __('orders.points_earned') }}
                         <img src="{{ asset('assets/favicon.ico') }}" alt="" class="h-4 w-4 object-contain">
                     </span>
                     <span class="font-bold tabular-nums text-zinc-900">{{ number_format($points) }}</span>
@@ -1096,31 +1165,32 @@
 
     {{-- What happens next — only while the order is still being settled --}}
     @if ($isPending)
-        <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 ring-1 ring-zinc-100 sm:p-6">
-            <h2 class="text-lg font-bold text-zinc-900">What happens next</h2>
+        <section class="mt-6 rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6">
+            <h2 class="text-lg font-bold text-zinc-900">{{ __('orders.next_heading') }}</h2>
             <ol class="mt-4 space-y-4">
                 @php
                     // Order content drives the wording. A pure top-up order
                     // shouldn't say "codes will be emailed" — nothing is.
                     $fulfilLabel = $orderHasGiftCards
-                        ? 'Codes are issued'
-                        : ($orderHasEsims ? 'eSIM is generated' : 'Top-up is processed');
+                        ? __('orders.next_codes_title')
+                        : ($orderHasEsims ? __('orders.next_esim_title') : __('orders.next_topup_title'));
                     $fulfilDesc = $orderHasGiftCards
-                        ? 'Each item is fulfilled and its redemption code attached to your order.'
+                        ? __('orders.next_codes_body')
                         : ($orderHasEsims
-                            ? 'Your eSIM QR is generated and attached to this order.'
-                            : 'Your top-up is sent to the recipient phone number.');
+                            ? __('orders.next_esim_body')
+                            : __('orders.next_topup_body'));
                     $deliveryLabel = $orderHasGiftCards
-                        ? 'Delivery'
-                        : ($orderHasEsims ? 'eSIM ready' : 'Confirmation');
+                        ? __('orders.next_delivery_codes_title')
+                        : ($orderHasEsims ? __('orders.next_delivery_esim_title') : __('orders.next_delivery_topup_title'));
+                    $deliveryTo = ['email' => $deliveryEmail ?: __('orders.next_your_email')];
                     $deliveryDesc = $orderHasGiftCards
-                        ? 'Codes arrive at '.($deliveryEmail ?: 'your email').' and stay available on this page.'
+                        ? __('orders.next_delivery_codes_body', $deliveryTo)
                         : ($orderHasEsims
-                            ? 'Your QR + activation code land at '.($deliveryEmail ?: 'your email').' and on this page.'
-                            : 'A confirmation lands at '.($deliveryEmail ?: 'your email').' the moment the credit posts.');
+                            ? __('orders.next_delivery_esim_body', $deliveryTo)
+                            : __('orders.next_delivery_topup_body', $deliveryTo));
                 @endphp
                 @foreach ([
-                    ['Confirm payment', 'We verify your payment with the provider. This is usually instant.'],
+                    [__('orders.next_confirm_title'), __('orders.next_confirm_body')],
                     [$fulfilLabel, $fulfilDesc],
                     [$deliveryLabel, $deliveryDesc],
                 ] as $i => $step)
@@ -1139,12 +1209,12 @@
     {{-- Actions --}}
     <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <a href="{{ route('dashboard.orders') }}" wire:navigate
-            class="flex items-center justify-center rounded-[12px] border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
-            Go to orders
+            class="flex items-center justify-center rounded-full border-2 border-blue-600 bg-white px-4 py-3 text-base font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white">
+            {{ __('orders.go_to_orders') }}
         </a>
         <a href="{{ $shopRoute('gift-cards') }}" wire:navigate
-            class="flex items-center justify-center rounded-[12px] bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
-            Continue shopping
+            class="flex items-center justify-center rounded-full bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700">
+            {{ __('orders.continue_shopping') }}
         </a>
     </div>
 
@@ -1152,7 +1222,7 @@
         <svg class="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        Need help with this order? Contact support with reference {{ $order->order_number }}.
+        {{ __('orders.need_help', ['reference' => $order->order_number]) }}
     </p>
 
 </div>

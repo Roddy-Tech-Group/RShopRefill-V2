@@ -77,7 +77,7 @@ class extends Component {
                 $title = preg_match('/<title>(.*?)<\/title>/is', $head, $m)
                     ? trim(html_entity_decode($m[1]))
                     : $slug;
-                // Drop a leading site-name prefix ("RShopRefill — ...").
+                // Drop a leading site-name prefix ("RshopRefill — ...").
                 $title = Str::of($title)->afterLast('— ')->trim()->toString();
 
                 $entries[$slug] = ['slug' => $slug, 'title' => $title, 'summary' => 'Reference handbook, opens as its own document.', 'type' => 'doc'];
@@ -133,7 +133,7 @@ class extends Component {
 <x-slot:heading>Runbooks</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
 @endphp
 
 <div class="max-w-7xl mx-auto -mt-2">

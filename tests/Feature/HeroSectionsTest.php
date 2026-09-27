@@ -38,18 +38,20 @@ class HeroSectionsTest extends TestCase
     {
         $this->withoutVite()->get('/')
             ->assertOk()
-            ->assertSee('One Ecosystem');
+            ->assertSee('All in One Place');
     }
 
     public function test_hero_scrolls_with_the_page_instead_of_pinning(): void
     {
         // The sticky pin wrapper was removed (July 2026): the hero must render
-        // in normal flow, followed by the opaque content wrapper.
+        // in normal flow, followed by the opaque content wrapper: a page-tone
+        // <section> stacked above the hero so the category cards can overlap
+        // its bottom edge.
         $this->withoutVite()->get('/')
             ->assertOk()
             ->assertDontSee('data-hero-stage', false)
             ->assertDontSee('class="sticky z-0"', false)
-            ->assertSeeInOrder(['One Ecosystem', 'relative z-10 bg-[#eff6ff]'], false);
+            ->assertSeeInOrder(['All in One Place', 'relative z-10 bg-[#f4f6f5] dark:bg-[#0c1a36]'], false);
     }
 
     public function test_homepage_hides_the_hero_when_all_sections_are_off(): void
@@ -59,7 +61,7 @@ class HeroSectionsTest extends TestCase
 
         $this->withoutVite()->get('/')
             ->assertOk()
-            ->assertDontSee('One Ecosystem');
+            ->assertDontSee('All in One Place');
     }
 
     public function test_enabled_custom_section_renders_alongside_the_default_hero(): void
@@ -68,7 +70,7 @@ class HeroSectionsTest extends TestCase
 
         $this->withoutVite()->get('/')
             ->assertOk()
-            ->assertSee('One Ecosystem')
+            ->assertSee('All in One Place')
             ->assertSee('Summer Giftcard Deals');
     }
 
@@ -105,7 +107,7 @@ class HeroSectionsTest extends TestCase
 
         $this->withoutVite()->get('/')
             ->assertOk()
-            ->assertDontSee('One Ecosystem')
+            ->assertDontSee('All in One Place')
             ->assertSee('Solo Promo Hero');
     }
 

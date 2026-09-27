@@ -72,11 +72,17 @@ class WebPushProvider
         $lastError = null;
 
         try {
+            // The icon rides in the payload rather than being left to the
+            // service worker's fallback, so a notification carries our mark
+            // even on a client running an older worker. array_filter drops the
+            // badge when none is configured, which is what makes the worker
+            // leave it to the browser instead of requesting a missing file.
             $payload = json_encode(array_filter([
                 'title' => $title,
                 'body' => $body,
                 'url' => $url,
-                'icon' => $icon,
+                'icon' => $icon ?: config('webpush.notification.icon'),
+                'badge' => config('webpush.notification.badge'),
             ]));
 
             $queued = 0;

@@ -234,10 +234,10 @@ class extends Component {
         if ($this->editingId) {
             $rate = CurrencyRate::findOrFail($this->editingId);
             $rate->update($data);
-            session()->flash('status', $this->code.' updated.');
+            $this->dispatch('toast', message: $this->code.' updated.');
         } else {
             $rate = CurrencyRate::create($data);
-            session()->flash('status', $this->code.' added.');
+            $this->dispatch('toast', message: $this->code.' added.');
         }
 
         // End-to-end: push the saved rate through to exchange_rates immediately
@@ -264,7 +264,7 @@ class extends Component {
             ->delete();
 
         $rate->delete();
-        session()->flash('status', $code.' deleted.');
+        $this->dispatch('toast', message: $code.' deleted.');
         unset($this->rates, $this->freshness, $this->summary);
     }
 
@@ -318,7 +318,7 @@ class extends Component {
     public function runSync(): void
     {
         SyncExchangeRatesJob::dispatchSync();
-        session()->flash('status', 'All rates synced. Freshness clocks reset.');
+        $this->dispatch('toast', message: 'All rates synced. Freshness clocks reset.');
         unset($this->freshness, $this->summary);
     }
 }; ?>
@@ -328,10 +328,6 @@ class extends Component {
     <x-slot:subheading>{{ number_format($this->summary['fiat'] + $this->summary['crypto']) }} currencies defined. Sync pushes them into the live <code class="rounded-[5px] bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300">exchange_rates</code> table that runtime pricing reads.</x-slot:subheading>
 
     <div class="flex flex-1 flex-col gap-6">
-
-        @if (session('status'))
-            <div class="rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30">{{ session('status') }}</div>
-        @endif
 
         {{-- Critical-stale warning banner. Surfaces the same StaleRateException
              that the runtime would throw, BEFORE a checkout hits it. --}}
@@ -356,7 +352,7 @@ class extends Component {
                 ['label' => 'Fresh',    'value' => $this->summary['fresh'],    'dot' => 'bg-blue-500'],
                 ['label' => 'Stale + critical', 'value' => $this->summary['stale'] + $this->summary['critical'], 'dot' => $this->summary['critical'] > 0 ? 'bg-red-500' : 'bg-amber-500'],
             ] as $stat)
-                <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+                <div class="rounded-[12px] bg-white p-4 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
                         <span class="inline-block h-1.5 w-1.5 rounded-full {{ $stat['dot'] }}"></span>
                         {{ $stat['label'] }}
@@ -444,7 +440,7 @@ class extends Component {
         @endif
 
         {{-- Table card --}}
-        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <div class="overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <div class="overflow-x-auto p-3">
                 <table class="admin-table w-full text-left text-sm">
                     <thead>
@@ -535,7 +531,7 @@ class extends Component {
                                 <td class="whitespace-nowrap text-right">
                                     <div class="inline-flex items-center gap-1.5">
                                         <button wire:click="edit({{ $rate->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">Edit</button>
-                                        <button wire:click="delete({{ $rate->id }})" wire:confirm="Delete {{ $rate->code }} permanently? This can't be undone." type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
+                                        <button wire:click="delete({{ $rate->id }})" data-confirm="Delete {{ $rate->code }} permanently? This can't be undone." data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25">Delete</button>
                                     </div>
                                 </td>
                             </tr>

@@ -112,10 +112,10 @@ class extends Component {
 
         if ($this->editingId) {
             Faq::findOrFail($this->editingId)->update($payload);
-            session()->flash('status', 'FAQ updated.');
+            $this->dispatch('toast', message: 'FAQ updated.');
         } else {
             Faq::create($payload);
-            session()->flash('status', 'FAQ created.');
+            $this->dispatch('toast', message: 'FAQ created.');
         }
 
         $this->resetForm();
@@ -125,7 +125,7 @@ class extends Component {
     public function delete(int $id): void
     {
         Faq::findOrFail($id)->delete();
-        session()->flash('status', 'FAQ deleted.');
+        $this->dispatch('toast', message: 'FAQ deleted.');
         unset($this->faqs);
     }
 
@@ -163,19 +163,15 @@ class extends Component {
         </button>
     </header>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-[12px] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">{{ session('status') }}</div>
-    @endif
-
     @forelse ($this->faqs as $topic => $items)
-        <section class="mb-6 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200 dark:bg-[#1d3252] dark:ring-white/10">
+        <section class="mb-6 overflow-hidden rounded-[12px] bg-white shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             {{-- Header pill --}}
-            <div class="mx-3 my-3 rounded-[12px] bg-blue-50 px-6 py-3 ring-2 ring-blue-500 dark:bg-blue-600/15 dark:ring-blue-400">
+            <div class="mx-3 my-3 rounded-[12px] bg-zinc-50 px-6 py-3 dark:bg-white/5">
                 <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">{{ $topic }}</h2>
             </div>
-            <ul class="divide-inset">
+            <ul class="divide-inset pb-3">
                 @foreach ($items as $faq)
-                    <li class="group relative mx-3 flex items-start justify-between gap-4 px-5 py-4 transition-all hover:bg-blue-50 hover:rounded-[12px] dark:hover:bg-blue-600/15 dark:hover:ring-blue-400">
+                    <li class="group relative mx-3 flex items-start justify-between gap-4 px-5 py-4 transition-all hover:bg-blue-50">
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-zinc-900">{{ $faq->question }}</p>
                             <p class="mt-1.5 text-sm leading-relaxed text-zinc-600">{{ $faq->answer }}</p>
@@ -190,14 +186,14 @@ class extends Component {
                                 {{ $faq->is_published ? 'Unpublish' : 'Publish' }}
                             </button>
                             <button wire:click="edit({{ $faq->id }})" type="button" class="rounded-[5px] bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100">Edit</button>
-                            <button wire:click="delete({{ $faq->id }})" wire:confirm="Delete this FAQ permanently?" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100">Delete</button>
+                            <button wire:click="delete({{ $faq->id }})" data-confirm="Delete this FAQ permanently?" data-confirm-tone="danger" data-confirm-text="Delete" type="button" class="rounded-[5px] bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100">Delete</button>
                         </div>
                     </li>
                 @endforeach
             </ul>
         </section>
     @empty
-        <div class="rounded-[12px] ring-1 ring-zinc-200 bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]">
+        <div class="rounded-[12px] bg-white p-8 text-center shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]">
             <p class="text-sm text-zinc-600 dark:text-zinc-400">No FAQs yet. Click "New FAQ" to create one, or run <code class="rounded-[12px] bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700/50">php artisan db:seed --class=FaqSeeder</code>.</p>
         </div>
     @endforelse

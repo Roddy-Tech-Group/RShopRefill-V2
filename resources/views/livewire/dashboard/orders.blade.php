@@ -3,15 +3,16 @@
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
 
 new
 #[Layout('components.layouts.dashboard')]
 #[Title('Order history')]
 class extends Component {
-    use WithPagination;
+    /** How many more orders each scroll to the bottom brings in. */
+    private const CHUNK = 10;
 
     /** Search by order id / order number. */
     public string $search = '';
@@ -19,14 +20,29 @@ class extends Component {
     /** Show terminal (failed / cancelled) orders instead of active ones. */
     public bool $expired = false;
 
+    /**
+     * How many orders are on the page right now. The list has no page
+     * numbers: reaching the bottom grows this figure and the next chunk
+     * renders under the rows already there, so a customer with thousands
+     * of orders scrolls one list rather than paging through it. Locked so
+     * the browser cannot ask for the whole history in one request.
+     */
+    #[Locked]
+    public int $visible = self::CHUNK;
+
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     public function updatedExpired(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
+    }
+
+    public function loadMore(): void
+    {
+        $this->visible += self::CHUNK;
     }
 
     public function with(): array
@@ -34,7 +50,7 @@ class extends Component {
         // orderByDesc('id') breaks created_at ties - two orders placed in the same
         // second would otherwise be free to swap between page loads, showing the
         // customer one order twice and hiding another.
-        $query = Auth::user()->orders()->with('items')->latest()->orderByDesc('id');
+        $query = Auth::user()->orders()->with(['items', 'paymentAttempts'])->latest()->orderByDesc('id');
 
         if (($term = trim($this->search)) !== '') {
             $query->where(fn ($q) => $q->where('id', 'like', "%{$term}%")
@@ -49,7 +65,10 @@ class extends Component {
             $query->whereNotIn('order_status', ['failed', 'cancelled']);
         }
 
-        return ['orders' => $query->paginate(10)];
+        // A single page sized to what is on screen. The simple paginator
+        // fetches one row past it, so hasMorePages() says whether another
+        // chunk exists without counting the customer's whole history.
+        return ['orders' => $query->simplePaginate($this->visible, ['*'], 'page', 1)];
     }
 }; ?>
 
@@ -135,8 +154,11 @@ class extends Component {
     @if ($orders->isNotEmpty())
         {{-- All orders live in ONE card; each order is a drop-down row.
              Opening one auto-closes the previously-opened one
-             (single-expanded accordion behaviour). --}}
-        <div x-data="{ openId: null }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:border-zinc-700 dark:shadow-none">
+             (single-expanded accordion behaviour). The newest order starts
+             open. The card's key follows the filter, not the loaded count:
+             a new search swaps the card and opens its own first order, while
+             loading more morphs it and leaves whatever is open alone. --}}
+        <div wire:key="orders-{{ md5(trim($search).'|'.(int) $expired) }}" x-data="{ openId: @js((string) $orders->first()->id) }" class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:divide-zinc-700 dark:shadow-none">
             @foreach ($orders as $order)
                 @php
                     [$lineLabel, $lineTone, $lineIcon] = $statusLine[$order->order_status->value] ?? ['Placed', 'text-amber-600 dark:text-amber-400', 'clock'];
@@ -235,6 +257,14 @@ class extends Component {
                                 <dt class="text-zinc-500">Payment method</dt>
                                 <dd class="font-semibold text-zinc-900">{{ $methodLabels[$order->payment_method] ?? 'Card' }}</dd>
                             </div>
+                            {{-- The channel the money actually travelled. The order's own
+                                 method folds card and mobile money together; the paid
+                                 attempt tells them apart. Customer words only, never the
+                                 provider's name. --}}
+                            <div class="flex items-center justify-between gap-4">
+                                <dt class="text-zinc-500">Payment gateway</dt>
+                                <dd class="font-semibold text-zinc-900">{{ $order->customerGatewayLabel() }}</dd>
+                            </div>
                             <div class="flex items-center justify-between gap-4">
                                 <dt class="text-zinc-500">Earned points</dt>
                                 <dd class="flex items-center gap-1.5 font-semibold text-zinc-900">
@@ -291,7 +321,7 @@ class extends Component {
                                         window.open(@js($dlLogo), '_blank');
                                     }
                                 })()"
-                                class="ml-4 mt-4 inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                                class="ml-4 mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#f4f6f5] px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:text-zinc-900"
                             >
                                 <svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
@@ -407,10 +437,12 @@ class extends Component {
                                 {{-- Gift card — brand logo + denomination, full width inside the order card.
                                      `theme-static`: resellers screenshot this to deliver to their own
                                      customers, so it must look identical in light and dark mode. --}}
-                                {{-- Light brand colours (e.g. Apple's near-white) keep the zinc border so
-     the card edge still reads against the white panel; dark brands merge
-     border into the fill. --}}
-<div class="theme-static max-w-[340px] rounded-[12px] border-2 border-zinc-100 bg-zinc-100 px-3 py-1.5" @if ($brandBg) style="background: {{ $brandBg }};{{ $brandDark ? ' border-color: '.$brandBg.';' : '' }}" @endif>
+                                {{-- No border: the soft shadow is what gives light brand colours
+                                     (e.g. Apple's near-white) their edge against the white panel.
+                                     bg-zinc-100 (not the #f4f6f5 token) on purpose: theme-static
+                                     re-pins zinc-100 to light in dark mode, the hex token would
+                                     flip to the dark ground and break the screenshot. --}}
+                                <div class="theme-static max-w-[340px] rounded-[12px] bg-zinc-100 px-3 py-1.5 shadow-md shadow-zinc-900/[0.06]" @if ($brandBg) style="background: {{ $brandBg }};" @endif>
                                     <div class="flex items-start justify-between gap-3 px-2 pt-2">
                                         <div class="flex min-w-0 flex-col items-start gap-2.5">
                                             @if ($logo)
@@ -444,7 +476,7 @@ class extends Component {
                                         {{-- eSIM: QR for scan + SM-DP+ address and activation code for manual entry. --}}
                                         <div class="space-y-2">
                                             @if ($esim['qr'])
-                                                <div class="flex flex-col items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white p-4">
+                                                <div class="flex flex-col items-center gap-2 rounded-[12px] bg-white p-4">
                                                     <img src="{{ $esim['qr'] }}" alt="eSIM activation QR code" class="h-44 w-44 object-contain" loading="lazy">
                                                     <p class="text-center text-xs font-medium text-zinc-600">Scan this QR from another device to install your eSIM.</p>
                                                 </div>
@@ -459,7 +491,7 @@ class extends Component {
                                             @endif
                                             @if ($esim['manage'])
                                                 {{-- Branded eSIMs Cloud portal — customer monitors usage,
-                                                     re-installs, and tops up on a RshopRefills-branded page. --}}
+                                                     re-installs, and tops up on a RshopRefill-branded page. --}}
                                                 <a href="{{ $esim['manage'] }}" target="_blank" rel="noopener" class="flex items-center justify-center gap-2 rounded-[12px] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
                                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788M12 12h.008v.008H12V12z"/>
@@ -477,7 +509,7 @@ class extends Component {
                                                 </a>
                                             @endif
                                             @foreach (array_filter(['SM-DP+' => $esim['lpa'], 'Code' => $esim['code'], 'ICCID' => $esim['iccid'], 'Access' => $esim['access']]) as $credLabel => $credValue)
-                                                <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3" wire:key="esim-{{ $item->id }}-{{ $credLabel }}">
+                                                <div class="flex items-center gap-3 rounded-[12px] bg-white px-4 py-3" wire:key="esim-{{ $item->id }}-{{ $credLabel }}">
                                                     <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
                                                     <span class="min-w-0 flex-1 truncate text-sm font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                                     <button
@@ -498,8 +530,8 @@ class extends Component {
                                     @elseif ($topup)
                                         {{-- Mobile top-up — no code to copy; airtime lands on the
                                              recipient phone. Tile confirms the number that was credited. --}}
-                                        <div class="flex items-center gap-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3">
-                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                                        <div class="flex items-center gap-3 rounded-[12px] bg-white px-4 py-3">
+                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600">
                                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                                                 </svg>
@@ -534,7 +566,7 @@ class extends Component {
                                         {{-- Gift card — code + PIN, each independently copyable. --}}
                                         <div class="space-y-2">
                                             @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
-                                                <div class="flex items-center gap-2 rounded-full border border-zinc-100 bg-white px-3.5 py-2" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
+                                                <div class="flex items-center gap-2 rounded-full bg-white px-3.5 py-2" wire:key="cred-{{ $item->id }}-{{ $credLabel }}">
                                                     <span class="w-8 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{{ $credLabel }}</span>
                                                     <span class="min-w-0 flex-1 truncate text-xs font-bold tracking-wider text-zinc-900">{{ $credValue }}</span>
                                                     <button
@@ -570,7 +602,7 @@ class extends Component {
                                             @endif
                                         </div>
                                     @else
-                                        <div class="flex items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">
+                                        <div class="flex items-center gap-2 rounded-[12px] bg-white px-4 py-3 text-xs font-medium text-zinc-500">
                                             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
@@ -600,7 +632,7 @@ class extends Component {
                                     </div>
 
                                     @if ($redeemHtml || $supplierSteps)
-                                        <div x-show="panel === 'redeem'" x-collapse x-cloak class="mt-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
+                                        <div x-show="panel === 'redeem'" x-collapse x-cloak class="mt-3 rounded-[12px] bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
                                             @if ($supplierSteps)
                                                 <p class="whitespace-pre-line {{ $redeemHtml ? 'mb-2' : '' }}">{{ $supplierSteps }}</p>
                                             @endif
@@ -608,7 +640,7 @@ class extends Component {
                                         </div>
                                     @endif
                                     @if ($termsHtml)
-                                        <div x-show="panel === 'terms'" x-collapse x-cloak class="mt-3 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
+                                        <div x-show="panel === 'terms'" x-collapse x-cloak class="mt-3 rounded-[12px] bg-white px-4 py-3 text-left text-xs leading-relaxed text-zinc-700 [&_a]:text-blue-600 [&_a]:underline [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5">
                                             {!! $termsHtml !!}
                                         </div>
                                     @endif
@@ -625,8 +657,8 @@ class extends Component {
              orders ever" variant is much warmer and offers four storefront
              surfaces to start from so the page doesn't feel like a dead end. --}}
         @if (trim($search) !== '' || $expired)
-            <div class="rounded-[12px] bg-[#eff6ff] px-6 py-16 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60">
-                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+            <div class="rounded-[12px] bg-[#ffffff] px-6 py-16 text-center shadow-md shadow-zinc-900/[0.06] dark:ring-1 dark:ring-zinc-700/60 dark:shadow-none">
+                <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#f4f6f5] text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
@@ -673,8 +705,8 @@ class extends Component {
                 ];
             @endphp
 
-            <div class="overflow-hidden rounded-[12px] bg-[#eff6ff] px-6 py-12 text-center ring-1 ring-zinc-200 dark:ring-zinc-700/60 sm:px-10">
-                <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full text-blue-600 ring-1 ring-blue-100 dark:text-blue-300 dark:ring-blue-500/20">
+            <div class="overflow-hidden rounded-[12px] bg-[#ffffff] px-6 py-12 text-center shadow-md shadow-zinc-900/[0.06] dark:ring-1 dark:ring-zinc-700/60 dark:shadow-none sm:px-10">
+                <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f6f5] text-blue-600 dark:text-blue-300 dark:ring-1 dark:ring-blue-500/20">
                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
                     </svg>
@@ -691,9 +723,9 @@ class extends Component {
                         <a
                             href="{{ $link['href'] }}"
                             wire:navigate
-                            class="group flex flex-col items-center gap-3 rounded-[12px] border-2 border-zinc-200 bg-[#eff6ff] px-3 py-4 text-center transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm dark:border-zinc-700/60 dark:hover:border-blue-400/50"
+                            class="group flex flex-col items-center gap-3 rounded-[12px] bg-[#f4f6f5] px-3 py-4 text-center transition-shadow hover:shadow-lg hover:shadow-zinc-900/[0.10] dark:border-2 dark:border-zinc-700/60 dark:hover:border-zinc-500"
                         >
-                            <span class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/20">
+                            <span class="flex h-11 w-11 items-center justify-center rounded-full bg-[#ffffff] transition-colors group-hover:bg-blue-100 dark:bg-blue-500/15 dark:ring-1 dark:ring-blue-500/20">
                                 <img src="{{ asset('assets/' . rawurlencode($link['icon'])) }}" alt="" class="h-6 w-6 object-contain" loading="lazy">
                             </span>
                             <span class="leading-tight">
@@ -704,10 +736,13 @@ class extends Component {
                     @endforeach
                 </div>
 
+                {{-- A button in the shop tiles' own #f4f6f5 surface, radius and
+                     hover lift, so it reads as part of that set rather than a
+                     text link trailing under it. --}}
                 <a
                     href="{{ route('dashboard.shop.gift-cards') }}"
                     wire:navigate
-                    class="mt-7 inline-flex items-center text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                    class="mt-7 inline-flex items-center rounded-[12px] bg-[#f4f6f5] px-5 py-3 text-sm font-semibold text-zinc-900 transition-shadow hover:shadow-lg hover:shadow-zinc-900/[0.10] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-2 dark:border-zinc-700/60 dark:text-white dark:hover:border-zinc-500"
                 >
                     Explore everything
                 </a>
@@ -715,10 +750,23 @@ class extends Component {
         @endif
     @endif
 
-    @if ($orders->hasPages())
-        {{-- Matches the admin products page paginator (vendor/pagination/circles). --}}
-        <div class="mt-2 rounded-[12px] border-2 border-zinc-100 bg-[#eff6ff] px-5 py-3 dark:ring-zinc-700/60">
-            {{ $orders->onEachSide(1)->links('vendor.pagination.circles-livewire') }}
+    @if ($orders->hasMorePages())
+        {{-- Scroll sentinel. As it nears the viewport (a good screen early,
+             via the margin) it asks for the next chunk. Its key carries the
+             loaded count, so every response hands the browser a fresh
+             element: if the new rows still leave it on screen it fires
+             again at once instead of waiting for a scroll that never needs
+             to happen. It leaves with the last order. --}}
+        <div
+            wire:key="orders-more-{{ $visible }}"
+            wire:intersect.margin.400px="loadMore"
+            class="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+        >
+            <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
+                <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
+            </svg>
+            Loading more orders
         </div>
     @endif
 </div>

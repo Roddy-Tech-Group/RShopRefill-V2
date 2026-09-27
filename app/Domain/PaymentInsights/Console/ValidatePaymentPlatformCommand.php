@@ -70,7 +70,9 @@ use Illuminate\Validation\ValidationException;
  * Guarantees: no wallet mutations, no real orders (probe orders exist only
  * inside the rolled-back transaction), no external provider calls (session
  * lifecycle only — providers are never contacted), no balance changes.
- * Emails render through the log mailer into laravel.log.
+ * Emails render through the log mailer into the dedicated mail log
+ * (storage/logs/mail-YYYY-MM-DD.log), never laravel.log: the rendered MIME
+ * carries base64 inline images and would bury the application log.
  */
 class ValidatePaymentPlatformCommand extends Command
 {
@@ -165,10 +167,11 @@ class ValidatePaymentPlatformCommand extends Command
             return self::FAILURE;
         }
 
-        // Safe transports for the whole run: emails render into laravel.log,
+        // Safe transports for the whole run: emails render into the mail log,
         // queued jobs execute inline, cache writes stay in-process.
         config([
             'mail.default' => 'log',
+            'mail.mailers.log.channel' => 'mail',
             'queue.default' => 'sync',
             'cache.default' => 'array',
         ]);
@@ -1603,8 +1606,12 @@ class ValidatePaymentPlatformCommand extends Command
     {
         foreach (array_keys($this->touchedFlagKeys) as $key) {
             try {
+                // The model's own forget: it clears the shared cache AND the
+                // per-request memo. Clearing the cache alone left this process
+                // still answering from the value the probe wrote before the
+                // transaction rolled it back.
+                SiteSetting::forget($key);
                 Cache::forget('site_setting_'.$key);
-                Cache::forget('site_setting:'.$key);
             } catch (\Throwable) {
                 // A cache hiccup here must not mask the probe results.
             }
@@ -1691,7 +1698,7 @@ class ValidatePaymentPlatformCommand extends Command
         $this->newLine();
 
         if (! $this->option('static')) {
-            $this->components->info('All probe data was rolled back — no orders, balances, or provider calls were made. Recovery emails rendered to storage/logs/laravel.log.');
+            $this->components->info('All probe data was rolled back — no orders, balances, or provider calls were made. Recovery emails rendered to the mail log (storage/logs/mail-YYYY-MM-DD.log).');
         }
 
         return $totalFailed === 0 ? self::SUCCESS : self::FAILURE;

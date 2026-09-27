@@ -3,6 +3,11 @@
     // Optional inline icon rendered before the title. Currently only 'globe'
     // (used by the Discover Global eSIM rows).
     'titleIcon' => null,
+    // Heading type scale. The default is the row heading every surface has
+    // used. The home page's category / subcategory rows pass the larger
+    // 'text-[30px]' variant; the dashboard and the eSIM pages keep this one,
+    // where the row sits inside a column and a 30px heading would shout.
+    'titleSize' => 'text-lg sm:text-xl',
     'subtitle' => null,
     'viewAllHref' => '#',
     'cols' => 6,
@@ -21,10 +26,42 @@
     // dashboard's left rail) it overflows its neighbours, so pass :bleed="false"
     // to keep the track contained to its own width.
     'bleed' => true,
+    // How many rows deep the carousel track runs from `sm` up. 1 (the
+    // default) is the single scrolling line every row has always been; 2
+    // stacks the cards two-deep and pages sideways, so a screenful shows
+    // twice as many brands without taking twice the scroll.
+    'rows' => 1,
+    // The same, below `sm`. Separate because a phone card is 160px against
+    // the desktop's 280px, so the two breakpoints do not want the same
+    // depth: three short rows read as a block on a phone, where three tall
+    // ones on a desktop would push everything under them off the fold.
+    'mobileRows' => 1,
+    // Fit exactly this many columns across the visible track, from `sm` up.
+    // 0 (the default) keeps the fixed per-breakpoint card width.
+    //
+    // A fixed width cannot answer "three per line" inside a column whose
+    // width the viewport does not tell you: the dashboard's row lives in an
+    // 8-of-12 grid column, so the 280px card that shows four across the
+    // storefront shows barely two there. This measures the track instead.
+    'perView' => 0,
 ])
 
 @php
     // Explicit class strings so Tailwind's JIT picks them up.
+    // Track depth. grid-flow-col fills top-to-bottom then starts a new
+    // column, so the cards stay in reading order as the track scrolls.
+    //
+    // Written out per value rather than interpolated: Tailwind scans source
+    // text, so a built-up class name is a class that never gets generated.
+    $rowsClass = fn (int $n, string $prefix = '') => match (max(1, min(4, $n))) {
+        4 => $prefix.'grid-rows-[repeat(4,auto)]',
+        3 => $prefix.'grid-rows-[repeat(3,auto)]',
+        2 => $prefix.'grid-rows-[repeat(2,auto)]',
+        default => $prefix.'grid-rows-[repeat(1,auto)]',
+    };
+
+    $trackRows = $rowsClass((int) $mobileRows).' '.$rowsClass((int) $rows, 'sm:');
+
     $gridCols = match ((int) $cols) {
         5 => 'lg:grid-cols-5',
         7 => 'lg:grid-cols-7',
@@ -56,6 +93,19 @@
         //   2. --card-w - a fixed per-breakpoint card width consumed by the
         //      carousel-list card-width rule in app.css. Without it the cards
         //      fall back to brand-card sm:w-auto and balloon to their logo size.
+        // Whether the track may actually span the page right now.
+        //
+        // On the storefront a bleeding row always may. Inside the dashboard it
+        // depends on the width: from lg the sidebar rail holds a column of its
+        // own, so a page-wide track would run out past the panel it lives in,
+        // but below lg the panel IS the page and the bleed is honest. setup()
+        // already re-runs on resize, so this settles itself at the breakpoint
+        // rather than being decided once on the server.
+        bleeding() {
+            return this.bleed
+                && ! (document.body.classList.contains('dashboard') && window.innerWidth >= 1024);
+        },
+
         setup() {
             const t    = this.$refs.track;
             const list = this.$refs.list;
@@ -70,7 +120,7 @@
             const apply = () => {
                 // Contained (non-bleed) tracks sit inside their own column, so the
                 // first card lines up at the track's left edge - no viewport offset.
-                const padLeft = this.bleed
+                const padLeft = this.bleeding()
                     ? Math.max(minPad, Math.round(this.$el.getBoundingClientRect().left))
                     : 0;
                 if (list.style.paddingLeft !== padLeft + 'px') {
@@ -80,7 +130,38 @@
             };
             apply();
             setTimeout(apply, 700);
-            const cardW = window.innerWidth >= 1024 ? 280 : window.innerWidth >= 640 ? 200 : 160;
+            // Card width. perView measures the track and divides it; otherwise
+            // the fixed per-breakpoint widths stand.
+            //
+            // Measured AFTER apply(), because apply() is what sets the list's
+            // padding-left - reading the padding before it runs would divide
+            // the wrong width and land a column short.
+            //
+            // Phones are excluded at any setting: three-per-line on a 390px
+            // screen is a 120px card, which is smaller than the artwork.
+            const perView = {{ (int) $perView }};
+            let cardW;
+            if (perView > 0 && window.innerWidth >= 640) {
+                const cs   = getComputedStyle(list);
+                const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+                const gap  = 20;
+                const room = Math.max(0, t.clientWidth - padX);
+                cardW = Math.max(120, Math.floor((room - gap * (perView - 1)) / perView));
+            } else if (window.innerWidth < 640) {
+                // Phones: the largest card that still leaves TWO whole ones on
+                // screen, measured rather than assumed. The flat 160px this
+                // replaced was tuned for a small phone and left a widening
+                // strip of dead peek on everything bigger - 18px on a 390, far
+                // more on a 430. Floored at 160 so it can only ever grow: the
+                // same formula on a 360px screen would compute ~151 and make
+                // today's cards smaller, which is not what was asked for.
+                const cs2   = getComputedStyle(list);
+                const padX2 = (parseFloat(cs2.paddingLeft) || 0) + (parseFloat(cs2.paddingRight) || 0);
+                const gap2  = parseFloat(cs2.columnGap) || 16;
+                cardW = Math.max(160, Math.floor((t.clientWidth - padX2 - gap2) / 2));
+            } else {
+                cardW = window.innerWidth >= 1024 ? 280 : 200;
+            }
             list.style.setProperty('--card-w', cardW + 'px');
             this.$nextTick(() => this.refresh());
         },
@@ -107,65 +188,76 @@
         },
     }"
     x-on:livewire:navigated.window="$nextTick(() => setup())"
-    x-init="$nextTick(() => setup())"
+    {{-- setup() divides the TRACK's width, so it has to re-run whenever that
+         width changes, not just when the window does. Inside the dashboard the
+         pane narrows and widens on its own every time the sidebar folds, with
+         no window resize to hear, which left the cards at their old width and
+         cut the last column off at the panel edge until a hard reload. A
+         ResizeObserver on the section catches that and every other cause
+         (panel, zoom, device rotation) without knowing what any of them are.
+         The width guard matters: setup() writes padding and --card-w, which
+         would otherwise re-trigger the observer forever. --}}
+    x-init="
+        $nextTick(() => setup());
+        if (window.ResizeObserver) {
+            let seen = 0, queued = false;
+            $el._rowObserver = new ResizeObserver(() => {
+                const w = Math.round($el.getBoundingClientRect().width);
+                if (! w || w === seen || queued) { return; }
+                seen = w;
+                // One measure per frame: the sidebar folds over a transition,
+                // so the observer fires on every frame of it.
+                queued = true;
+                requestAnimationFrame(() => { queued = false; setup(); });
+            });
+            $el._rowObserver.observe($el);
+        }
+    "
+    x-on:livewire:navigating.window="$el._rowObserver?.disconnect()"
     class="relative"
 >
     <div class="mb-4 flex items-end justify-between gap-4">
         <div class="min-w-0">
-            <h2 class="text-lg font-bold text-zinc-900 sm:text-xl dark:text-white">
+            <h2 class="{{ $titleSize }} font-bold text-zinc-900 dark:text-white">
                 @if ($titleIcon === 'globe')
                     <svg class="mr-1 inline-block h-5 w-5 align-[-3px] text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
                 @endif{{ $title }}
             </h2>
             @if ($subtitle)
-                <p class="mt-0.5 text-base text-zinc-600 dark:text-zinc-400">{{ $subtitle }}</p>
+                {{-- One step up in ink from the zinc-600/400 it was: this is the line
+                     that says what the category holds, and at 16px in the lightest
+                     grey on the page it read as decoration. --}}
+                <p class="mt-0.5 text-base text-zinc-700 dark:text-zinc-300">{{ $subtitle }}</p>
             @endif
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        {{-- Pill + arrows: the shared cluster, same as the reviews row header.
+             The dashboard's round "+" variant is a different control and has no
+             pill equivalent, so it goes in the slot and href stays unset.
+
+             navigate is false because this link has always been a full page
+             load, unlike the "+" variant beside it. Worth reconciling, but not
+             silently as part of a restyle. --}}
+        <x-ui.row-controls
+            :href="! in_array($viewAllVariant, ['none', 'plus'], true) ? $viewAllHref : null"
+            :navigate="false"
+            :prev="$carousel ? 'nudge(-1)' : null"
+            :next="$carousel ? 'nudge(1)' : null"
+            prev-disabled="! canPrev"
+            next-disabled="! canNext"
+        >
             @if ($viewAllVariant === 'plus')
-                <a href="{{ $viewAllHref }}" wire:navigate aria-label="See more {{ $title }}" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
+                <a href="{{ $viewAllHref }}" wire:navigate aria-label="{{ __('common.see_more_named', ['name' => $title]) }}" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eff6ff] text-blue-700 border border-zinc-200 transition-colors hover:border-green-200 dark:border-zinc-700 dark:hover:border-white">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                     </svg>
                 </a>
-            @elseif ($viewAllVariant !== 'none')
-                {{-- Same control style as the storefront reviews header:
-                     white rounded-[12px] pill with a zinc ring. --}}
-                <a href="{{ $viewAllHref }}" class="flex h-10 shrink-0 items-center rounded-[12px] bg-white px-4 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:bg-[#1d3252] dark:text-zinc-200 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]">
-                    See all
-                </a>
             @endif
-
-            @if ($carousel)
-                <button
-                    type="button"
-                    @click="nudge(-1)"
-                    :disabled="! canPrev"
-                    aria-label="Previous"
-                    class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-30 disabled:cursor-not-allowed sm:flex dark:bg-[#1d3252] dark:text-zinc-200 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]"
-                >
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M15 6l-6 6 6 6"/>
-                    </svg>
-                </button>
-                <button
-                    type="button"
-                    @click="nudge(1)"
-                    :disabled="! canNext"
-                    aria-label="Next"
-                    class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-white text-zinc-700 ring-1 ring-zinc-200 shadow-sm transition-colors duration-150 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-30 disabled:cursor-not-allowed sm:flex dark:bg-[#1d3252] dark:text-zinc-200 dark:ring-zinc-700/60 dark:hover:bg-[#26416b]"
-                >
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M9 6l6 6-6 6"/>
-                    </svg>
-                </button>
-            @endif
-        </div>
+        </x-ui.row-controls>
     </div>
 
     @if ($carousel)
-        {{-- Full-bleed carousel: the track spans 100vw via mx-[calc(50%-50vw)],
+        {{-- Full-bleed carousel: the track spans the viewport via .full-bleed,
              breaking out of the max-w container. JS sets padding-left = the
              section's distance from the viewport left, so the first card lines
              up with the content column on load. On scroll, cards pass through
@@ -180,7 +272,7 @@
                  the -webkit-overflow-scrolling momentum and make the swipe feel
                  catchy/sluggish instead of gliding freely. The arrow buttons still
                  animate via nudge()'s explicit scrollBy({ behavior: 'smooth' }). --}}
-            class="{{ $bleed ? 'mx-[calc(50%-50vw)] w-screen' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
+            class="{{ $bleed ? 'full-bleed' : 'w-full' }} overflow-x-auto overflow-y-hidden py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
         >
             {{-- pl-* / --card-w fallbacks: setup() overrides paddingLeft and sets
                  --card-w inline at runtime; these keep a sane layout pre-JS. --}}
@@ -191,7 +283,7 @@
                 x-ref="list"
                 data-reveal-group
                 style="--card-w: 160px;"
-                class="carousel-list flex w-max gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0"
+                class="carousel-list grid w-max grid-flow-col {{ $trackRows }} gap-4 pl-4 pr-4 sm:gap-5 sm:pl-6 sm:pr-6 lg:pl-8 lg:pr-8 [&>*]:shrink-0"
             >
                 {{ $slot }}
             </ul>

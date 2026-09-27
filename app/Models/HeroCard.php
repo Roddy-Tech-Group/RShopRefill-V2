@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasTranslations;
 use Database\Factories\HeroCardFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +28,16 @@ use Illuminate\Support\Facades\Cache;
  */
 class HeroCard extends Model
 {
+    use HasTranslations;
+
+    /**
+     * Prose the admin can translate. The column stays the SOURCE text;
+     * a locale with no row here reads straight through to it.
+     *
+     * @var array<int, string>
+     */
+    protected array $translatable = ['title', 'subtitle'];
+
     /** @use HasFactory<HeroCardFactory> */
     use HasFactory;
 

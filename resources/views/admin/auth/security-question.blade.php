@@ -7,7 +7,7 @@
 
             {{-- Admin chip --}}
             <div class="flex justify-center">
-                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-indigo-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black">
+                <span class="inline-flex items-center gap-1.5 rounded-[6px] bg-indigo-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black dark:bg-white/10">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                     </svg>
@@ -26,7 +26,7 @@
                 @csrf
 
                 {{-- Security Question --}}
-                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-center">
+                <div class="rounded-[12px] bg-zinc-50 p-4 text-center">
                     <span class="block text-sm font-semibold text-zinc-500 uppercase tracking-wide">Question</span>
                     <span class="mt-1 block text-lg font-medium text-zinc-900">{{ $question }}</span>
                 </div>
@@ -42,7 +42,7 @@
                             required
                             autofocus
                             placeholder="Enter your answer"
-                            class="w-full rounded-xl border border-zinc-300 bg-white py-3 px-4 text-center text-lg text-zinc-900 placeholder:text-zinc-400 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                            class="w-full rounded-[12px] border border-zinc-300 bg-white py-3 px-4 text-center text-lg text-zinc-900 placeholder:text-zinc-400 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                         />
                         <button type="button" @click="show = !show" class="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors hover:text-zinc-700" :aria-label="show ? 'Hide answer' : 'Show answer'">
                             <svg x-show="!show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -61,7 +61,7 @@
                 <button
                     type="submit"
                     x-bind:disabled="submitting"
-                    class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/25 transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:opacity-75 disabled:cursor-not-allowed"
+                    class="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] bg-indigo-600 px-4 py-2.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/25 transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                     <svg x-show="submitting" class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="display: none;">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

@@ -24,9 +24,12 @@ use Tests\TestCase;
  *    table in the schema, so that page got heavier with every top-up, purchase
  *    and refund forever. It must use withCount (a SQL COUNT), never the relation.
  *
- * 2. The gift-card listing rendered one card for every brand (~688 in
- *    production) on a single uncached, anonymous page, eager-loading variants
- *    out of an 18k-row table for each. It must paginate.
+ * 2. The gift-card listing renders one card for every brand on a single
+ *    uncached, anonymous page - a deliberate product decision, so the guard is
+ *    not a page size. It is that the page's cost stays FLAT in the number of
+ *    brands: variants arrive in one eager-load and ratings in one rollup, so
+ *    doubling the catalogue must not double the queries. A per-card lookup
+ *    creeping back in is the regression that matters now.
  */
 class UnboundedListTest extends TestCase
 {
@@ -88,14 +91,15 @@ class UnboundedListTest extends TestCase
         );
     }
 
-    public function test_the_gift_card_listing_paginates_instead_of_rendering_every_brand(): void
+    /** Seeds $count gift-card brands, one available variant each. */
+    private function seedBrands(int $count): void
     {
-        $this->withoutVite();
+        $category = Category::firstOrCreate(
+            ['slug' => 'gift-cards'],
+            ['name' => 'Gift Cards']
+        );
 
-        $category = Category::factory()->create(['slug' => 'gift-cards', 'name' => 'Gift Cards']);
-
-        // More brands than fit on one page, so the cap has to bite.
-        foreach (range(1, 70) as $i) {
+        foreach (range(1, $count) as $i) {
             $product = Product::factory()->create([
                 'category_id' => $category->id,
                 'brand_key' => 'Brand'.$i,
@@ -111,13 +115,59 @@ class UnboundedListTest extends TestCase
                 'face_value' => 10,
             ]);
         }
+    }
+
+    /** Every brand, in one scroll - no page links, nothing withheld. */
+    public function test_the_gift_card_listing_renders_every_brand(): void
+    {
+        $this->withoutVite();
+        $this->seedBrands(70);
 
         $html = $this->get('/gift-cards')->assertOk()->getContent();
 
-        // Page 2 must exist, which only happens if the listing is paginated.
-        $this->assertStringContainsString('page=2', $html, 'the gift-card listing must paginate');
+        // Tiles print Product::brandDisplayName($brand_key), so the label is
+        // the KEY ("Brand70"), not the product's name column ("Brand 70").
+        // The old assertion looked for the spaced form, which never appears -
+        // it passed against any page at all.
+        $this->assertStringContainsString('Brand70', $html);
+        $this->assertStringNotContainsString('page=2', $html);
+    }
 
-        // And the last brand must NOT be on page one.
-        $this->assertStringNotContainsString('Brand 70', $html);
+    /**
+     * The real guard: doubling the catalogue must not double the queries.
+     *
+     * A per-card lookup - for variants, or for a brand's rating - is what made
+     * this the heaviest page in the app before. Both come back keyed by the
+     * whole result set, so the count holds flat.
+     */
+    public function test_the_listing_cost_does_not_scale_with_the_number_of_brands(): void
+    {
+        $this->withoutVite();
+
+        $count = function (): int {
+            $queries = 0;
+            DB::listen(function () use (&$queries): void {
+                $queries++;
+            });
+
+            $this->get('/gift-cards')->assertOk();
+
+            return $queries;
+        };
+
+        $this->seedBrands(10);
+        $small = $count();
+
+        $this->seedBrands(60);
+        $large = $count();
+
+        // Some slack for query-log noise, but nothing resembling one per brand:
+        // 50 extra brands must not mean anywhere near 50 extra queries.
+        $this->assertLessThan(
+            $small + 10,
+            $large,
+            "Query count scaled with the catalogue: {$small} queries for 10 brands, {$large} for 70. ".
+            'Something is looking up per card instead of per page.'
+        );
     }
 }

@@ -44,7 +44,7 @@
         .sheet { padding: 22px 40px 0; }
 
         /* Amount hero */
-        .hero { background: #f0f6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+        .hero { background: #f4f6f5; border: 1px solid #dfe3e1; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
         .hero .label { color: #3b82f6; font-size: 8px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
         .hero .amount { font-size: 21px; font-weight: 700; color: #0c1a2e; margin-top: 2px; }
         .hero .sub { color: #64748b; font-size: 8.5px; margin-top: 2px; }
@@ -84,7 +84,7 @@
                     {{-- JPEG deliberately: DomPDF embeds JPEG without the GD
                          extension, PNG requires it. White-flattened, so it is
                          visually identical on this light header. --}}
-                    <img src="{{ public_path('assets/email-logo.jpg') }}" style="height: 30px;" alt="RShopRefills">
+                    <img src="{{ public_path('assets/email-logo.jpg') }}" style="height: 30px;" alt="RshopRefill">
                     <div class="doc" style="margin-top: 7px;">Order Report</div>
                 </td>
                 <td class="meta">
@@ -239,7 +239,7 @@
     </div>
 
     <div class="footer">
-        RShopRefill &middot; rshoprefill.com &middot; Generated {{ $fmt($r['generated_at']) }} &middot; Report {{ $r['id'] }}
+        RshopRefill &middot; rshoprefill.com &middot; Generated {{ $fmt($r['generated_at']) }} &middot; Report {{ $r['id'] }}
     </div>
 </body>
 </html>

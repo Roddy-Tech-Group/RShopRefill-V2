@@ -6,36 +6,50 @@ use App\Domain\Shared\Enums\WalletTransactionType;
 use App\Models\PaymentAttempt;
 use App\Models\Product;
 use App\Models\WalletFunding;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Locked;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new
 #[Layout('components.layouts.dashboard')]
 #[Title('Transactions')]
 class extends Component {
-    use WithPagination;
-
     /** Search by reference / description. */
     public string $search = '';
 
     /** Direction filter: all | credit | debit. */
     public string $filter = 'all';
 
+    /** How many more rows each scroll to the bottom brings in. */
+    private const CHUNK = 12;
+
+    /**
+     * How many rows are on the page right now. The ledger has no page numbers:
+     * reaching the bottom grows this figure and the next chunk renders under
+     * the rows already there, the same as the order history and the
+     * notifications. Locked so the browser cannot ask for the whole ledger in
+     * one request.
+     */
+    #[Locked]
+    public int $visible = self::CHUNK;
+
+    public function loadMore(): void
+    {
+        $this->visible += self::CHUNK;
+    }
+
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     public function setFilter(string $filter): void
     {
         $this->filter = in_array($filter, ['all', 'credit', 'debit'], true) ? $filter : 'all';
-        $this->resetPage();
+        $this->visible = self::CHUNK;
     }
 
     /**
@@ -210,14 +224,11 @@ class extends Component {
 
         $rows = $rows->sortByDesc('date')->values();
 
-        $page = Paginator::resolveCurrentPage();
-        $transactions = new LengthAwarePaginator(
-            $rows->forPage($page, 12)->values(),
-            $rows->count(),
-            12,
-            $page,
-            ['path' => Paginator::resolveCurrentPath()],
-        );
+        // The feed is two queries merged and sorted in PHP, so the slice is
+        // taken here rather than by a paginator: the rows already exist, and
+        // the only question is how many of them to draw.
+        $hasMoreTransactions = $rows->count() > $this->visible;
+        $transactions = $rows->take($this->visible);
 
         // Non-completed funding attempts. A completed deposit already appears in
         // the ledger below as a credit, so here we surface only the in-flight and
@@ -241,6 +252,7 @@ class extends Component {
 
         return [
             'transactions' => $transactions,
+            'hasMoreTransactions' => $hasMoreTransactions,
             'recentDeposits' => $recentDeposits,
             'feedTruncated' => $feedTruncated,
             'feedCap' => $cap,
@@ -252,9 +264,9 @@ class extends Component {
     // Unified status pill tones — same recipe as the admin list pages (and the
     // customer orders page) so every status badge in the app reads the same.
     $depositStatusUi = [
-        'pending'    => ['Pending',    'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30'],
-        'processing' => ['Processing', 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-600/15 dark:text-blue-300 dark:ring-blue-500/30'],
-        'failed'     => ['Failed',     'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30'],
+        'pending'    => ['Pending',    'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'],
+        'processing' => ['Processing', 'bg-blue-600/10 text-blue-700 dark:bg-blue-600/15! dark:text-zinc-200!'],
+        'failed'     => ['Failed',     'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300'],
     ];
 @endphp
 
@@ -275,7 +287,7 @@ class extends Component {
                 type="text"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search by reference or description"
-                class="w-full rounded-full py-2 sm:rounded-[15px] sm:py-3 border-2 border-zinc-400 bg-[#eff6ff] pl-12 pr-4 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors hover:border-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:text-white"
+                class="w-full rounded-full py-2 sm:rounded-[15px] sm:py-3 border-2 border-zinc-400 bg-[#ffffff] pl-12 pr-4 text-sm text-zinc-900 placeholder:text-zinc-500 outline-none transition-colors hover:border-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:text-white"
             >
             <div wire:loading wire:target="search" class="absolute right-3 top-1/2 -translate-y-1/2">
                 <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -295,7 +307,7 @@ class extends Component {
                 <button
                     type="button"
                     wire:click="setFilter('{{ $key }}')"
-                    class="rounded-full px-3.5 py-2 text-sm font-semibold transition-colors {{ $filter === $key ? 'bg-blue-600 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50' }}"
+                    class="rounded-full px-3.5 py-2 text-sm font-semibold transition-colors {{ $filter === $key ? 'bg-blue-600 text-white' : 'bg-[#ffffff] text-zinc-700 ring-1 ring-zinc-200 hover:bg-[#f4f6f5]' }}"
                 >
                     {{ $label }}
                 </button>
@@ -307,7 +319,7 @@ class extends Component {
             wire:click="downloadCsv"
             wire:loading.attr="disabled"
             wire:target="downloadCsv"
-            class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]"
+            class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-[#ffffff] px-3.5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-[#f4f6f5] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700/60 dark:bg-[#1d3252] dark:text-zinc-200 dark:hover:bg-[#26416b]"
         >
             <svg wire:loading.remove wire:target="downloadCsv" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
@@ -325,11 +337,11 @@ class extends Component {
     @if ($recentDeposits->isNotEmpty())
         <div class="flex flex-col gap-2">
             <p class="text-sm font-bold text-zinc-900">Recent deposits</p>
-            <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+            <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
                 @foreach ($recentDeposits as $deposit)
-                    @php [$depLabel, $depClass] = $depositStatusUi[$deposit->status->value] ?? ['Pending', 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30']; @endphp
+                    @php [$depLabel, $depClass] = $depositStatusUi[$deposit->status->value] ?? ['Pending', 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300']; @endphp
                     <div class="flex items-center gap-3 px-4 py-3" wire:key="dep-{{ $deposit->id }}">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-blue-50 text-blue-600">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#f4f6f5] text-blue-600">
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0l6-6m-6 6l-6-6"/>
                             </svg>
@@ -340,7 +352,7 @@ class extends Component {
                         </div>
                         <div class="flex shrink-0 flex-col items-end gap-1">
                             <p class="text-sm font-bold text-zinc-900">{{ $deposit->currency?->symbol() }}{{ number_format((float) $deposit->amount, 2) }}</p>
-                            <span class="inline-flex w-fit items-center whitespace-nowrap rounded-[5px] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 {{ $depClass }}">{{ $depLabel }}</span>
+                            <span class="inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $depClass }}">{{ $depLabel }}</span>
                         </div>
                     </div>
                 @endforeach
@@ -354,7 +366,7 @@ class extends Component {
     <div
         wire:loading.flex
         wire:target="search, setFilter, gotoPage, nextPage, previousPage"
-        class="skeleton-stagger-fast flex-col divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none"
+        class="skeleton-stagger-fast flex-col divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:shadow-none"
     >
         @for ($i = 0; $i < 6; $i++)
             <x-skeletons.table-row style="--i: {{ $i }}" />
@@ -364,16 +376,18 @@ class extends Component {
     {{-- Ledger --}}
     <div wire:loading.remove wire:target="search, setFilter, gotoPage, nextPage, previousPage" class="flex flex-col gap-5">
     @if ($transactions->isNotEmpty())
-        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] border border-zinc-200 bg-[#eff6ff] shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
+        <div class="divide-y divide-zinc-200 overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
             @foreach ($transactions as $txn)
                 <div class="flex items-center gap-3 px-4 py-3.5" wire:key="{{ $txn->key }}">
-                    {{-- Animated direction icon - green incoming arrow for
-                         money in, red outgoing for money out. --}}
-                    @if ($txn->is_credit)
-                        <x-icons.txn-credit class="h-10 w-10" />
-                    @else
-                        <x-icons.txn-debit class="h-10 w-10" />
-                    @endif
+                    {{-- Direction icon in a small rounded tile: a dark blue arrow
+                         pointing in for money in, out for money out. --}}
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-[#f4f6f5]">
+                        @if ($txn->is_credit)
+                            <x-icons.txn-credit class="h-4 w-4" />
+                        @else
+                            <x-icons.txn-debit class="h-4 w-4" />
+                        @endif
+                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-bold text-zinc-900">{{ $txn->title }}</p>
                         <p class="truncate text-xs text-zinc-500">
@@ -382,7 +396,7 @@ class extends Component {
                         </p>
                     </div>
                     <div class="flex shrink-0 flex-col items-end gap-0.5">
-                        <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-zinc-900' }}">
+                        <p class="text-sm font-bold {{ $txn->is_credit ? 'text-emerald-600' : 'text-red-600' }}">
                             {{ $txn->is_credit ? '+' : '-' }}{{ $txn->symbol }}{{ number_format($txn->amount, 2) }}
                         </p>
                         @if ($txn->balance_after !== null)
@@ -394,8 +408,8 @@ class extends Component {
         </div>
     @else
         {{-- Empty state --}}
-        <div class="dash-shimmer rounded-[12px] bg-[#eff6ff] px-6 py-16 text-center border border-zinc-200 shadow-md shadow-zinc-900/[0.06] dark:border-zinc-700 dark:shadow-none">
-            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+        <div class="dash-shimmer rounded-[12px] bg-[#ffffff] px-6 py-16 text-center shadow-md shadow-zinc-900/[0.06] dark:shadow-none">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#f4f6f5] text-blue-600">
                 <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
                 </svg>
@@ -415,22 +429,35 @@ class extends Component {
                 @endif
             </p>
             @unless (trim($search) !== '' || $filter !== 'all')
-                <a href="{{ route('dashboard.wallet') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700">
+                {{-- Same #f4f6f5 button as "Explore everything" on the empty orders page. --}}
+                <a href="{{ route('dashboard.wallet') }}" wire:navigate class="mt-4 inline-flex items-center rounded-[12px] bg-[#f4f6f5] px-5 py-3 text-sm font-semibold text-zinc-900 transition-shadow hover:shadow-lg hover:shadow-zinc-900/[0.10] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-2 dark:border-zinc-700/60 dark:text-white dark:hover:border-zinc-500">
                     Go to wallet
                 </a>
             @endunless
         </div>
     @endif
 
-    @if ($transactions->hasPages())
-        @if ($feedTruncated)
-            {{-- The feed merges two tables in PHP, so it is capped. Say so: without
-                 this the paginator's total looks like the whole history. --}}
-            <p class="mb-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                Showing your most recent {{ number_format($feedCap) }} transactions. Contact support if you need older records.
-            </p>
-        @endif
-        <div>{{ $transactions->links('vendor.pagination.circles-livewire') }}</div>
+    @if ($hasMoreTransactions)
+        {{-- Scroll sentinel, as on the order history. As it nears the viewport
+             it asks for the next chunk. Its key carries the loaded count, so
+             every response hands the browser a fresh element that fires again
+             at once if the new rows still leave it on screen. It leaves with
+             the last transaction.
+
+             The CSV beside the filters was never bound to what is drawn here:
+             it streams the whole ledger in chunks, so an export is the
+             complete history whether one chunk has been loaded or twenty. --}}
+        <div
+            wire:key="transactions-more-{{ $visible }}"
+            wire:intersect.margin.400px="loadMore"
+            class="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+        >
+            <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"/>
+                <path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6V3z"/>
+            </svg>
+            Loading more transactions
+        </div>
     @endif
     </div>
 </div>

@@ -61,8 +61,9 @@ return [
     |
     */
     'controller' => [
-        'name' => 'Roddy Technologies LTD (trading as RShopRefill)',
-        'dpo_email' => 'info@rshoprefill.com',
+        'name' => 'Roddy Technologies LTD (trading as RshopRefill)',
+        // support@ is the one mailbox that receives mail; info@ has no inbox.
+        'dpo_email' => 'support@rshoprefill.com',
         'website' => 'https://rshoprefill.com',
     ],
 

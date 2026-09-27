@@ -100,9 +100,9 @@ class extends Component {
 <x-slot:heading>Finances</x-slot:heading>
 
 @php
-    $card = 'rounded-[12px] ring-1 ring-zinc-200 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:ring-white/10 dark:bg-[#1d3252]';
+    $card = 'rounded-[12px] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:bg-[#1d3252]';
     $sectionTitle = 'text-sm font-bold text-zinc-900 dark:text-white';
-    $th = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400';
+    $th = 'text-left';
     $td = 'px-3 py-2.5 text-[13px] tabular-nums text-zinc-700 dark:text-zinc-200';
 
     $data = $this->breakdown;
@@ -140,8 +140,8 @@ class extends Component {
         }
         $good = $downIsGood ? $pct <= 0 : $pct >= 0;
         $tone = $good
-            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30'
-            : 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30';
+            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+            : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300';
 
         return '<span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 '.$tone.'">'
             .($pct >= 0 ? '+' : '').number_format($pct, 1).'% vs prev</span>';
@@ -154,13 +154,13 @@ class extends Component {
         <p class="text-sm text-zinc-600 dark:text-zinc-400">Monthly revenue, supplier cost and gross profit, by provider and category. Refunds and supplier credits come off in the month they happen.</p>
         @php $isLaunchMonth = $this->selectedMonth()->equalTo($this->launchMonth()); @endphp
         <div class="flex items-center gap-2">
-            <button type="button" wire:click="stepMonth(-1)" @disabled($isLaunchMonth) class="rounded-[10px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Previous month">
+            <button type="button" wire:click="stepMonth(-1)" @disabled($isLaunchMonth) class="rounded-[12px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Previous month">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
             </button>
 
             {{-- Month picker: months since launch (Jun 2026), grouped by year. --}}
             <div x-data="{ open: false }" @click.outside="open = false" class="relative">
-                <button type="button" @click="open = ! open" :aria-expanded="open.toString()" class="inline-flex min-w-40 items-center justify-between gap-2 rounded-[10px] bg-white px-3.5 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-white dark:ring-white/10 dark:hover:bg-white/5">
+                <button type="button" @click="open = ! open" :aria-expanded="open.toString()" class="inline-flex min-w-40 items-center justify-between gap-2 rounded-[12px] bg-white px-3.5 py-2 text-sm font-semibold text-zinc-900 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 dark:bg-[#1d3252] dark:text-white dark:ring-white/10 dark:hover:bg-white/5">
                     <span class="inline-flex items-center gap-2">
                         <svg class="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
                         {{ $this->selectedMonth()->format('F Y') }}
@@ -189,7 +189,7 @@ class extends Component {
                 </div>
             </div>
 
-            <button type="button" wire:click="stepMonth(1)" @disabled($isCurrentMonth) class="rounded-[10px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Next month">
+            <button type="button" wire:click="stepMonth(1)" @disabled($isCurrentMonth) class="rounded-[12px] p-2 text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Next month">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             </button>
         </div>
@@ -245,9 +245,9 @@ class extends Component {
         <header class="flex items-center justify-between px-5 pt-5 pb-3">
             <h2 class="{{ $sectionTitle }}">By providers</h2>
         </header>
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+        <div class="overflow-x-auto p-3">
+            <table class="w-full admin-table">
+                <thead class="">
                     <tr>
                         <th class="{{ $th }} pl-5">Provider</th>
                         <th class="{{ $th }} text-right">Orders</th>
@@ -258,7 +258,7 @@ class extends Component {
                         <th class="{{ $th }} pr-5 text-right">Margin</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                <tbody class="">
                     @forelse ($data['providers'] as $row)
                         <tr>
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['label'] }}</td>
@@ -295,9 +295,9 @@ class extends Component {
         <header class="flex items-center justify-between px-5 pt-5 pb-3">
             <h2 class="{{ $sectionTitle }}">By product category</h2>
         </header>
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="border-y border-zinc-100 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+        <div class="overflow-x-auto p-3">
+            <table class="w-full admin-table">
+                <thead class="">
                     <tr>
                         <th class="{{ $th }} pl-5">Category</th>
                         <th class="{{ $th }} text-right">Orders</th>
@@ -308,7 +308,7 @@ class extends Component {
                         <th class="{{ $th }} pr-5 text-right">Margin</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 dark:divide-white/10">
+                <tbody class="">
                     @forelse ($data['categories'] as $row)
                         <tr>
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['category'] }}</td>

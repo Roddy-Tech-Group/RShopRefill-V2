@@ -77,16 +77,6 @@
             // but not third-party iframes. Not HttpOnly - JS writes it.
             document.cookie = `${name}=${isDark ? '1' : '0'}; path=/; max-age=31536000; SameSite=Lax`;
         }
-        // Mirror the resolved pure-dark (Extra Dark / black) decision into its own
-        // cookie too, so the server can paint .pure-dark from the first byte.
-        // Customer side defaults to ON when the cookie is absent (see head.blade.php),
-        // so the default black page never flashes navy first.
-        function writePureDarkCookie(on) {
-            const name = location.pathname.startsWith('/admin')
-                ? 'theme_admin_puredark'
-                : 'theme_web_puredark';
-            document.cookie = `${name}=${on ? '1' : '0'}; path=/; max-age=31536000; SameSite=Lax`;
-        }
 
         // Flux UI ships its own theme engine (loaded by the appearance
         // directive in the head) that runs AFTER our script. It reads
@@ -107,32 +97,32 @@
             try { localStorage.setItem('flux.appearance', choice); } catch (_) {}
         }
 
-        // Extra-dark (true black) is a sub-preference of dark mode, stored per
-        // area exactly like the theme key — admin and customer each remember
-        // their own choice. Only applies while dark is the resolved theme.
-        function pureDarkKey() {
-            return location.pathname.startsWith('/admin') ? 'admin.theme.pure_dark' : 'theme.pure_dark';
-        }
+        // Soft dark has been removed: there is one dark palette now, the grainy
+        // black. `.pure-dark` is still the class the palette hangs off in
+        // app.css, so it goes on unconditionally whenever dark resolves, and
+        // this always answers true. Kept as a function rather than inlined so
+        // window.pureDarkOn stays a valid call for anything still asking.
         function pureDarkOn() {
-            const v = localStorage.getItem(pureDarkKey());
-            if (v !== null) { return v === '1'; }   // the user's own choice always wins
-            // No explicit choice → the default dark palette:
-            //  - customer side: pure black IS the default dark mode (navy is the
-            //    opt-in "Soft dark" appearance).
-            //  - admin side: unchanged — navy by default, unless the admin's
-            //    global Extra Dark setting is on.
-            if (location.pathname.startsWith('/admin')) { return !! cfg.globalExtraDark; }
             return true;
+        }
+
+        // Anyone carrying the retired soft-dark preference is moved to the new
+        // dark on their next load, and the stale key and cookie are cleared so
+        // nothing reads them again.
+        function clearRetiredSoftDark() {
+            try {
+                localStorage.removeItem('theme.pure_dark');
+                localStorage.removeItem('admin.theme.pure_dark');
+            } catch (_) {}
+            document.cookie = 'pure_dark=; Max-Age=0; path=/; SameSite=Lax';
         }
 
         function applyTheme() {
             const choice = themeChoice();
             const isDark = resolveDark();
-            const pure = pureDarkOn();
             root.classList.toggle('dark', isDark);
-            root.classList.toggle('pure-dark', isDark && pure);
+            root.classList.toggle('pure-dark', isDark);
             writeCookie(isDark);
-            writePureDarkCookie(pure);
             syncFlux(choice);
         }
 
@@ -165,15 +155,11 @@
         window.themeIsDark = resolveDark;
         window.themeChoice = themeChoice;
 
-        // Pure-dark (true black) is the default dark palette; the "Soft dark"
-        // appearance toggle stores its inverse here. Local only (no server
-        // round-trip); applyTheme re-evaluates the .pure-dark class + cookie.
-        window.setPureDark = function (on) {
-            try { localStorage.setItem(pureDarkKey(), on ? '1' : '0'); } catch (_) {}
-            applyTheme();
-            window.dispatchEvent(new CustomEvent('pure-dark-changed', { detail: { on: pureDarkOn() } }));
-        };
+        // Retained as no-ops so any stale bundle or cached view that still calls
+        // these cannot throw. There is only one dark palette to select now.
+        window.setPureDark = function () {};
         window.pureDarkOn = pureDarkOn;
+        clearRetiredSoftDark();
 
         // The account's saved theme wins over a stale cache from another login.
         if (cfg.server) {
