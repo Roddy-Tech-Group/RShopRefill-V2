@@ -40,6 +40,9 @@ class IpLocator
     /** Cache marker for "this address resolved to nothing", so misses are cached too. */
     private const UNKNOWN = 'unknown';
 
+    /** Cache marker for "the missing database has already been reported in this window". */
+    private const MISSING_DATABASE_REPORTED = 'geoip:database-missing-reported';
+
     public function __construct(private OperationalAlerter $alerter) {}
 
     /**
@@ -61,6 +64,17 @@ class IpLocator
 
         if (is_array($cached) && isset($cached['country_code'])) {
             return ResolvedLocation::fromArray($cached);
+        }
+
+        // Without the database every answer is "unknown" for a reason that
+        // says nothing about the address. Caching it would keep every address
+        // that signed in before the file arrived unknown for a day after, so
+        // this miss is answered fresh each time. Checking for the file is a
+        // single stat call, so not caching it costs next to nothing.
+        if (! $this->databaseAvailable()) {
+            $this->reportMissingDatabase();
+
+            return null;
         }
 
         $resolved = $this->lookup($ip);
@@ -102,16 +116,11 @@ class IpLocator
     }
 
     /**
-     * Ask the driver, and translate every failure mode into null.
+     * Ask the driver, and translate every failure mode into null. Only called
+     * once the database is known to be on disk.
      */
     private function lookup(string $ip): ?ResolvedLocation
     {
-        if (! $this->databaseAvailable()) {
-            $this->alertMissingDatabase();
-
-            return null;
-        }
-
         try {
             $position = Location::get($ip);
         } catch (Throwable $e) {
@@ -172,9 +181,19 @@ class IpLocator
      * The database is how we know where anything comes from. Its absence is
      * not visible to a customer and would otherwise be invisible to us: every
      * lookup would simply return null and every geo rule would go quiet.
+     *
+     * Reported once per alert throttle window, not once per address. The
+     * alerter throttles its own delivery, but it still logs and reports every
+     * call it is given, and this runs inside login requests.
      */
-    private function alertMissingDatabase(): void
+    private function reportMissingDatabase(): void
     {
+        $windowMinutes = max(1, (int) config('alerting.throttle_minutes', 60));
+
+        if (! Cache::add(self::MISSING_DATABASE_REPORTED, true, now()->addMinutes($windowMinutes))) {
+            return;
+        }
+
         $this->alerter->send(
             AlertSeverity::Sev2,
             'geoip:database-missing',

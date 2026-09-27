@@ -170,7 +170,14 @@ class DeviceVerificationController extends Controller
         $deviceId = session()->pull('pending_device_id');
         if ($deviceId) {
             $device = TrustedDevice::find($deviceId);
-            if ($device) {
+
+            // A device that is already trusted keeps the trust it has earned.
+            // It was asked for a code because this login looked unusual (a
+            // country change, or a customer who wants a code every time), not
+            // because the device is new. Trusting it again would restart the
+            // 24-hour hold on sensitive actions and email the customer about a
+            // "new" device they have been using for months.
+            if ($device && ! $device->isTrusted()) {
                 $this->trustManager->markAsTrusted($device);
 
                 // Now that it's verified, send the "New device logged in" email

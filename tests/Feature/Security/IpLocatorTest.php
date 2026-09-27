@@ -175,6 +175,60 @@ class IpLocatorTest extends TestCase
         $this->assertNull($locator->databaseUpdatedAt());
     }
 
+    /**
+     * Between a deploy and the first `location:update` there is no file, and
+     * every login in that gap resolves to unknown. That answer is about the
+     * server, not the address, so it must not outlive the file's arrival: the
+     * next lookup after the download has to be a real one.
+     */
+    public function test_a_miss_caused_by_the_missing_database_is_not_cached(): void
+    {
+        config(['location.maxmind.local.path' => base_path('database/maxmind/does-not-exist.mmdb')]);
+        $this->mock(OperationalAlerter::class)->shouldReceive('send')->andReturnTrue();
+
+        $locator = app(IpLocator::class);
+        $this->assertNull($locator->locate(self::PUBLIC_IP));
+
+        // The file arrives.
+        $this->pretendDatabaseExists();
+        Location::shouldReceive('get')->once()->andReturn($this->position('CM', 'Cameroon'));
+
+        $this->assertSame('CM', $locator->locate(self::PUBLIC_IP)?->countryCode);
+    }
+
+    /**
+     * The missing file is one problem, not one problem per customer. Reporting
+     * it for every address that signs in logged and sent a tracker event per
+     * login, inside the login request.
+     */
+    public function test_the_missing_database_is_reported_once_per_window_not_once_per_address(): void
+    {
+        config([
+            'location.maxmind.local.path' => base_path('database/maxmind/does-not-exist.mmdb'),
+            'alerting.throttle_minutes' => 60,
+        ]);
+        Location::shouldReceive('get')->never();
+
+        $alerter = $this->mock(OperationalAlerter::class);
+        $alerter->shouldReceive('send')
+            ->twice()
+            ->withArgs(fn (AlertSeverity $severity, string $key) => $key === 'geoip:database-missing')
+            ->andReturnTrue();
+
+        $locator = app(IpLocator::class);
+
+        foreach (['102.90.100.141', '8.8.8.8', '41.58.12.9', '102.90.100.141'] as $ip) {
+            $this->assertNull($locator->locate($ip));
+        }
+
+        // Still missing an hour later: reported again, once.
+        $this->travel(61)->minutes();
+
+        foreach (['102.90.100.141', '8.8.8.8'] as $ip) {
+            $this->assertNull($locator->locate($ip));
+        }
+    }
+
     public function test_it_reports_the_database_age_when_the_file_is_there(): void
     {
         $this->pretendDatabaseExists();
