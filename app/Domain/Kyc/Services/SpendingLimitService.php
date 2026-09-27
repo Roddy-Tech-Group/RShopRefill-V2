@@ -4,6 +4,7 @@ namespace App\Domain\Kyc\Services;
 
 use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Models\SiteSetting;
+use App\Models\SpendingLimitEvent;
 use App\Models\User;
 use App\Support\FeatureFlag;
 use Illuminate\Support\Facades\Log;
@@ -111,7 +112,15 @@ class SpendingLimitService
                 continue;
             }
 
-            if (! $this->enforcementEnabled()) {
+            $enforced = $this->enforcementEnabled();
+
+            // Recorded either way: in shadow this row is the only trace that
+            // a customer reached the cap (the log line nobody reads was), and
+            // after the flip it is the record of who was refused. Read by
+            // `limits:report`.
+            $this->record($user, $context, $window, $rule['limit'], $moneyIn, $amountUsd, $enforced);
+
+            if (! $enforced) {
                 Log::info('limits.shadow_exceeded', [
                     'user_id' => $user->getKey(),
                     'context' => $context,
@@ -126,6 +135,33 @@ class SpendingLimitService
             }
 
             throw new SpendingLimitExceededException($window, $rule['limit'], $user->isKycVerified(), KycGate::verificationAvailable());
+        }
+    }
+
+    /**
+     * Keep the row. Fail open: this is a record of a decision, never the
+     * decision itself, so a write that fails must not break a payment or
+     * turn a refusal into a pass.
+     */
+    private function record(User $user, string $context, string $window, float $limit, float $moneyIn, float $amountUsd, bool $enforced): void
+    {
+        try {
+            SpendingLimitEvent::create([
+                'user_id' => $user->getKey(),
+                'context' => $context,
+                'limit_window' => $window,
+                'limit_usd' => round($limit, 4),
+                'money_in_usd' => round($moneyIn, 4),
+                'amount_usd' => round($amountUsd, 4),
+                'kyc_verified' => $user->isKycVerified(),
+                'enforced' => $enforced,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('limits.event_not_recorded', [
+                'user_id' => $user->getKey(),
+                'window' => $window,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

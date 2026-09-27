@@ -7,6 +7,7 @@ use App\Domain\Kyc\Exceptions\KycProviderUnavailableException;
 use App\Domain\Kyc\Providers\SmileKycProvider;
 use App\Domain\Kyc\Services\KycGate;
 use App\Domain\Kyc\Services\KycProviderFactory;
+use App\Domain\Kyc\Services\KycSelfServeEligibility;
 use App\Domain\Kyc\Services\KycTierService;
 use App\Domain\Kyc\Services\KycVerdictRecorder;
 use App\Http\Controllers\Controller;
@@ -42,7 +43,7 @@ class KycStatusController extends Controller
         ]);
     }
 
-    public function start(Request $request, KycProviderFactory $providers, KycVerdictRecorder $recorder)
+    public function start(Request $request, KycProviderFactory $providers, KycVerdictRecorder $recorder, KycSelfServeEligibility $eligibility)
     {
         $user = $request->user();
 
@@ -64,6 +65,17 @@ class KycStatusController extends Controller
         // never end in a verified account.
         if (! KycGate::verificationAvailable()) {
             return response()->json(['message' => 'Verification is currently unavailable, try again later.'], 503);
+        }
+
+        // Transact first. A paid identity check is started only for a
+        // customer who has already bought something or funded their wallet
+        // (KycSelfServeEligibility). Only this door: the checkout and funding
+        // step-ups never ask, or a first big order would be deadlocked.
+        if (! $eligibility->isEligible($user)) {
+            return response()->json([
+                'message' => $eligibility->refusalMessage(),
+                'kyc_ineligible' => true,
+            ], 403);
         }
 
         // The customer's explicit ID-issuing-country choice (the KYC page shows

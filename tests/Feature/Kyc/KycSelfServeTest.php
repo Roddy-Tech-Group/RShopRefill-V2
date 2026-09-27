@@ -8,6 +8,7 @@ use App\Domain\Kyc\DTOs\KycVerdict;
 use App\Domain\Kyc\Providers\SmileKycProvider;
 use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Domain\Kyc\Services\KycProviderFactory;
+use App\Domain\Kyc\Services\KycSelfServeEligibility;
 use App\Models\KycVerification;
 use App\Models\SiteSetting;
 use App\Models\User;
@@ -30,6 +31,10 @@ class KycSelfServeTest extends TestCase
         parent::setUp();
 
         SiteSetting::put('features.kyc_verification_enabled', 'on', 'features');
+        // The transact-first rule has its own suite (KycSelfServeEligibilityTest);
+        // switched off here so these tests keep exercising the session flow
+        // for customers who have not bought anything yet.
+        SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, '0', 'features');
         Cache::flush();
     }
 

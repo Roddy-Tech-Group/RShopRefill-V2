@@ -53,6 +53,8 @@ class extends Component {
         ],
         'Verification & Limits' => [
             'features.kyc_verification_enabled',
+            'features.kyc_self_serve_min_transactions',
+            'features.kyc_self_serve_min_transaction_usd',
             'features.kyc_enforce_enabled',
             'features.kyc_tier2_threshold_usd',
             'features.kyc_cumulative_threshold_usd',
@@ -67,6 +69,7 @@ class extends Component {
             'features.signup_enabled',
             'features.guest_cart_enabled',
             'features.device_management_enabled',
+            'features.login_country_check_enabled',
             'features.admin_inactivity_timeout_enabled',
             'features.admin_inactivity_timeout_minutes',
             'features.admin_security_question_enabled',

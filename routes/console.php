@@ -353,6 +353,28 @@ Schedule::command('communication:validate')
 Schedule::command('reconcile:wallet-balances')->dailyAt('02:00')->sentryMonitor('reconcile-wallet-balances');
 Schedule::command('reconcile:orphaned-sessions')->hourly()->sentryMonitor('reconcile-orphaned-sessions');
 
+// Identity safety net, the same shape as the crypto one below: a Smile ID
+// callback that never arrives leaves the customer reading "in review" with
+// nothing coming, and under step-up enforcement holds their payment behind
+// it. This asks Smile about anything still waiting and applies the verdict
+// through the path the callback would have used.
+Schedule::command('kyc:reconcile')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->name('kyc:reconcile')
+    ->sentryMonitor('kyc-reconcile');
+
+// Refresh the local GeoLite2 database. Everything that knows where a login came
+// from reads this one file, and IP ranges are reassigned continually, so a
+// stale file quietly loses accuracy rather than failing. MaxMind publishes
+// twice a week; Tuesday covers it with room to spare. A failed download leaves
+// the existing file in place, so the worst case is staleness, never a gap.
+Schedule::command('location:update')
+    ->weeklyOn(2, '03:20')
+    ->withoutOverlapping()
+    ->name('location:update')
+    ->sentryMonitor('location-update');
+
 // Crypto safety net: re-verifies pending NOWPayments attempts against the gateway
 // so dropped IPNs still confirm. This is not optional cover — NOWPayments stops
 // sending callbacks once a payment expires while still crediting deposits that
