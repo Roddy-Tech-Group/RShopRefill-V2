@@ -1087,6 +1087,10 @@ html.dark .wallet-glass {
         padding-bottom: 0.75rem;
         background-color: #0c1337 !important;
         background-image: none !important;
+        /* A line where the bar ends, so whatever scrolls under it is cut
+           cleanly instead of running into it. The header class sets
+           !border-b-0, hence the !important. */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
     }
     /* Every header popup (search, cart, notifications, account, refer) drops
        under the bar as a full-width sheet instead of hanging off its chip,
@@ -1149,6 +1153,60 @@ html.dark .wallet-glass {
         height: 100dvh;
         overflow: hidden;
     }
+    /* The balance band's wash.
+    
+       Three layers rather than one straight ramp: a bright cyan bloom off the
+       top right, a blue one off the top left, over a deep navy-to-blue base.
+       A single linear gradient reads as a printed ramp; the blooms give it the
+       soft mesh the reference has, where the colour pools rather than marches.
+       Multi-layer gradients are beyond what a utility class can express, which
+       is why this is here and not on the element. */
+    .dash-hero-wash {
+        background-color: #0b2f9e;
+        background-image:
+            radial-gradient(115% 85% at 88% 6%, #33c2f0 0%, rgba(51, 194, 240, 0) 58%),
+            radial-gradient(80% 75% at 97% 96%, #3fc9f2 0%, rgba(63, 201, 242, 0) 62%),
+            /* and a third coming in off the left edge, half way down, so the
+               light blue is not only ever on the right. */
+            radial-gradient(65% 85% at 0% 52%, rgba(56, 186, 235, 0.62) 0%, rgba(56, 186, 235, 0) 62%),
+            radial-gradient(95% 115% at 6% 2%, #1a4fd4 0%, rgba(26, 79, 212, 0) 62%),
+            linear-gradient(165deg, #092571 0%, #0f3aa6 46%, #1668d8 100%);
+    }
+    html.dark .dash-hero-wash {
+        /* Dark keeps the flat navy it always had. */
+        background-color: #0c1337;
+        background-image: none;
+    }
+
+    /* The curve under the bar, drawn on top instead of cut out.
+    
+       Two corner wedges in the bar's colour, with a quarter circle taken out of
+       each, and nothing at all between them. Because it paints only the corners
+       it can sit ABOVE the page without covering anything: the middle is
+       transparent, so the cards scroll past untouched.
+    
+       Fixed, so the curve holds under the bar however far the page has
+       scrolled. Cutting the corners out of the panel instead made two holes
+       that fell through to the page canvas, and putting the curve on the
+       balance band made it scroll away with it. */
+    .dash-curve-fill {
+        position: fixed;
+        z-index: 50;
+        left: 0;
+        right: 0;
+        top: calc(env(safe-area-inset-top) + 3.75rem);
+        height: 32px;
+        pointer-events: none;
+        background:
+            radial-gradient(circle 32px at 32px 32px, transparent 0 31.4px, #0c1337 32.6px) left top / 32px 32px no-repeat,
+            radial-gradient(circle 32px at 0 32px, transparent 0 31.4px, #0c1337 32.6px) right top / 32px 32px no-repeat;
+    }
+    html.dark .dash-curve-fill {
+        background:
+            radial-gradient(circle 32px at 32px 32px, transparent 0 31.4px, #000000 32.6px) left top / 32px 32px no-repeat,
+            radial-gradient(circle 32px at 0 32px, transparent 0 31.4px, #000000 32.6px) right top / 32px 32px no-repeat;
+    }
+
     .dash-mobile-panel {
         /* flow-root: the hero's own top margin was collapsing through the
            panel and pushing its curved top 12px below the bar. */
@@ -1158,8 +1216,16 @@ html.dark .wallet-glass {
         overflow-y: auto;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
-        border-top-left-radius: 32px;
-        border-top-right-radius: 32px;
+        /* Square. The curve is DRAWN over the top by .dash-curve-fill rather
+           than cut out of this element.
+        
+           Cutting it here made two holes: a rounded corner shows whatever its
+           parent paints, and a probe colour on the pane never appeared
+           anywhere, so the panel overflows its parent and the corners fell
+           through to the page canvas. Nothing could be put behind them. */
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+
         /* No hairline on a phone.
         
            The desktop pane carries one so its curve reads against the black

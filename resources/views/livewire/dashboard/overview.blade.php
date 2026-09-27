@@ -320,7 +320,7 @@ new #[Lazy] class extends Component
             <img
                 src="{{ asset('assets/' . rawurlencode('Pick a product first process.webp')) }}"
                 alt=""
-                class="pointer-events-none absolute -right-3 bottom-2 w-[46%] max-w-[260px] select-none object-contain object-bottom drop-shadow-2xl"
+                class="pointer-events-none absolute right-2 top-1/2 w-[46%] max-w-[260px] -translate-y-1/2 select-none object-contain object-center drop-shadow-2xl"
                 loading="lazy"
             >
         </div>
@@ -803,7 +803,7 @@ new #[Lazy] class extends Component
                     <img
                         src="{{ asset('assets/' . rawurlencode('Pick a product first process.webp')) }}"
                         alt=""
-                        class="pointer-events-none absolute -right-3 bottom-2 w-[46%] max-w-[230px] select-none object-contain object-bottom drop-shadow-2xl"
+                        class="pointer-events-none absolute right-2 top-1/2 w-[46%] max-w-[230px] -translate-y-1/2 select-none object-contain object-center drop-shadow-2xl"
                         loading="lazy"
                     >
                 </div>

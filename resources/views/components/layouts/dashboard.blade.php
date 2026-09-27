@@ -1593,6 +1593,7 @@
              the desktop frame lifts its pane off the header (.dash-mobile-panel
              in app.css). lg:contents removes the wrapper from the desktop
              layout entirely. --}}
+        <div class="dash-curve-fill lg:hidden" aria-hidden="true"></div>
         <div class="dash-mobile-panel lg:contents" x-data x-on:scroll.passive="window.dispatchEvent(new Event('scroll'))">
         @unless ($skipMobileHero)
         {{-- The balance area, its own band under the bar, clipped by the
@@ -1611,7 +1612,7 @@
              the first row of cards rises into it, rather than the colour
              stopping on a flat edge the moment the balance text ends. The
              content below pulls up over that curve. --}}
-        <header class="relative z-10 rounded-b-[28px] bg-gradient-to-br from-[#0b2a8f] via-[#1766d9] to-[#2bb0ea] px-5 pt-5 pb-14 dark:bg-none dark:bg-[#0c1337] lg:hidden">
+        <header class="dash-hero-wash relative z-10 rounded-b-[28px] px-5 pt-5 pb-14 lg:hidden">
             @isset($mobileHero)
                 {{-- Padding on the header, not a margin on the hero: a margin
                      would collapse through the header's top edge and leave the

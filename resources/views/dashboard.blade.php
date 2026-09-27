@@ -147,7 +147,7 @@
                 :aria-expanded="open.toString()"
                 aria-haspopup="dialog"
                 aria-label="Show wallet balances"
-                class="inline-flex items-center gap-2 rounded-full bg-[#ffffff] py-1.5 pl-1.5 pr-4 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-700 shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95 dark:bg-[#1d3252] dark:text-zinc-200 dark:shadow-none"
+                class="inline-flex items-center gap-2 rounded-full bg-[#ffffff] py-1.5 pl-1.5 pr-4 text-[12px] font-black uppercase tracking-[0.12em] text-zinc-900 shadow-md shadow-zinc-900/[0.06] transition-transform active:scale-95 dark:bg-[#1d3252] dark:text-zinc-200 dark:shadow-none"
             >
                 <span class="flex -space-x-2.5">
                     {{-- Every wallet the customer holds, up to five. Three was a
@@ -185,7 +185,7 @@
                     </svg>
                 </button>
             </div>
-            <p class="mt-2 text-xs text-white/70">{{ $walletRows->count() }} {{ \Illuminate\Support\Str::plural('wallet', $walletRows->count()) }} · USD equivalent</p>
+            <p class="mt-2 text-xs text-white">{{ $walletRows->count() }} {{ \Illuminate\Support\Str::plural('wallet', $walletRows->count()) }} · USD equivalent</p>
 
             {{-- The sheet lives on <body>: the hero's own stacking context would
                  cap its z-index under the fixed header. --}}

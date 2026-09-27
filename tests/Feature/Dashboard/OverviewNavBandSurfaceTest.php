@@ -64,7 +64,21 @@ class OverviewNavBandSurfaceTest extends TestCase
     {
         $rules = $this->phoneRules();
 
-        $this->assertMatchesRegularExpression('/\.dash-mobile-panel \{[^}]*border-top-left-radius: 32px;[^}]*border-top-right-radius: 32px;/', $rules);
+        // The curve under the bar is DRAWN, not cut.
+        //
+        // Cutting it out of the panel made two holes: a rounded corner shows
+        // whatever its parent paints there, and a probe colour on the pane
+        // never appeared anywhere on the page, so the panel overflows its
+        // parent and the corners fell through to the page canvas. Putting it
+        // on the balance band instead made it scroll away with the band.
+        //
+        // So the panel is square and two corner wedges are painted over the
+        // top, fixed. Only the corners are painted, the middle is transparent,
+        // which is why it can sit above the page without covering the cards.
+        $this->assertMatchesRegularExpression('/\.dash-mobile-panel \{[^}]*border-top-left-radius: 0;/s', $rules);
+        $this->assertMatchesRegularExpression('/\.dash-curve-fill \{[^}]*position: fixed;[^}]*height: 32px;/s', $rules);
+        $this->assertMatchesRegularExpression('/\.dash-curve-fill \{[^}]*radial-gradient\(circle 32px at 32px 32px, transparent 0 31\.4px, #0c1337 32\.6px\)/s', $rules);
+        $this->assertMatchesRegularExpression('/html\.dark \.dash-curve-fill \{[^}]*#000000 32\.6px\)/s', $rules);
         $this->assertStringContainsString('<div class="dash-mobile-panel lg:contents" x-data', $this->layout());
         // The bar mirrors the desktop header: navy in light, pure black in
         // dark, and the same colour runs behind the page so the panel's curve
@@ -98,9 +112,21 @@ class OverviewNavBandSurfaceTest extends TestCase
      */
     public function test_the_balance_area_is_a_coloured_band_in_both_themes(): void
     {
-        $header = '<header class="relative z-10 rounded-b-[28px] bg-gradient-to-br from-[#0b2a8f] via-[#1766d9] to-[#2bb0ea] px-5 pt-5 pb-14 dark:bg-none dark:bg-[#0c1337] lg:hidden">';
+        // The band carries only its BOTTOM curve. The curve under the bar is
+        // drawn over the top by .dash-curve-fill, because it has to stay put
+        // while the page scrolls and anything on the band scrolls away with it.
+        $this->assertStringContainsString(
+            '<header class="dash-hero-wash relative z-10 rounded-b-[28px] px-5 pt-5 pb-14 lg:hidden">',
+            $this->layout(),
+        );
 
-        $this->assertStringContainsString($header, $this->layout());
+        $css = File::get(resource_path('css/app.css'));
+
+        // Layered blooms, not one straight ramp: a single linear gradient reads
+        // as a printed ribbon, and the point is for the colour to pool.
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 88% 6%/s', $css);
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 97% 96%/s', $css);
+        $this->assertMatchesRegularExpression('/\.dash-hero-wash \{[^}]*radial-gradient\([^)]*at 0% 52%/s', $css);
     }
 
     /**
@@ -110,14 +136,15 @@ class OverviewNavBandSurfaceTest extends TestCase
      */
     public function test_dark_clears_the_gradient_rather_than_painting_over_it(): void
     {
-        $css = File::get(public_path('build/assets/'.collect(File::files(public_path('build/assets')))
-            ->filter(fn ($f) => str_starts_with($f->getFilename(), 'app-') && $f->getExtension() === 'css')
-            ->sortByDesc(fn ($f) => $f->getMTime())
-            ->first()
-            ->getFilename()));
+        $css = File::get(resource_path('css/app.css'));
 
-        $this->assertStringContainsString('background-image:none', $css);
-        $this->assertStringContainsString('background-color:#0c1337', $css);
+        // background-image: none is the load-bearing line. The wash is an
+        // IMAGE, so dark's background-COLOUR alone would sit under it and dark
+        // would wear the light theme's gradient.
+        $this->assertMatchesRegularExpression(
+            '/html\.dark \.dash-hero-wash \{[^}]*background-color: #0c1337;[^}]*background-image: none;/s',
+            $css
+        );
     }
 
     /**
