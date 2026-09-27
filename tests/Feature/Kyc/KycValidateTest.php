@@ -114,13 +114,45 @@ class KycValidateTest extends TestCase
         $this->assertStringContainsString('Spending limits are not enforced ahead of verification', Artisan::output());
     }
 
+    /**
+     * An attempt minted a minute ago is in flight, not stuck. It is shown and
+     * does not block, or the pre-flight could never pass on a live system.
+     */
     public function test_it_reports_verifications_still_waiting_on_a_verdict(): void
     {
         KycVerification::factory()->create(['status' => 'pending']);
 
-        Artisan::call('kyc:validate');
+        $this->assertSame(0, Artisan::call('kyc:validate'));
 
         $this->assertStringContainsString('1 verification(s) waiting on a verdict', Artisan::output());
+    }
+
+    /**
+     * An abandoned attempt is already closed, however old it is.
+     */
+    public function test_an_abandoned_attempt_does_not_fail_the_pre_flight(): void
+    {
+        $attempt = KycVerification::factory()->create(['status' => 'abandoned']);
+        $attempt->forceFill(['created_at' => now()->subDays(30)])->save();
+
+        $this->assertSame(0, Artisan::call('kyc:validate'));
+
+        $this->assertStringContainsString('1 attempt(s) closed without a verdict', Artisan::output());
+    }
+
+    /**
+     * kyc:reconcile closes a pending attempt once it passes the polling
+     * window. One still pending after that means the reconciler is not doing
+     * its job.
+     */
+    public function test_a_pending_attempt_past_the_window_fails(): void
+    {
+        $attempt = KycVerification::factory()->create(['status' => 'pending']);
+        $attempt->forceFill(['created_at' => now()->subDays(8)])->save();
+
+        $this->assertSame(1, Artisan::call('kyc:validate'));
+
+        $this->assertStringContainsString('1 verification(s) pending over 7 day(s)', Artisan::output());
     }
 
     /**

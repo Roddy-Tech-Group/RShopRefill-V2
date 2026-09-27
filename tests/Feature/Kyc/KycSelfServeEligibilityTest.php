@@ -20,6 +20,7 @@ use App\Models\WalletFunding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Livewire\Volt\Volt;
 use Tests\TestCase;
 
 /**
@@ -177,6 +178,75 @@ class KycSelfServeEligibilityTest extends TestCase
         SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, '0', 'features');
         Cache::flush();
         $this->assertTrue($eligibility->isEligible($this->customer()));
+    }
+
+    /**
+     * Both dials are seeded 1, which the Settings page took for a switch: it
+     * drew On/Off with no number field, and switching Off wrote "off", which
+     * read as the default 1, so the rule stayed on. They are always a number
+     * field now, at 0 and 1 too.
+     */
+    public function test_the_dials_render_as_number_fields_not_switches(): void
+    {
+        foreach (['1', '0'] as $value) {
+            SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, $value, 'features');
+            SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTION_USD_KEY, $value, 'features');
+            Cache::flush();
+
+            $html = Volt::test('admin.system-settings')->html();
+
+            foreach ([KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, KycSelfServeEligibility::MIN_TRANSACTION_USD_KEY] as $key) {
+                $label = preg_quote('aria-label="'.$key.'"', '/');
+
+                $this->assertSame(1, preg_match('/<input\b(?:(?!<).)*?'.$label.'/s', $html), "{$key} at {$value} renders a number field");
+                $this->assertSame(0, preg_match('/role="switch"(?:(?!<).)*?'.$label.'/s', $html), "{$key} at {$value} does not render a switch");
+            }
+        }
+    }
+
+    public function test_a_dial_saved_on_the_settings_page_reaches_the_rule(): void
+    {
+        $eligibility = app(KycSelfServeEligibility::class);
+
+        Volt::test('admin.system-settings')
+            ->call('updateSetting', KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, '2')
+            ->assertHasNoErrors();
+        Cache::flush();
+
+        $this->assertSame(2, $eligibility->minTransactions());
+
+        Volt::test('admin.system-settings')
+            ->call('updateSetting', KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, '0')
+            ->assertHasNoErrors();
+        Cache::flush();
+
+        $this->assertSame(0, $eligibility->minTransactions());
+        $this->assertTrue($eligibility->isEligible($this->customer()), '0 switches the rule off');
+    }
+
+    /**
+     * A row the old switch left as a word reads the way the switch showed
+     * it: Off was 0, On was 1.
+     */
+    public function test_a_dial_left_on_or_off_by_the_old_switch_reads_as_it_showed(): void
+    {
+        $eligibility = app(KycSelfServeEligibility::class);
+
+        SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, 'off', 'features');
+        SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTION_USD_KEY, 'off', 'features');
+        Cache::flush();
+
+        $this->assertSame(0, $eligibility->minTransactions());
+        $this->assertSame(0.0, $eligibility->minTransactionUsd());
+        $this->assertTrue($eligibility->isEligible($this->customer()));
+
+        SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTIONS_KEY, 'on', 'features');
+        SiteSetting::put(KycSelfServeEligibility::MIN_TRANSACTION_USD_KEY, 'on', 'features');
+        Cache::flush();
+
+        $this->assertSame(1, $eligibility->minTransactions());
+        $this->assertSame(1.0, $eligibility->minTransactionUsd());
+        $this->assertFalse($eligibility->isEligible($this->customer()));
     }
 
     /**

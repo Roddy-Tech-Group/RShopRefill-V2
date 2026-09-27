@@ -101,15 +101,41 @@ class KycSelfServeEligibility
 
     public function minTransactions(): int
     {
-        $value = SiteSetting::get(self::MIN_TRANSACTIONS_KEY);
-
-        return is_numeric($value) ? max(0, (int) $value) : 1;
+        return (int) $this->dial(self::MIN_TRANSACTIONS_KEY, 1.0);
     }
 
     public function minTransactionUsd(): float
     {
-        $value = SiteSetting::get(self::MIN_TRANSACTION_USD_KEY);
+        return $this->dial(self::MIN_TRANSACTION_USD_KEY, 1.0);
+    }
 
-        return is_numeric($value) ? max(0.0, (float) $value) : 1.0;
+    /**
+     * A dial's value, never below 0. Both dials once rendered as an on/off
+     * switch on the Settings page, which showed 0 as Off and 1 as On and
+     * saved the word. A word left behind reads the way the switch showed it,
+     * so a dial switched Off really is off. Anything else unreadable falls
+     * back to the default.
+     */
+    private function dial(string $key, float $default): float
+    {
+        $value = SiteSetting::get($key);
+
+        if (is_numeric($value)) {
+            return max(0.0, (float) $value);
+        }
+
+        if (is_bool($value)) {
+            return $value ? 1.0 : 0.0;
+        }
+
+        if (! is_string($value)) {
+            return $default;
+        }
+
+        return match (strtolower(trim($value))) {
+            'off', 'false' => 0.0,
+            'on', 'true' => 1.0,
+            default => $default,
+        };
     }
 }

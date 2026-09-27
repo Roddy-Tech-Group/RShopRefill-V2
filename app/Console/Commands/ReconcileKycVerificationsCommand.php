@@ -7,8 +7,10 @@ use App\Domain\Kyc\Services\KycVerdictRecorder;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use App\Models\KycVerification;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -32,17 +34,27 @@ use Illuminate\Support\Facades\Log;
  * from a later decision; late callbacks still land on those through the
  * webhook, which is what abandoned exists for.
  *
- * Attempts older than --max-age-days are never polled (Smile has long since
- * finished or forgotten them) and are reported as stuck so a human closes
- * them out.
+ * An attempt still pending past --max-age-days was polled every run for the
+ * whole window and never had a verdict, so the capture was never submitted.
+ * It is closed as abandoned, the same state a newer session leaves an
+ * unfinished one in, and a customer held "in review" only by it is put back
+ * so they can start again. Closing is what stops it coming back: it used to
+ * be reported as stuck on every run, forever.
  */
 class ReconcileKycVerificationsCommand extends Command
 {
+    /**
+     * The polling window in days. kyc:validate reads it too, so the
+     * pre-flight fails on exactly the attempts this command should have
+     * closed.
+     */
+    public const MAX_AGE_DAYS = 7;
+
     protected $signature = 'kyc:reconcile
         {--minutes=10 : Grace period: only attempts waiting longer than this are polled}
-        {--max-age-days=7 : Attempts older than this are reported as stuck, never polled}
+        {--max-age-days='.self::MAX_AGE_DAYS.' : Attempts still pending after this are closed as abandoned, never polled}
         {--limit=100 : Most attempts to poll in one run}
-        {--dry-run : List what would be polled and change nothing}';
+        {--dry-run : List what would be polled and closed, and change nothing}';
 
     protected $description = 'Ask the identity provider about verifications whose callback never arrived, and apply the verdicts.';
 
@@ -58,7 +70,7 @@ class ReconcileKycVerificationsCommand extends Command
         $maxAgeDays = max(1, (int) $this->option('max-age-days'));
         $limit = max(1, (int) $this->option('limit'));
 
-        $stuck = $this->stuckAttempts($maxAgeDays);
+        $expired = $this->expiredAttempts($provider->key(), $maxAgeDays);
 
         $due = KycVerification::query()
             ->with('user')
@@ -70,31 +82,21 @@ class ReconcileKycVerificationsCommand extends Command
             ->limit($limit)
             ->get();
 
-        if ($due->isEmpty() && $stuck->isEmpty()) {
+        if ($due->isEmpty() && $expired->isEmpty()) {
             $this->info("No verifications are waiting on a verdict beyond {$graceMinutes} minute(s).");
 
             return self::SUCCESS;
         }
 
-        $this->reportStuck($stuck, $maxAgeDays, $alerter);
+        if ($this->option('dry-run')) {
+            $this->describeDryRun($due, $expired, $maxAgeDays);
 
-        if ($due->isEmpty()) {
             return self::SUCCESS;
         }
 
-        if ($this->option('dry-run')) {
-            $this->warn("Dry run: {$due->count()} verification(s) would be checked with Smile ID. Nothing was changed.");
-            $this->table(
-                ['Attempt', 'Reference', 'Customer', 'Product', 'Waiting since'],
-                $due->map(fn (KycVerification $v) => [
-                    $v->id,
-                    $v->reference,
-                    $v->user_id,
-                    $v->productLabel(),
-                    $v->created_at?->diffForHumans(),
-                ])->all(),
-            );
+        $this->closeExpired($expired, $maxAgeDays);
 
+        if ($due->isEmpty()) {
             return self::SUCCESS;
         }
 
@@ -156,51 +158,147 @@ class ReconcileKycVerificationsCommand extends Command
     }
 
     /**
-     * Attempts past the polling window with no verdict. Smile will not have
-     * an answer any more, so these need a person: reconcile by hand from the
-     * admin page, or set the customer's status directly.
+     * Attempts still pending past the polling window. Abandoned attempts are
+     * already closed and never count.
      *
      * @return Collection<int, KycVerification>
      */
-    private function stuckAttempts(int $maxAgeDays): Collection
+    private function expiredAttempts(string $providerKey, int $maxAgeDays): Collection
     {
         return KycVerification::query()
-            ->whereIn('status', ['pending', 'abandoned'])
+            ->where('provider', $providerKey)
+            ->where('status', 'pending')
             ->where('created_at', '<', now()->subDays($maxAgeDays))
             ->orderBy('created_at')
             ->get();
     }
 
     /**
-     * @param  Collection<int, KycVerification>  $stuck
+     * @param  Collection<int, KycVerification>  $due
+     * @param  Collection<int, KycVerification>  $expired
      */
-    private function reportStuck(Collection $stuck, int $maxAgeDays, OperationalAlerter $alerter): void
+    private function describeDryRun(Collection $due, Collection $expired, int $maxAgeDays): void
     {
-        if ($stuck->isEmpty()) {
+        if ($due->isNotEmpty()) {
+            $this->warn("Dry run: {$due->count()} verification(s) would be checked with Smile ID. Nothing was changed.");
+            $this->attemptTable($due);
+        }
+
+        if ($expired->isNotEmpty()) {
+            $this->warn("Dry run: {$expired->count()} verification(s) pending over {$maxAgeDays} day(s) would be closed as abandoned. Nothing was changed.");
+            $this->attemptTable($expired);
+        }
+    }
+
+    /**
+     * @param  Collection<int, KycVerification>  $attempts
+     */
+    private function attemptTable(Collection $attempts): void
+    {
+        $this->table(
+            ['Attempt', 'Reference', 'Customer', 'Product', 'Waiting since'],
+            $attempts->map(fn (KycVerification $v) => [
+                $v->id,
+                $v->reference,
+                $v->user_id,
+                $v->productLabel(),
+                $v->created_at?->diffForHumans(),
+            ])->all(),
+        );
+    }
+
+    /**
+     * Close attempts the provider never had a verdict for across the whole
+     * polling window. That is a capture the customer never submitted, which
+     * is routine, so it is logged once per run rather than alerted: the rows
+     * are closed and cannot come back. A verdict that does turn up late still
+     * lands on an abandoned attempt through the webhook.
+     *
+     * @param  Collection<int, KycVerification>  $expired
+     */
+    private function closeExpired(Collection $expired, int $maxAgeDays): void
+    {
+        $closed = [];
+        $reopened = [];
+
+        foreach ($expired as $attempt) {
+            DB::transaction(function () use ($attempt, &$closed, &$reopened): void {
+                // A verdict landing between the read and this write wins:
+                // only a row that is still pending is closed.
+                $closedNow = KycVerification::query()
+                    ->whereKey($attempt->getKey())
+                    ->where('status', 'pending')
+                    ->update(['status' => 'abandoned']) === 1;
+
+                if (! $closedNow) {
+                    return;
+                }
+
+                $closed[] = $attempt->getKey();
+
+                if ($this->reopenCustomer($attempt)) {
+                    $reopened[] = $attempt->user_id;
+                }
+            });
+        }
+
+        if ($closed === []) {
             return;
         }
 
-        $this->warn("{$stuck->count()} verification(s) have been waiting over {$maxAgeDays} day(s) and are past the point Smile ID will answer for them.");
+        $this->warn(sprintf(
+            'Closed %d verification(s) pending over %d day(s) as abandoned; %d customer(s) can start verification again.',
+            count($closed),
+            $maxAgeDays,
+            count($reopened),
+        ));
 
-        foreach ($stuck->take(10) as $attempt) {
-            $this->line("  - attempt {$attempt->id} (customer {$attempt->user_id}), {$attempt->productLabel()}, since ".($attempt->created_at?->toDateString() ?? 'unknown'));
+        Log::info('kyc.reconcile_closed_unsubmitted', [
+            'closed' => count($closed),
+            'max_age_days' => $maxAgeDays,
+            'verification_ids' => array_slice($closed, 0, 50),
+            'reopened_user_ids' => array_slice($reopened, 0, 50),
+        ]);
+    }
+
+    /**
+     * Put the customer back where they stood before the closed attempt, when
+     * it is the only thing holding them "in review". While their status reads
+     * pending, Verify now and the checkout step-up both refuse to start a new
+     * session, so without this they could never try again. Verified and
+     * rejected customers are never touched.
+     *
+     * The status they had before is not stored. Verify now starts from one
+     * of two: rejected when their last decided attempt was a rejection,
+     * unsubmitted otherwise.
+     */
+    private function reopenCustomer(KycVerification $attempt): bool
+    {
+        $user = User::query()->lockForUpdate()->find($attempt->user_id);
+
+        if ($user === null || $user->kyc_status !== 'pending') {
+            return false;
         }
 
-        $alerter->send(
-            severity: AlertSeverity::Sev2,
-            key: 'kyc:reconcile:stuck',
-            title: 'Verifications stuck without a verdict',
-            message: sprintf(
-                '%d identity verification(s) have waited over %d days with no verdict. The customer sees "in review" with nothing coming, and under step-up enforcement their payments are held. Resolve each from the admin verification page, or set the customer\'s status by hand.',
-                $stuck->count(),
-                $maxAgeDays,
-            ),
-            context: [
-                'Oldest' => $stuck->first()?->created_at?->toDateString(),
-                'Customers' => $stuck->take(10)->pluck('user_id')->implode(', '),
-            ],
-            runbook: 'docs/runbooks/logs.md',
-        );
+        $anotherLiveAttempt = KycVerification::query()
+            ->where('user_id', $user->getKey())
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($anotherLiveAttempt) {
+            return false;
+        }
+
+        $lastDecided = KycVerification::query()
+            ->where('user_id', $user->getKey())
+            ->whereIn('status', ['approved', 'rejected'])
+            ->orderByDesc('decided_at')
+            ->orderByDesc('id')
+            ->value('status');
+
+        $user->update(['kyc_status' => $lastDecided === 'rejected' ? 'rejected' : 'unsubmitted']);
+
+        return true;
     }
 
     private function providerConfigured(): bool

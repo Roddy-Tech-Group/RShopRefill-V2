@@ -225,14 +225,39 @@ class ValidateKycPlatformCommand extends Command
     {
         $section = 'Accounts today';
 
-        $awaiting = KycVerification::query()->whereIn('status', ['pending', 'abandoned'])->count();
-        $oldest = KycVerification::query()->whereIn('status', ['pending', 'abandoned'])->min('created_at');
+        // Only a pending attempt past the polling window is a failure:
+        // kyc:reconcile closes those, so one left means it is not running.
+        // A younger pending attempt is in flight, and an abandoned one is
+        // already closed; both are shown, neither blocks.
+        $maxAgeDays = ReconcileKycVerificationsCommand::MAX_AGE_DAYS;
+        $cutoff = now()->subDays($maxAgeDays);
+
+        $overdue = KycVerification::query()->where('status', 'pending')->where('created_at', '<', $cutoff);
+        $overdueCount = (clone $overdue)->count();
 
         $this->record(
             $section,
-            $awaiting === 0,
-            $awaiting === 0 ? 'No verification is waiting on a verdict' : "{$awaiting} verification(s) waiting on a verdict",
-            $awaiting === 0 ? null : 'Oldest since '.$oldest.'. Run kyc:reconcile, then resolve what is left by hand.',
+            $overdueCount === 0,
+            $overdueCount === 0
+                ? "No verification has been pending over {$maxAgeDays} day(s)"
+                : "{$overdueCount} verification(s) pending over {$maxAgeDays} day(s)",
+            $overdueCount === 0 ? null : 'Oldest since '.$overdue->min('created_at').'. kyc:reconcile closes these; run it, then check again.',
+        );
+
+        $inFlight = KycVerification::query()->where('status', 'pending')->where('created_at', '>=', $cutoff)->count();
+        $this->record(
+            $section,
+            true,
+            $inFlight === 0 ? 'No verification is waiting on a verdict' : "{$inFlight} verification(s) waiting on a verdict",
+            $inFlight === 0 ? null : 'In flight. kyc:reconcile asks the provider about these on every run.',
+        );
+
+        $abandoned = KycVerification::query()->where('status', 'abandoned')->count();
+        $this->record(
+            $section,
+            true,
+            "{$abandoned} attempt(s) closed without a verdict",
+            $abandoned === 0 ? null : 'A capture the customer never submitted, or one a newer attempt replaced. A late verdict still lands on it.',
         );
 
         $verified = User::query()->where('kyc_status', 'verified')->count();

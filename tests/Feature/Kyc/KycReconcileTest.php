@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Kyc;
 
+use App\Domain\Kyc\DTOs\KycVerdict;
+use App\Domain\Kyc\Enums\KycTier;
 use App\Domain\Kyc\Providers\SmileKycProvider;
+use App\Domain\Kyc\Services\KycVerdictRecorder;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Enums\AlertSeverity;
 use App\Models\KycVerification;
@@ -51,9 +54,9 @@ class KycReconcileTest extends TestCase
         });
     }
 
-    private function waitingAttempt(string $status = 'pending', int $minutesAgo = 60): KycVerification
+    private function waitingAttempt(string $status = 'pending', int $minutesAgo = 60, ?User $customer = null): KycVerification
     {
-        $user = User::factory()->create(['kyc_status' => 'pending']);
+        $user = $customer ?? User::factory()->create(['kyc_status' => 'pending']);
 
         $attempt = KycVerification::factory()->create(['user_id' => $user->id, 'status' => $status]);
         $attempt->forceFill(['created_at' => now()->subMinutes($minutesAgo)])->save();
@@ -165,20 +168,137 @@ class KycReconcileTest extends TestCase
     }
 
     /**
-     * Past the window Smile will answer for, the attempt needs a person.
+     * Polled for the whole window and never answered, the capture was never
+     * submitted. It is closed rather than reported: reporting it sent a SEV-2
+     * every hour for as long as the row existed.
      */
-    public function test_an_attempt_stuck_past_the_window_is_reported_not_polled(): void
+    public function test_an_attempt_pending_past_the_window_is_closed_not_polled(): void
     {
         $attempt = $this->waitingAttempt(minutesAgo: 60 * 24 * 9);
         $this->partialMock(SmileKycProvider::class, fn ($mock) => $mock->shouldReceive('queryJobStatus')->never());
 
-        Artisan::call('kyc:reconcile', ['--max-age-days' => 7]);
+        $this->assertSame(0, Artisan::call('kyc:reconcile', ['--max-age-days' => 7]));
 
-        $this->assertSame('pending', $attempt->fresh()->status);
+        $this->assertSame('abandoned', $attempt->fresh()->status);
+        $this->assertStringContainsString('Closed 1 verification(s) pending over 7 day(s)', Artisan::output());
+        $this->assertSame([], $this->alerts, 'a closed capture is routine, not an incident');
+    }
 
-        $alert = collect($this->alerts)->firstWhere('key', 'kyc:reconcile:stuck');
-        $this->assertNotNull($alert);
-        $this->assertStringContainsString('1 identity verification(s) have waited over 7 days', $alert['message']);
+    public function test_a_closed_attempt_does_not_come_back_on_the_next_run(): void
+    {
+        $this->waitingAttempt(minutesAgo: 60 * 24 * 9);
+        $this->partialMock(SmileKycProvider::class, fn ($mock) => $mock->shouldReceive('queryJobStatus')->never());
+
+        Artisan::call('kyc:reconcile');
+        Artisan::call('kyc:reconcile');
+
+        $this->assertStringContainsString('No verifications are waiting', Artisan::output());
+        $this->assertSame([], $this->alerts);
+    }
+
+    /**
+     * An abandoned attempt is already closed. However old, it is not stuck,
+     * and it is never polled.
+     */
+    public function test_an_old_abandoned_attempt_is_not_stuck(): void
+    {
+        $attempt = $this->waitingAttempt(status: 'abandoned', minutesAgo: 60 * 24 * 30);
+        $this->partialMock(SmileKycProvider::class, fn ($mock) => $mock->shouldReceive('queryJobStatus')->never());
+
+        Artisan::call('kyc:reconcile');
+
+        $this->assertSame('abandoned', $attempt->fresh()->status);
+        $this->assertStringContainsString('No verifications are waiting', Artisan::output());
+        $this->assertSame([], $this->alerts);
+    }
+
+    /**
+     * While the account reads "in review", Verify now and the checkout
+     * step-up both refuse to start a new session. Closing the only attempt
+     * behind that status gives the customer their way back.
+     */
+    public function test_a_customer_held_in_review_by_the_closed_attempt_can_start_again(): void
+    {
+        $attempt = $this->waitingAttempt(minutesAgo: 60 * 24 * 9);
+
+        Artisan::call('kyc:reconcile');
+
+        $this->assertSame('unsubmitted', $attempt->user->fresh()->kyc_status);
+        $this->assertStringContainsString('1 customer(s) can start verification again', Artisan::output());
+    }
+
+    public function test_a_customer_rejected_before_the_closed_attempt_goes_back_to_rejected(): void
+    {
+        $customer = User::factory()->create(['kyc_status' => 'pending']);
+        KycVerification::factory()->rejected()->create(['user_id' => $customer->id, 'decided_at' => now()->subDays(12)]);
+        $this->waitingAttempt(minutesAgo: 60 * 24 * 9, customer: $customer);
+
+        Artisan::call('kyc:reconcile');
+
+        $this->assertSame('rejected', $customer->fresh()->kyc_status);
+    }
+
+    public function test_verified_and_rejected_customers_are_never_touched(): void
+    {
+        $verified = User::factory()->create(['kyc_status' => 'verified']);
+        $rejected = User::factory()->create(['kyc_status' => 'rejected']);
+        $verifiedAttempt = $this->waitingAttempt(minutesAgo: 60 * 24 * 9, customer: $verified);
+        $rejectedAttempt = $this->waitingAttempt(minutesAgo: 60 * 24 * 9, customer: $rejected);
+
+        Artisan::call('kyc:reconcile');
+
+        $this->assertSame('abandoned', $verifiedAttempt->fresh()->status);
+        $this->assertSame('abandoned', $rejectedAttempt->fresh()->status);
+        $this->assertSame('verified', $verified->fresh()->kyc_status);
+        $this->assertSame('rejected', $rejected->fresh()->kyc_status);
+    }
+
+    /**
+     * Another attempt still in flight is a real reason to read "in review".
+     */
+    public function test_a_customer_with_another_live_attempt_stays_in_review(): void
+    {
+        $customer = User::factory()->create(['kyc_status' => 'pending']);
+        $old = $this->waitingAttempt(minutesAgo: 60 * 24 * 9, customer: $customer);
+        $live = $this->waitingAttempt(minutesAgo: 2, customer: $customer);
+
+        Artisan::call('kyc:reconcile');
+
+        $this->assertSame('abandoned', $old->fresh()->status);
+        $this->assertSame('pending', $live->fresh()->status);
+        $this->assertSame('pending', $customer->fresh()->kyc_status);
+    }
+
+    /**
+     * A verdict that arrives after the attempt was closed still lands on it.
+     */
+    public function test_a_late_verdict_still_lands_on_a_closed_attempt(): void
+    {
+        $attempt = $this->waitingAttempt(minutesAgo: 60 * 24 * 9);
+        Artisan::call('kyc:reconcile');
+
+        app(KycVerdictRecorder::class)->apply(KycVerdict::approved($attempt->reference, KycTier::IdentityVerified, ['ResultCode' => '0810']));
+
+        $this->assertSame('approved', $attempt->fresh()->status);
+        $this->assertSame('verified', $attempt->user->fresh()->kyc_status);
+    }
+
+    public function test_a_dry_run_sends_nothing_and_writes_nothing(): void
+    {
+        $expired = $this->waitingAttempt(minutesAgo: 60 * 24 * 9);
+        $due = $this->waitingAttempt();
+        $this->partialMock(SmileKycProvider::class, fn ($mock) => $mock->shouldReceive('queryJobStatus')->never());
+
+        Artisan::call('kyc:reconcile', ['--dry-run' => true]);
+
+        $this->assertSame('pending', $expired->fresh()->status);
+        $this->assertSame('pending', $expired->user->fresh()->kyc_status);
+        $this->assertSame('pending', $due->fresh()->status);
+        $this->assertSame([], $this->alerts);
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('would be closed as abandoned', $output);
+        $this->assertStringContainsString($expired->reference, $output);
     }
 
     public function test_a_dry_run_reports_and_changes_nothing(): void

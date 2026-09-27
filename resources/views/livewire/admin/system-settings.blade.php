@@ -93,6 +93,40 @@ class extends Component {
     ];
 
     /**
+     * Number dials. A value of 0 or 1 looks boolean to the switch detection
+     * below, so these always get the text input instead. As a switch they
+     * wrote "on"/"off", which no number reader understands: the self-serve
+     * transaction count seeded at 1 and switched Off stayed 1.
+     *
+     * @var list<string>
+     */
+    private const NUMERIC_KEYS = [
+        'features.kyc_self_serve_min_transactions',
+        'features.kyc_self_serve_min_transaction_usd',
+        'features.kyc_tier2_threshold_usd',
+        'features.kyc_cumulative_threshold_usd',
+        'features.spend_limit_standard_day_usd',
+        'features.spend_limit_standard_week_usd',
+        'features.spend_limit_verified_day_usd',
+        'features.spend_limit_verified_week_usd',
+        'features.spend_limit_verified_month_usd',
+        'features.admin_inactivity_timeout_minutes',
+        'features.experience_prompt_delay_minutes',
+    ];
+
+    /**
+     * Whether a row renders as an on/off switch rather than the text input.
+     */
+    public function rendersAsSwitch(string $key, string $displayValue): bool
+    {
+        if (in_array($key, self::NUMERIC_KEYS, true)) {
+            return false;
+        }
+
+        return in_array(strtolower($displayValue), ['on', 'off', 'true', 'false', '1', '0'], true);
+    }
+
+    /**
      * The features card's render list: heading labels (strings) interleaved
      * with the setting rows in section order. Rows keep their models; the
      * blade branches on is_string() to draw the sub-heading.
@@ -315,11 +349,12 @@ class extends Component {
                                  Boolean-style settings (value is on/off or
                                  true/false) render a toggle switch instead of
                                  a text input - admin flips it, change saves
-                                 immediately, no Save button needed. Everything
+                                 immediately, no Save button needed. Number
+                                 dials never do, even at 0 or 1. Everything
                                  else uses the text input + Save button.
                                  Alpine tracks the initial value so the Save
                                  button only enables when the field is dirty. --}}
-                            @php $isToggle = in_array(strtolower((string) $displayVal), ['on', 'off', 'true', 'false', '1', '0'], true); @endphp
+                            @php $isToggle = $this->rendersAsSwitch($setting->key, $displayVal); @endphp
 
                             @if ($isToggle)
                                 <div
