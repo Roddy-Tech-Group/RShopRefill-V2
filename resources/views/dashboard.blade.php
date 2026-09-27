@@ -170,7 +170,7 @@
 
             {{-- Effective visibility = the local eye AND the account menu's global
                  "Hide all balances" switch. Either one off masks the figure. --}}
-            <div class="mt-4 flex items-center gap-2 text-zinc-900 dark:text-white">
+            <div class="mt-4 flex items-center gap-2 text-white">
                 <p class="text-[40px] font-bold leading-none tracking-tight tabular-nums">
                     <span x-show="visible && ! $store.dashPrefs.hideBalance">${{ $totalWhole }}<span class="text-2xl">.{{ $totalCents }}</span></span>
                     <span x-show="! (visible && ! $store.dashPrefs.hideBalance)" x-cloak>$ ••••</span>
@@ -185,7 +185,7 @@
                     </svg>
                 </button>
             </div>
-            <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ $walletRows->count() }} {{ \Illuminate\Support\Str::plural('wallet', $walletRows->count()) }} · USD equivalent</p>
+            <p class="mt-2 text-xs text-white/70">{{ $walletRows->count() }} {{ \Illuminate\Support\Str::plural('wallet', $walletRows->count()) }} · USD equivalent</p>
 
             {{-- The sheet lives on <body>: the hero's own stacking context would
                  cap its z-index under the fixed header. --}}

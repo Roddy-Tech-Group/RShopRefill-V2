@@ -1160,9 +1160,14 @@ html.dark .wallet-glass {
         -webkit-overflow-scrolling: touch;
         border-top-left-radius: 32px;
         border-top-right-radius: 32px;
-        /* The desktop pane's hairline: transparent in light, a faint line in
-           dark, so the panel's curve reads against the black ground. */
-        border-top: 1px solid var(--dash-pane-line, transparent);
+        /* No hairline on a phone.
+        
+           The desktop pane carries one so its curve reads against the black
+           ground. Here the balance band is the top of the panel and provides
+           that edge itself, and the border only ever made a 1px seam above it:
+           the panel's own background showing through a transparent border in
+           light, and a white line in dark. */
+        border-top: 0;
         background-color: #f4f6f5;
     }
     /* The panel paints the page on a phone, so the content inside it must not

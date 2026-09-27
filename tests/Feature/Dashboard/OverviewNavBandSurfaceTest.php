@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dashboard;
 
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 /**
@@ -87,15 +88,58 @@ class OverviewNavBandSurfaceTest extends TestCase
     }
 
     /**
-     * The wallet balance area is the dashboard's dark blue in the dark theme:
-     * the mobile hero header carries the navy the sidebar marks wear, under
-     * the black bar, and stays on the panel itself in the light theme.
+     * The wallet balance area is a coloured band in BOTH themes.
+     *
+     * Dark keeps the navy the sidebar marks wear. Light used to be transparent,
+     * so the balance sat on the plain panel and the band did not read as a band
+     * at all; it carries a blue wash now. It runs deeper than its text needs
+     * and curves at the bottom, so the cards below rise into it rather than
+     * meeting a flat edge.
      */
-    public function test_the_balance_area_is_dark_blue_in_the_dark_theme(): void
+    public function test_the_balance_area_is_a_coloured_band_in_both_themes(): void
     {
-        $this->assertStringContainsString(
-            '<header class="relative z-10 bg-transparent px-5 pt-5 pb-6 dark:bg-[#0c1337] lg:hidden">',
-            $this->layout(),
+        $header = '<header class="relative z-10 rounded-b-[28px] bg-gradient-to-br from-[#0b2a8f] via-[#1766d9] to-[#2bb0ea] px-5 pt-5 pb-14 dark:bg-none dark:bg-[#0c1337] lg:hidden">';
+
+        $this->assertStringContainsString($header, $this->layout());
+    }
+
+    /**
+     * bg-none is what lets dark keep its navy. The gradient is a background
+     * IMAGE, so a background-colour alone would sit under it rather than
+     * replace it, and dark would wear the light theme's wash.
+     */
+    public function test_dark_clears_the_gradient_rather_than_painting_over_it(): void
+    {
+        $css = File::get(public_path('build/assets/'.collect(File::files(public_path('build/assets')))
+            ->filter(fn ($f) => str_starts_with($f->getFilename(), 'app-') && $f->getExtension() === 'css')
+            ->sortByDesc(fn ($f) => $f->getMTime())
+            ->first()
+            ->getFilename()));
+
+        $this->assertStringContainsString('background-image:none', $css);
+        $this->assertStringContainsString('background-color:#0c1337', $css);
+    }
+
+    /**
+     * No hairline above the band on a phone.
+     *
+     * The panel carried a 1px top border so its curve would read against the
+     * black ground. On a phone the band is the panel's top and provides that
+     * edge itself, and the border only ever produced a seam above it: the
+     * panel's own background showing through a transparent border in light,
+     * and a white line in dark.
+     */
+    public function test_the_phone_panel_has_no_hairline_above_the_band(): void
+    {
+        $rules = File::get(resource_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.dash-mobile-panel \{[^}]*border-top: 0;/s',
+            $rules
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.dash-mobile-panel \{[^}]*border-top: 1px solid var\(--dash-pane-line/s',
+            $rules
         );
     }
 }
