@@ -6,6 +6,8 @@ use App\Domain\Admin\Queries\DashboardMetricsQuery;
 use App\Domain\Admin\Queries\FinanceReportQuery;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Services\OrderService;
+use App\Domain\Order\Services\RefundLedger;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Models\Category;
 use App\Models\Order;
@@ -16,6 +18,9 @@ use App\Models\ProductVariant;
 use App\Models\Subcategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Livewire\Volt\Volt;
 use Tests\TestCase;
 
 /**
@@ -42,8 +47,9 @@ class OverviewReadsRefundsTest extends TestCase
         float $cost = 70.0,
         ?string $completedAt = null,
         string $itemStatus = 'fulfilled',
+        ?Category $category = null,
     ): Order {
-        $category = $this->category();
+        $category ??= $this->category();
         $variant = $this->variant();
 
         $order = Order::factory()->create([
@@ -81,6 +87,14 @@ class OverviewReadsRefundsTest extends TestCase
         );
     }
 
+    private function esims(): Category
+    {
+        return Category::firstOrCreate(
+            ['slug' => 'esims'],
+            ['name' => 'eSIMs', 'type' => 'digital'],
+        );
+    }
+
     private function subcategory(): Subcategory
     {
         return Subcategory::firstOrCreate(
@@ -112,6 +126,42 @@ class OverviewReadsRefundsTest extends TestCase
             'revenue_reversed_usd' => $revenueReversed,
             'refunded_at' => $at ?? now()->subDay(),
         ]);
+    }
+
+    /**
+     * A customer refund recorded through the real ledger, so its per-item
+     * allocations carry the item's category exactly as production writes
+     * them. A supplier credit, when given, is granted on the same day.
+     */
+    private function ledgerRefund(Order $order, float $amount, string $at, ?float $supplierCredit = null): OrderRefund
+    {
+        $context = ['refunded_at' => Carbon::parse($at)];
+
+        if ($supplierCredit !== null) {
+            $context += [
+                'supplier_credit_status' => OrderRefund::CREDIT_CREDITED,
+                'supplier_credit_usd' => $supplierCredit,
+                'supplier_credited_at' => Carbon::parse($at),
+            ];
+        }
+
+        return app(RefundLedger::class)->record($order->fresh(), $amount, 'admin-'.Str::uuid(), $context);
+    }
+
+    /**
+     * The Reports page's own series for this calendar month, summed.
+     *
+     * @return array{sales: float, cost: float, profit: float}
+     */
+    private function reportMonthTotals(?int $categoryId = null): array
+    {
+        $series = $this->metrics()->getReportSeries(now()->startOfMonth(), now()->endOfMonth(), 'daily', $categoryId);
+
+        return [
+            'sales' => round(array_sum(array_column($series, 'sales_usd')), 2),
+            'cost' => round(array_sum(array_column($series, 'cost_usd')), 2),
+            'profit' => round(array_sum(array_column($series, 'profit_usd')), 2),
+        ];
     }
 
     private function metrics(): DashboardMetricsQuery
@@ -402,5 +452,283 @@ class OverviewReadsRefundsTest extends TestCase
             0.01,
             'Overview and Finances must not disagree about the same month',
         );
+    }
+
+    // ------------------------------------------------ narrowed to a category
+
+    /**
+     * Narrowing Reports to one category narrowed the sales and the cost but
+     * still took EVERY category's refunds and supplier credits off them. An
+     * eSIM refund showed up as a gift card loss.
+     */
+    public function test_reports_narrowed_to_a_category_deducts_only_that_categorys_refunds_and_credits(): void
+    {
+        $soldOn = now()->startOfMonth()->addDay()->toDateTimeString();
+        $refundedOn = now()->startOfMonth()->addDays(3)->toDateTimeString();
+
+        $giftCard = $this->order(total: 100.0, cost: 70.0, completedAt: $soldOn);
+        $esim = $this->order(total: 10.0, cost: 7.0, completedAt: $soldOn, category: $this->esims());
+
+        $this->ledgerRefund($giftCard, 20.0, $refundedOn);
+        $this->ledgerRefund($esim, 10.0, $refundedOn, supplierCredit: 7.0);
+
+        $giftCards = $this->reportMonthTotals($this->category()->id);
+        $esims = $this->reportMonthTotals($this->esims()->id);
+
+        $this->assertEqualsWithDelta(80.0, $giftCards['sales'], 0.01, 'the eSIM refund is not a gift card refund');
+        $this->assertEqualsWithDelta(70.0, $giftCards['cost'], 0.01, 'the eSIM credit is not a gift card credit');
+        $this->assertEqualsWithDelta(0.0, $esims['sales'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $esims['cost'], 0.01);
+
+        // The Finances page splits the same month by category from the same
+        // allocations, and the two must agree row for row.
+        $categories = collect(app(FinanceReportQuery::class)->monthlyBreakdown(now()->startOfMonth())['categories'])
+            ->keyBy('category');
+
+        foreach (['Gift Cards' => $giftCards, 'eSIMs' => $esims] as $name => $report) {
+            $this->assertEqualsWithDelta($categories[$name]['revenue_usd'], $report['sales'], 0.01, "{$name} revenue");
+            $this->assertEqualsWithDelta($categories[$name]['cost_usd'], $report['cost'], 0.01, "{$name} cost");
+            $this->assertEqualsWithDelta($categories[$name]['profit_usd'], $report['profit'], 0.01, "{$name} profit");
+        }
+
+        // Unfiltered, every refund and credit still comes off.
+        $all = $this->reportMonthTotals();
+        $this->assertEqualsWithDelta(80.0, $all['sales'], 0.01);
+        $this->assertEqualsWithDelta(70.0, $all['cost'], 0.01);
+    }
+
+    /**
+     * The map used to skip refunds altogether once narrowed to a category.
+     * The allocations say which category each refund reversed, so the
+     * narrowed map can take off exactly that category's share.
+     */
+    public function test_the_country_map_narrowed_to_a_category_deducts_that_categorys_refunds(): void
+    {
+        $giftCard = $this->order(total: 100.0, completedAt: now()->subDays(2)->toDateTimeString());
+        $esim = $this->order(total: 10.0, cost: 7.0, completedAt: now()->subDays(2)->toDateTimeString(), category: $this->esims());
+
+        $this->ledgerRefund($giftCard, 30.0, now()->subDay()->toDateTimeString());
+        $this->ledgerRefund($esim, 10.0, now()->subDay()->toDateTimeString());
+
+        $this->assertEqualsWithDelta(70.0, $this->metrics()->getBestSellingCountries(7, 'gift')['US'] ?? 0.0, 0.01);
+        $this->assertEqualsWithDelta(0.0, $this->metrics()->getBestSellingCountries(7, 'esim')['US'] ?? 0.0, 0.01);
+        $this->assertEqualsWithDelta(70.0, $this->metrics()->getBestSellingCountries(7)['US'] ?? 0.0, 0.01);
+    }
+
+    /**
+     * The revenue-by-category chart can place a refund in its own category on
+     * the day it was given back, so it nets refunds like every other page.
+     */
+    public function test_the_category_revenue_chart_takes_a_refund_off_its_own_category_on_the_day_given_back(): void
+    {
+        $soldOn = now()->subDays(5);
+        $refundedOn = now()->subDays(2);
+
+        $giftCard = $this->order(total: 100.0, completedAt: $soldOn->toDateTimeString());
+        $this->order(total: 10.0, cost: 7.0, completedAt: $soldOn->toDateTimeString(), category: $this->esims());
+        $this->ledgerRefund($giftCard, 30.0, $refundedOn->toDateTimeString());
+
+        $chart = collect($this->metrics()->getRevenueChartData(30))->keyBy('date');
+
+        $this->assertEqualsWithDelta(100.0, $chart[$soldOn->format('Y-m-d')]['gift_cards'], 0.01);
+        $this->assertEqualsWithDelta(10.0, $chart[$soldOn->format('Y-m-d')]['esim'], 0.01);
+        $this->assertEqualsWithDelta(-30.0, $chart[$refundedOn->format('Y-m-d')]['gift_cards'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $chart[$refundedOn->format('Y-m-d')]['esim'], 0.01);
+        $this->assertSame($chart->keys()->sort()->values()->all(), $chart->keys()->all(), 'rows stay in date order');
+    }
+
+    // ------------------------------------------------ no per-bucket floor
+
+    /**
+     * Each day's cost was floored at zero, so a supplier credit landing on a
+     * day with no sales was thrown away. An eSIM sold on the 5th for $10 at a
+     * $7 cost and refunded on the 12th with the supplier's $7 credit read on
+     * Reports as sales 0, cost 7, profit -7, while Finances read 0 / 0 / 0.
+     */
+    public function test_a_supplier_credit_on_a_day_with_no_sales_is_not_thrown_away(): void
+    {
+        $soldOn = now()->startOfMonth()->addDays(4);
+        $refundedOn = now()->startOfMonth()->addDays(11);
+
+        $esim = $this->order(total: 10.0, cost: 7.0, completedAt: $soldOn->toDateTimeString(), category: $this->esims());
+        $this->ledgerRefund($esim, 10.0, $refundedOn->toDateTimeString(), supplierCredit: 7.0);
+        $esim->forceFill(['order_status' => OrderStatus::Refunded])->save();
+
+        $finances = app(FinanceReportQuery::class)->monthlyBreakdown(now()->startOfMonth())['totals'];
+
+        $this->assertEqualsWithDelta(0.0, $finances['revenue_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $finances['cost_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $finances['profit_usd'], 0.001);
+
+        // The Reports page's own KPI strip for the month, daily buckets.
+        $totals = Volt::test('admin.reports')
+            ->set('preset', 'custom')
+            ->set('start', now()->startOfMonth()->toDateString())
+            ->set('end', now()->endOfMonth()->toDateString())
+            ->set('granularity', 'daily')
+            ->instance()
+            ->totals;
+
+        $this->assertEqualsWithDelta($finances['revenue_usd'], $totals['sales'], 0.001, 'Reports sales = Finances revenue');
+        $this->assertEqualsWithDelta($finances['cost_usd'], $totals['cost'], 0.001, 'Reports cost = Finances cost');
+        $this->assertEqualsWithDelta($finances['profit_usd'], $totals['profit'], 0.001, 'Reports profit = Finances profit');
+
+        // The credit sits on the day it was granted, as a negative cost.
+        $refundDay = collect($this->metrics()->getReportSeries(now()->startOfMonth(), now()->endOfMonth(), 'daily'))
+            ->firstWhere('date', $refundedOn->format('Y-m-d'));
+        $this->assertEqualsWithDelta(-7.0, $refundDay['cost_usd'], 0.001);
+        $this->assertEqualsWithDelta(-10.0, $refundDay['sales_usd'], 0.001);
+        $this->assertEqualsWithDelta(-3.0, $refundDay['profit_usd'], 0.001);
+    }
+
+    public function test_the_trends_chart_keeps_a_supplier_credit_that_lands_on_a_quiet_day(): void
+    {
+        $esim = $this->order(total: 10.0, cost: 7.0, completedAt: now()->subDays(10)->toDateTimeString(), category: $this->esims());
+        $this->ledgerRefund($esim, 10.0, now()->subDays(3)->toDateTimeString(), supplierCredit: 7.0);
+
+        $series = collect($this->metrics()->getSalesCostTimeseries(30));
+
+        $this->assertEqualsWithDelta(0.0, $series->sum('sales'), 0.001);
+        $this->assertEqualsWithDelta(0.0, $series->sum('cost'), 0.001, 'the credit comes off in full');
+        $this->assertEqualsWithDelta(-7.0, $series->firstWhere('date', now()->subDays(3)->format('Y-m-d'))['cost'], 0.001);
+    }
+
+    // ------------------------------------------------ never-booked sales
+
+    /**
+     * An order refunded in full while it still waited on the supplier never
+     * completed, so its sale was never booked. Overview booked it anyway (the
+     * refunded status is a booked status) and counted the undelivered item's
+     * cost, while Reports, Trends and Finances booked no sale but still took
+     * the refund off. Nothing was sold and nothing was kept, so every page
+     * must show nothing.
+     */
+    public function test_a_refund_of_an_order_that_never_completed_moves_no_page(): void
+    {
+        $order = $this->order(status: OrderStatus::RequiresAttention->value, total: 30.0, cost: 22.0, itemStatus: 'delayed');
+        $order->forceFill(['completed_at' => null])->save();
+
+        // The admin refund path, less the gateway call.
+        $orders = app(OrderService::class);
+        $orders->recordRefundedAmount($order, 30.0, 'admin-'.Str::uuid(), ['refunded_at' => now()]);
+        $orders->markRefunded($order->fresh());
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::Refunded, $order->order_status);
+        $this->assertNull($order->completed_at);
+        $this->assertEqualsWithDelta(30.0, (float) OrderRefund::query()->sole()->revenue_reversed_usd, 0.001, 'the ledger records the refund');
+
+        $overview = $this->metrics()->getOverviewMetrics();
+        $this->assertEqualsWithDelta(0.0, $overview['total_revenue'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $overview['donuts']['completed_orders_pct'], 0.001, 'it never completed');
+
+        $split = $this->metrics()->getMoneySplit();
+        $this->assertEqualsWithDelta(0.0, $split['gross_sales_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $split['supplier_cost_usd'], 0.001, 'an undelivered item is not a cost');
+
+        $reports = $this->reportMonthTotals();
+        $this->assertEqualsWithDelta(0.0, $reports['sales'], 0.001, 'a refund of a sale never booked reverses nothing');
+        $this->assertEqualsWithDelta(0.0, $reports['cost'], 0.001);
+
+        $this->assertEqualsWithDelta(0.0, collect($this->metrics()->getSalesCostTimeseries(30))->sum('sales'), 0.001);
+
+        $finances = app(FinanceReportQuery::class)->monthlyBreakdown(now()->startOfMonth());
+        $this->assertEqualsWithDelta(0.0, $finances['totals']['revenue_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $finances['totals']['refunds_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $finances['totals']['cost_usd'], 0.001);
+        $this->assertSame(0, $finances['refunds']['count']);
+    }
+
+    /**
+     * The same order, delivered after all. Completion books the sale, and
+     * from then on the refund reverses it: revenue nets to zero and the cost
+     * of goods handed over for free is a real loss, on every page alike.
+     */
+    public function test_a_refunded_order_that_delivers_after_all_books_the_sale_and_its_refund(): void
+    {
+        $order = $this->order(status: OrderStatus::RequiresAttention->value, total: 30.0, cost: 22.0, itemStatus: 'delayed');
+        $order->forceFill(['completed_at' => null])->save();
+
+        $orders = app(OrderService::class);
+        $orders->recordRefundedAmount($order, 30.0, 'admin-'.Str::uuid(), ['refunded_at' => now()]);
+        $orders->markRefunded($order->fresh());
+
+        $order->items()->update(['fulfillment_status' => 'fulfilled']);
+        $order->fresh()->forceFill(['order_status' => OrderStatus::Completed, 'completed_at' => now()])->save();
+
+        $finances = app(FinanceReportQuery::class)->monthlyBreakdown(now()->startOfMonth())['totals'];
+        $this->assertEqualsWithDelta(0.0, $finances['revenue_usd'], 0.001);
+        $this->assertEqualsWithDelta(22.0, $finances['cost_usd'], 0.001);
+
+        $reports = $this->reportMonthTotals();
+        $this->assertEqualsWithDelta($finances['revenue_usd'], $reports['sales'], 0.001);
+        $this->assertEqualsWithDelta($finances['cost_usd'], $reports['cost'], 0.001);
+
+        $this->assertEqualsWithDelta(0.0, $this->metrics()->getOverviewMetrics()['total_revenue'], 0.001);
+        $this->assertEqualsWithDelta(22.0, $this->metrics()->getMoneySplit()['supplier_cost_usd'], 0.001);
+    }
+
+    /**
+     * A refund taken in September while the order still waited on the
+     * supplier, on an order that delivers in October. September booked no
+     * sale and has closed, so the refund must not reach back into it once the
+     * order completes. It used to: it was dated by its own day, so September
+     * dropped by $10 after the fact. It reverses the sale where the sale was
+     * booked, in October, on every page.
+     */
+    public function test_a_refund_taken_before_the_order_completes_never_reopens_a_closed_month(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-20 12:00:00'));
+
+        $order = $this->order(status: OrderStatus::RequiresAttention->value, total: 30.0, cost: 22.0, itemStatus: 'delayed');
+        $order->forceFill(['completed_at' => null])->save();
+        app(OrderService::class)->recordRefundedAmount($order, 10.0, 'admin-'.Str::uuid(), ['refunded_at' => now()]);
+
+        $september = Carbon::parse('2026-09-01');
+        $october = Carbon::parse('2026-10-01');
+        $finances = app(FinanceReportQuery::class);
+
+        $closed = $finances->monthlyBreakdown($september);
+        $this->assertEqualsWithDelta(0.0, $closed['totals']['refunds_usd'], 0.001, 'no sale booked yet, so nothing to reverse');
+
+        // October: the item delivers and the order completes.
+        $this->travelTo(Carbon::parse('2026-10-05 09:00:00'));
+        $order->items()->update(['fulfillment_status' => 'fulfilled']);
+        $order->fresh()->forceFill(['order_status' => OrderStatus::Completed, 'completed_at' => now()])->save();
+
+        $reopened = $finances->monthlyBreakdown($september);
+        $this->assertSame($closed['totals'], $reopened['totals'], 'a closed month stays closed');
+        $this->assertSame(0, $reopened['refunds']['count']);
+
+        $booked = $finances->monthlyBreakdown($october);
+        $this->assertEqualsWithDelta(30.0, $booked['totals']['gross_revenue_usd'], 0.001);
+        $this->assertEqualsWithDelta(10.0, $booked['totals']['refunds_usd'], 0.001, 'the refund lands with the sale it reverses');
+        $this->assertEqualsWithDelta(20.0, $booked['totals']['revenue_usd'], 0.001);
+        $this->assertEqualsWithDelta(22.0, $booked['totals']['cost_usd'], 0.001);
+        $this->assertSame(1, $booked['refunds']['count']);
+
+        // Reports, Trends, the category chart and the map place it the same
+        // way: on the day the order completed.
+        $septemberReport = $this->metrics()->getReportSeries($september, $september->copy()->endOfMonth(), 'daily');
+        $this->assertEqualsWithDelta(0.0, array_sum(array_column($septemberReport, 'sales_usd')), 0.001);
+
+        $completionDay = collect($this->metrics()->getReportSeries($october, $october->copy()->endOfMonth(), 'daily'))
+            ->firstWhere('date', '2026-10-05');
+        $this->assertEqualsWithDelta(20.0, $completionDay['sales_usd'], 0.001);
+
+        $narrowed = collect($this->metrics()->getReportSeries($october, $october->copy()->endOfMonth(), 'daily', $this->category()->id))
+            ->firstWhere('date', '2026-10-05');
+        $this->assertEqualsWithDelta(20.0, $narrowed['sales_usd'], 0.001);
+
+        $trends = collect($this->metrics()->getSalesCostTimeseries(30))->keyBy('date');
+        $this->assertEqualsWithDelta(0.0, $trends['2026-09-20']['sales'], 0.001);
+        $this->assertEqualsWithDelta(20.0, $trends['2026-10-05']['sales'], 0.001);
+
+        $chart = collect($this->metrics()->getRevenueChartData(30))->keyBy('date');
+        $this->assertArrayNotHasKey('2026-09-20', $chart->all(), 'no refund row in September');
+        $this->assertEqualsWithDelta(20.0, $chart['2026-10-05']['gift_cards'], 0.001);
+
+        $this->assertEqualsWithDelta(20.0, $this->metrics()->getBestSellingCountries(3)['US'] ?? 0.0, 0.001, 'the refund is inside the window the sale is');
+        $this->assertEqualsWithDelta(20.0, $this->metrics()->getOverviewMetrics()['total_revenue'], 0.001);
     }
 }

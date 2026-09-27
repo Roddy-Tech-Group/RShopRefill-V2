@@ -137,6 +137,32 @@ class Order extends Model
         return is_numeric($rate) && (float) $rate > 0 ? (float) $rate : null;
     }
 
+    /**
+     * The part of the order the customer paid in cash, from 0 to 1. The rest
+     * was paid with Rcoin, which is not revenue.
+     *
+     * Checkout takes Rcoin off the order total after the item prices are
+     * set, so the items still carry their full price. settlement_total_usd is
+     * what was left to pay in cash and rcoin_discount_usd what the Rcoin
+     * covered, both in USD whatever the display currency. An order with no
+     * Rcoin, or without those figures, is paid in full: 1.
+     *
+     * DashboardMetricsQuery::itemCashUsdSql() applies the same rule in SQL.
+     */
+    public function cashShare(): float
+    {
+        $cash = $this->metadata['settlement_total_usd'] ?? null;
+        $rcoin = $this->metadata['rcoin_discount_usd'] ?? null;
+
+        if (! is_numeric($cash) || ! is_numeric($rcoin) || (float) $rcoin <= 0) {
+            return 1.0;
+        }
+
+        $paid = (float) $cash + (float) $rcoin;
+
+        return $paid > 0 ? (float) $cash / $paid : 1.0;
+    }
+
     public function usdTotal(): float
     {
         return $this->resolveUsdAmount('settlement_total_usd', (float) $this->total_amount);

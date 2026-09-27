@@ -70,8 +70,9 @@ class DashboardMetricsQuery
         // month's revenue shrink after the fact.
         //
         // Summed from DELIVERED ITEMS, never the whole order total, and via
-        // itemUsdSql() so the display-currency figures (4000 XAF, 12000 NGN)
-        // become real USD rather than being added together raw.
+        // itemCashUsdSql() so the display-currency figures (4000 XAF, 12000
+        // NGN) become real USD rather than being added together raw, and only
+        // the part the customer paid in cash counts. Rcoin is not revenue.
         //
         // The order total includes items that never delivered, which the
         // customer was refunded for. Counting it while counting only delivered
@@ -79,13 +80,19 @@ class DashboardMetricsQuery
         // and inflates profit by exactly the failed items' cost. Revenue and
         // cost have to come off the same basis, which is what the Finances page
         // has always done and what these two pages did not.
+        //
+        // Completed orders only, like every other page. An order refunded in
+        // full while it still waited on the supplier is `refunded`, a booked
+        // status, but it never completed: nothing was sold, and its
+        // undelivered items cost nothing.
         $grossRevenue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->whereIn('orders.order_status', OrderStatus::booked())
+            ->whereNotNull('orders.completed_at')
             ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->when($startDate, fn ($q) => $q->where('orders.created_at', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('orders.created_at', '<=', $endDate))
-            ->sum(DB::raw($this->itemUsdSql()));
+            ->sum(DB::raw($this->itemCashUsdSql()));
 
         // Money handed back for goods the customer actually received, dated by
         // when it was handed back. Same ledger the Finances page reads, so the
@@ -125,6 +132,7 @@ class DashboardMetricsQuery
 
         $completedOrders = (clone $ordersQuery)
             ->whereIn('order_status', OrderStatus::booked())
+            ->whereNotNull('completed_at')
             ->count();
         $completedOrdersPct = $totalOrders > 0
             ? round(($completedOrders / $totalOrders) * 100, 2)
@@ -138,14 +146,20 @@ class DashboardMetricsQuery
         // and earned nothing, so counting its cost against a booked sale would
         // invent a loss. Supplier credits come off on the day the supplier
         // granted them, which is not the day we refunded the customer.
+        //
+        // Not floored at zero, the same as Finances. A window can hold a
+        // credit for a sale made before it, and dropping part of that credit
+        // would report a cost the supplier gave back. The donut below clamps
+        // the share to 0-100 anyway, so nothing downstream sees a negative.
         $supplierCost = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->whereIn('orders.order_status', OrderStatus::booked())
+            ->whereNotNull('orders.completed_at')
             ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->when($startDate, fn ($q) => $q->where('orders.created_at', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('orders.created_at', '<=', $endDate))
             ->sum(DB::raw('order_items.provider_cost_usd * order_items.quantity'));
-        $supplierCost = max(0.0, (float) $supplierCost - $this->refunds->supplierCreditsUsd($startDate, $endDate));
+        $supplierCost = (float) $supplierCost - $this->refunds->supplierCreditsUsd($startDate, $endDate);
 
         $markupSharePct = $totalRevenue > 0
             ? round((($totalRevenue - $supplierCost) / $totalRevenue) * 100, 2)
@@ -182,8 +196,9 @@ class DashboardMetricsQuery
      *                         available to honour their spends and withdrawals.
      *                         NOT the company's to spend.
      *   - company_profit_usd  Markup actually earned = completed-order sales
-     *                         minus the supplier cost paid. This IS the
-     *                         business's money.
+     *                         (the part paid in cash, never Rcoin) minus the
+     *                         supplier cost paid. This IS the business's
+     *                         money.
      *
      * Deliberately all-time and range-independent: float is a live snapshot (you
      * cannot date-filter a current balance) and profit is cumulative earnings.
@@ -202,8 +217,9 @@ class DashboardMetricsQuery
         $grossSales = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->whereIn('orders.order_status', OrderStatus::booked())
+            ->whereNotNull('orders.completed_at')
             ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
-            ->sum(DB::raw($this->itemUsdSql()));
+            ->sum(DB::raw($this->itemCashUsdSql()));
         $grossSales = max(0.0, $grossSales - $this->refunds->customerRefundsUsd());
 
         // Source-of-truth supplier cost from the item cost snapshots, delivered
@@ -211,6 +227,7 @@ class DashboardMetricsQuery
         $supplierCost = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->whereIn('orders.order_status', OrderStatus::booked())
+            ->whereNotNull('orders.completed_at')
             ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->sum(DB::raw('order_items.provider_cost_usd * order_items.quantity'));
         $supplierCost = max(0.0, $supplierCost - $this->refunds->supplierCreditsUsd());
@@ -316,11 +333,16 @@ class DashboardMetricsQuery
     /**
      * SQL expression converting order_items.subtotal_amount (display currency)
      * to USD via the order's metadata exchange-rate snapshot. Orders without a
-     * snapshot divide by 1 — for those legacy rows the stored amount is the
+     * snapshot divide by 1: for those legacy rows the stored amount is the
      * only honest figure available (mirrors Order::usdTotal()'s fallback).
      *
-     * Public so FinanceReportQuery / LeaderboardQuery reuse the exact same
-     * conversion rule — two pages must never disagree about a USD figure.
+     * Public so LeaderboardQuery reuses the exact same conversion rule, and
+     * itemCashUsdSql() builds on it. Two pages must never disagree about a
+     * USD figure.
+     *
+     * This is the item's full price, whatever paid for it. The customer
+     * rankings (LeaderboardQuery) read it. The admin money pages read
+     * itemCashUsdSql() instead.
      */
     public function itemUsdSql(): string
     {
@@ -330,9 +352,46 @@ class DashboardMetricsQuery
     }
 
     /**
+     * The revenue an item earned: its USD price (itemUsdSql) times the share
+     * of its order the customer paid in cash. Revenue is what the customer
+     * paid in cash. The part paid with Rcoin is not revenue, and an order paid
+     * entirely with Rcoin earns nothing while its supplier cost still counts.
+     *
+     * A coupon needs no share: checkout lowers the item's own price for it.
+     * Rcoin only lowers the order total, so the item still carries its full
+     * price and the share takes the Rcoin part back out. The share is
+     * settlement_total_usd over settlement_total_usd plus rcoin_discount_usd,
+     * both USD, so it holds for every display currency. With no Rcoin, or
+     * without those figures, the share is 1 and this equals itemUsdSql().
+     *
+     * Order::cashShare() applies the same rule in PHP, for the pages that
+     * sum in PHP and for RefundAdjustments.
+     *
+     * Overview, the money split (and the money:report command), Trends, the
+     * country map, the category chart and Finances read this SQL. Reports
+     * sums its buckets in PHP and applies Order::cashShare() instead.
+     */
+    public function itemCashUsdSql(): string
+    {
+        $cash = $this->jsonDecimalSql('orders.metadata', '$.settlement_total_usd');
+        $rcoin = $this->jsonDecimalSql('orders.metadata', '$.rcoin_discount_usd');
+
+        // A missing key reads as NULL, which fails both tests and leaves the
+        // share at 1. The * 1.0 keeps sqlite from dividing whole numbers as
+        // integers.
+        $share = "CASE WHEN {$rcoin} > 0 AND {$cash} + {$rcoin} > 0 THEN {$cash} * 1.0 / ({$cash} + {$rcoin}) ELSE 1 END";
+
+        return "({$this->itemUsdSql()}) * ({$share})";
+    }
+
+    /**
      * Driver-aware numeric extraction from a JSON column. MySQL needs
      * JSON_UNQUOTE + DECIMAL cast; SQLite (the test driver) unquotes inside
      * json_extract already and casts with NUMERIC.
+     *
+     * A stored JSON null reads as SQL NULL on both drivers. MySQL unquotes it
+     * to the text 'null', which would otherwise cast to 0 and read as a real
+     * zero (a cash share of 0 where SQLite and Order::cashShare() say 1).
      */
     public function jsonDecimalSql(string $column, string $path): string
     {
@@ -340,7 +399,7 @@ class DashboardMetricsQuery
             return "CAST(json_extract({$column}, '{$path}') AS NUMERIC)";
         }
 
-        return "CAST(JSON_UNQUOTE(JSON_EXTRACT({$column}, '{$path}')) AS DECIMAL(16,8))";
+        return "CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT({$column}, '{$path}')), 'null') AS DECIMAL(16,8))";
     }
 
     /**
@@ -398,14 +457,24 @@ class DashboardMetricsQuery
      * category.
      *
      * Revenue and cost both come from DELIVERED ITEMS, converted by the order's
-     * own rate snapshot, which is the basis the Finances page uses. For a given
-     * month this returns the same revenue Finances does, and a test asserts it,
-     * because the two pages disagreeing is how a refunded-but-still-counted
-     * item inflated profit here for months without anyone noticing.
+     * own rate snapshot, and revenue is only the part the customer paid in
+     * cash (Order::cashShare), which is the basis the Finances page uses. For
+     * a given month this returns the same revenue Finances does, and a test
+     * asserts it, because the two pages disagreeing is how a
+     * refunded-but-still-counted item inflated profit here for months without
+     * anyone noticing.
      *
      * Narrowing to a category narrows the revenue too, since only that
      * category's items are loaded. Previously a category filter still reported
-     * the WHOLE order total of any order containing that category.
+     * the WHOLE order total of any order containing that category. Refunds and
+     * supplier credits narrow the same way, through each refund's per-item
+     * allocations, so the figure for one category matches that category's row
+     * on Finances.
+     *
+     * A bucket's cost can go negative: a supplier credit granted on a day with
+     * less cost than the credit. It is kept whole, because flooring each
+     * bucket threw part of the credit away and the period's total stopped
+     * matching Finances.
      *
      * Product-only scope:
      *   - Sourced from `orders` only. Wallet top-ups live in `wallet_fundings`
@@ -424,8 +493,8 @@ class DashboardMetricsQuery
      * Returns an array keyed by bucket date (Y-m-d), each row carrying:
      *   - date              ISO bucket start
      *   - transactions      distinct completed product orders in the bucket
-     *   - sales_usd         delivered items' USD subtotals (NOT order totals)
-     *   - cost_usd          sum of supplier USD cost
+     *   - sales_usd         delivered items' USD subtotals, cash share only (NOT order totals)
+     *   - cost_usd          sum of supplier USD cost, less supplier credits
      *   - profit_usd        sales − cost
      *   - profit_margin     profit / sales × 100, or 0 when sales = 0
      *   - avg_per_tx_usd    sales / transactions, or 0 when transactions = 0
@@ -491,16 +560,17 @@ class DashboardMetricsQuery
             // order total as revenue while costing only what delivered reports
             // money we gave back against cost we never paid.
             //
-            // Same conversion as itemUsdSql(), which divides each item's
-            // display-currency subtotal by the order's rate snapshot. The rate
-            // is per order, so dividing the order's summed subtotals by it once
-            // is identical arithmetic, and it keeps this figure equal to the
-            // Finances page's revenue for the same month.
+            // Same conversion as itemCashUsdSql(), which divides each item's
+            // display-currency subtotal by the order's rate snapshot and keeps
+            // only the share the customer paid in cash. The rate and the share
+            // are per order, so applying them once to the order's summed
+            // subtotals is identical arithmetic, and it keeps this figure equal
+            // to the Finances page's revenue for the same month.
             $delivered = $order->items->where('fulfillment_status', '!=', FulfillmentStatus::Failed);
             $rate = $order->exchangeRate() ?: 1.0;
 
             $buckets[$bucketKey]['transactions']++;
-            $buckets[$bucketKey]['sales'] += $delivered->sum(fn ($item) => (float) $item->subtotal_amount) / $rate;
+            $buckets[$bucketKey]['sales'] += $delivered->sum(fn ($item) => (float) $item->subtotal_amount) / $rate * $order->cashShare();
             $buckets[$bucketKey]['cost'] += $delivered
                 ->sum(fn ($item) => (float) $item->provider_cost_usd * (int) $item->quantity);
         }
@@ -508,9 +578,12 @@ class DashboardMetricsQuery
         // Refunds and supplier credits land in the bucket they HAPPENED in,
         // not the bucket that made the sale. An eSIM sold in September and
         // refunded in October is September revenue and an October deduction,
-        // which is the whole reason the ledger records its own dates.
-        $refundBuckets = $this->refunds->customerRefundsByBucket($start, $end, $granularity);
-        $creditBuckets = $this->refunds->supplierCreditsByBucket($start, $end, $granularity);
+        // which is the whole reason the ledger records its own dates. The one
+        // exception is a refund taken before its order completed: it lands
+        // with the sale it reverses, never in an earlier bucket. Under a
+        // category filter only that category's share of each comes off.
+        $refundBuckets = $this->refunds->customerRefundsByBucket($start, $end, $granularity, $categoryId);
+        $creditBuckets = $this->refunds->supplierCreditsByBucket($start, $end, $granularity, $categoryId);
 
         // Gap-fill every bucket between start and end so the chart line is
         // continuous (no missing days = no jagged drops to zero).
@@ -526,7 +599,7 @@ class DashboardMetricsQuery
             $key = $cursor->format('Y-m-d');
             $row = $buckets[$key] ?? ['transactions' => 0, 'sales' => 0.0, 'cost' => 0.0];
             $sales = round((float) $row['sales'] - ($refundBuckets[$key] ?? 0.0), 4);
-            $cost = round(max(0.0, (float) $row['cost'] - ($creditBuckets[$key] ?? 0.0)), 4);
+            $cost = round((float) $row['cost'] - ($creditBuckets[$key] ?? 0.0), 4);
             $profit = round($sales - $cost, 4);
             $transactions = (int) $row['transactions'];
 
@@ -551,16 +624,9 @@ class DashboardMetricsQuery
     }
 
     /**
-     * Get revenue chart data aggregated by date and product category.
-     *
-     * Accepts either a named preset ('7d' | '30d' | '6m' | '1y') or a raw int
-     * day count (e.g. 15). Day counts always group daily; '6m' and '1y' group
-     * monthly. The int path lets the dashboard's 1-30 day picker drive the
-     * chart at full granularity without each day mapping to a coarser bucket.
-     */
-    /**
      * Daily sales + cost timeseries for the Trends chart. Sales is what the
-     * customer paid (order_items.subtotal_amount, converted to USD); cost is the
+     * customer paid in cash (order_items.subtotal_amount, converted to USD,
+     * less any part paid with Rcoin); cost is the
      * real USD wholesale we paid the supplier (order_items.provider_cost_usd x
      * quantity) - the same source-of-truth cost the reports page and the KPI
      * donut use, so the three never disagree. Items missing a cost contribute
@@ -584,7 +650,8 @@ class DashboardMetricsQuery
                 // Item subtotals are display-currency figures; divide by the
                 // order's exchange-rate snapshot so the chart's "sales" are
                 // real USD, comparable against the USD supplier cost below.
-                DB::raw('SUM('.$this->itemUsdSql().') as sales'),
+                // Only the cash-paid share counts: Rcoin is not revenue.
+                DB::raw('SUM('.$this->itemCashUsdSql().') as sales'),
                 // Cost is the real USD wholesale we paid the supplier
                 // (order_items.provider_cost_usd) - the SAME source getReportSeries
                 // and the KPI donut use. The old variant_snapshot.cost_price
@@ -600,6 +667,9 @@ class DashboardMetricsQuery
 
         // Refunds and credits belong to the day they happened, so the line
         // dips when money went back out, not retroactively on the sale day.
+        // A day's cost is not floored: a credit granted on a quiet day would
+        // otherwise be partly thrown away, and the window would stop summing
+        // to what Finances shows.
         $refundDays = $this->refunds->customerRefundsByBucket($startDate, now()->endOfDay());
         $creditDays = $this->refunds->supplierCreditsByBucket($startDate, now()->endOfDay());
 
@@ -612,7 +682,7 @@ class DashboardMetricsQuery
             $series[] = [
                 'date' => $date,
                 'sales' => round((float) ($row->sales ?? 0) - ($refundDays[$date] ?? 0.0), 2),
-                'cost' => round(max(0.0, (float) ($row->cost ?? 0) - ($creditDays[$date] ?? 0.0)), 2),
+                'cost' => round((float) ($row->cost ?? 0) - ($creditDays[$date] ?? 0.0), 2),
             ];
         }
 
@@ -645,26 +715,32 @@ class DashboardMetricsQuery
                 DB::raw('UPPER('.$this->jsonTextSql('order_items.product_snapshot', '$.country_code').') as cc'),
                 // Converted to USD via the order's rate snapshot — the map
                 // labels these figures "USD", so a 4373 XAF sale must show
-                // as ~$7, not as $4373.
-                DB::raw('SUM('.$this->itemUsdSql().') as total'),
+                // as ~$7, not as $4373. Cash-paid share only, like Overview.
+                DB::raw('SUM('.$this->itemCashUsdSql().') as total'),
             )
             ->groupBy('cc');
+
+        $categoryIds = null;
 
         if ($category !== null && $category !== 'all') {
             $query->join('categories', 'order_items.category_id', '=', 'categories.id')
                 ->where('categories.slug', 'like', '%'.$category.'%');
+
+            $categoryIds = DB::table('categories')
+                ->where('slug', 'like', '%'.$category.'%')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
         }
 
         $rows = $query->get();
 
         // Refunds come off the country that made the sale, read from each
-        // refund's own per-item allocations rather than spread evenly. Skipped
-        // when the map is narrowed to one category, because the allocations
-        // would have to be filtered the same way and a half-applied deduction
-        // is worse than none.
-        $refundsByCountry = ($category === null || $category === 'all')
-            ? $this->refunds->customerRefundsByCountry($startDate, now()->endOfDay())
-            : [];
+        // refund's own per-item allocations rather than spread evenly. Each
+        // allocation also names its item's category, so a map narrowed to one
+        // category takes off exactly that category's refunds, matched by the
+        // same slug rule as the sales above.
+        $refundsByCountry = $this->refunds->customerRefundsByCountry($startDate, now()->endOfDay(), $categoryIds);
 
         $byCountry = [];
         foreach ($rows as $row) {
@@ -679,6 +755,20 @@ class DashboardMetricsQuery
         return $byCountry;
     }
 
+    /**
+     * Get revenue chart data aggregated by date and product category.
+     *
+     * Accepts either a named preset ('7d' | '30d' | '6m' | '1y') or a raw int
+     * day count (e.g. 15). Day counts always group daily; '6m' and '1y' group
+     * monthly. The int path lets the dashboard's 1-30 day picker drive the
+     * chart at full granularity without each day mapping to a coarser bucket.
+     *
+     * Net of customer refunds, each taken off its own category on the day it
+     * was given back. A day with a refund and no sales gets its own row, which
+     * can be negative.
+     *
+     * @return array<int, array{date: string, gift_cards: int|float, esim: int|float, topup: int|float, other: int|float}>
+     */
     public function getRevenueChartData(string|int $range = '7d'): array
     {
         if (is_int($range) || ctype_digit((string) $range)) {
@@ -699,10 +789,7 @@ class DashboardMetricsQuery
         }
 
         // Aggregate delivered items on booked orders by product type. A
-        // paid-but-still-processing order does NOT appear here yet. This chart
-        // shows gross delivered sales per category and is deliberately not net
-        // of refunds: it answers "what sells", and a refund belongs to the day
-        // it happened, which a category mix cannot express.
+        // paid-but-still-processing order does NOT appear here yet.
         $results = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('categories', 'order_items.category_id', '=', 'categories.id')
@@ -712,8 +799,9 @@ class DashboardMetricsQuery
             ->select(
                 DB::raw($this->dateFormatSql('orders.completed_at', $dateFormat).' as date'),
                 'categories.slug as category_slug',
-                // USD via the order's rate snapshot, matching the other charts.
-                DB::raw('SUM('.$this->itemUsdSql().') as total')
+                // USD via the order's rate snapshot, cash-paid share only,
+                // matching the other charts.
+                DB::raw('SUM('.$this->itemCashUsdSql().') as total')
             )
             ->groupBy('date', 'categories.slug')
             ->orderBy('date')
@@ -724,29 +812,68 @@ class DashboardMetricsQuery
         foreach ($results as $row) {
             $date = $row->date;
 
-            if (! isset($chartData[$date])) {
-                $chartData[$date] = [
-                    'date' => $date,
-                    'gift_cards' => 0,
-                    'esim' => 0,
-                    'topup' => 0,
-                    'other' => 0,
-                ];
-            }
-
-            // Pivot product types into fixed categories
-            $slug = strtolower($row->category_slug);
-            $key = match (true) {
-                str_contains($slug, 'gift') => 'gift_cards',
-                str_contains($slug, 'esim') => 'esim',
-                str_contains($slug, 'topup') || str_contains($slug, 'airtime') || str_contains($slug, 'data') => 'topup',
-                default => 'other',
-            };
-
-            $chartData[$date][$key] += (float) $row->total;
+            $chartData[$date] ??= $this->emptyRevenueChartRow($date);
+            $chartData[$date][$this->revenueChartKey((string) $row->category_slug)] += (float) $row->total;
         }
 
+        // Refunds come off the category of each item they reversed, on the
+        // day they were given back, which each refund's allocations record.
+        // That is how Reports narrowed to a category reads them too, so a
+        // category's line here matches Reports for that category.
+        $granularity = $dateFormat === '%Y-%m' ? 'monthly' : 'daily';
+        $refunds = $this->refunds->customerRefundsByCategory($startDate, now(), $granularity);
+
+        $slugById = DB::table('categories')
+            ->whereIn('id', collect($refunds)->flatMap(fn (array $byCategory) => array_keys($byCategory))->unique()->all())
+            ->pluck('slug', 'id');
+
+        foreach ($refunds as $bucket => $byCategory) {
+            $date = $granularity === 'monthly' ? substr($bucket, 0, 7) : $bucket;
+
+            foreach ($byCategory as $categoryId => $usd) {
+                $slug = $slugById[$categoryId] ?? null;
+
+                if ($slug === null) {
+                    continue;
+                }
+
+                $chartData[$date] ??= $this->emptyRevenueChartRow($date);
+                $chartData[$date][$this->revenueChartKey((string) $slug)] -= $usd;
+            }
+        }
+
+        ksort($chartData);
+
         return array_values($chartData);
+    }
+
+    /**
+     * @return array{date: string, gift_cards: int|float, esim: int|float, topup: int|float, other: int|float}
+     */
+    private function emptyRevenueChartRow(string $date): array
+    {
+        return [
+            'date' => $date,
+            'gift_cards' => 0,
+            'esim' => 0,
+            'topup' => 0,
+            'other' => 0,
+        ];
+    }
+
+    /**
+     * Pivot a category slug into the chart's fixed product lines.
+     */
+    private function revenueChartKey(string $slug): string
+    {
+        $slug = strtolower($slug);
+
+        return match (true) {
+            str_contains($slug, 'gift') => 'gift_cards',
+            str_contains($slug, 'esim') => 'esim',
+            str_contains($slug, 'topup') || str_contains($slug, 'airtime') || str_contains($slug, 'data') => 'topup',
+            default => 'other',
+        };
     }
 
     /**

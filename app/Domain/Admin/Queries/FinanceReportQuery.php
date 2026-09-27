@@ -2,6 +2,7 @@
 
 namespace App\Domain\Admin\Queries;
 
+use App\Domain\Admin\Support\RefundAdjustments;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Models\OrderRefund;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * Company-finance aggregations for the Management → Finances page: the
  * monthly P&L per fulfilment provider and per product category.
  *
- *   Gross revenue      delivered items on orders completed in the month
+ *   Gross revenue      the cash paid for delivered items on orders
+ *                      completed in the month
  *   less Refunds       customer refunds recorded in the month
  *   = Revenue          (net)
  *   Supplier cost      what those delivered items cost us
@@ -22,7 +24,13 @@ use Illuminate\Support\Facades\DB;
  *   = Cost             (net)
  *   Gross profit       Revenue - Cost
  *
- * Three rules keep a closed month closed and the page true to the supplier's
+ * Revenue is what the customer paid in cash. The part of an order paid with
+ * Rcoin (reward points) is not revenue, so each item counts at its order's
+ * cash share (DashboardMetricsQuery::itemCashUsdSql), and an order paid
+ * entirely with Rcoin earns nothing while its supplier cost still counts. A
+ * coupon needs no share, because checkout lowers the item's own price for it.
+ *
+ * Four rules keep a closed month closed and the page true to the supplier's
  * own invoice:
  *
  *   1. Revenue is booked when an order completes and never un-booked. An
@@ -37,14 +45,32 @@ use Illuminate\Support\Facades\DB;
  *      month it was granted, each from the refund ledger (order_refunds). The
  *      Airalo invoice for a month is that month's eSIMs less that month's
  *      credits, so the supplier cost line here reconciles to it.
+ *   4. A refund or credit only counts against a sale that was booked (rule 1
+ *      applied to its order), and never before that sale. An order refunded
+ *      in full before it ever completed sold nothing, so its refund reverses
+ *      nothing. If the order completes after all, a refund or credit (full or
+ *      partial) taken before that lands in the month the order completed,
+ *      next to the sale it reverses. Its own date would put it in a month
+ *      that had already closed, so this is the one case where rule 3 gives
+ *      way.
  *
- * USD conversion is DashboardMetricsQuery::itemUsdSql() (item subtotal over
- * the order's exchange-rate snapshot), and a refund reverses revenue at that
- * same rate (RefundLedger), so no exchange-rate noise enters a refund.
+ * USD conversion is DashboardMetricsQuery::itemCashUsdSql() (item subtotal
+ * over the order's exchange-rate snapshot, times the order's cash share), and
+ * a refund reverses revenue at that same rate (RefundLedger), so no
+ * exchange-rate noise enters a refund. The ledger records what a refund
+ * reversed at the item's full price; RefundAdjustments applies the same cash
+ * share to it, so a refund never takes off revenue that was never counted.
  *
- * This is the P&L. The Overview dashboard's revenue KPI is a different
- * measure (whole order totals, windowed by created_at) and is not reconciled
- * to this page.
+ * The ledger is read through RefundAdjustments, which Overview, Reports and
+ * Trends read too, so rule 4 and the way a credit splits across categories
+ * are the same everywhere. Reports and Trends book sales exactly as this page
+ * does, and for a calendar month they sum to its totals; Reports narrowed to
+ * a category matches that category's row here. The Overview revenue card
+ * uses the same basis (delivered items on completed orders, less refunds and
+ * credits on the later of their own date and the order's completion, see
+ * rule 4) but windows its sales by the order's
+ * created_at rather than completed_at, so an order placed in one month and
+ * completed in the next lands in a different month there.
  *
  * Profit is GROSS profit (revenue - supplier cost). Gateway fees and operating
  * costs are not captured per payment yet, so a "net profit" claim would be
@@ -65,7 +91,10 @@ class FinanceReportQuery
     /** Canonical category slugs that get the same always-present treatment. */
     private const CORE_CATEGORY_SLUGS = ['gift-cards', 'esims', 'mobile-airtime', 'bill-payments'];
 
-    public function __construct(private DashboardMetricsQuery $metrics) {}
+    public function __construct(
+        private DashboardMetricsQuery $metrics,
+        private RefundAdjustments $refunds,
+    ) {}
 
     /**
      * Full monthly breakdown for the Finances page.
@@ -131,7 +160,7 @@ class FinanceReportQuery
                 DB::raw("LOWER(COALESCE(NULLIF(products.provider_name, ''), NULLIF(order_items.provider_name, ''), 'unknown')) as provider"),
                 DB::raw('COUNT(DISTINCT orders.id) as orders_count'),
                 DB::raw('SUM(order_items.quantity) as units'),
-                DB::raw('SUM('.$this->metrics->itemUsdSql().') as revenue_usd'),
+                DB::raw('SUM('.$this->metrics->itemCashUsdSql().') as revenue_usd'),
                 DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost_usd'),
             )
             ->groupBy('provider')
@@ -173,7 +202,7 @@ class FinanceReportQuery
                 'categories.name as category',
                 DB::raw('COUNT(DISTINCT orders.id) as orders_count'),
                 DB::raw('SUM(order_items.quantity) as units'),
-                DB::raw('SUM('.$this->metrics->itemUsdSql().') as revenue_usd'),
+                DB::raw('SUM('.$this->metrics->itemCashUsdSql().') as revenue_usd'),
                 DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost_usd'),
             )
             ->groupBy('categories.name')
@@ -217,7 +246,7 @@ class FinanceReportQuery
             ->select(
                 DB::raw('COUNT(DISTINCT orders.id) as orders_count'),
                 DB::raw('SUM(order_items.quantity) as units'),
-                DB::raw('SUM('.$this->metrics->itemUsdSql().') as revenue_usd'),
+                DB::raw('SUM('.$this->metrics->itemCashUsdSql().') as revenue_usd'),
                 DB::raw('SUM(order_items.provider_cost_usd * order_items.quantity) as cost_usd'),
             )
             ->first();
@@ -231,11 +260,19 @@ class FinanceReportQuery
     /**
      * What the refund ledger moves in the window: customer refunds (revenue
      * unwound, by refunded_at) and supplier credits (cost recovered, by
-     * supplier_credited_at), each split by provider and by category.
+     * supplier_credited_at), each split by provider and by category. A row
+     * taken before its order completed counts from the completion instead
+     * (rule 4).
      *
      * Fulfilment reversals are left out on purpose. They return money for an
      * item that never delivered, and a never-delivered item is not booked as
      * revenue (bookedItemsQuery), so there is nothing for them to reverse.
+     * For the same reason a refund on an order that never completed is left
+     * out (RefundAdjustments applies rule 4).
+     *
+     * A refund takes off only its order's cash share of the revenue it
+     * reversed, the share the sale was booked at. Credits are cost, and
+     * count in full.
      *
      * @return array{
      *     refunds_usd: float, refund_count: int, credits_usd: float, credit_count: int,
@@ -254,14 +291,11 @@ class FinanceReportQuery
             'categories' => [],
         ];
 
-        $refunds = OrderRefund::query()
-            ->where('kind', OrderRefund::KIND_CUSTOMER_REFUND)
-            ->whereBetween('refunded_at', [$start, $end])
-            ->get(['id', 'revenue_reversed_usd', 'allocations']);
+        $refunds = $this->refunds->customerRefunds($start, $end)
+            ->with('order:id,metadata')
+            ->get(['id', 'order_id', 'revenue_reversed_usd', 'allocations']);
 
-        $credits = OrderRefund::query()
-            ->where('supplier_credit_status', OrderRefund::CREDIT_CREDITED)
-            ->whereBetween('supplier_credited_at', [$start, $end])
+        $credits = $this->refunds->supplierCredits($start, $end)
             ->get(['id', 'supplier_credit_usd', 'allocations']);
 
         $categoryNames = DB::table('categories')
@@ -274,11 +308,13 @@ class FinanceReportQuery
             ->pluck('name', 'id');
 
         foreach ($refunds as $refund) {
-            $result['refunds_usd'] += (float) $refund->revenue_reversed_usd;
+            $cashShare = $this->refunds->cashShareOf($refund);
+
+            $result['refunds_usd'] += (float) $refund->revenue_reversed_usd * $cashShare;
             $result['refund_count']++;
 
             foreach ((array) $refund->allocations as $allocation) {
-                $this->addTo($result, $allocation, $categoryNames, 'refunds_usd', (float) $allocation['revenue_reversed_usd']);
+                $this->addTo($result, $allocation, $categoryNames, 'refunds_usd', (float) $allocation['revenue_reversed_usd'] * $cashShare);
             }
         }
 
@@ -288,16 +324,10 @@ class FinanceReportQuery
             $result['credit_count']++;
 
             // A credit recovers the cost of the items the refund covered, in
-            // the same proportion their revenue was split.
-            $allocations = (array) $credit->allocations;
-            $weight = array_sum(array_column($allocations, 'revenue_reversed_usd'));
-
-            foreach ($allocations as $allocation) {
-                $share = $weight > 0
-                    ? $amount * ((float) $allocation['revenue_reversed_usd'] / $weight)
-                    : $amount / max(1, count($allocations));
-
-                $this->addTo($result, $allocation, $categoryNames, 'credits_usd', $share);
+            // the same proportion their revenue was split. Reports narrows to
+            // a category with the same split.
+            foreach ($this->refunds->creditByAllocation($credit) as $share) {
+                $this->addTo($result, $share['allocation'], $categoryNames, 'credits_usd', $share['credit_usd']);
             }
         }
 
