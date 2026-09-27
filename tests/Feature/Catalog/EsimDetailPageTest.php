@@ -8,11 +8,24 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class EsimDetailPageTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * These pages render entirely from the database. The guard keeps it that
+     * way: if a future change makes a page reach out to a supplier while it
+     * renders, this suite fails loudly instead of quietly depending on Airalo
+     * being up whenever CI runs.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::preventStrayRequests();
+    }
 
     private function esimRegion(): Product
     {

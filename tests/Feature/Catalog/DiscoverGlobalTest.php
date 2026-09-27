@@ -9,6 +9,7 @@ use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -19,6 +20,16 @@ use Tests\TestCase;
 class DiscoverGlobalTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Rendered from the database alone. The guard fails the suite loudly if a
+     * future change makes a storefront page call a supplier while it renders.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::preventStrayRequests();
+    }
 
     private function makeGlobalEsim(): Product
     {
