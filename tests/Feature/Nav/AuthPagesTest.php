@@ -26,9 +26,9 @@ class AuthPagesTest extends TestCase
     }
 
     /**
-     * Standalone, and now standalone all the way: the storefront nav is
-     * stripped on purpose - one job per page - and so is everything that used
-     * to sit above the card. The card is the whole page.
+     * Standalone: the storefront nav is stripped on purpose - one job per
+     * page. The only thing above the card is the logo, top left, which is
+     * also the way back to the store.
      */
     public function test_they_are_standalone(): void
     {
@@ -40,11 +40,26 @@ class AuthPagesTest extends TestCase
         }
 
         $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
+        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $layout);
 
-        // No header row at any width, and no logo in it - it was a second brand
-        // mark on a page that already says where you are.
-        $this->assertStringNotContainsString('<header', $layout);
-        $this->assertStringNotContainsString('Rshoprefillslogo', $layout);
+        // One header, holding the logo and nothing else, linking home.
+        $this->assertSame(1, substr_count($markup, '<header'));
+        $this->assertMatchesRegularExpression('/<header[^>]*>\s*<a href="\{\{ route\(\'home\'\) \}\}"[^>]*>\s*<img src="\{\{ asset\(\'assets\/logo\.webp\'\)/', $markup);
+    }
+
+    /**
+     * The page is the dashboard's navy in both themes, edge to edge, and the
+     * logo on it is white: the colour mark would sink into the navy.
+     */
+    public function test_the_page_is_navy_with_a_white_logo(): void
+    {
+        $layout = File::get(resource_path('views/components/layouts/auth.blade.php'));
+        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $layout);
+
+        $this->assertStringContainsString('<body class="flex min-h-screen flex-col bg-[#0c1337]', $markup);
+        $this->assertStringNotContainsString('dark:bg-[#060607]', $markup, 'dark mode keeps the navy too');
+        $this->assertStringContainsString('html, html.dark { background-color: #0c1337; }', $markup);
+        $this->assertMatchesRegularExpression('/<img src="\{\{ asset\(\'assets\/logo\.webp\'\)[^>]*class="[^"]*brightness-0 invert/', $markup);
     }
 
     public function test_the_card_wrapper_never_stacks_a_second_viewport_minimum(): void

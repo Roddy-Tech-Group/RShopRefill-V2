@@ -13,6 +13,10 @@
              navigation so login -> register feels like a single surface
              swapping its details, not a full-page reload. --}}
         <style>
+            /* The shared head paints the page edge white (black in dark) for
+               the first frame and for overscroll. Here the whole page is navy. */
+            html, html.dark { background-color: #0c1337; }
+
             @keyframes authFormSlide {
                 from { transform: translateX(40px); opacity: 0; }
                 to   { transform: translateX(0);    opacity: 1; }
@@ -39,20 +43,29 @@
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
         @endif
     </head>
-    <body class="flex min-h-screen flex-col bg-[#dee3e1] text-zinc-900 antialiased dark:bg-[#060607] dark:text-zinc-100">
+    {{-- The dashboard's deep navy in both themes: the white card reads as the
+         one lit thing on the page, and signing in already looks like the
+         account it opens. --}}
+    <body class="flex min-h-screen flex-col bg-[#0c1337] text-zinc-900 antialiased dark:text-zinc-100">
 
         {{-- Translation engine. Sign-in and register are website content too:
              a visitor who reached them in their own language should not be
              handed an English form at the one step that asks them to type. --}}
 
-        {{-- The form card alone, centered on the page tone. Nothing sits
-             above it any more: the logo was a second brand mark on a page that
-             already says where you are, and the "Back to website" pill went
-             with it. The card has one job and shows one thing.
+        {{-- The brand, top left, and the way back to the store. White on the
+             navy: brightness-0 flattens the mark to black and invert turns it
+             white, the same treatment the logo gets in dark mode. --}}
+        <header class="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-10">
+            <a href="{{ route('home') }}" wire:navigate class="inline-flex rounded-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40" aria-label="{{ $siteName }} home">
+                <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ $siteName }}" class="site-logo h-9 w-auto object-contain brightness-0 invert">
+            </a>
+        </header>
 
-             flex-1 on a flex-column body, not min-h-screen: with nothing
-             stacked above it either fills the viewport, and flex-1 stays
-             correct if a sibling is ever added back. --}}
+        {{-- The form card, centered on the navy.
+
+             flex-1 on a flex-column body, not min-h-screen: the header above
+             takes its height and the card fills what is left, where a second
+             viewport minimum would push it off the bottom. --}}
         <div class="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-10">
             {{-- Form card. max-w-md, not max-w-xl: at 576px the fields ran
                  wider than anything typed into them and the card read as a page
