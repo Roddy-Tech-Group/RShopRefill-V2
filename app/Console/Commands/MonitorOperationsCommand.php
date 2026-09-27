@@ -68,6 +68,7 @@ class MonitorOperationsCommand extends Command
         $sent += $this->checkDisk($snapshot['disk']);
         $sent += $this->checkReconciliation($snapshot['reconciliation']);
         $sent += $this->checkStuckOrders($snapshot['orders']);
+        $sent += $this->checkStalledWithProvider($snapshot['orders']);
         $sent += $this->checkFailedJobs($snapshot['jobs']);
         $sent += $this->checkQueueWaits($snapshot['queues']);
         $sent += $this->checkSweeper($snapshot['sweeper']);
@@ -162,6 +163,28 @@ class MonitorOperationsCommand extends Command
             ),
             context: $recon,
             runbook: 'docs/runbooks/ledger-integrity.md',
+        );
+    }
+
+    /** @param array{stuck: int, stalled_with_provider: int, requires_attention: int} $orders */
+    private function checkStalledWithProvider(array $orders): int
+    {
+        $stalled = $orders['stalled_with_provider'] ?? 0;
+
+        if ($stalled === 0) {
+            return 0;
+        }
+
+        return (int) $this->alerter->send(
+            severity: AlertSeverity::Sev2,
+            key: 'orders:stalled-with-provider',
+            title: 'Paid orders the provider never resolved',
+            message: sprintf(
+                '%d item(s) were accepted by the provider and have sat unresolved for over 40 minutes. Each one is a customer who paid, whose order the provider is holding, and which nothing will now retry on its own.',
+                $stalled,
+            ),
+            context: $orders,
+            runbook: 'docs/runbooks/fulfillment-provider-outage.md',
         );
     }
 

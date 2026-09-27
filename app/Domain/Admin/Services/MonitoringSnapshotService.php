@@ -33,6 +33,13 @@ class MonitoringSnapshotService
     /** An order paid this long ago but still unfulfilled counts as stuck. */
     private const STUCK_AFTER_MINUTES = 15;
 
+    /**
+     * How long an item may sit with the provider before it is money in limbo.
+     * Generous on purpose: a top-up that resolves in two minutes is normal and
+     * one still running after forty is not.
+     */
+    private const STALLED_AFTER_MINUTES = 40;
+
     public function __construct(
         private HealthCheckService $health,
         private BackupHealthService $backupHealth,
@@ -161,9 +168,10 @@ class MonitoringSnapshotService
     /**
      * Money-in-limbo counts: paid-but-unfulfilled orders older than the stuck
      * threshold (each one is a fulfillment dispatch or webhook that went
-     * missing) and orders flagged requires_attention.
+     * missing), items the provider accepted but never resolved, and orders
+     * flagged requires_attention.
      *
-     * @return array{stuck: int, requires_attention: int}
+     * @return array{stuck: int, stalled_with_provider: int, requires_attention: int}
      */
     private function orderBacklog(): array
     {
@@ -174,11 +182,30 @@ class MonitoringSnapshotService
             ->where('placed_at', '<=', now()->subMinutes(self::STUCK_AFTER_MINUTES))
             ->count();
 
+        // Handed to the provider and never resolved.
+        //
+        // This was the blind spot. The count above only sees fulfilment that
+        // never STARTED, so an item the provider accepted and then sat on
+        // matched nothing: not this alert, and not the poll sweeper either,
+        // which ignores anything untouched for thirty minutes. A customer
+        // could pay, the provider could stall indefinitely, and no part of the
+        // system would say a word.
+        $stalled = DB::table('order_items')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->whereIn('orders.payment_status', ['paid', 'reserved'])
+            ->whereIn('order_items.fulfillment_status', ['processing', 'delayed'])
+            ->where('order_items.updated_at', '<=', now()->subMinutes(self::STALLED_AFTER_MINUTES))
+            ->count();
+
         $attention = DB::table('orders')
             ->where('order_status', 'requires_attention')
             ->count();
 
-        return ['stuck' => $stuck, 'requires_attention' => $attention];
+        return [
+            'stuck' => $stuck,
+            'stalled_with_provider' => $stalled,
+            'requires_attention' => $attention,
+        ];
     }
 
     /**
