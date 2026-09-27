@@ -69,6 +69,7 @@ class AiraloTopupCatalogService
             // Preserve admin toggles across re-syncs: keep whatever availability
             // an admin set, and never overwrite a manual price override (we simply
             // don't pass manual_retail_price_usd, so updateOrCreate leaves it).
+            // ProductVariant itself keeps an admin-disabled package off sale.
             $existing = ProductVariant::where('provider_offer_id', $offerId)->first();
 
             $variant = ProductVariant::updateOrCreate(
@@ -82,6 +83,11 @@ class AiraloTopupCatalogService
                     'cost_price' => $netCost,
                     'retail_price' => $faceValue,
                     'is_variable' => false,
+                    // The supplier just returned this package in a live fetch,
+                    // so it sells it. Re-enabling a package an admin switched
+                    // off hands it back to this verdict, and the purchase
+                    // re-checks the live list before anyone is charged.
+                    'supplier_available' => true,
                     'is_available' => $existing?->is_available ?? true,
                     'metadata' => $this->variantMetadata($pkg, $id, $parentEsim),
                 ],

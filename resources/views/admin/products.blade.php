@@ -919,6 +919,11 @@
                         'duration' => data_get($meta, 'duration'),
                         'dataSpeed' => data_get($meta, 'dataSpeed'),
                         'isAvailable' => (bool) $variant->is_available,
+                        // Off by an admin's hand, which survives the sync, as
+                        // opposed to off because the supplier or a cleanup took
+                        // it off, which the next sync can undo.
+                        'isAdminDisabled' => $variant->isAdminDisabled(),
+                        'supplierAvailable' => (bool) $variant->supplier_available,
                         'isActive' => (bool) ($product?->is_active ?? false),
                         'isOutOfStock' => (bool) ($product?->is_out_of_stock ?? false),
                         'isFeatured' => (bool) ($product?->is_featured ?? false),
@@ -1102,6 +1107,13 @@
                                 <button type="button" @click="setAvailable(true)" :disabled="savingAvailable" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="data.isAvailable ? 'bg-emerald-500 text-white' : 'text-zinc-600 dark:text-zinc-300'">Enabled</button>
                                 <button type="button" @click="setAvailable(false)" :disabled="savingAvailable" class="rounded-[8px] px-3 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60" :class="! data.isAvailable ? 'bg-zinc-700 text-white' : 'text-zinc-600 dark:text-zinc-300'">Disabled</button>
                             </div>
+                            <p class="mt-1 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400" x-text="data.isAdminDisabled
+                                ? 'Switched off here. Stays off through every sync.'
+                                : (data.isAvailable
+                                    ? 'On sale while the supplier lists it.'
+                                    : (data.supplierAvailable
+                                        ? 'Off, but not switched off here. Click Disabled to keep it off.'
+                                        : 'Off at the supplier. Click Disabled to keep it off if the supplier brings it back.'))"></p>
                         </div>
                     </div>
 
@@ -1731,8 +1743,13 @@
                     },
 
                     async setAvailable(value) {
-                        if (!this.data.variantId || this.savingAvailable || this.data.isAvailable === value) { return; }
-                        const previous = this.data.isAvailable;
+                        // Disabled still has work to do on an offer that is off
+                        // but not switched off here: the supplier or a cleanup
+                        // took it off, and the next sync can put it back on sale
+                        // unless an admin pins it.
+                        const alreadySet = value ? this.data.isAvailable : this.data.isAdminDisabled;
+                        if (!this.data.variantId || this.savingAvailable || alreadySet) { return; }
+                        const previous = { isAvailable: this.data.isAvailable, isAdminDisabled: this.data.isAdminDisabled };
                         this.data.isAvailable = value;
                         this.savingAvailable = true;
                         try {
@@ -1740,6 +1757,8 @@
                                 `/admin/api/catalog/variants/${this.data.variantId}/availability`,
                                 { is_available: value });
                             this.data.isAvailable = json.is_available;
+                            this.data.isAdminDisabled = json.admin_disabled;
+                            this.data.supplierAvailable = json.supplier_available;
                             // Switching off is always obeyed and now survives the
                             // sync. Switching on only hands the offer back to the
                             // supplier, so say why when the supplier still has it
@@ -1749,7 +1768,8 @@
                                 alert('The supplier no longer lists this offer, so it cannot go back on sale. It will return by itself if the supplier lists it again.');
                             }
                         } catch (e) {
-                            this.data.isAvailable = previous;
+                            this.data.isAvailable = previous.isAvailable;
+                            this.data.isAdminDisabled = previous.isAdminDisabled;
                             alert(e.message);
                         } finally {
                             this.savingAvailable = false;

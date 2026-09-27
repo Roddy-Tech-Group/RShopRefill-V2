@@ -96,7 +96,7 @@ class CatalogSyncRunService
             return $run;
         }
 
-        [$delisted, $restored, $wentDark, $cameBack] = DB::transaction(fn () => $this->applyCleanup($run));
+        [$delisted, $restored, $wentDark, $cameBack, $adminDisabledMarked] = DB::transaction(fn () => $this->applyCleanup($run));
 
         $run->update([
             'status' => CatalogSyncRunStatus::Completed,
@@ -113,6 +113,7 @@ class CatalogSyncRunService
             'offers_delisted' => $delisted,
             'offers_restored' => $restored,
             'products_went_dark' => $wentDark->count(),
+            'admin_disabled_marked_delisted' => $adminDisabledMarked,
         ]);
 
         if ($wentDark->isNotEmpty()) {
@@ -189,7 +190,7 @@ class CatalogSyncRunService
     }
 
     /**
-     * @return array{0: int, 1: int, 2: Collection<int, Product>}
+     * @return array{0: int, 1: int, 2: Collection<int, Product>, 3: Collection<int, Product>, 4: int}
      */
     private function applyCleanup(CatalogSyncRun $run): array
     {
@@ -201,6 +202,14 @@ class CatalogSyncRunService
                 'delisted_at' => now(),
             ]);
         }
+
+        // Offers an admin already took off sale are not in the set above, but
+        // the supplier dropping them still has to be recorded. Without the
+        // marker, handing one back to the supplier would put an offer the
+        // supplier withdrew back on sale.
+        $adminDisabledMarked = $this->missingAdminDisabledVariants($run)->toBase()->update([
+            'delisted_at' => now(),
+        ]);
 
         // A returning offer was already switched back on by its normalizer when
         // the run saw it; clearing the marker closes the delisting record. Who
@@ -218,7 +227,7 @@ class CatalogSyncRunService
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return [$missing->count(), $restored, $wentDark, $cameBack];
+        return [$missing->count(), $restored, $wentDark, $cameBack, $adminDisabledMarked];
     }
 
     /**
@@ -314,6 +323,27 @@ class CatalogSyncRunService
     {
         return $this->feedVariants($run)
             ->where('is_available', true)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('last_seen_at')
+                ->orWhere('last_seen_at', '<', $run->started_at));
+    }
+
+    /**
+     * Admin-disabled variants of the feed that this run never saw and no
+     * cleanup has marked yet.
+     *
+     * Kept apart from missingVariants() on purpose. They are already off sale,
+     * so counting them would let a handful of hand-disabled offers trip the
+     * mass-delist guard, inflate the delisted count and name products in a
+     * went-dark alert that an admin took off sale long ago.
+     *
+     * @return Builder<ProductVariant>
+     */
+    private function missingAdminDisabledVariants(CatalogSyncRun $run): Builder
+    {
+        return $this->feedVariants($run)
+            ->whereNotNull('admin_disabled_at')
+            ->whereNull('delisted_at')
             ->where(fn (Builder $query) => $query
                 ->whereNull('last_seen_at')
                 ->orWhere('last_seen_at', '<', $run->started_at));
