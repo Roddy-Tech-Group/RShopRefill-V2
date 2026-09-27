@@ -2,6 +2,8 @@
 
 namespace App\Domain\Admin\Queries;
 
+use App\Domain\Admin\Support\RefundAdjustments;
+use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
@@ -25,6 +27,8 @@ use Illuminate\Support\Facades\DB;
  */
 class DashboardMetricsQuery
 {
+    public function __construct(private RefundAdjustments $refunds) {}
+
     /**
      * Get aggregated overview metrics.
      *
@@ -58,18 +62,26 @@ class DashboardMetricsQuery
         $totalUsers = $usersQuery->count();
         $totalOrders = $ordersQuery->count();
 
-        // Revenue is recognised only when an order is completed + fulfilled
-        // (order_status = Completed). A paid-but-still-processing order is
-        // money in the till but not yet earned — excluded here so the KPI
-        // matches the Revenue Overview chart's "completed and fulfilled" rule.
+        // Revenue is recognised when an order completes, and is never
+        // un-booked. A paid-but-still-processing order is money in the till
+        // but not yet earned, so it is excluded; a refunded one stays, because
+        // the sale really happened and the refund is deducted below on the day
+        // it was given back. Dropping the order instead is what made a closed
+        // month's revenue shrink after the fact.
         //
         // Summed via Order::usdTotal(): total_amount is the display-currency
         // figure (4000 XAF, 12000 NGN, ...), so summing it raw would mix
         // currencies into a number the dashboard then labels "USD".
-        $totalRevenue = (clone $ordersQuery)
-            ->where('order_status', OrderStatus::Completed->value)
+        $grossRevenue = (clone $ordersQuery)
+            ->whereIn('order_status', OrderStatus::booked())
             ->get(['id', 'total_amount', 'display_currency', 'metadata'])
             ->sum(fn (Order $order) => $order->usdTotal());
+
+        // Money handed back for goods the customer actually received, dated by
+        // when it was handed back. Same ledger the Finances page reads, so the
+        // two pages cannot disagree.
+        $refunds = $this->refunds->customerRefundsUsd($startDate, $endDate);
+        $totalRevenue = round((float) $grossRevenue - $refunds, 4);
 
         $paymentCount = (clone $paymentQuery)->count();
         $walletTxCount = $walletTxQuery->count();
@@ -102,7 +114,7 @@ class DashboardMetricsQuery
             : 0.0;
 
         $completedOrders = (clone $ordersQuery)
-            ->where('order_status', OrderStatus::Completed->value)
+            ->whereIn('order_status', OrderStatus::booked())
             ->count();
         $completedOrdersPct = $totalOrders > 0
             ? round(($completedOrders / $totalOrders) * 100, 2)
@@ -112,14 +124,21 @@ class DashboardMetricsQuery
         // what we paid the supplier. order_items.provider_cost_usd × quantity
         // is the source-of-truth supplier cost — items without a cost snapshot
         // contribute zero (no synthetic estimate), so the figure stays honest.
+        // Delivered items only: an item that never delivered cost us nothing
+        // and earned nothing, so counting its cost against a booked sale would
+        // invent a loss. Supplier credits come off on the day the supplier
+        // granted them, which is not the day we refunded the customer.
         $supplierCost = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->when($startDate, fn ($q) => $q->where('orders.created_at', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('orders.created_at', '<=', $endDate))
             ->sum(DB::raw('order_items.provider_cost_usd * order_items.quantity'));
+        $supplierCost = max(0.0, (float) $supplierCost - $this->refunds->supplierCreditsUsd($startDate, $endDate));
+
         $markupSharePct = $totalRevenue > 0
-            ? round((((float) $totalRevenue - (float) $supplierCost) / (float) $totalRevenue) * 100, 2)
+            ? round((($totalRevenue - $supplierCost) / $totalRevenue) * 100, 2)
             : 0.0;
 
         $transactionsSuccessPct = $transactionsCount > 0
@@ -165,18 +184,24 @@ class DashboardMetricsQuery
     {
         $customerFloat = $this->walletBalanceTotalUsd();
 
-        // All-time completed-order sales, converted per-order to USD (same rule
-        // as the Total Revenue KPI, just unfiltered by date).
+        // All-time booked sales, converted per-order to USD (same rule as the
+        // Total Revenue KPI, just unfiltered by date), less what was handed
+        // back to customers. Profit the business can actually spend is net of
+        // refunds, so this figure has to be too.
         $grossSales = (float) Order::query()
-            ->where('order_status', OrderStatus::Completed->value)
+            ->whereIn('order_status', OrderStatus::booked())
             ->get(['id', 'total_amount', 'display_currency', 'metadata'])
             ->sum(fn (Order $order) => $order->usdTotal());
+        $grossSales = max(0.0, $grossSales - $this->refunds->customerRefundsUsd());
 
-        // Source-of-truth supplier cost from the item cost snapshots.
+        // Source-of-truth supplier cost from the item cost snapshots, delivered
+        // items only, less every credit the supplier has granted us.
         $supplierCost = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->sum(DB::raw('order_items.provider_cost_usd * order_items.quantity'));
+        $supplierCost = max(0.0, $supplierCost - $this->refunds->supplierCreditsUsd());
 
         return [
             'customer_float_usd' => round($customerFloat, 2),
@@ -398,7 +423,7 @@ class DashboardMetricsQuery
         $granularity = in_array($granularity, ['daily', 'weekly', 'monthly'], true) ? $granularity : 'daily';
 
         $ordersQuery = Order::query()
-            ->where('order_status', OrderStatus::Completed->value)
+            ->whereIn('order_status', OrderStatus::booked())
             ->whereBetween('completed_at', [$start, $end])
             // Defensive: only orders with at least one product item (i.e. a
             // row in order_items with a non-null category_id) count. This is
@@ -442,10 +467,20 @@ class DashboardMetricsQuery
 
             $buckets[$bucketKey]['transactions']++;
             $buckets[$bucketKey]['sales'] += $order->usdTotal();
-            $buckets[$bucketKey]['cost'] += $order->items->sum(
-                fn ($item) => (float) $item->provider_cost_usd * (int) $item->quantity,
-            );
+            // Delivered items only. A failed item cost nothing and earned
+            // nothing, so charging its cost against a booked sale would invent
+            // a loss on a partially completed order.
+            $buckets[$bucketKey]['cost'] += $order->items
+                ->where('fulfillment_status', '!=', FulfillmentStatus::Failed)
+                ->sum(fn ($item) => (float) $item->provider_cost_usd * (int) $item->quantity);
         }
+
+        // Refunds and supplier credits land in the bucket they HAPPENED in,
+        // not the bucket that made the sale. An eSIM sold in September and
+        // refunded in October is September revenue and an October deduction,
+        // which is the whole reason the ledger records its own dates.
+        $refundBuckets = $this->refunds->customerRefundsByBucket($start, $end, $granularity);
+        $creditBuckets = $this->refunds->supplierCreditsByBucket($start, $end, $granularity);
 
         // Gap-fill every bucket between start and end so the chart line is
         // continuous (no missing days = no jagged drops to zero).
@@ -460,8 +495,8 @@ class DashboardMetricsQuery
         while ($cursor <= $endCursor) {
             $key = $cursor->format('Y-m-d');
             $row = $buckets[$key] ?? ['transactions' => 0, 'sales' => 0.0, 'cost' => 0.0];
-            $sales = round((float) $row['sales'], 4);
-            $cost = round((float) $row['cost'], 4);
+            $sales = round((float) $row['sales'] - ($refundBuckets[$key] ?? 0.0), 4);
+            $cost = round(max(0.0, (float) $row['cost'] - ($creditBuckets[$key] ?? 0.0)), 4);
             $profit = round($sales - $cost, 4);
             $transactions = (int) $row['transactions'];
 
@@ -511,7 +546,8 @@ class DashboardMetricsQuery
 
         $rows = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->where('orders.completed_at', '>=', $startDate)
             ->select(
                 DB::raw($this->dateFormatSql('orders.completed_at', '%Y-%m-%d').' as date'),
@@ -532,6 +568,11 @@ class DashboardMetricsQuery
             ->get()
             ->keyBy('date');
 
+        // Refunds and credits belong to the day they happened, so the line
+        // dips when money went back out, not retroactively on the sale day.
+        $refundDays = $this->refunds->customerRefundsByBucket($startDate, now()->endOfDay());
+        $creditDays = $this->refunds->supplierCreditsByBucket($startDate, now()->endOfDay());
+
         // Fill every day in the window so the chart line is continuous even
         // when there were no sales that day.
         $series = [];
@@ -540,8 +581,8 @@ class DashboardMetricsQuery
             $row = $rows[$date] ?? null;
             $series[] = [
                 'date' => $date,
-                'sales' => $row ? round((float) $row->sales, 2) : 0.0,
-                'cost' => $row ? round((float) $row->cost, 2) : 0.0,
+                'sales' => round((float) ($row->sales ?? 0) - ($refundDays[$date] ?? 0.0), 2),
+                'cost' => round(max(0.0, (float) ($row->cost ?? 0) - ($creditDays[$date] ?? 0.0)), 2),
             ];
         }
 
@@ -567,7 +608,8 @@ class DashboardMetricsQuery
 
         $query = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->where('orders.completed_at', '>=', $startDate)
             ->select(
                 DB::raw('UPPER('.$this->jsonTextSql('order_items.product_snapshot', '$.country_code').') as cc'),
@@ -585,6 +627,15 @@ class DashboardMetricsQuery
 
         $rows = $query->get();
 
+        // Refunds come off the country that made the sale, read from each
+        // refund's own per-item allocations rather than spread evenly. Skipped
+        // when the map is narrowed to one category, because the allocations
+        // would have to be filtered the same way and a half-applied deduction
+        // is worse than none.
+        $refundsByCountry = ($category === null || $category === 'all')
+            ? $this->refunds->customerRefundsByCountry($startDate, now()->endOfDay())
+            : [];
+
         $byCountry = [];
         foreach ($rows as $row) {
             $cc = (string) ($row->cc ?? '');
@@ -592,7 +643,7 @@ class DashboardMetricsQuery
             if ($cc === '' || strlen($cc) !== 2 || $cc === 'WW') {
                 continue;
             }
-            $byCountry[$cc] = round((float) $row->total, 2);
+            $byCountry[$cc] = round(max(0.0, (float) $row->total - ($refundsByCountry[$cc] ?? 0.0)), 2);
         }
 
         return $byCountry;
@@ -617,13 +668,16 @@ class DashboardMetricsQuery
             $dateFormat = in_array($range, ['6m', '1y']) ? '%Y-%m' : '%Y-%m-%d';
         }
 
-        // Aggregate completed + fulfilled orders by product type. Revenue is
-        // recognised only when fulfillment finishes (order_status = Completed),
-        // so a paid-but-still-processing order does NOT appear here yet.
+        // Aggregate delivered items on booked orders by product type. A
+        // paid-but-still-processing order does NOT appear here yet. This chart
+        // shows gross delivered sales per category and is deliberately not net
+        // of refunds: it answers "what sells", and a refund belongs to the day
+        // it happened, which a category mix cannot express.
         $results = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('categories', 'order_items.category_id', '=', 'categories.id')
-            ->where('orders.order_status', OrderStatus::Completed->value)
+            ->whereIn('orders.order_status', OrderStatus::booked())
+            ->where('order_items.fulfillment_status', '!=', FulfillmentStatus::Failed->value)
             ->where('orders.completed_at', '>=', $startDate)
             ->select(
                 DB::raw($this->dateFormatSql('orders.completed_at', $dateFormat).' as date'),

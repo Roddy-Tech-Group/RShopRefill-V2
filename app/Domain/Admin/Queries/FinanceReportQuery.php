@@ -65,17 +65,6 @@ class FinanceReportQuery
     /** Canonical category slugs that get the same always-present treatment. */
     private const CORE_CATEGORY_SLUGS = ['gift-cards', 'esims', 'mobile-airtime', 'bill-payments'];
 
-    /**
-     * Order states that mean the order DID complete. Refunded is here on
-     * purpose: a refund is recorded in the month it happens, so the sale it
-     * refunds must stay booked in the month it happened.
-     */
-    private const BOOKED_ORDER_STATUSES = [
-        OrderStatus::Completed,
-        OrderStatus::PartiallyCompleted,
-        OrderStatus::Refunded,
-    ];
-
     public function __construct(private DashboardMetricsQuery $metrics) {}
 
     /**
@@ -358,7 +347,7 @@ class FinanceReportQuery
     {
         return DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.order_status', array_map(fn (OrderStatus $status) => $status->value, self::BOOKED_ORDER_STATUSES))
+            ->whereIn('orders.order_status', OrderStatus::booked())
             ->whereNotNull('orders.completed_at')
             ->whereBetween('orders.completed_at', [$start, $end])
             // fulfillment_status is NOT NULL (default not_started), so a plain
