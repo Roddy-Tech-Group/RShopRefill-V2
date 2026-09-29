@@ -371,6 +371,19 @@
             if ($event.detail && ['country', 'language', 'currency'].includes($event.detail.pane)) { pane = $event.detail.pane; }
         });
     "
+    {{-- A region picked outside the modal (a gift card's "Choose another
+         region" list), applied at once rather than staged. This element is
+         inside the storefrontLocale() wrapper on both the storefront and the
+         dashboard, and its own x-data holds none of these keys, so the writes
+         reach the wrapper and its watchers navigate. The dashboard wraps only
+         the modal in that scope, so the picker cannot assign them itself. --}}
+    x-on:pick-region.window="
+        country = $event.detail.country;
+        countryFlag = $event.detail.countryFlag;
+        countryCode = $event.detail.countryCode;
+        currency = $event.detail.currency;
+        currencySymbol = $event.detail.currencySymbol;
+    "
     x-effect="if (! localeModalOpen) { pane = 'root'; syncDrafts(); }"
     x-show="localeModalOpen"
     x-transition:enter="transition-opacity ease-out duration-300"

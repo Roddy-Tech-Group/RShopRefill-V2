@@ -5,9 +5,11 @@ namespace Tests\Feature\Catalog;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use App\Support\TaggedCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -102,11 +104,101 @@ class BrandRegionPickerTest extends TestCase
             $this->assertStringContainsString('>'.$name.'</span>', $picker);
         }
 
-        // Three options, each one setting the shared region state rather than
-        // opening the global modal.
+        // Three options, each one sending the region to the shared state rather
+        // than opening the global modal.
         $this->assertSame(3, substr_count($picker, 'role="option"'));
-        $this->assertStringContainsString("countryCode = 'GB'", $picker);
+        $this->assertStringContainsString("\$dispatch('pick-region', { country: 'United Kingdom'", $picker);
+        $this->assertStringContainsString("countryCode: 'GB', currency: 'GBP'", $picker);
         $this->assertStringNotContainsString('Find your country', $html);
+    }
+
+    /**
+     * The storefront wraps the whole page in storefrontLocale(), the dashboard
+     * only its locale modal. The picker used to assign the region keys itself,
+     * which reached that scope on the storefront but no watching scope at all on
+     * the dashboard, so the menu closed and nothing switched. It now sends an
+     * event, and whatever applies it has to sit inside storefrontLocale() on
+     * both surfaces.
+     *
+     * @return array<string, array{0: bool}>
+     */
+    public static function surfaces(): array
+    {
+        return [
+            'storefront' => [false],
+            'dashboard' => [true],
+        ];
+    }
+
+    #[DataProvider('surfaces')]
+    public function test_picking_a_region_reaches_the_shared_locale_scope(bool $inDashboard): void
+    {
+        $this->row('US');
+        $this->row('GB');
+
+        TaggedCache::for(['catalog'])->flush();
+
+        $request = $this->withoutVite();
+
+        if ($inDashboard) {
+            $request->actingAs(User::factory()->create());
+        }
+
+        $html = $request
+            ->get(route($inDashboard ? 'dashboard.shop.brand' : 'shop.brand', ['brandSlug' => 'acme', 'country' => 'US']))
+            ->assertOk()
+            ->getContent();
+
+        $picker = $this->picker($html);
+        $this->assertStringContainsString("\$dispatch('pick-region'", $picker);
+        $this->assertStringNotContainsString('countryCode = ', $picker);
+
+        $this->assertSame(1, preg_match_all('/x-on:pick-region\.window="([^"]*)"/', $html, $listener), 'Exactly one element should apply a picked region.');
+
+        foreach (['country', 'countryFlag', 'countryCode', 'currency', 'currencySymbol'] as $key) {
+            $this->assertStringContainsString("{$key} = \$event.detail.{$key};", $listener[1][0]);
+        }
+
+        $this->assertTrue(
+            $this->isNestedIn($html, 'x-data="storefrontLocale()"', 'x-on:pick-region.window'),
+            'The pick-region listener is outside the storefrontLocale() scope, so its writes fire no watcher.'
+        );
+    }
+
+    /**
+     * Whether $needle sits inside the element carrying $wrapperAttribute.
+     *
+     * Counted by tags rather than walked in a DOM: PHP's HTML parser drops
+     * most of these pages (custom elements, Alpine's @ and : attributes), the
+     * locale modal with them.
+     */
+    private function isNestedIn(string $html, string $wrapperAttribute, string $needle): bool
+    {
+        $needleAt = strpos($html, $needle);
+        $this->assertNotFalse($needleAt, "{$needle} did not render.");
+
+        $wrapperAt = strrpos(substr($html, 0, $needleAt), $wrapperAttribute);
+        $this->assertNotFalse($wrapperAt, "No {$wrapperAttribute} before {$needle}.");
+
+        $tagAt = strrpos(substr($html, 0, $wrapperAt), '<');
+        preg_match('/^<([a-z][a-z0-9-]*)/i', substr($html, $tagAt), $tag);
+
+        // Script bodies can hold markup strings that are not tags.
+        $between = preg_replace('#<script\b[^>]*>.*?</script>#is', '', substr($html, $tagAt, $needleAt - $tagAt));
+        preg_match_all('#<(/?)'.preg_quote($tag[1], '#').'\b#i', $between, $tags, PREG_SET_ORDER);
+
+        // The wrapper opens at depth 1; closing back to 0 before the needle
+        // means the needle comes after it, not inside it.
+        $depth = 0;
+        foreach ($tags as $index => $found) {
+            $depth += $found[1] === '/' ? -1 : 1;
+
+            if ($index > 0 && $depth < 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function test_a_brand_in_one_country_offers_nothing(): void

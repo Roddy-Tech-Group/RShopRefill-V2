@@ -8,11 +8,16 @@
     served another region's card without being told. A brand sold in one country
     says so and offers nothing, because there is nothing to choose.
 
-    Choosing writes through to the shared storefrontLocale() scope, the same
-    keys the search panel's country rows set. Its watcher navigates and the nav
-    pill follows, so the region on the card and the region in the header cannot
+    Choosing sends a `pick-region` event, which the locale modal applies to the
+    shared storefrontLocale() scope. Its watcher navigates and the nav pill
+    follows, so the region on the card and the region in the header cannot
     disagree. That switch is site-wide, not card-scoped: it is the same region
     the pill and the locale modal set.
+
+    An event rather than assigning the keys here: the storefront wraps the whole
+    page in that scope, but the dashboard wraps only the modal, so on the
+    dashboard an assignment from this partial landed on no scope that watches it
+    and the picker closed without switching anything.
 --}}
 @php
     $availabilityCountries = collect($brandCountries ?? [])->values();
@@ -105,7 +110,7 @@
                         type="button"
                         role="option"
                         :aria-selected="@js($availabilityCode === strtoupper((string) $product->country_code))"
-                        @click="country = @js($availabilityName); countryFlag = @js($availabilityEmoji); countryCode = @js($availabilityCode); currency = @js($availabilityCurrency); currencySymbol = @js(\App\Models\Product::currencySymbol($availabilityCurrency)); open = false"
+                        @click="$dispatch('pick-region', { country: @js($availabilityName), countryFlag: @js($availabilityEmoji), countryCode: @js($availabilityCode), currency: @js($availabilityCurrency), currencySymbol: @js(\App\Models\Product::currencySymbol($availabilityCurrency)) }); open = false"
                         @class([
                             'flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-sm font-medium transition-colors',
                             'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' => $availabilityCode === strtoupper((string) $product->country_code),
