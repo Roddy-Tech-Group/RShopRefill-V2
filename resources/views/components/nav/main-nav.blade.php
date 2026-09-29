@@ -357,7 +357,7 @@
                          filled pill inside the right edge. Focus recolours that hairline
                          instead of thickening it, so the field never changes size when
                          it is clicked. --}}
-                    :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/25'"
+                    :class="open ? 'border-edge dark:border-edge' : 'border-zinc-200 hover:border-zinc-300 dark:border-white'"
                     class="group flex h-9 cursor-text items-center gap-2.5 rounded-full border-2 bg-[#eff6ff] pl-4 pr-1 transition-colors duration-200"
                 >
                     {{-- A mark, not a button: the field has a Search button now, and two
@@ -465,7 +465,7 @@
                      a filled round button inside its right edge. The focus state
                      brightens the same hairline rather than swapping in a second,
                      thicker border, so the pill never changes size when tapped. --}}
-                :class="open ? 'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white/10 dark:bg-white/8'"
+                :class="open ? 'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white dark:bg-white/8'"
                 class="flex cursor-text items-center gap-2 rounded-full border-2 py-0.5 pl-4 pr-0.5 transition-colors duration-200"
             >
                 <input
