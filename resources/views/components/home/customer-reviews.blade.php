@@ -87,12 +87,12 @@
                         <p class="mt-2 text-sm leading-relaxed text-zinc-700">{{ __('reviews.collector_body') }}</p>
 
                         <div class="mt-auto pt-6">
-                            <div class="inline-flex overflow-hidden rounded-[12px] bg-white shadow-md shadow-zinc-900/20">
+                            <div class="review-collector-frame inline-flex h-[52px] items-center overflow-hidden rounded-[12px] bg-[#ffffff] shadow-md shadow-zinc-900/20">
                                 <div class="trustpilot-widget"
                                     data-locale="{{ $tp['locale'] }}"
                                     data-template-id="{{ $tp['review_collector_template_id'] }}"
                                     data-businessunit-id="{{ $tp['business_unit_id'] }}"
-                                    data-style-height="52px"
+                                    data-style-height="38px"
                                     data-style-width="240px"
                                     data-token="{{ $tp['review_collector_token'] }}">
                                     <a href="{{ $trustpilotProfileUrl }}" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-700 hover:underline">{{ __('reviews.review_fallback') }}</a>

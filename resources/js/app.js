@@ -578,6 +578,29 @@ if (document.readyState === 'loading') {
 // Re-run on Livewire SPA navigation so animations replay on the new page.
 document.addEventListener('livewire:navigated', bootAll);
 
+// The review widget's loader builds the widgets it finds on its first run and
+// never looks again. A page reached by in-place navigation after that (home,
+// then Contact) kept only its fallback link, so build any widget still
+// without its frame. The first page load is left to the loader itself.
+let reviewWidgetsFirstVisit = true;
+document.addEventListener('livewire:navigated', () => {
+    if (reviewWidgetsFirstVisit) {
+        reviewWidgetsFirstVisit = false;
+        return;
+    }
+
+    const loader = window.Trustpilot;
+    if (!loader || typeof loader.loadFromElement !== 'function') {
+        return;
+    }
+
+    document.querySelectorAll('.trustpilot-widget').forEach((widget) => {
+        if (!widget.querySelector('iframe')) {
+            loader.loadFromElement(widget, true);
+        }
+    });
+});
+
 /**
  * Shared locale Alpine component used by both the storefront and customer-dashboard
  * layouts. Owns: locale modal open state, country (name + flag + ISO code),

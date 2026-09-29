@@ -192,9 +192,9 @@ return [
         // Safe to commit defaults since the same values would render in HTML anyway.
         'business_unit_id' => env('TRUSTPILOT_BUSINESS_UNIT_ID', '6a09a40f1ccabec3e9c1b491'),
         'review_collector_template_id' => env('TRUSTPILOT_REVIEW_COLLECTOR_TEMPLATE_ID', '56278e9abfbbba0bdcd568bc'),
-        'review_collector_token' => env('TRUSTPILOT_REVIEW_COLLECTOR_TOKEN', 'cfe1b67e-5fc4-4d20-9666-cc4ca9b37b87'),
+        'review_collector_token' => env('TRUSTPILOT_REVIEW_COLLECTOR_TOKEN', '729d50a6-9fed-4135-b791-92b14b8f875f'),
         'profile_url' => env('TRUSTPILOT_PROFILE_URL', 'https://www.trustpilot.com/review/rshoprefill.com'),
-        'short_link' => env('TRUSTPILOT_SHORT_LINK', 'https://trstp.lt/WMNWs7ZKQx'),
+        'short_link' => env('TRUSTPILOT_SHORT_LINK', 'https://trstp.lt/N-svFRNzv_'),
         'locale' => env('TRUSTPILOT_LOCALE', 'en-US'),
     ],
 
