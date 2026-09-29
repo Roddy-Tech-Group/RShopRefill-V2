@@ -72,7 +72,7 @@ class MobileActionButtonsTest extends TestCase
 
         // The phone search field wears the same fill at rest, and drops it for
         // a white surface with the edge-blue border once it has focus.
-        $this->assertStringContainsString("'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-zinc-200 bg-[#f4f6f5] dark:border-white dark:bg-white/8'", $this->nav());
+        $this->assertStringContainsString("'border-edge bg-[#ffffff] dark:border-edge dark:bg-[#0c1a36]' : 'border-[#e4e4e7] bg-[#f4f6f5] dark:border-white dark:bg-white/8'", $this->nav());
 
         // Cart and account no longer share this kit: both are the dashboard's
         // outlined chips (CartChipTest, AccountAvatarShapeTest), so none of

@@ -87,7 +87,14 @@ class ReviewWidgetAndContactButtonsTest extends TestCase
         $nav = File::get(resource_path('views/components/nav/main-nav.blade.php'));
 
         // Desktop and phone fields, at rest.
-        $this->assertTrue(str_contains($nav, "'border-zinc-200 hover:border-zinc-300 dark:border-white'"), 'the desktop search field edge is not white in dark mode');
-        $this->assertTrue(str_contains($nav, "'border-zinc-200 bg-[#f4f6f5] dark:border-white dark:bg-white/8'"), 'the phone search field edge is not white in dark mode');
+        $this->assertTrue(str_contains($nav, "'border-[#e4e4e7] hover:border-zinc-300 dark:border-white dark:hover:border-white'"), 'the desktop search field edge is not white in dark mode');
+        $this->assertTrue(str_contains($nav, "'border-[#e4e4e7] bg-[#f4f6f5] dark:border-white dark:bg-white/8'"), 'the phone search field edge is not white in dark mode');
+
+        // dark:border-white alone is not enough: the stylesheet's
+        // `.dark .border-zinc-200` outranks it and painted the edge #3a3a3a,
+        // so the light edge must be written as a colour that rule never names.
+        $css = File::get(resource_path('css/app.css'));
+        $this->assertTrue(str_contains($css, '.dark .border-zinc-200,'), 'the dark border remap moved; recheck what can outrank the search edge');
+        $this->assertSame(0, preg_match("/'border-zinc-200 [^']*dark:border-white/", $nav), 'a search field went back to a light edge that dark mode remaps to grey');
     }
 }
