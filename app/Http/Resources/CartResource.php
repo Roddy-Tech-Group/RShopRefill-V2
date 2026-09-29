@@ -6,6 +6,7 @@ use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Cart\Services\CartValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 class CartResource extends JsonResource
 {
@@ -26,7 +27,10 @@ class CartResource extends JsonResource
             'id' => $this->id,
             'status' => $this->status,
             'items' => CartItemResource::collection($this->whenLoaded('items')),
-            'totals' => $totals,
+            // Customer-facing figures only. The pricing service also returns
+            // the markup and the supplier cost for internal use; this endpoint
+            // is public to anyone holding a guest token.
+            'totals' => Arr::only($totals, ['currency', 'subtotal', 'total', 'estimated_rcoin_reward']),
             'issues' => $issues,
             'last_activity_at' => $this->last_activity_at,
         ];

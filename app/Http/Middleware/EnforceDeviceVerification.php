@@ -20,6 +20,17 @@ class EnforceDeviceVerification
                 return $next($request);
             }
 
+            // The API answers on the same session cookie, so a session that has
+            // the password but not the emailed code must be refused there too:
+            // /api/orders returns delivered codes. It gets JSON, not a redirect
+            // to a page it cannot render.
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Enter the code we emailed you to finish signing in on this device.',
+                    'device_verification_required' => true,
+                ], 403);
+            }
+
             // Redirect all other requests to the verification page
             return redirect()->route('security.verify-device');
         }

@@ -43,14 +43,23 @@ class CheckoutApiController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'cart_id' => ['required', 'uuid', 'exists:carts,id'],
+            'cart_id' => ['required', 'uuid'],
             'payment_method' => ['required', 'string', Rule::in(['wallet', 'flutterwave', 'crypto'])],
             'preferred_currency' => ['required', 'string', 'size:3'],
             'delivery_email' => ['nullable', 'email'],
             'wallet_currency' => ['nullable', 'string', 'size:3'],
         ]);
 
-        $cart = Cart::with(['items.product', 'items.variant'])->findOrFail($validated['cart_id']);
+        // Only the caller's own active cart, the one the web checkout would
+        // resolve for them. A bare findOrFail on the id let any signed-in
+        // customer place an order against someone else's cart, and the old
+        // `exists` rule confirmed to anyone which cart ids were real.
+        $cart = Cart::with(['items.product', 'items.variant'])
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->find($validated['cart_id']);
+
+        abort_if($cart === null, 404, 'Cart not found.');
 
         try {
             $order = $this->checkoutService->placeOrder(

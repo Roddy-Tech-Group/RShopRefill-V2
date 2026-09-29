@@ -112,6 +112,34 @@ class CheckoutApiGuardsTest extends TestCase
         $this->postCheckout(User::factory()->create())->assertStatus(503);
     }
 
+    public function test_a_customer_cannot_place_an_order_against_someone_elses_cart(): void
+    {
+        // The cart id used to be looked up with a bare findOrFail, so any
+        // signed-in customer who had another customer's cart id could check
+        // it out. It is now the caller's own active cart or nothing, and a
+        // cart that exists but is not yours answers exactly like one that
+        // does not exist.
+        $owner = User::factory()->create();
+        $cart = $this->cartWithItem($owner);
+
+        $this->postCheckout(User::factory()->create(), ['cart_id' => $cart->id])->assertNotFound();
+        $this->postCheckout($owner, ['cart_id' => '00000000-0000-0000-0000-000000000000'])->assertNotFound();
+
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_a_paid_cart_cannot_be_checked_out_again(): void
+    {
+        // A cart is set to abandoned once its payment confirms. Placing a
+        // second order against it would bill the customer twice for items
+        // they already received.
+        $user = User::factory()->create();
+        $cart = $this->cartWithItem($user);
+        $cart->update(['status' => 'abandoned']);
+
+        $this->postCheckout($user, ['cart_id' => $cart->id])->assertNotFound();
+    }
+
     public function test_unverified_email_is_always_refused_at_checkout(): void
     {
         // Email verification is mandatory: the EnsureEmailVerified middleware

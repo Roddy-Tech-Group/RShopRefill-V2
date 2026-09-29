@@ -183,10 +183,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // check as the web group runs here too: these routes authenticate the
         // very same session cookie, so a banned customer must not keep
         // working /api endpoints just because they never load a web page.
+        //
+        // EnforceDeviceVerification runs here for the same reason: a session
+        // still waiting on its new-device email code was refused every web
+        // page but could read /api/orders, delivered codes included.
         $middleware->api(append: [
             EncryptCookies::class,
             StartSession::class,
             EnsureAccountActive::class,
+            EnforceDeviceVerification::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));

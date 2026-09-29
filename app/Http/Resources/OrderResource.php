@@ -16,7 +16,8 @@ class OrderResource extends JsonResource
             'order_number' => $this->order_number,
             'display_currency' => $this->display_currency,
             'subtotal_amount' => (float) $this->subtotal_amount,
-            'markup_amount' => (float) $this->markup_amount,
+            // markup_amount is deliberately absent: it is our margin, not a
+            // figure the customer pays or needs to see.
             'total_amount' => (float) $this->total_amount,
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status->value,
