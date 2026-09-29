@@ -44,6 +44,7 @@ enum CommunicationCategory: string
     // ── Orders (orders@) ──────────────────────────────────────────
     case OrderPlaced = 'order_placed';
     case OrderFulfilled = 'order_fulfilled';
+    case OrderComplete = 'order_complete';
     case GiftCard = 'gift_card';
     case Esim = 'esim';
     case EsimLowData = 'esim_low_data';
@@ -109,6 +110,20 @@ enum CommunicationCategory: string
     }
 
     /**
+     * Whether this category is an email and nothing else, for a reason other
+     * than a one-time code.
+     *
+     * OrderComplete exists to carry the review invitation copy on a message
+     * that holds no codes. A bell entry or push banner saying the order is
+     * complete would only repeat the delivery notification the customer
+     * already had.
+     */
+    public function isEmailOnly(): bool
+    {
+        return $this->carriesOneTimeCode() || $this === self::OrderComplete;
+    }
+
+    /**
      * Resolve which MailDomain this category belongs to.
      */
     public function mailDomain(): MailDomain
@@ -147,6 +162,7 @@ enum CommunicationCategory: string
             // Orders
             self::OrderPlaced,
             self::OrderFulfilled,
+            self::OrderComplete,
             self::GiftCard,
             self::Esim,
             self::EsimLowData,
@@ -236,6 +252,7 @@ enum CommunicationCategory: string
             self::WalletDebit => 'Wallet Debit',
             self::OrderPlaced => 'Order Placed',
             self::OrderFulfilled => 'Order Fulfilled',
+            self::OrderComplete => 'Order Complete',
             self::Refund => 'Refund Processed',
             self::GiftCardsRestored => 'Gift Cards Restored',
             self::GiftCardsUnavailable => 'Gift Cards Unavailable',

@@ -58,6 +58,12 @@ class ResendProvider implements MailProviderInterface
             $payload['attachments'] = $rendered['attachments'];
         }
 
+        // A blind copy the mailable declared on its envelope. The payload is
+        // built by hand, so without this it was silently dropped.
+        if (! empty($rendered['bcc'])) {
+            $payload['bcc'] = $rendered['bcc'];
+        }
+
         // Optional mail advertises its way out. A caller that minted a signed
         // one-click link (UnsubscribeLink) gets the full RFC 8058 pair; the
         // legacy marketing flag points at the settings page, which needs a
@@ -197,6 +203,7 @@ class ResendProvider implements MailProviderInterface
             return [
                 'html' => $email->getHtmlBody(),
                 'attachments' => $attachments,
+                'bcc' => array_map(fn ($address) => $address->getAddress(), $email->getBcc()),
             ];
 
         } finally {

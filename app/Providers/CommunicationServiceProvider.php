@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Domain\Communication\Listeners\Commerce\FulfillmentNotificationListener;
+use App\Domain\Communication\Listeners\Commerce\OrderCompleteNoticeListener;
 use App\Domain\Communication\Listeners\Commerce\OrderConfirmationListener;
 use App\Domain\Communication\Listeners\Commerce\RefundNotificationListener;
 use App\Domain\Communication\Listeners\Rewards\RcoinRewardListener;
@@ -21,6 +22,7 @@ use App\Domain\Communication\Providers\MailProviderInterface;
 use App\Domain\Communication\Providers\ResendProvider;
 use App\Domain\Communication\Services\CommunicationManager;
 use App\Domain\Order\Events\FulfillmentSucceeded;
+use App\Domain\Order\Events\OrderCompleted;
 use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Rewards\Events\RcoinEarned;
@@ -109,6 +111,7 @@ class CommunicationServiceProvider extends ServiceProvider
         // sweeper cancelled the order behind the email's back.
         Event::listen(OrderConfirmed::class, OrderConfirmationListener::class);
         Event::listen(FulfillmentSucceeded::class, FulfillmentNotificationListener::class);
+        Event::listen(OrderCompleted::class, OrderCompleteNoticeListener::class);
         Event::listen(RefundIssued::class, RefundNotificationListener::class);
 
         // Register Wallet Listeners

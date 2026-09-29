@@ -35,8 +35,10 @@ class ChannelResolver
         // banner both render the message body verbatim, which means the code
         // reaches anyone already holding a session or a stale push
         // subscription - neither of which proves control of the inbox the code
-        // exists to verify.
-        if ($category->carriesOneTimeCode()) {
+        // exists to verify. The order-complete note is email-only too: it
+        // exists to carry the review invitation copy, and anywhere else it
+        // would only repeat the delivery notification.
+        if ($category->isEmailOnly()) {
             return $hasMailable && $this->isEmailAllowed($recipient, $category, $hasOverrideEmail, $preferenceManager)
                 ? [CommunicationChannel::Email]
                 : [];

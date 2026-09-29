@@ -5,6 +5,7 @@ namespace App\Domain\Order\Services;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Fulfillment\Services\EsimRegistry;
 use App\Domain\Order\Enums\OrderStatus;
+use App\Domain\Order\Events\OrderCompleted;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\WalletPaymentProvider;
@@ -48,7 +49,9 @@ class OrderService
      */
     public function transitionFulfillmentStatus(Order $order, FulfillmentStatus $newStatus): void
     {
-        DB::transaction(function () use ($order, $newStatus) {
+        $deliveredInFull = null;
+
+        DB::transaction(function () use ($order, $newStatus, &$deliveredInFull) {
             $order = Order::where('id', $order->id)->lockForUpdate()->firstOrFail();
 
             $order->fulfillment_status = $newStatus;
@@ -132,7 +135,23 @@ class OrderService
                     }
                 }
             }
+
+            // Every item delivered, whether that happened now or an admin
+            // finished an order that had only partly delivered (it was already
+            // Completed, so the rewards check above does not see it).
+            if ($newStatus === FulfillmentStatus::Fulfilled
+                && $order->wasChanged('fulfillment_status')
+                && $order->order_status === OrderStatus::Completed) {
+                $deliveredInFull = $order;
+            }
         });
+
+        // Raised outside the transaction so the rewards job above is always
+        // queued first, whatever a listener here does. Inside an outer
+        // transaction the event still waits for that commit.
+        if ($deliveredInFull !== null) {
+            OrderCompleted::dispatch($deliveredInFull);
+        }
     }
 
     /**

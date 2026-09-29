@@ -6,6 +6,7 @@ use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Enums\MailDomain;
 use App\Domain\Communication\Jobs\DispatchCommunicationJob;
 use App\Domain\Communication\Listeners\Commerce\FulfillmentNotificationListener;
+use App\Domain\Communication\Listeners\Commerce\OrderCompleteNoticeListener;
 use App\Domain\Communication\Listeners\Commerce\OrderConfirmationListener;
 use App\Domain\Communication\Listeners\Commerce\RefundNotificationListener;
 use App\Domain\Communication\Listeners\Rewards\RcoinRewardListener;
@@ -28,6 +29,7 @@ use App\Domain\Communication\Services\PreferenceManager;
 use App\Domain\Communication\Services\SenderResolver;
 use App\Domain\Fulfillment\Enums\FulfillmentStatus;
 use App\Domain\Order\Events\FulfillmentSucceeded;
+use App\Domain\Order\Events\OrderCompleted;
 use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Events\PaymentSessionFailed;
@@ -122,6 +124,7 @@ class ValidateCommunicationPlatformCommand extends Command
         // the money, not the creation of the checkout skeleton.
         [OrderConfirmed::class, OrderConfirmationListener::class, 'handle'],
         [FulfillmentSucceeded::class, FulfillmentNotificationListener::class, 'handle'],
+        [OrderCompleted::class, OrderCompleteNoticeListener::class, 'handle'],
         [RefundIssued::class, RefundNotificationListener::class, 'handle'],
         [WalletCredited::class, WalletCreditListener::class, 'handle'],
         [WalletDebited::class, WalletDebitListener::class, 'handle'],
