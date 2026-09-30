@@ -262,8 +262,8 @@
         {{-- gap-2 on a phone, gap-4 from md.
 
              On a phone this gap sits between the menu button and the logo, and
-             16px there measured much wider than it was: the button's icon is
-             24px inside a 44px tap target, so ten of those pixels are already
+             16px there measured much wider than it was: the button's chip is
+             36px inside a 44px tap target, so four of those pixels are already
              empty before the gap starts. From md the button is gone and the
              same gap separates the logo from the search bar, where 16px is
              right, so the two cases are set separately rather than compromised
@@ -274,16 +274,26 @@
 
             {{-- Menu, phone only. Opens the sheet above, which is also where
                  the mark lives on a phone; the logo keeps its own grid column
-                 from md, so adding this cannot shift it. --}}
+                 from md, so adding this cannot shift it.
+
+                 The button is the 44px tap target and the chip inside it is
+                 what shows: the cart and account chips' own 36px outlined
+                 circle, so every control on the row reads as one set, with a
+                 stronger wash while a finger is on it. Three bare lines gave a
+                 tap no answer at all, and a phone never sees a hover. -ml-1
+                 takes up the 4px between button and chip, which puts the
+                 chip's outline on the gutter. --}}
             <button
                 type="button"
                 @click="$dispatch('open-mobile-menu')"
                 aria-label="{{ __('common.menu') }}"
-                class="col-start-1 -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-zinc-900 transition-colors hover:bg-[#f4f6f5] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 md:hidden dark:text-zinc-200 dark:hover:bg-white/10"
+                class="col-start-1 -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full group/menu focus:outline-none md:hidden"
             >
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                    <path d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
+                <span class="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors group-hover/menu:border-edge group-hover/menu:bg-[#0c1337]/10 group-active/menu:border-edge group-active/menu:bg-[#0c1337]/20 group-focus-visible/menu:ring-2 group-focus-visible/menu:ring-blue-500/50 dark:border-white/10 dark:text-zinc-200 dark:group-hover/menu:bg-white/5 dark:group-active/menu:bg-white/15">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <path d="M4 7h16M4 12h16M4 17h16" />
+                    </svg>
+                </span>
             </button>
 
 

@@ -52,6 +52,34 @@ class MobileActionButtonsTest extends TestCase
     }
 
     /**
+     * The menu button shows as the account controls' 36px outlined chip, drawn
+     * inside its 44px tap target, and answers a tap with a stronger wash. It was
+     * three bare lines whose only feedback was a hover fill, which a phone never
+     * shows.
+     */
+    public function test_the_menu_button_is_an_outlined_chip_that_answers_a_tap(): void
+    {
+        $nav = $this->nav();
+        $start = strpos($nav, "@click=\"\$dispatch('open-mobile-menu')\"");
+
+        $this->assertNotFalse($start, 'the menu button is missing');
+
+        $button = substr($nav, $start, strpos($nav, '</button>', $start) - $start);
+
+        // The chip is keyed to the button, so the whole 44px target drives it.
+        $this->assertStringContainsString('group/menu', $button);
+        $this->assertStringContainsString('h-9 w-9 items-center justify-center rounded-full border-2 border-[#0c1337]/30 text-zinc-700 transition-colors group-hover/menu:border-edge group-hover/menu:bg-[#0c1337]/10', $button);
+        $this->assertStringContainsString('dark:border-white/10 dark:text-zinc-200 dark:group-hover/menu:bg-white/5', $button);
+
+        // Pressed: a stronger wash than the hover, in both themes.
+        $this->assertStringContainsString('group-active/menu:border-edge group-active/menu:bg-[#0c1337]/20', $button);
+        $this->assertStringContainsString('dark:group-active/menu:bg-white/15', $button);
+
+        // The button no longer paints its own 44px disc behind the chip.
+        $this->assertStringNotContainsString('hover:bg-[#f4f6f5]', $button);
+    }
+
+    /**
      * One fill across the whole action row: #f4f6f5 on the light page, white/10
      * in dark.
      *

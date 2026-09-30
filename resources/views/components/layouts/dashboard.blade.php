@@ -876,13 +876,16 @@
             {{-- Phones and tablets: this same header is the top bar, fixed by
                  app.css, and it leads with the hamburger that opens the sidebar
                  drawer (at the foot of this layout). The pills to its right are
-                 the desktop ones, unchanged: same controls, same dropdowns. --}}
+                 the desktop ones, unchanged: same controls, same dropdowns.
+                 The button wears their outline too (2px, white at 30%), so it
+                 reads as a control rather than three bare lines, and its
+                 outline sits on the gutter the way the chips on the right do. --}}
             <button
                 type="button"
                 x-data
                 x-on:click="$dispatch('open-mobile-menu')"
                 aria-label="Open menu"
-                class="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition-colors active:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 active:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 dark:active:bg-white/15 lg:hidden"
             >
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>

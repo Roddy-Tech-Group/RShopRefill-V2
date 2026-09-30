@@ -174,6 +174,28 @@ class MobileNavChromeVisibilityTest extends TestCase
             ->assertDontSee(self::BADGE_MARKER, false);
     }
 
+    /**
+     * The hamburger wears the chips' outline (2px, white at 30%) and answers a
+     * tap with a stronger wash, rather than being three bare lines. No -ml-1:
+     * that pull was for a bare glyph, and it would put the outline off the
+     * gutter the chips on the right sit on.
+     */
+    public function test_the_hamburger_is_an_outlined_chip_with_a_pressed_state(): void
+    {
+        $this->withoutVite();
+
+        $html = $this->actingAs(User::factory()->create())->get('/dashboard')->assertOk()->getContent();
+        $at = strpos($html, 'aria-label="Open menu"');
+
+        $this->assertNotFalse($at, 'the hamburger is missing');
+
+        $tag = substr($html, $at, strpos($html, '>', $at) - $at);
+
+        $this->assertStringContainsString('rounded-full border-2 border-white/30 text-white transition-colors hover:bg-white/15 active:bg-white/25', $tag);
+        $this->assertStringContainsString('dark:border-white/30 dark:text-zinc-200 dark:hover:bg-white/5 dark:active:bg-white/15', $tag);
+        $this->assertStringNotContainsString('-ml-1', $tag);
+    }
+
     private function completedOrder(User $user, OrderStatus $status = OrderStatus::Completed): void
     {
         Order::create([
