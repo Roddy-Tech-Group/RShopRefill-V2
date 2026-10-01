@@ -45,6 +45,28 @@ class MoneyTest extends TestCase
         $this->assertSame('XYZ', Money::symbol('XYZ'));
     }
 
+    public function test_exact_keeps_two_decimals_and_widens_only_for_sub_cent_amounts(): void
+    {
+        $this->assertSame('10.51', Money::exact(10.51, 'USD'));
+        $this->assertSame('125.50', Money::exact(125.5, 'USD'));
+        $this->assertSame('7.00', Money::exact(7, Currency::GBP));
+        $this->assertSame('1,234.56', Money::exact(1234.56, 'NGN'));
+
+        // A leftover a 2-decimal render would show as 0.01, the one amount
+        // the debit form then refuses as more than the balance.
+        $this->assertSame('0.0099', Money::exact(0.0099, 'USD'));
+        $this->assertSame('0.009', Money::exact(0.009, 'USD'));
+        $this->assertSame('10.5137', Money::exact(10.5137, 'USD'));
+
+        // Never beyond the ledger's four decimals.
+        $this->assertSame('0.0001', Money::exact(0.00012, 'USD'));
+    }
+
+    public function test_exact_renders_rcoin_as_whole_coins(): void
+    {
+        $this->assertSame('1,500', Money::exact(1500, 'RCOIN'));
+    }
+
     public function test_it_accepts_a_currency_enum_directly(): void
     {
         // Some callers pass the enum (e.g. wallet models cast `currency` to

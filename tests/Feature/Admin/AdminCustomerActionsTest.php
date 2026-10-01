@@ -85,6 +85,67 @@ class AdminCustomerActionsTest extends TestCase
         $this->assertTrue((bool) $user->wallets()->first()->is_active);
     }
 
+    public function test_admin_can_debit_a_wallet_down_to_exactly_zero(): void
+    {
+        $user = User::factory()->create();
+        $wallet = Wallet::create([
+            'user_id' => $user->id,
+            'currency' => 'USD',
+            'balance' => 10.51,
+            'locked_balance' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin(), 'admin')
+            ->post(route('admin.customer.wallet-adjust', $user), [
+                'currency' => 'USD',
+                'direction' => 'debit',
+                'amount' => '10.51',
+                'reason' => 'Card refunded instead of wallet credit',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'Debited 10.51 USD.');
+
+        $this->assertSame(0.0, (float) $wallet->fresh()->balance);
+    }
+
+    public function test_debiting_more_than_a_sub_cent_balance_names_the_exact_balance(): void
+    {
+        $user = User::factory()->create();
+        $wallet = Wallet::create([
+            'user_id' => $user->id,
+            'currency' => 'USD',
+            'balance' => 0.0099,
+            'locked_balance' => 0,
+            'is_active' => true,
+        ]);
+
+        $admin = $this->admin();
+
+        // A 2-decimal message said "only has 0.01" while refusing 0.01.
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.customer.wallet-adjust', $user), [
+                'currency' => 'USD',
+                'direction' => 'debit',
+                'amount' => '0.01',
+                'reason' => 'Clear the leftover',
+            ])
+            ->assertSessionHasErrors(['amount' => "Customer only has 0.0099 USD - can't debit more than that."]);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.customer.wallet-adjust', $user), [
+                'currency' => 'USD',
+                'direction' => 'debit',
+                'amount' => '0.0099',
+                'reason' => 'Clear the leftover',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'Debited 0.0099 USD.');
+
+        $this->assertSame(0.0, (float) $wallet->fresh()->balance);
+    }
+
     // ────────────────────────────────────────────────────────────
     //  Suspend / Lift suspension
     // ────────────────────────────────────────────────────────────

@@ -19,6 +19,9 @@ use App\Domain\Shared\Enums\Currency;
  */
 class Money
 {
+    /** Scale of wallets.balance and every amount the wallet ledger records. */
+    private const LEDGER_DECIMALS = 4;
+
     public static function format(float $amount, Currency|string|null $code): string
     {
         $currency = self::resolve($code);
@@ -42,6 +45,24 @@ class Money
         $precision = $currency instanceof Currency ? $currency->decimalPrecision() : 2;
 
         return $upper.' '.number_format($amount, $precision);
+    }
+
+    /**
+     * The amount as the wallet ledger stores it, for admin screens where the
+     * figure has to be acted on exactly: the currency's usual decimals,
+     * widened up to the ledger's four only when the value carries them, so a
+     * 0.0099 balance never reads as 0.01 and can be typed back to clear it.
+     */
+    public static function exact(float $amount, Currency|string|null $code): string
+    {
+        $currency = self::resolve($code);
+        $decimals = $currency instanceof Currency ? $currency->decimalPrecision() : 2;
+
+        while ($decimals < self::LEDGER_DECIMALS && round($amount, $decimals) !== round($amount, self::LEDGER_DECIMALS)) {
+            $decimals++;
+        }
+
+        return number_format($amount, $decimals);
     }
 
     public static function symbol(Currency|string|null $code): string

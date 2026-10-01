@@ -601,11 +601,13 @@
                         @php
                             $code = $w->currency?->value ?? 'USD';
                             $isRcoin = $code === 'RCOIN';
-                            $tone = $isRcoin ? 'bg-blue-50 text-blue-700' : 'bg-zinc-50 text-zinc-700';
+                            // Literal light fills: the dark theme repaints bg-zinc-50 / bg-blue-50
+                            // as the card's own ash, which hid the chips; sunk to the ground instead.
+                            $tone = $isRcoin ? 'bg-[#f4f6f5] text-blue-700 dark:bg-[var(--ground)]' : 'bg-[#fafafa] text-zinc-700 dark:bg-[var(--ground)]';
                         @endphp
                         <div class="rounded-[12px] p-2.5 {{ $tone }}">
                             <p class="text-[10px] font-bold uppercase tracking-wider opacity-70">{{ $code }}</p>
-                            <p class="mt-0.5 text-base font-black tabular-nums">{{ number_format((float) $w->balance, $isRcoin ? 0 : 2) }}</p>
+                            <p class="mt-0.5 text-base font-black tabular-nums">{{ \App\Domain\Shared\Services\Money::exact((float) $w->balance, $code) }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -671,9 +673,8 @@
                             @php
                                 $code = $opt['code'];
                                 $hasBalance = $opt['balance'] !== null;
-                                $isRcoinOpt = $code === 'RCOIN';
                                 $balanceDisplay = $hasBalance
-                                    ? number_format((float) $opt['balance'], $isRcoinOpt ? 0 : 2)
+                                    ? \App\Domain\Shared\Services\Money::exact((float) $opt['balance'], $code)
                                     : null;
                             @endphp
                             <button
@@ -700,13 +701,13 @@
 
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     {{-- Credit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-zinc-50 dark:bg-white/5">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-[#fafafa] dark:bg-[var(--ground)]">
                         @csrf
                         <input type="hidden" name="direction" value="credit">
                         <input type="hidden" name="currency" :value="currency">
-                        <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Credit</p>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Credit</p>
                         <div class="mt-2 flex overflow-hidden rounded-[12px] border border-zinc-200">
-                            <input type="number" name="amount" min="0.0001" step="0.01" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
+                            <input type="number" name="amount" min="0.0001" step="0.0001" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
                             <span class="flex shrink-0 items-center bg-zinc-50 px-3 text-[11px] font-semibold text-zinc-600" x-text="currency"></span>
                         </div>
                         <textarea name="reason" rows="2" required placeholder="Reason (audit log) - e.g. 'Refund for order RSR-… per finance ticket #1234'" class="mt-2 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>
@@ -714,13 +715,13 @@
                     </form>
 
                     {{-- Debit form --}}
-                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-zinc-50 dark:bg-white/5" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
+                    <form method="POST" action="{{ route('admin.customer.wallet-adjust', $user) }}" class="rounded-[12px] p-3 bg-[#fafafa] dark:bg-[var(--ground)]" data-confirm="Debit from {{ $user->name }}'s wallet? This is final." data-confirm-tone="danger" data-confirm-text="Debit">
                         @csrf
                         <input type="hidden" name="direction" value="debit">
                         <input type="hidden" name="currency" :value="currency">
-                        <p class="text-[11px] font-bold uppercase tracking-wider text-red-700">Debit</p>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400">Debit</p>
                         <div class="mt-2 flex overflow-hidden rounded-[12px] border border-zinc-200">
-                            <input type="number" name="amount" min="0.0001" step="0.01" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
+                            <input type="number" name="amount" min="0.0001" step="0.0001" placeholder="100" class="flex-1 border-0 bg-white px-3 py-2 text-sm tabular-nums text-zinc-900 outline-none focus:ring-0">
                             <span class="flex shrink-0 items-center bg-zinc-50 px-3 text-[11px] font-semibold text-zinc-600" x-text="currency"></span>
                         </div>
                         <textarea name="reason" rows="2" required placeholder="Reason (audit log)" class="mt-2 w-full rounded-[12px] border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 outline-none focus:border-blue-500"></textarea>

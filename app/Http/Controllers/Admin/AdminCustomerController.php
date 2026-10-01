@@ -16,6 +16,7 @@ use App\Domain\Kyc\Services\KycOutcomeNotifier;
 use App\Domain\Security\Services\SessionRevocationService;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Shared\Services\Money;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
@@ -132,7 +133,7 @@ class AdminCustomerController extends Controller
             } else {
                 if ((float) $wallet->balance < $amount) {
                     return back()->withErrors([
-                        'amount' => 'Customer only has '.number_format((float) $wallet->balance, $currencyCase === Currency::RCOIN ? 0 : 2)." {$currencyCase->value} - can't debit more than that.",
+                        'amount' => 'Customer only has '.Money::exact((float) $wallet->balance, $currencyCase)." {$currencyCase->value} - can't debit more than that.",
                     ]);
                 }
                 $walletService->debit(
@@ -150,9 +151,7 @@ class AdminCustomerController extends Controller
         }
 
         $verb = $validated['direction'] === 'credit' ? 'Credited' : 'Debited';
-        $formatted = $currencyCase === Currency::RCOIN
-            ? number_format($amount)
-            : number_format($amount, 2);
+        $formatted = Money::exact((float) $amount, $currencyCase);
 
         // Money moved by an admin's hand is always audited: who, how much,
         // which direction, and the stated reason.
