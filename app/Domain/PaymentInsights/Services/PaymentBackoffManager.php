@@ -458,6 +458,12 @@ class PaymentBackoffManager
             ->join('payment_attempts', 'payment_attempts.id', '=', 'payment_sessions.payment_attempt_id')
             ->whereIn('payment_sessions.status', self::FAILED_SESSION_STATUSES)
             ->whereNotIn('payment_sessions.provider', self::BALANCE_PROVIDERS)
+            // A session closed because a newer checkout replaced its order is
+            // housekeeping, not a payment that failed: the customer changed
+            // their cart and is still here. Counting it would pause somebody
+            // for editing their basket three times (PaymentSessionService::
+            // supersedeSession writes the marker).
+            ->whereNull('payment_sessions.metadata->superseded_by')
             ->where('payment_sessions.created_at', '>', $since)
             ->where(fn ($query) => $this->scopeToIdentity($query, $user, $deviceUuid, $ip, 'payment_attempts.user_id', 'payment_sessions.device_uuid', 'payment_sessions.customer_ip'))
             ->get(['payment_sessions.id', 'payment_sessions.created_at', 'payment_sessions.failed_at', 'payment_sessions.updated_at']);

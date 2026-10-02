@@ -3,6 +3,7 @@
 namespace App\Domain\Wallet\Services;
 
 use App\Domain\Wallet\Exceptions\StaleRateException;
+use App\Domain\Wallet\Exceptions\UnknownCurrencyException;
 use App\Models\CurrencyRate;
 use App\Models\ExchangeRate;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +14,15 @@ class CurrencyRateService
      * Resolve the active exchange rate between two currencies.
      * Uses the exchange_rates table first, then falls back to the currency_rates table.
      *
+     * This is the TRANSACTIONAL resolver: checkout, wallet funding and the wallet
+     * payment provider price charges with it. It fails closed. A pair whose live
+     * rate is too old throws StaleRateException; a currency with no active row at
+     * all throws UnknownCurrencyException rather than quietly converting at 1.0.
+     * Read-only displays use resolveRateForDisplay(), which keeps the old
+     * leniency.
+     *
      * @throws StaleRateException
+     * @throws UnknownCurrencyException
      */
     public function resolveRate(string $baseCurrency, string $targetCurrency): float
     {
@@ -51,12 +60,16 @@ class CurrencyRateService
             return $rate > 0 ? (1.0 / $rate) : 0.0;
         }
 
-        // 3. Fallback: Resolve using the currency_rates table
-        return $this->resolveFallbackRate($base, $target);
+        // 3. Fallback: Resolve using the currency_rates table. Strict: a
+        //    currency the table does not know cannot be charged in.
+        return $this->resolveFallbackRate($base, $target, strict: true);
     }
 
     /**
      * Convert an amount between two currencies.
+     *
+     * @throws StaleRateException
+     * @throws UnknownCurrencyException
      */
     public function convert(float $amount, string $from, string $to): float
     {
@@ -179,11 +192,19 @@ class CurrencyRateService
 
     /**
      * Resolves a synthetic rate using the legacy currency_rates table.
+     *
+     * Strict mode is for money. CurrencyRate::resolve() answers an unknown or
+     * deactivated code with the USD row, which is the right thing for a price
+     * label (show dollars rather than nothing) and the wrong thing for a charge:
+     * it turned "5.00 ZZZ" into a real order for 5.00 of a currency we do not
+     * hold a rate for. In strict mode each code must have its own active row.
+     *
+     * @throws UnknownCurrencyException
      */
-    protected function resolveFallbackRate(string $base, string $target): float
+    protected function resolveFallbackRate(string $base, string $target, bool $strict = false): float
     {
-        $baseRateObj = CurrencyRate::resolve($base);
-        $targetRateObj = CurrencyRate::resolve($target);
+        $baseRateObj = $strict ? $this->activeRateRow($base) : CurrencyRate::resolve($base);
+        $targetRateObj = $strict ? $this->activeRateRow($target) : CurrencyRate::resolve($target);
 
         $basePerUsd = (float) $baseRateObj->rate_per_usd;
         $targetPerUsd = (float) $targetRateObj->rate_per_usd;
@@ -195,5 +216,37 @@ class CurrencyRateService
         // If converting USD -> NGN: targetPerUsd / basePerUsd (USD is base, NGN is target)
         // targetPerUsd (1400 NGN) / basePerUsd (1.0 USD) = 1400 NGN per USD
         return $targetPerUsd / $basePerUsd;
+    }
+
+    /**
+     * The active rate row for exactly this code, or a refusal. No substitution,
+     * with one exception that is not a substitution: USD is the settlement
+     * currency every rate in the table is expressed against, so when it has no
+     * row of its own it is the anchor at 1.0, exactly as CurrencyRate::resolve()
+     * treats it. Any other code must have its own active row.
+     *
+     * @throws UnknownCurrencyException
+     */
+    private function activeRateRow(string $code): CurrencyRate
+    {
+        $row = CurrencyRate::query()
+            ->where('is_active', true)
+            ->where('code', $code)
+            ->first();
+
+        if ($row !== null) {
+            return $row;
+        }
+
+        if ($code === 'USD') {
+            return new CurrencyRate([
+                'code' => 'USD',
+                'name' => 'United States Dollar',
+                'type' => 'fiat',
+                'rate_per_usd' => 1.0,
+            ]);
+        }
+
+        throw new UnknownCurrencyException($code);
     }
 }

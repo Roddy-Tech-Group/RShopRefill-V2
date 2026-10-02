@@ -2,9 +2,10 @@
 
 namespace App\Domain\Wallet\Exceptions;
 
-use Exception;
-
-class StaleRateException extends Exception
+/**
+ * The live rate for a pair is too old to charge at. See RateUnavailableException.
+ */
+class StaleRateException extends RateUnavailableException
 {
     //
 }

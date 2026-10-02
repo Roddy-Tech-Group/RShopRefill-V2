@@ -14,7 +14,9 @@ use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentSessionResource;
 use App\Models\WalletFunding;
+use App\Rules\ChargeableCurrency;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class UserWalletController extends Controller
@@ -48,10 +50,20 @@ class UserWalletController extends Controller
 
     public function initiateFunding(Request $request)
     {
+        if (is_string($request->input('display_currency'))) {
+            $request->merge(['display_currency' => strtoupper(trim($request->input('display_currency')))]);
+        }
+
         $validated = $request->validate([
-            'currency' => ['required', new Enum(Currency::class)],
+            // A cash wallet. Rcoin is a rewards balance: it is earned and
+            // redeemed, never bought, and it has no rate to charge at.
+            'currency' => ['required', new Enum(Currency::class), Rule::notIn([Currency::RCOIN->value])],
             'amount' => ['required', 'numeric', 'min:1'],
-            'display_currency' => ['nullable', 'string', 'max:10'],
+            // The currency the customer is charged in. It must hold a live,
+            // active rate: the lookup behind funding used to answer an unknown
+            // code with the USD row, so a 50 USD top-up "paid in ZZZ" raised a
+            // 50.00 ZZZ charge and the wallet was credited the full 50 USD.
+            'display_currency' => ['nullable', 'string', 'size:3', new ChargeableCurrency],
         ]);
 
         $currency = Currency::from($validated['currency']);

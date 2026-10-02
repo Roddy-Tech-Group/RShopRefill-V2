@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Cart\Services\CartManager;
 use App\Domain\Cart\Services\CartPricingService;
 use App\Domain\Shared\Support\CharmPrice;
-use App\Domain\Wallet\Exceptions\StaleRateException;
+use App\Domain\Wallet\Exceptions\RateUnavailableException;
 use App\Domain\Wallet\Services\CurrencyRateService;
 use App\Models\Cart;
 use App\Models\CurrencyRate;
@@ -209,16 +209,17 @@ class CartWebController extends Controller
 
         // Route the conversion through CurrencyRateService so the same freshness
         // gate that protects checkout protects the cart display too. If the rate
-        // is critically stale (> 48h, StaleRateException) we degrade to raw USD
-        // and flag the response so the frontend can show a "prices in USD -
-        // rates refreshing" banner, instead of silently showing the customer a
-        // stale price they could then check out at.
+        // is critically stale (> 48h) or the currency has no active rate at all
+        // (RateUnavailableException either way) we degrade to raw USD and flag
+        // the response so the frontend can show a "prices in USD - rates
+        // refreshing" banner, instead of silently showing the customer a price
+        // in a currency checkout will then refuse to charge in.
         $resolvedCurrency = $this->supportedCurrency($currencyCode);
         $rateStale = false;
         try {
             $exchangeRate = $this->currencyRateService->resolveRate('USD', $resolvedCurrency);
-        } catch (StaleRateException $e) {
-            Log::warning('Cart fell back to USD display due to critically stale rate.', [
+        } catch (RateUnavailableException $e) {
+            Log::warning('Cart fell back to USD display: no usable rate for the requested currency.', [
                 'requested_currency' => $resolvedCurrency,
                 'error' => $e->getMessage(),
             ]);

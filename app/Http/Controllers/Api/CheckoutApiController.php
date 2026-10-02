@@ -7,17 +7,20 @@ use App\Domain\Kyc\Exceptions\SpendingLimitExceededException;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
+use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\Risk\Exceptions\RiskDeniedException;
 use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
+use App\Domain\Wallet\Exceptions\RateUnavailableException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\PaymentSessionResource;
 use App\Models\Cart;
 use App\Models\Order;
+use App\Rules\ChargeableCurrency;
 use App\Support\FeatureFlag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -42,13 +45,35 @@ class CheckoutApiController extends Controller
 
         $user = $request->user();
 
+        // Upper-cased before validation so the rate-table lookup below matches
+        // the row however the client spelt the code.
+        foreach (['preferred_currency', 'wallet_currency'] as $field) {
+            if (is_string($request->input($field))) {
+                $request->merge([$field => strtoupper(trim($request->input($field)))]);
+            }
+        }
+
         $validated = $request->validate([
             'cart_id' => ['required', 'uuid'],
             'payment_method' => ['required', 'string', Rule::in(['wallet', 'flutterwave', 'crypto'])],
-            'preferred_currency' => ['required', 'string', 'size:3'],
+            // A currency with a live, active rate, exactly as the web form
+            // requires. The rate lookup behind checkout used to answer an
+            // unknown code with the USD row, so "5.00 ZZZ" became a real order.
+            'preferred_currency' => ['required', 'string', 'size:3', new ChargeableCurrency],
             'delivery_email' => ['nullable', 'email'],
             'wallet_currency' => ['nullable', 'string', 'size:3'],
         ]);
+
+        // The method must be one this currency can take, the same check the web
+        // form makes. 'flutterwave' is the fiat rail and the specific method is
+        // chosen at the pay step, where card is the one every currency accepts.
+        $methodKey = $validated['payment_method'] === 'flutterwave' ? 'card' : $validated['payment_method'];
+
+        if (! SupportedPaymentMethods::allows($validated['preferred_currency'], $methodKey)) {
+            return response()->json([
+                'message' => "The selected payment method is not available for {$validated['preferred_currency']}.",
+            ], 422);
+        }
 
         // Only the caller's own active cart, the one the web checkout would
         // resolve for them. A bare findOrFail on the id let any signed-in
@@ -116,6 +141,13 @@ class CheckoutApiController extends Controller
         } catch (RiskDeniedException $e) {
             // Refused by the risk engine; customer-safe message, no reason codes.
             return response()->json($e->toResponse(), 403);
+        } catch (RateUnavailableException $e) {
+            // No usable rate for the charge currency (too old, or none at all).
+            // Nothing was written; one customer sentence rather than the pair
+            // and age the stale exception carries for the log.
+            return response()->json([
+                'message' => 'We cannot price your order in '.$validated['preferred_currency'].' right now. Please try again shortly or choose another currency.',
+            ], 422);
         } catch (\Exception $e) {
             Log::error('SILENT CHECKOUT ERROR: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
