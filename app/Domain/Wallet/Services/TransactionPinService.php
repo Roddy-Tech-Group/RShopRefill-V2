@@ -32,6 +32,12 @@ class TransactionPinService
 
     public const HARD_LOCK_MESSAGE = 'Your PIN is locked after too many incorrect attempts. Use Forgot PIN to set a new one.';
 
+    /**
+     * How long a verified PIN authorises a payment for. Public so the API can tell
+     * the app the same figure rather than restating it.
+     */
+    public const AUTH_TOKEN_TTL_MINUTES = 5;
+
     private const WEAK_PINS = [
         '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
         '1234', '2345', '3456', '4567', '5678', '6789', '0123',
@@ -98,9 +104,9 @@ class TransactionPinService
         $user->resetTransactionPinAttempts();
         $user->markTransactionPinUsed();
 
-        // Generate short-lived auth token (valid for 5 minutes)
+        // Generate short-lived auth token
         $token = 'auth_pin_'.Str::random(40);
-        Cache::put("pin_auth_{$user->id}_{$token}", true, now()->addMinutes(5));
+        Cache::put("pin_auth_{$user->id}_{$token}", true, now()->addMinutes(self::AUTH_TOKEN_TTL_MINUTES));
 
         return $token;
     }

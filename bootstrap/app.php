@@ -11,24 +11,32 @@ use App\Http\Middleware\EnsureDeviceMature;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
 use App\Http\Middleware\EnsureProfileCompleted;
+use App\Http\Middleware\EnsureSupportedAppBuild;
+use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\NegotiateMarkdown;
+use App\Http\Middleware\NormaliseV2ErrorEnvelope;
 use App\Http\Middleware\RedirectAlternateHosts;
 use App\Http\Middleware\RejectMalformedInput;
+use App\Http\Middleware\ResolveApiDisplayCurrency;
 use App\Http\Middleware\ResolveDisplayCurrency;
 use App\Http\Middleware\ResolveRegion;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\ThrottleApiV2Group;
 use App\Http\Middleware\TraceRequestMiddleware;
 use App\Http\Middleware\VerifyTurnstile;
 use App\Models\Admin;
+use App\Support\ApiV2Error;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Exceptions\PublicPropertyNotFoundException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
@@ -44,6 +52,17 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // The mobile API. Registered here rather than as part of the `api`
+        // group on purpose: that group appends StartSession and
+        // authenticates a browser session cookie, which is exactly what a
+        // token API must not do. /v2 gets its own stack (see the `api-v2`
+        // group below) so nothing about the 133 live /api routes changes.
+        then: function () {
+            Route::middleware('api-v2')
+                ->prefix('v2')
+                ->name('v2.')
+                ->group(base_path('routes/api_v2.php'));
+        },
     )
     // Console commands live under domain folders, which are NOT auto-discovered
     // (only app/Console/Commands is). Register the domain command dirs so the
@@ -194,6 +213,34 @@ return Application::configure(basePath: dirname(__DIR__))
             EnforceDeviceVerification::class,
         ]);
 
+        // The mobile API. Deliberately NOT part of the `api` group above:
+        // stateless, no cookies, no session, no CSRF. A phone carries a
+        // bearer token instead, so a session would add cost and a footgun
+        // and nothing else. RejectMalformedInput and TraceRequestMiddleware
+        // already cover it, being global.
+        //
+        // Account state (banned, closed) is checked by EnsureApiAccountActive
+        // on the authenticated routes rather than here, because it needs a
+        // resolved token user and the public routes have none.
+        $middleware->group('api-v2', [
+            ForceJsonResponse::class,
+            // Immediately after ForceJsonResponse so it wraps everything below it,
+            // including the middleware /v2 shares with the website. Those refuse in
+            // their own shapes; the app is promised exactly one.
+            NormaliseV2ErrorEnvelope::class,
+            EnsureSupportedAppBuild::class,
+            // The general ceiling, and it has to run BEFORE auth:sanctum so a flood
+            // of made-up tokens is refused without a database lookup each. A plain
+            // `throttle:v2` here would be re-sorted to run after authentication; see
+            // the class for why this wrapper exists.
+            ThrottleApiV2Group::class,
+            // Puts the app's chosen currency where DisplayCurrency looks, so
+            // every price the API sends is converted by the same chain the
+            // storefront uses. Stateless: no cookie is set or read.
+            ResolveApiDisplayCurrency::class,
+            SubstituteBindings::class,
+        ]);
+
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(function () {
             if (request()->is('admin*')) {
@@ -240,5 +287,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'secret',
             'credentials',
         ]);
+        // One error shape for /v2, and ONLY /v2: fromException returns null
+        // for every other path, which leaves the storefront and the existing
+        // /api responses exactly as they are.
+        $exceptions->render(fn (Throwable $e, Request $request) => ApiV2Error::fromException($e, $request));
+
         Integration::handles($exceptions);
     })->create();

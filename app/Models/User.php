@@ -6,6 +6,7 @@ use App\Domain\Communication\Enums\CommunicationCategory;
 use App\Domain\Communication\Mail\Security\PasswordResetMail;
 use App\Domain\Communication\Mail\Security\VerifyEmailMail;
 use App\Domain\Communication\Services\CommunicationManager;
+use App\Domain\Security\Services\ApiTokenService;
 use App\Domain\Shared\Enums\Currency;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -20,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 use LogicException;
 
 /**
@@ -56,8 +58,16 @@ use LogicException;
  */
 class User extends Authenticatable implements HasLocalePreference, MustVerifyEmail
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    /**
+     * HasApiTokens lets a customer own bearer tokens, which is how the mobile
+     * app authenticates against /v2. A phone has no cookie jar, so it carries
+     * proof of identity by hand on every request instead of the browser doing
+     * it invisibly. The website is unaffected: it still signs in through the
+     * "web" session guard exactly as before.
+     *
+     * @use HasFactory<UserFactory>
+     */
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -125,6 +135,27 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     {
         static::deleting(function (): never {
             throw new LogicException('Users are never hard-deleted. Use AccountClosureService to close an account.');
+        });
+
+        /**
+         * A password change signs the mobile app out everywhere.
+         *
+         * The website relies on the AuthenticateSession middleware, which voids
+         * other SESSIONS the moment the password hash changes. A bearer token has
+         * no session for that to reach, so without this a thief already holding a
+         * token would survive the victim changing their password, which is the
+         * first thing a victim does and the one thing that has to work.
+         *
+         * Hooked on the model rather than on an event because passwords are
+         * written from several places (the settings screen, the reset flow, a
+         * guest claim, account closure) and not all of them raise an event.
+         * Anything that writes the column is covered, including whatever is added
+         * later.
+         */
+        static::updated(function (self $user): void {
+            if ($user->wasChanged('password')) {
+                app(ApiTokenService::class)->revokeEverything($user);
+            }
         });
     }
 
