@@ -25,7 +25,7 @@ class CaptureReferralCookie
 
     public function handle(Request $request, Closure $next): Response
     {
-        $code = trim((string) $request->query('ref', ''));
+        $code = trim($request->queryString('ref', ''));
 
         $response = $next($request);
 

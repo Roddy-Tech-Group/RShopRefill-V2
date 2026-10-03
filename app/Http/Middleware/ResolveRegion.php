@@ -25,7 +25,7 @@ class ResolveRegion
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $fromUrl = strtoupper(trim((string) $request->query('country', '')));
+        $fromUrl = strtoupper(trim($request->queryString('country', '')));
         $isSwitch = preg_match('/^[A-Z]{2}$/', $fromUrl) === 1;
 
         $region = $isSwitch

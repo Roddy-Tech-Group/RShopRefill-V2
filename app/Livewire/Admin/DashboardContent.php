@@ -47,12 +47,12 @@ class DashboardContent extends Component
      */
     public function mount(): void
     {
-        $this->rangePreset = request('range');
-        $this->rangeStart = request('start');
-        $this->rangeEnd = request('end');
+        $this->rangePreset = request()->queryString('range') ?: null;
+        $this->rangeStart = request()->queryString('start') ?: null;
+        $this->rangeEnd = request()->queryString('end') ?: null;
         $this->revenueDays = max(1, min(365, (int) request('revenue_days', 7)));
         $this->countryDays = max(1, min(365, (int) request('country_days', 7)));
-        $this->countryCategory = (string) request('country_cat', 'all');
+        $this->countryCategory = request()->queryString('country_cat', 'all');
     }
 
     /** Trends chart period dropdown. */

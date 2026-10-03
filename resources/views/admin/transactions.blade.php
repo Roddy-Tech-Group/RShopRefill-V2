@@ -8,7 +8,7 @@
     // "Failed" = failed. "Refunded" is special — see below.
     // DEFAULT IS COMPLETED, not All: the first question an admin asks this
     // page is "what money actually arrived", so that's the opening view.
-    $statusFilter = strtolower((string) request()->query('status', 'completed'));
+    $statusFilter = strtolower(request()->queryString('status', 'completed'));
     $allowedStatuses = ['all', 'completed', 'pending', 'cancelled', 'failed', 'refunded'];
     if (! in_array($statusFilter, $allowedStatuses, true)) {
         $statusFilter = 'completed';
@@ -18,7 +18,7 @@
     // attempts here (they have no order page of their own to land on), so this
     // page has to be able to isolate a single reference - and an admin handed a
     // gateway reference by a customer can now paste it straight in.
-    $search = trim((string) request()->query('q', ''));
+    $search = trim(request()->queryString('q', ''));
 
     $statusMap = [
         'completed' => ['paid'],

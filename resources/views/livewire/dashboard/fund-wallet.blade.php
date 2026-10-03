@@ -71,12 +71,12 @@ new class extends Component
         $this->currency = $resolved === 'RCOIN' ? 'USD' : $resolved;
         $this->variant = $variant;
 
-        $requested = strtoupper(trim((string) request()->query('fund', '')));
+        $requested = strtoupper(trim(request()->queryString('fund', '')));
 
         if ($requested !== '' && $requested === $this->currency) {
             $this->openOnLoad = true;
 
-            $amount = (float) request()->query('amount', 0);
+            $amount = (float) request()->queryString('amount', '0');
             if ($amount > 0) {
                 $this->amount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
             }

@@ -19,13 +19,13 @@
         ->pluck('rate_per_usd', 'code')
         ->map(fn ($r) => (float) $r);
 
-    $search = request()->query('q', '');
-    $categorySlug = request()->query('category', 'all');                   // Product Type filter
-    $subtypeFilter = (string) request()->query('subtype', '');             // eSIM sub-type: 'data' | 'voice'
-    $country = strtoupper((string) request()->query('country', 'all'));    // Country filter (ISO-2)
-    $brandKey = (string) request()->query('brand', '');                    // Brand filter (brand_key)
-    $providerName = (string) request()->query('provider', '');             // Provider filter (zendit | airalo)
-    $regionFilter = (string) request()->query('region', '');               // Region filter (continent name)
+    $search = request()->queryString('q', '');
+    $categorySlug = request()->queryString('category', 'all');                   // Product Type filter
+    $subtypeFilter = request()->queryString('subtype', '');             // eSIM sub-type: 'data' | 'voice'
+    $country = strtoupper(request()->queryString('country', 'all'));    // Country filter (ISO-2)
+    $brandKey = request()->queryString('brand', '');                    // Brand filter (brand_key)
+    $providerName = request()->queryString('provider', '');             // Provider filter (zendit | airalo)
+    $regionFilter = request()->queryString('region', '');               // Region filter (continent name)
     $perPage = 25;
 
     // Pills: real categories from DB + an "All" sentinel that maps to no filter.

@@ -27,7 +27,7 @@ class ResolveDisplayCurrency
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $fromUrl = strtoupper(trim((string) $request->query('display_currency', '')));
+        $fromUrl = strtoupper(trim($request->queryString('display_currency', '')));
         $isSwitch = preg_match('/^[A-Z]{3}$/', $fromUrl) === 1;
 
         $currency = $isSwitch

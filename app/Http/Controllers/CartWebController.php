@@ -60,7 +60,7 @@ class CartWebController extends Controller
             }
         }
 
-        return $this->respond($cart, $token, $request->query('currency'));
+        return $this->respond($cart, $token, $request->queryString('currency'));
     }
 
     public function add(Request $request)
@@ -119,7 +119,7 @@ class CartWebController extends Controller
             $request->session()->put('cart.buy_now_items', array_values(array_unique($ids)));
         }
 
-        return $this->respond($cart, $token, $request->query('currency'));
+        return $this->respond($cart, $token, $request->queryString('currency'));
     }
 
     public function update(Request $request, string $item)
@@ -131,7 +131,7 @@ class CartWebController extends Controller
         [$cart, $token] = $this->resolve($request);
         $this->cartManager->updateQuantity($cart, $item, (int) $data['quantity']);
 
-        return $this->respond($cart, $token, $request->query('currency'));
+        return $this->respond($cart, $token, $request->queryString('currency'));
     }
 
     public function remove(Request $request, string $item)
@@ -139,7 +139,7 @@ class CartWebController extends Controller
         [$cart, $token] = $this->resolve($request);
         $this->cartManager->removeItem($cart, $item);
 
-        return $this->respond($cart, $token, $request->query('currency'));
+        return $this->respond($cart, $token, $request->queryString('currency'));
     }
 
     /**

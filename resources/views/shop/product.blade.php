@@ -421,7 +421,7 @@
     $topupHasPlans = ! empty($topupGroups['data']) || ! empty($topupGroups['bundle']);
     // The listing's "Credit, Data & Calls" filter passes ?plan=bundles so the detail
     // opens on a bundle/data tab; otherwise it opens on Credit (the amount selector).
-    $topupPlanScope = (string) request()->query('plan', '');
+    $topupPlanScope = request()->queryString('plan', '');
     $topupDefaultTab = ($topupPlanScope === 'bundles' && $topupHasPlans)
         ? (! empty($topupGroups['bundle']) ? 'bundle' : 'data')
         : (array_key_first($topupTabs) ?: 'credit');

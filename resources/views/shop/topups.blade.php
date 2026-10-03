@@ -14,11 +14,11 @@
 
     // URL-driven filters. $country is the locked region (resolved by ResolveRegion
     // middleware and shared as $region) — the catalog only ever shows that country.
-    $search   = (string) request()->query('q', '');
+    $search   = request()->queryString('q', '');
     $country  = strtoupper((string) ($region ?? 'US'));
-    $currency = strtoupper((string) request()->query('currency', ''));
-    $sub      = (string) request()->query('subcategory', '');
-    $sort     = (string) request()->query('sort', 'popular');
+    $currency = strtoupper(request()->queryString('currency', ''));
+    $sub      = request()->queryString('subcategory', '');
+    $sort     = request()->queryString('sort', 'popular');
 
     // Resolve a partial country-name search ("camero", "United Sta") to ISO codes so the
     // user can type a country name in the global nav and get a matching catalog filter.
