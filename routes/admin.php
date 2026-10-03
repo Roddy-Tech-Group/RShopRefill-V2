@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Admin\Services\AudienceInsightsService;
+use App\Http\Controllers\Admin\AdminApiDocsController;
 use App\Http\Controllers\Admin\AdminCatalogController;
 use App\Http\Controllers\Admin\AdminCommerceController;
 use App\Http\Controllers\Admin\AdminCustomerController;
@@ -284,6 +285,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // one-segment Volt wildcard below.
             Route::get('runbooks/doc/{doc}', AdminRunbookDocController::class)->name('runbooks.doc');
             Volt::route('runbooks/{runbook?}', 'admin.management.runbooks')->name('runbooks');
+            // The mobile API's contract (docs/api/v2), rendered, plus the raw
+            // OpenAPI file for Roddy's tooling. Admin-only on purpose.
+            Route::get('api-docs', [AdminApiDocsController::class, 'page'])->name('api-docs');
+            Route::get('api-docs/openapi.yaml', [AdminApiDocsController::class, 'spec'])->name('api-docs.spec');
         });
         Volt::route('notifications', 'admin.notifications')->name('notifications');
         Volt::route('reports', 'admin.reports')->name('reports');

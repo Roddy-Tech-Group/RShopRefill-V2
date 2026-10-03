@@ -74,6 +74,16 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
             'rate_per_usd' => 600.0,
             'is_active' => true,
         ]);
+
+        // The GBP top-up below needs a live rate: funding now refuses a currency
+        // it cannot price rather than treating a pound as a dollar.
+        CurrencyRate::create([
+            'code' => 'GBP',
+            'name' => 'British Pound',
+            'type' => 'fiat',
+            'rate_per_usd' => 0.79,
+            'is_active' => true,
+        ]);
     }
 
     /**

@@ -16,12 +16,14 @@ use App\Domain\Risk\Exceptions\RiskDeniedException;
 use App\Domain\Risk\Exceptions\RiskReviewRequiredException;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
+use App\Domain\Wallet\Exceptions\RateUnavailableException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Http\Resources\PaymentSessionResource;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
+use App\Rules\ChargeableCurrency;
 use App\Support\FeatureFlag;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -96,6 +98,22 @@ class CheckoutController extends Controller
         $displayCurrency = strtoupper((string) $request->input('currency', 'USD'));
         if (strlen($displayCurrency) !== 3) {
             $displayCurrency = 'USD';
+        }
+
+        // It must be a currency we hold a live rate for. The rate lookup behind
+        // checkout used to answer an unknown or deactivated code with the USD
+        // row, so a $5 cart posted as "ZZZ" became an order for 5.00 ZZZ and
+        // that figure went to the gateway. The customer picked this currency in
+        // the locale modal, so if an admin has since switched it off they are
+        // told to pick another rather than being charged in dollars unawares.
+        if (! ChargeableCurrency::accepts($displayCurrency)) {
+            $msg = 'That currency is not available right now. Please choose another currency and try again.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $msg], 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))
+                ->with('checkout_status', $msg);
         }
 
         // Verify currency-method compatibility behind the scenes. Mirrors the
@@ -239,6 +257,16 @@ class CheckoutController extends Controller
             }
 
             return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $e->customerMessage());
+        } catch (RateUnavailableException $e) {
+            // No usable rate for the charge currency (too old, or none at all).
+            // Nothing was written. One customer sentence, not the pair and age
+            // the stale exception carries for the log.
+            $msg = 'We cannot price your order in '.$displayCurrency.' right now. Please try again shortly or choose another currency.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => $msg], 422);
+            }
+
+            return redirect($this->shopRoute($request, 'checkout'))->with('checkout_status', $msg);
         } catch (Throwable $e) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([

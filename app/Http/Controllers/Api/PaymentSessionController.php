@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\PaymentConfirmed;
-use App\Domain\Order\Services\CouponRedemptionService;
 use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
@@ -30,6 +30,7 @@ use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\WalletFunding;
 use App\Support\FeatureFlag;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -140,38 +141,11 @@ class PaymentSessionController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($session) {
-                // Check if session can be cancelled
-                if (! in_array($session->status, ['pending', 'awaiting_method', 'awaiting_payment', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'awaiting_customer_action'])) {
-                    throw new \DomainException("Cannot cancel payment session that is already {$session->status}.");
-                }
-
-                // Capture how far the customer got before the transition wipes
-                // it, so the outcome records the real stage rather than the
-                // terminal one.
-                $session->metadata = array_merge($session->metadata ?? [], [
-                    'status_at_failure' => $session->status,
-                ]);
-                $session->save();
-
-                $session->transitionTo('cancelled');
-
-                // Cancel polymorphic payment attempt
-                $attempt = $session->paymentAttempt;
-                if ($attempt && $attempt->payment_status !== PaymentStatus::Paid) {
-                    $attempt->update([
-                        'payment_status' => PaymentStatus::Failed,
-                        'failed_at' => now(),
-                    ]);
-                }
-
-                // Give the coupon slot back. This path bypasses failSession()
-                // and expireSession(), so without an explicit release a customer
-                // who cancels deliberately would hold the slot until it lapsed.
-                if ($order = $attempt?->order) {
-                    app(CouponRedemptionService::class)->releaseForOrder($order, 'customer_cancelled');
-                }
-            });
+            // The one cancellation routine: closes the attempt, releases a wallet
+            // hold and locked Rcoin, hands the coupon slot back and marks a
+            // wallet top-up cancelled. Throws DomainException once the session is
+            // past cancelling, answered below as a 400 like before.
+            app(PaymentSessionService::class)->cancelSession($session, 'customer_cancelled');
 
             return response()->json([
                 'message' => 'Payment session cancelled successfully.',
@@ -265,6 +239,15 @@ class PaymentSessionController extends Controller
             return response()->json(['message' => 'Associated payment attempt not found.'], 404);
         }
 
+        // The session's own state is not the whole story: its order can be
+        // closed underneath it. A newer checkout on the same cart cancels the
+        // earlier order (and now closes its session, but an older session may
+        // predate that), and an admin can cancel or refund one. Paying such a
+        // session moved a cancelled order back to processing and fulfilled it.
+        if ($refusal = $this->orderNotPayable($attempt)) {
+            return $refusal;
+        }
+
         // Gateway kill switch: refuse a FRESH charge on a disabled gateway.
         // This catches the customer whose payment modal was already open when
         // the switch flipped, since their tiles never got greyed out. Only
@@ -296,6 +279,15 @@ class PaymentSessionController extends Controller
             $allowedMethods = ['crypto'];
         } else {
             $allowedMethods = SupportedPaymentMethods::forCurrency($currency);
+        }
+
+        // A wallet top-up is new money coming IN; it cannot be paid from the
+        // balance it is meant to raise. The currency's list says wallet, so
+        // without this a customer could reserve the amount from their existing
+        // balance, fail verification at the fiat gateway (which never saw a
+        // charge), and be left with the reservation never released.
+        if ($attempt->payable_type === WalletFunding::class) {
+            $allowedMethods = array_values(array_diff($allowedMethods, ['wallet']));
         }
 
         if (! in_array($method, $allowedMethods)) {
@@ -566,6 +558,19 @@ class PaymentSessionController extends Controller
                     ], 503);
                 }
 
+                // One authorisation per session. The PIN token is single-use, which
+                // stops the SAME tap running twice, but two taps with two tokens
+                // (two PIN entries on two tabs) both passed the terminal-state
+                // check above before either had written, and both reserved the
+                // amount: the second hold was never released. The session is
+                // claimed into 'processing' under a row lock first, so the second
+                // caller finds it taken and nothing of theirs moves.
+                if (! $this->claimForWalletPayment($session)) {
+                    return response()->json([
+                        'message' => 'That payment is already being processed. Please wait a moment.',
+                    ], 409);
+                }
+
                 $walletProvider = $gatewayFactory->getProvider('wallet');
 
                 try {
@@ -762,6 +767,68 @@ class PaymentSessionController extends Controller
         $attempt->save();
 
         return new PaymentSessionResource($session->fresh());
+    }
+
+    /**
+     * Why the order behind this session can no longer take a payment, or null
+     * when it still can. Funding sessions have no order and are governed by the
+     * session's own state.
+     */
+    private function orderNotPayable(PaymentAttempt $attempt): ?JsonResponse
+    {
+        $order = $attempt->order;
+
+        if ($order === null) {
+            return null;
+        }
+
+        if (in_array($order->order_status, [OrderStatus::Cancelled, OrderStatus::Failed, OrderStatus::Refunded], true)) {
+            return response()->json([
+                'message' => 'This order is no longer open for payment. Please start the checkout again.',
+                'status' => 'order_closed',
+            ], 409);
+        }
+
+        if (in_array($order->payment_status, [PaymentStatus::Paid, PaymentStatus::Refunded, PaymentStatus::PartiallyRefunded], true)) {
+            return response()->json([
+                'message' => 'This order has already been paid.',
+                'status' => 'order_paid',
+            ], 409);
+        }
+
+        return null;
+    }
+
+    /**
+     * Take the session for this wallet authorisation, or report that another
+     * request already has it.
+     *
+     * The claim is the session's own state machine: a live session moves to
+     * 'processing' under a row lock, and from 'processing' the only ways out
+     * are confirmed (the authorisation succeeded) or failed (it did not), both
+     * of which the code below reaches. A second request blocks on the lock,
+     * re-reads, finds 'processing' or a terminal state, and is refused before
+     * it touches the customer's token or balance.
+     */
+    private function claimForWalletPayment(PaymentSession $session): bool
+    {
+        $claimed = DB::transaction(function () use ($session) {
+            $locked = PaymentSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($locked->status, ['awaiting_method', 'awaiting_payment', 'awaiting_customer_action'], true)) {
+                return false;
+            }
+
+            $locked->transitionTo('processing');
+
+            return true;
+        });
+
+        if ($claimed) {
+            $session->refresh();
+        }
+
+        return $claimed;
     }
 
     /**

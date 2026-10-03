@@ -48,6 +48,16 @@ return [
             'driver' => 'session',
             'provider' => 'admins',
         ],
+
+        // The mobile app. Reads a bearer token from the Authorization
+        // header instead of a session cookie, because a phone has no
+        // cookie jar carrying one for it. Used ONLY by the /v2 route
+        // group; the website and the existing /api routes keep using the
+        // session guards above, unchanged.
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*

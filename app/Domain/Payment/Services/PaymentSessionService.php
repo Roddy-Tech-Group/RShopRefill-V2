@@ -2,18 +2,22 @@
 
 namespace App\Domain\Payment\Services;
 
+use App\Domain\Order\Enums\OrderStatus;
 use App\Domain\Order\Events\OrderConfirmed;
 use App\Domain\Order\Services\CouponRedemptionService;
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Events\PaymentSessionConfirmed;
 use App\Domain\Payment\Events\PaymentSessionCreated;
 use App\Domain\Payment\Events\PaymentSessionExpired;
 use App\Domain\Payment\Events\PaymentSessionFailed;
+use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Support\CustomerFailureCopy;
 use App\Domain\PaymentInsights\Exceptions\PaymentBackoffException;
 use App\Domain\PaymentInsights\Jobs\ReconcileRefusedCardsJob;
 use App\Domain\PaymentInsights\Services\FailureReasonClassifier;
 use App\Domain\PaymentInsights\Services\PaymentBackoffManager;
 use App\Domain\Shared\Enums\Currency;
+use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
 use App\Domain\Wallet\Services\WalletService;
@@ -31,6 +35,22 @@ use Illuminate\Support\Str;
 
 class PaymentSessionService
 {
+    /**
+     * Session states a customer can still act on. A session in one of these can
+     * be cancelled by the customer or closed when its checkout is replaced.
+     *
+     * @var list<string>
+     */
+    private const LIVE_STATUSES = [
+        'pending',
+        'awaiting_method',
+        'awaiting_payment',
+        'awaiting_transfer',
+        'awaiting_redirect',
+        'awaiting_confirmation',
+        'awaiting_customer_action',
+    ];
+
     /**
      * Create a payment session for an Order checkout attempt.
      */
@@ -332,16 +352,7 @@ class PaymentSessionService
             // recorded on the order so a late confirm (failed -> confirmed)
             // knows the lock is already gone.
             $order = $session->paymentAttempt?->order;
-            if ($order) {
-                $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
-                if ($rcoinApplied > 0 && ! ($order->metadata['rcoin_lock_released'] ?? false)) {
-                    $walletService = app(WalletService::class);
-                    $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
-                    $walletService->unlockFunds($wallet, $rcoinApplied);
-                    $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
-                    $order->save();
-                }
-            }
+            $this->releaseRcoinLock($order);
 
             // Hand the coupon slot back so the next customer can use it. A late
             // confirm on this same session reclaims it (see redeemForOrder).
@@ -350,6 +361,141 @@ class PaymentSessionService
             }
 
             event(new PaymentSessionFailed($session, $reason));
+        });
+    }
+
+    /**
+     * The customer walked away from a payment they had not made.
+     *
+     * One routine for every surface that cancels a session, so the pieces hanging
+     * off it are always put back: the attempt is closed, a wallet reservation is
+     * released, locked Rcoin is returned, the coupon slot is handed back, and a
+     * wallet top-up is marked cancelled rather than left Pending for the hourly
+     * reconciler to ask the gateway about and then fail two hours later with a
+     * "your top-up failed" email for something the customer chose to stop.
+     *
+     * Cancelled is final, as it always has been for sessions: a card decline the
+     * gateway recorded is caught by the controller's reconcile step before this
+     * runs, and money that genuinely lands later is an operator's case.
+     *
+     * @throws \DomainException when the session is already past cancelling
+     */
+    public function cancelSession(PaymentSession $session, string $reason = 'customer_cancelled'): void
+    {
+        DB::transaction(function () use ($session, $reason) {
+            $session = PaymentSession::where('id', $session->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($session->status, self::LIVE_STATUSES, true)) {
+                throw new \DomainException("Cannot cancel payment session that is already {$session->status}.");
+            }
+
+            // How far the customer got, captured before the transition wipes it,
+            // so the outcome records the real stage rather than the terminal one.
+            $session->metadata = array_merge($session->metadata ?? [], [
+                'status_at_failure' => $session->status,
+            ]);
+
+            $session->transitionTo('cancelled');
+
+            $attempt = $session->paymentAttempt;
+            $order = $attempt?->order;
+
+            if ($attempt && ! $this->releaseReservedWalletFunds($attempt) && $attempt->payment_status !== PaymentStatus::Paid) {
+                $attempt->update([
+                    'payment_status' => PaymentStatus::Failed,
+                    'failed_at' => now(),
+                ]);
+            }
+
+            $this->releaseRcoinLock($order);
+
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, $reason);
+
+                // The order goes with its payment. It used to stay Pending for
+                // good: the sweeper looks for orders whose attempt is still open,
+                // and this one's attempt was just closed, so nothing ever came
+                // back for it. Only an order still waiting for money is touched;
+                // anything paid or in flight is left to the verify chain.
+                if ($order->order_status === OrderStatus::Pending
+                    && in_array($order->payment_status, [PaymentStatus::Unpaid, PaymentStatus::Pending], true)) {
+                    $order->update(['order_status' => OrderStatus::Cancelled]);
+                }
+            }
+
+            if ($attempt && $attempt->payable_type === WalletFunding::class) {
+                $funding = $attempt->payable;
+
+                if ($funding instanceof WalletFunding
+                    && in_array($funding->status, [FundingStatus::Pending, FundingStatus::Processing], true)) {
+                    $funding->update([
+                        'status' => FundingStatus::Cancelled,
+                        'processed_at' => now(),
+                    ]);
+                }
+            }
+        });
+    }
+
+    /**
+     * Close a session whose order has been replaced by a newer checkout on the
+     * same cart.
+     *
+     * The order is cancelled by the checkout that replaces it; this closes the
+     * payment behind it. Left live, that payment could still be made, and
+     * paying it moved a cancelled order back to processing and fulfilled it
+     * beside the new one. Its Rcoin lock also stayed held, so the very retry
+     * that replaced it could not re-apply the customer's points.
+     *
+     * The session ends as EXPIRED, not cancelled, and deliberately so: a hosted
+     * page or crypto address already issued for it cannot be withdrawn, and
+     * expired is the one terminal state a late payment can still confirm from.
+     * Money that lands then follows the existing late-arrival path (settled,
+     * ops told). No outcome event fires: a replaced checkout is housekeeping,
+     * not a payment that failed, and it must not count against the customer in
+     * the payment rate limiter or the insights dashboard. The marker written to
+     * metadata is what the limiter reads to leave it out.
+     */
+    public function supersedeSession(PaymentSession $session, string $replacementOrderNumber): void
+    {
+        DB::transaction(function () use ($session, $replacementOrderNumber) {
+            $session = PaymentSession::where('id', $session->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($session->status, self::LIVE_STATUSES, true)) {
+                return;
+            }
+
+            $session->metadata = array_merge($session->metadata ?? [], [
+                'status_at_failure' => $session->status,
+                'superseded_by' => $replacementOrderNumber,
+                'superseded_at' => now()->toIso8601String(),
+            ]);
+
+            $session->transitionTo('expired');
+
+            $attempt = $session->paymentAttempt;
+            $order = $attempt?->order;
+
+            // The sweeper's own rule for an abandoned attempt: Unpaid or Pending
+            // becomes Expired, anything further along (a charge in flight, coins
+            // partly received) is left for the verify chain to finish.
+            if ($attempt && ! $this->releaseReservedWalletFunds($attempt)
+                && in_array($attempt->payment_status, [PaymentStatus::Unpaid, PaymentStatus::Pending], true)) {
+                $attempt->update(['payment_status' => PaymentStatus::Expired]);
+            }
+
+            $this->releaseRcoinLock($order);
+
+            if ($order) {
+                app(CouponRedemptionService::class)->releaseForOrder($order, 'superseded_checkout');
+            }
+
+            Log::info('payment_session.superseded', [
+                'session_id' => $session->id,
+                'order_number' => $order?->order_number,
+                'replaced_by' => $replacementOrderNumber,
+                'status_at_supersede' => $session->metadata['status_at_failure'],
+            ]);
         });
     }
 
@@ -376,16 +522,7 @@ class PaymentSessionService
             // Unlock RCOIN if it was locked during checkout. Recorded on the
             // order so a late confirm (expired -> confirmed) skips re-unlock.
             $order = $session->paymentAttempt?->order;
-            if ($order) {
-                $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
-                if ($rcoinApplied > 0 && ! ($order->metadata['rcoin_lock_released'] ?? false)) {
-                    $walletService = app(WalletService::class);
-                    $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
-                    $walletService->unlockFunds($wallet, $rcoinApplied);
-                    $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
-                    $order->save();
-                }
-            }
+            $this->releaseRcoinLock($order);
 
             if ($order) {
                 app(CouponRedemptionService::class)->releaseForOrder($order, 'session_expired');
@@ -393,6 +530,49 @@ class PaymentSessionService
 
             event(new PaymentSessionExpired($session));
         });
+    }
+
+    /**
+     * Return the Rcoin a checkout locked against this order, once. The release
+     * is recorded on the order so a late confirm knows the lock is already gone
+     * and neither re-unlocks nor eats a lock belonging to a newer checkout.
+     */
+    private function releaseRcoinLock(?Order $order): void
+    {
+        if ($order === null) {
+            return;
+        }
+
+        $rcoinApplied = $order->metadata['rcoin_applied'] ?? 0;
+
+        if ($rcoinApplied > 0 && ! ($order->metadata['rcoin_lock_released'] ?? false)) {
+            $walletService = app(WalletService::class);
+            $wallet = $walletService->getOrCreateWallet($order->user, Currency::RCOIN);
+            $walletService->unlockFunds($wallet, $rcoinApplied);
+            $order->metadata = array_merge($order->metadata ?? [], ['rcoin_lock_released' => true]);
+            $order->save();
+        }
+    }
+
+    /**
+     * Give back wallet money an attempt is still holding.
+     *
+     * A wallet payment reserves the amount when the PIN token is accepted and
+     * only debits it when the order is fulfilled. If the session is closed in
+     * between (the confirm step failed and the customer cancelled, or a newer
+     * checkout replaced the order) the hold would otherwise outlive it. The
+     * provider's release also closes the attempt, so the caller skips its own
+     * terminal stamp when this returns true.
+     */
+    private function releaseReservedWalletFunds(PaymentAttempt $attempt): bool
+    {
+        if ($attempt->gateway !== 'wallet' || $attempt->payment_status !== PaymentStatus::Reserved) {
+            return false;
+        }
+
+        app(WalletPaymentProvider::class)->releaseFunds($attempt);
+
+        return true;
     }
 
     /**

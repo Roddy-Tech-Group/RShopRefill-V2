@@ -204,6 +204,13 @@ class CheckoutService
         //     coupon reservations too: this is a bulk update, so it fires no
         //     model events, and a superseded order that keeps holding a slot is
         //     exactly how repeat checkouts used to eat a promotion alive.
+        //
+        //     Their payment sessions are closed with them. A superseded order's
+        //     session used to stay live and payable: paying it moved a cancelled
+        //     order back to processing and fulfilled it beside the new one, and
+        //     its Rcoin lock stayed held so this very retry could not re-apply
+        //     the customer's points. The service releases both and marks the
+        //     session as replaced (not failed) so the rate limiter ignores it.
         $supersededOrders = Order::where('cart_id', $cart->id)
             ->where('order_status', OrderStatus::Pending)
             ->get();
@@ -213,6 +220,12 @@ class CheckoutService
                 ->update(['order_status' => OrderStatus::Cancelled]);
 
             foreach ($supersededOrders as $supersededOrder) {
+                foreach ($supersededOrder->paymentAttempts()->with('paymentSession')->get() as $supersededAttempt) {
+                    if ($supersededAttempt->paymentSession !== null) {
+                        $this->paymentSessionService->supersedeSession($supersededAttempt->paymentSession, $orderNumber);
+                    }
+                }
+
                 $this->couponRedemptionService->releaseForOrder($supersededOrder, 'superseded_checkout');
             }
         }

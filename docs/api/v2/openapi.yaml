@@ -1,0 +1,2565 @@
+openapi: 3.1.0
+
+info:
+  title: RShopRefill Mobile API
+  version: 2.0.0
+  summary: The API the RShopRefill app talks to.
+  description: |
+    Everything the Expo app can do: sign in, browse the catalogue, keep a basket,
+    place orders, pay for them, hold wallets, read notifications and manage the
+    account. This file is the contract. It is checked against the running code by
+    `tests/Feature/Api/V2/OpenApiContractTest.php`, so if the two disagree the test
+    suite fails.
+
+    **Read [README.md](README.md) first.** It explains the flows in order: tokens,
+    the installation id, idempotency keys, how a payment is driven by `next_action`,
+    and what each error type means for the screen you show.
+
+    ### Conventions
+    * Success is `{ "data": ... }`. Lists add `{ "page": { "per_page", "next_cursor", "has_more" } }`.
+    * Failure is `{ "error": { "type": "...", "message": "...", ... } }`. Branch on
+      `type`; it is stable. `message` is written for the customer and may change.
+    * Timestamps are ISO 8601 in UTC with a trailing `Z`.
+    * Money is `{ "amount": "1060.00", "currency": "NGN", "usd": "0.6605" }`.
+      Amounts are decimal **strings**, never floats. `usd` is the figure we settle in.
+      Wallet balances and face values are `{ "amount", "currency" }` with no `usd`.
+    * Prices on the catalogue and in the cart are converted into `X-Display-Currency`.
+      Orders and payments are historical and are never re-converted.
+
+    ### Headers the app sends
+    | Header | When | Why |
+    |---|---|---|
+    | `Authorization: Bearer <access_token>` | every signed-in call | the hour-long access token |
+    | `X-Installation-ID` | every call; required on sign-in and push routes | a stable id made once per install; device trust, the new-device hold and per-device sign-out hang off it |
+    | `X-App-Build` | every call | the Expo build number, so retired builds can be turned away with `426` |
+    | `X-Display-Currency` | catalogue and cart calls | the currency to show prices in; from `GET /auth/me` |
+    | `Idempotency-Key` | every call marked as needing one | a fresh random key per tap on a money action |
+    | `Accept-Language` | every call | messages come back in this language where translated |
+
+    ### Rate limits
+    Every refusal is `429` with `type: too_many_requests`, a `retry_after` field and a
+    `Retry-After` header. Per minute unless stated: whole API 300 per token (600 per
+    anonymous caller, 1500 per IP); sign-in 5 per email; money actions 20; payment
+    polling 120; payment verify 12; PIN entry 5 (and 20 per hour); things that send an
+    email 3 per email (10 per hour).
+
+servers:
+  - url: https://rshoprefill.com/v2
+    description: Production
+  - url: http://localhost/v2
+    description: Local development
+
+tags:
+  - name: Meta
+  - name: Auth
+    description: Sign in, tokens, device verification, passwords.
+  - name: Catalog
+    description: Public. Prices in `X-Display-Currency`.
+  - name: Cart
+  - name: Checkout
+  - name: Payments
+    description: Drive these from `next_action`. See README.
+  - name: Orders
+  - name: Wallets
+  - name: Transaction PIN
+  - name: Notifications
+  - name: Account
+  - name: Push
+
+security: []
+
+paths:
+
+  /meta:
+    get:
+      tags: [Meta]
+      summary: API version, minimum app build and server time
+      operationId: getMeta
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [api_version, minimum_app_build, server_time]
+                    properties:
+                      api_version: { type: string, examples: ['2.0.0'] }
+                      minimum_app_build:
+                        type: integer
+                        description: Builds below this are refused with `426`. `0` means no minimum.
+                      server_time:
+                        type: string
+                        format: date-time
+                        description: Compare with the device clock; a large gap explains tokens that look expired on arrival.
+
+  # ------------------------------------------------------------------ Auth
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create an account and sign it in
+      operationId: register
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, email, country, phone, gender, password, password_confirmation, terms]
+              properties:
+                first_name: { type: string, maxLength: 100 }
+                last_name: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 255, description: 'Lower case. Must not already be registered.' }
+                country: { type: string, description: 'ISO 3166 alpha-2 of the phone number''s country., examples: [NG]' }
+                phone: { type: string, maxLength: 32, description: 'National or international format; validated for `country`. One account per number.' }
+                gender: { type: string, enum: [male, female, other] }
+                password: { type: string, format: password, description: 'Default Laravel password rules.' }
+                password_confirmation: { type: string, format: password }
+                terms: { type: boolean, description: 'Must be `true`.' }
+                referral: { type: string, maxLength: 64, description: 'A referral code, if the customer has one.' }
+      responses:
+        '201':
+          description: Account created. Either signed in, or an email code is required first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignInResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in with email and password
+      operationId: login
+      description: |
+        Failures take a constant minimum time so the response time does not reveal
+        whether the address is registered. The answer is either `authenticated` with
+        tokens, or `verification_required` with a challenge token and **no** tokens:
+        a sign-in on a device we have not seen needs the emailed code first.
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Signed in, or verification required.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignInResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401':
+          description: '`invalid_credentials`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403':
+          description: '`account_banned` or `account_closed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/google:
+    post:
+      tags: [Auth]
+      summary: Sign in with a Google ID token
+      operationId: googleSignIn
+      description: |
+        The phone signs in with Google natively and sends the resulting **ID token**.
+        The server checks it was issued for one of our client ids; a token minted for
+        any other application is refused. A new customer gets `201`, an existing one `200`.
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token: { type: string, maxLength: 4096 }
+                referral: { type: string, maxLength: 64 }
+      responses:
+        '200':
+          description: Existing customer signed in (or verification required).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignInResponse' }
+        '201':
+          description: New customer created and signed in (or verification required).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignInResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401':
+          description: '`google_token_rejected`: the token is invalid, expired, unverified or for another application. Sign in again.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403':
+          description: '`account_banned` or `account_closed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: '`google_link_failed`: the address belongs to an account this Google identity cannot take over.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`google_unavailable`: Google could not be reached or is not configured. Show "try again", not "sign in again".'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/challenge/verify:
+    post:
+      tags: [Auth]
+      summary: Finish a sign-in with the emailed code
+      operationId: verifyChallenge
+      description: Authenticated by the `challenge_token`, not by an access token. The call must come from the same installation that started the sign-in.
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge_token, code]
+              properties:
+                challenge_token: { type: string, maxLength: 128 }
+                code: { type: string, minLength: 6, maxLength: 6 }
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthenticatedResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401':
+          description: '`challenge_expired`, `challenge_device_mismatch` or `code_burned` (too many wrong codes). Start the sign-in again.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403':
+          description: '`account_banned` or `account_closed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: '`code_invalid` (wrong or expired code, try again) or `validation_failed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/challenge/resend:
+    post:
+      tags: [Auth]
+      summary: Send the sign-in code again
+      operationId: resendChallenge
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge_token]
+              properties:
+                challenge_token: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: Sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, sent_to, code_expires_in, resend_available_in]
+                    properties:
+                      status: { type: string, const: sent }
+                      sent_to: { type: string, description: 'The masked email address.' }
+                      code_expires_in: { type: integer, description: 'Seconds.' }
+                      resend_available_in: { type: integer, description: 'Seconds until another resend is allowed.' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401':
+          description: '`challenge_expired` or `challenge_device_mismatch`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429':
+          description: '`resend_cooldown` (with `retry_after`), `resend_limit_reached` or `too_many_requests`'
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new token pair
+      operationId: refreshTokens
+      description: |
+        Unauthenticated by design: the app calls this because its access token has
+        expired. The refresh token is single use and bound to the installation it was
+        issued to. The reply carries a **new** refresh token; store it and discard the
+        old one. Presenting the same token again within 60 seconds returns the same new
+        pair (a retry after a dropped reply); after that it is treated as theft and every
+        token for that installation is revoked.
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: New pair.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, tokens]
+                    properties:
+                      status: { type: string, const: authenticated }
+                      tokens: { $ref: '#/components/schemas/TokenPair' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401':
+          description: '`refresh_token_invalid`, `refresh_token_expired`, `refresh_token_revoked` or `refresh_token_reused`. In every case: forget both tokens and show the sign-in screen.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Email a password reset link
+      operationId: forgotPassword
+      description: Always answers `sent`, whether or not the address is registered.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 255 }
+      responses:
+        '200':
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, message]
+                    properties:
+                      status: { type: string, const: sent }
+                      message: { type: string }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Set a new password with a reset token
+      operationId: resetPassword
+      description: Changing the password signs every phone out. The customer signs in again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, email, password, password_confirmation]
+              properties:
+                token: { type: string, description: 'From the emailed link.' }
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                password_confirmation: { type: string, format: password }
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, message]
+                    properties:
+                      status: { type: string, const: password_reset }
+                      message: { type: string }
+        '422':
+          description: '`reset_token_invalid` (expired, wrong or unknown address, one answer for all three) or `validation_failed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: The signed-in customer
+      operationId: getMe
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [user]
+                    properties:
+                      user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Sign this device out
+      operationId: logout
+      description: Revokes this installation's tokens and its push registration.
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Signed out.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Sign every device out
+      operationId: logoutAll
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: 'Signed out everywhere (`status: signed_out_everywhere`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /auth/email/resend:
+    post:
+      tags: [Auth]
+      summary: Send the email verification link again
+      operationId: resendEmailVerification
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: '`sent` (with `retry_after` seconds until the next is allowed) or `already_verified`.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: { type: string, enum: [sent, already_verified] }
+                      retry_after: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '429':
+          description: '`verification_cooldown` or `verification_limit_reached`, both with `retry_after`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # --------------------------------------------------------------- Catalog
+
+  /catalog/config:
+    get:
+      tags: [Catalog]
+      summary: Currencies and Rcoin settings
+      operationId: getCatalogConfig
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [settlement_currency, display_currencies, rcoin]
+                    properties:
+                      settlement_currency: { type: string, const: USD }
+                      display_currencies:
+                        type: array
+                        description: The currencies `X-Display-Currency` accepts, in display order.
+                        items:
+                          type: object
+                          required: [code, name]
+                          properties:
+                            code: { type: string, minLength: 3, maxLength: 3 }
+                            name: { type: string }
+                      rcoin:
+                        type: object
+                        required: [enabled, cashback_percentage, usd_rate, redemption]
+                        properties:
+                          enabled: { type: boolean }
+                          cashback_percentage: { type: number }
+                          usd_rate: { type: number, description: 'How many USD one Rcoin is worth.' }
+                          redemption:
+                            type: object
+                            required: [enabled, min_rcoin, max_percentage]
+                            properties:
+                              enabled: { type: boolean }
+                              min_rcoin: { type: integer }
+                              max_percentage: { type: number }
+
+  /catalog/categories:
+    get:
+      tags: [Catalog]
+      summary: Categories
+      operationId: listCategories
+      description: 'Categories switched off by an admin are absent, except gift cards and the like which carry `is_enabled: false`.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+
+  /catalog/subcategories:
+    get:
+      tags: [Catalog]
+      summary: Subcategories
+      operationId: listSubcategories
+      parameters:
+        - { name: category, in: query, schema: { type: string }, description: 'Category slug.' }
+        - { name: featured, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Subcategory' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /catalog/products:
+    get:
+      tags: [Catalog]
+      summary: Products
+      operationId: listProducts
+      description: |
+        Paged by cursor. eSIMs are ordinary products in the `esims` category: filter
+        with `category=esims`. Each product carries `price_from`; `GET /catalog/products/{slug}`
+        returns its variants.
+      parameters:
+        - { $ref: '#/components/parameters/DisplayCurrency' }
+        - { name: country, in: query, schema: { type: string, minLength: 2, maxLength: 2 }, description: 'ISO 3166 alpha-2.' }
+        - { name: category, in: query, schema: { type: string }, description: 'Category slug.' }
+        - { name: subcategory, in: query, schema: { type: string }, description: 'Subcategory slug.' }
+        - { name: search, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: featured, in: query, schema: { type: boolean } }
+        - { name: popular, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [name, popular, featured] } }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  page: { $ref: '#/components/schemas/Page' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /catalog/products/{slug}:
+    get:
+      tags: [Catalog]
+      summary: One product with its variants
+      operationId: getProduct
+      parameters:
+        - { $ref: '#/components/parameters/DisplayCurrency' }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /catalog/quote:
+    post:
+      tags: [Catalog]
+      summary: Price a typed amount on a variable product
+      operationId: quoteVariableAmount
+      description: 'A read with a body. Creates nothing and needs no idempotency key. Variable variants have `price: null`; this is how the app learns the exact price before adding to the cart.'
+      parameters: [{ $ref: '#/components/parameters/DisplayCurrency' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id, amount]
+              properties:
+                variant_id: { type: integer }
+                amount: { type: number, description: 'In the variant''s own currency (`face_value.currency`), between `min_amount` and `max_amount`.' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [variant_id, requested, price]
+                    properties:
+                      variant_id: { type: integer }
+                      requested: { $ref: '#/components/schemas/MoneyNative' }
+                      price: { $ref: '#/components/schemas/Money' }
+        '404':
+          description: '`variant_unavailable`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: '`variant_not_variable`, or `validation_failed` on `amount` (out of range, or no rate for the variant currency right now).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # ------------------------------------------------------------------ Cart
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: The basket
+      operationId: getCart
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/DisplayCurrency' }]
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+    delete:
+      tags: [Cart]
+      summary: Empty the basket
+      operationId: clearCart
+      security: [{ bearer: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountSuspendedOrInactive' }
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add an item
+      operationId: addCartItem
+      description: 'Adding a variant already in the basket **increases** its quantity, so this carries an `Idempotency-Key`: a retried request adds once.'
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/DisplayCurrency' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id, quantity]
+              properties:
+                variant_id: { type: integer }
+                quantity: { type: integer, minimum: 1, maximum: 100 }
+                amount: { type: number, description: 'Required for a variable variant, refused for a fixed one. In the variant''s own currency.' }
+                metadata:
+                  type: object
+                  description: Delivery details the product needs. Unknown keys are dropped.
+                  properties:
+                    recipient_phone: { type: string, description: 'For top-ups. Pattern `^\+?[0-9 \-]{6,20}$`.' }
+                    sender_phone: { type: string }
+                    delivery_email: { type: string, format: email, description: 'For gift cards.' }
+                    account_id: { type: string, description: 'For bill payments. Pattern `^[A-Za-z0-9 \-]{4,30}$`.' }
+      responses:
+        '201':
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyProblem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountSuspendedOrInactive' }
+        '404':
+          description: '`variant_unavailable`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409': { $ref: '#/components/responses/RequestInProgress' }
+        '422':
+          description: '`validation_failed`, `amount_not_accepted` (fixed variant sent an amount) or `idempotency_key_reused`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /cart/items/{item}:
+    patch:
+      tags: [Cart]
+      summary: Set an item's quantity
+      operationId: updateCartItem
+      description: Absolute, so safe to retry. Quantity `0` removes the line.
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CartItemId' }
+        - { $ref: '#/components/parameters/DisplayCurrency' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountSuspendedOrInactive' }
+        '404':
+          description: '`cart_item_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Cart]
+      summary: Remove an item
+      operationId: removeCartItem
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CartItemId' }
+        - { $ref: '#/components/parameters/DisplayCurrency' }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountSuspendedOrInactive' }
+        '404':
+          description: '`cart_item_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # -------------------------------------------------------------- Checkout
+
+  /checkout/orders:
+    post:
+      tags: [Checkout]
+      summary: Place an order for the basket
+      operationId: placeOrder
+      description: |
+        Creates the order and a payment session. **Then drive the payment from
+        `data.payment.next_action`**; see README. A second tap on an unchanged basket
+        while the first payment is still live returns the same order and payment rather
+        than a second order. Changing the basket and placing again cancels the earlier
+        order and closes its payment.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cart_id, payment_method, currency]
+              properties:
+                cart_id: { type: string, format: uuid, description: 'The basket the customer is looking at (`GET /cart` `data.id`).' }
+                payment_method:
+                  type: string
+                  enum: [wallet, flutterwave, crypto]
+                  description: '`flutterwave` is the card and bank family; the specific method is chosen at `POST /payments/{session}/pay`.'
+                currency:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: The currency to charge in. One of `GET /catalog/config` `display_currencies`, and one the method can take (any of them for `flutterwave`; wallet and crypto only where offered).
+                wallet_currency: { type: string, minLength: 3, maxLength: 3, description: 'For `wallet`, which cash wallet to spend from. Not `RCOIN`.' }
+                delivery_email: { type: string, format: email }
+                coupon_code: { type: string, maxLength: 64 }
+                apply_rcoin: { type: boolean, description: 'Redeem Rcoin against the total, up to the configured cap.' }
+      responses:
+        '201':
+          description: Order placed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [order, payment]
+                    properties:
+                      order: { $ref: '#/components/schemas/Order' }
+                      payment:
+                        oneOf:
+                          - { $ref: '#/components/schemas/PaymentSession' }
+                          - type: 'null'
+                        description: How to pay. Null only when nothing is owed; then re-read the order.
+        '400': { $ref: '#/components/responses/IdempotencyKeyProblem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: '`email_verification_required` (with `resend_retry_after`), `account_suspended`, `account_protected`, `payment_refused`, `account_banned` or `account_closed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: '`cart_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409': { $ref: '#/components/responses/RequestInProgress' }
+        '422':
+          description: '`validation_failed`, `cart_empty`, `needs_identity_verification` (with `required_tier`, `in_review`), `spending_limit_reached`, `held_for_review`, `payment_method_not_allowed_for_items`, `coupon_invalid`, `transaction_pin_required`, `idempotency_key_reused`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          description: '`payment_paused` (with `retry_after`, `locked`) or `too_many_requests`'
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: '`checkout_unavailable`, `maintenance`, `gateway_unavailable`, `rates_unavailable`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # -------------------------------------------------------------- Payments
+
+  /payments/{session}:
+    get:
+      tags: [Payments]
+      summary: Poll a payment
+      operationId: getPayment
+      description: Cheap. Poll this at most every 5 seconds while `next_action` says to wait. Call `verify` when the customer comes back from a gateway.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/PaymentSessionId' }]
+      responses:
+        '200': { $ref: '#/components/responses/Payment' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404': { $ref: '#/components/responses/PaymentNotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /payments/{session}/verify:
+    post:
+      tags: [Payments]
+      summary: Ask the gateway whether the payment went through
+      operationId: verifyPayment
+      description: Call once on return from a gateway page, then at most every few seconds. No idempotency key, safe to repeat. Costs a gateway round trip, so it is rate limited; poll `GET` in between.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/PaymentSessionId' }]
+      responses:
+        '200': { $ref: '#/components/responses/Payment' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404': { $ref: '#/components/responses/PaymentNotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`verification_unavailable`: try again in a moment.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /payments/{session}/pay:
+    post:
+      tags: [Payments]
+      summary: Choose a method and authorise the payment
+      operationId: authorisePayment
+      description: |
+        Send the method the customer picked plus what that method needs. A fresh
+        `Idempotency-Key` per tap; after any refusal the next tap uses a new key. The
+        reply is the payment with its next `next_action`. Wallet payments need a PIN
+        token from `POST /transaction-pin/verify`; one authorisation per payment, a
+        second concurrent one is refused.
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PaymentSessionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method]
+              properties:
+                method:
+                  type: string
+                  enum: [card, apple_pay, mobile_money, crypto, wallet, pay_with_bank, bank_transfer, ussd, bank_qr, mobile_wallet]
+                  description: Must be one the payment's currency accepts; a wallet payment accepts only `wallet`, a crypto one only `crypto`. A wallet top-up never accepts `wallet`.
+                details:
+                  type: object
+                  properties:
+                    auth_token: { type: string, description: 'Required for `wallet`. From `POST /transaction-pin/verify`.' }
+                    phone_number: { type: string, description: 'Required for `mobile_money`.' }
+                    network: { type: string, description: 'For `mobile_money` where the market has several (e.g. MTN, Orange).' }
+                    pay_currency: { type: string, description: 'Required for `crypto`: the coin ticker.' }
+                otp: { type: string, description: 'The one-time code, when `next_action.type` was `enter_otp`.' }
+                pin: { type: string, description: 'The card PIN, when `next_action.type` was `enter_card_pin`.' }
+                flw_ref: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Payment' }
+        '400':
+          description: '`idempotency_key_required`, `idempotency_key_invalid`, `payment_failed` (generic refusal; offer another method) or `request_failed` with a customer message'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: '`account_suspended`, `account_protected`, `account_banned`, `account_closed`, `payment_refused`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404': { $ref: '#/components/responses/PaymentNotFound' }
+        '409':
+          description: '`payment_session_expired`, `order_not_payable`, `order_already_paid`, `request_in_progress` (another authorisation of this payment is running; wait and poll)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: '`validation_failed` (including a method the currency cannot take), `insufficient_balance`, `wallet_on_hold`, `transaction_pin_required`, `payment_method_not_allowed_for_items`, `category_ineligible`, `idempotency_key_reused`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`gateway_unavailable`, `gateway_disabled`, `maintenance`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /payments/{session}/cancel:
+    post:
+      tags: [Payments]
+      summary: Abandon a payment
+      operationId: cancelPayment
+      description: Closes the payment and the order behind it (or marks a wallet top-up cancelled), returns held Rcoin and coupon. A card the gateway recorded as declined is filed as a decline instead. Cannot be undone.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/PaymentSessionId' }]
+      responses:
+        '200': { $ref: '#/components/responses/Payment' }
+        '400':
+          description: '`request_failed`: the payment is already settled or closed.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404': { $ref: '#/components/responses/PaymentNotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`maintenance`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /payments/{session}/top-up:
+    post:
+      tags: [Payments]
+      summary: Pay the shortfall on an underpaid crypto payment
+      operationId: topUpPayment
+      description: Only when `underpayment.can_top_up` is true. Issues a fresh crypto quote for the difference; the reply's `next_action` is `send_crypto` again.
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PaymentSessionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/Payment' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyProblem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountSuspendedOrInactive' }
+        '404': { $ref: '#/components/responses/PaymentNotFound' }
+        '409': { $ref: '#/components/responses/RequestInProgress' }
+        '422':
+          description: '`validation_failed`: nothing outstanding, or not a crypto payment.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`gateway_disabled`, `maintenance`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # ---------------------------------------------------------------- Orders
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Order history
+      operationId: listOrders
+      description: Newest first, paged by cursor. Amounts are what was charged at the time and are never re-converted.
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, maxLength: 40 }, description: 'Filter on `order_status`.' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+                  page: { $ref: '#/components/schemas/Page' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /orders/{orderNumber}:
+    get:
+      tags: [Orders]
+      summary: One order with its items and delivered goods
+      operationId: getOrder
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: orderNumber, in: path, required: true, schema: { type: string }, description: 'e.g. `RSR-20261001-AB12CD`' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404':
+          description: '`order_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # --------------------------------------------------------------- Wallets
+
+  /wallets:
+    get:
+      tags: [Wallets]
+      summary: All wallets
+      operationId: listWallets
+      description: Balances are in each wallet's own currency and are never converted. `kind` is `points` for Rcoin, `cash` otherwise.
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Wallet' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /wallets/transactions:
+    get:
+      tags: [Wallets]
+      summary: Wallet ledger
+      operationId: listWalletTransactions
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: currency, in: query, schema: { type: string, minLength: 3, maxLength: 3 }, description: 'One wallet only.' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/WalletTransaction' }
+                  page: { $ref: '#/components/schemas/Page' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /wallets/{currency}:
+    get:
+      tags: [Wallets]
+      summary: One wallet
+      operationId: getWallet
+      description: Opens the wallet if the customer does not have one yet.
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: currency, in: path, required: true, schema: { type: string, enum: [NGN, USD, EUR, GBP, GHS, XAF, RCOIN] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Wallet' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404':
+          description: '`unsupported_currency`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /wallets/fund:
+    post:
+      tags: [Wallets]
+      summary: Add money to a wallet
+      operationId: fundWallet
+      description: Creates a top-up and a payment for it. Drive the payment from `data.payment.next_action` exactly as for an order. Not for `RCOIN`.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currency, amount]
+              properties:
+                currency: { type: string, enum: [NGN, USD, EUR, GBP, GHS, XAF], description: 'The wallet to top up.' }
+                amount: { type: number, description: 'In the wallet''s currency, within that currency''s minimum and maximum per transaction.' }
+                display_currency: { type: string, minLength: 3, maxLength: 3, description: 'Charge the customer in another currency. One of `display_currencies`.' }
+      responses:
+        '201':
+          description: Top-up created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [reference, amount, payment]
+                    properties:
+                      reference: { type: string, description: 'What the customer quotes to support.' }
+                      amount: { $ref: '#/components/schemas/MoneyNative' }
+                      payment: { $ref: '#/components/schemas/PaymentSession' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyProblem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: '`email_verification_required`, `account_suspended`, `account_protected`, `payment_refused`, `account_banned`, `account_closed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409': { $ref: '#/components/responses/RequestInProgress' }
+        '422':
+          description: '`validation_failed` (amount outside the limits names them), `needs_identity_verification`, `spending_limit_reached`, `held_for_review`, `idempotency_key_reused`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          description: '`payment_paused` or `too_many_requests`'
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: '`wallet_funding_unavailable`, `gateway_unavailable`, `rates_unavailable`, `maintenance`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # ------------------------------------------------------- Transaction PIN
+
+  /transaction-pin:
+    get:
+      tags: [Transaction PIN]
+      summary: PIN status
+      operationId: getTransactionPinStatus
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [has_pin, is_locked, locked_until]
+                    properties:
+                      has_pin: { type: boolean }
+                      is_locked: { type: boolean, description: 'Too many wrong entries; wait until `locked_until`.' }
+                      locked_until: { type: [string, 'null'], format: date-time }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+    post:
+      tags: [Transaction PIN]
+      summary: Set a first PIN
+      operationId: setupTransactionPin
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin, pin_confirmation]
+              properties:
+                pin: { type: string, pattern: '^[0-9]{4}$', description: 'Four digits. Weak PINs (1234, 0000, …) are refused.' }
+                pin_confirmation: { type: string }
+      responses:
+        '201':
+          description: '`status: pin_set`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422':
+          description: '`transaction_pin_already_set` or `validation_failed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: '`maintenance`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [Transaction PIN]
+      summary: Change the PIN
+      operationId: changeTransactionPin
+      description: Behind the 24-hour new-device hold.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_pin, new_pin, new_pin_confirmation]
+              properties:
+                old_pin: { type: string, pattern: '^[0-9]{4}$' }
+                new_pin: { type: string, pattern: '^[0-9]{4}$' }
+                new_pin_confirmation: { type: string }
+      responses:
+        '200':
+          description: '`status: pin_changed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/DeviceRestricted' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /transaction-pin/verify:
+    post:
+      tags: [Transaction PIN]
+      summary: Enter the PIN and get a one-use authorisation token
+      operationId: verifyTransactionPin
+      description: 'The token authorises one wallet payment at `POST /payments/{session}/pay` and lasts `expires_in` seconds. Five wrong entries lock the PIN for a while; further failures lock it hard until support resets it.'
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin: { type: string, pattern: '^[0-9]{4}$' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [auth_token, expires_in]
+                    properties:
+                      auth_token: { type: string }
+                      expires_in: { type: integer, description: 'Seconds.' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422':
+          description: '`validation_failed` on `pin`: wrong PIN, no PIN set, or locked (the message says which).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /transaction-pin/reset/request:
+    post:
+      tags: [Transaction PIN]
+      summary: Email a PIN reset code
+      operationId: requestTransactionPinReset
+      description: Behind the 24-hour new-device hold.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: { type: string, format: password, description: 'The account password, where the account has one.' }
+      responses:
+        '200':
+          description: '`status: reset_code_sent`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/DeviceRestricted' }
+        '422':
+          description: '`transaction_pin_not_set` or `validation_failed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /transaction-pin/reset/confirm:
+    post:
+      tags: [Transaction PIN]
+      summary: Set a new PIN with the emailed code
+      operationId: confirmTransactionPinReset
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_pin, new_pin_confirmation]
+              properties:
+                token: { type: string }
+                new_pin: { type: string, pattern: '^[0-9]{4}$' }
+                new_pin_confirmation: { type: string }
+      responses:
+        '200':
+          description: '`status: pin_reset`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/DeviceRestricted' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # --------------------------------------------------------- Notifications
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Notifications
+      operationId: listNotifications
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean }, description: 'Only unread.' }
+        - { $ref: '#/components/parameters/PerPage' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+                  page: { $ref: '#/components/schemas/Page' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Unread count
+      operationId: getUnreadCount
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [unread]
+                    properties:
+                      unread: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark everything read
+      operationId: markAllNotificationsRead
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [marked_read]
+                    properties:
+                      marked_read: { type: integer, description: 'How many were unread.' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /notifications/{notification}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark one read
+      operationId: markNotificationRead
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: notification, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '404':
+          description: '`notification_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: Notification preferences
+      operationId: getNotificationPreferences
+      security: [{ bearer: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Preferences' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+    put:
+      tags: [Notifications]
+      summary: Update notification preferences
+      operationId: updateNotificationPreferences
+      description: Send only what changed; omitted settings are left alone. Sending nothing is refused.
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channels:
+                  type: object
+                  properties:
+                    email: { type: boolean }
+                    push: { type: boolean }
+                categories:
+                  type: object
+                  properties:
+                    wallet: { $ref: '#/components/schemas/CategoryChannels' }
+                    orders: { $ref: '#/components/schemas/CategoryChannels' }
+                    transactions: { $ref: '#/components/schemas/CategoryChannels' }
+                    product_updates: { $ref: '#/components/schemas/CategoryChannels' }
+                    marketing: { $ref: '#/components/schemas/CategoryChannels' }
+      responses:
+        '200': { $ref: '#/components/responses/Preferences' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422':
+          description: '`no_preferences_given` or `validation_failed`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # --------------------------------------------------------------- Account
+
+  /account/profile:
+    put:
+      tags: [Account]
+      summary: Update the profile
+      operationId: updateProfile
+      description: Send only the fields being changed. Changing the phone clears its verified status. Changing the email is not offered here on purpose.
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 255 }
+                phone: { type: [string, 'null'], maxLength: 32, description: 'International (`+…`) or national with `country`. One account per number.' }
+                country: { type: [string, 'null'], description: 'ISO 3166 alpha-2. Required when `phone` is national.' }
+                gender: { type: [string, 'null'], enum: [male, female, other, null] }
+                locale: { type: string, description: 'One of the supported locales.' }
+                display_currency: { type: [string, 'null'], minLength: 3, maxLength: 3, description: 'One of `display_currencies`.' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [user]
+                    properties:
+                      user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /account/devices:
+    get:
+      tags: [Account]
+      summary: Devices signed in to this account
+      operationId: listDevices
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TrustedDevice' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  /account/devices/{device}:
+    delete:
+      tags: [Account]
+      summary: Sign a device out
+      operationId: revokeDevice
+      description: An account with a password proves it with `password`. A Google-only account has none, so the 24-hour new-device hold applies instead.
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: device, in: path, required: true, schema: { type: integer } }
+        - { $ref: '#/components/parameters/InstallationId' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: { type: string, format: password, description: 'Required when the account has a password.' }
+      responses:
+        '200':
+          description: '`status: device_signed_out`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/DeviceRestricted' }
+        '404':
+          description: '`device_not_found`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /account/security/otp-preference:
+    put:
+      tags: [Account]
+      summary: When to ask for an email code at sign-in
+      operationId: updateOtpPreference
+      description: Behind the 24-hour new-device hold.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email_otp_preference]
+              properties:
+                email_otp_preference: { type: string, enum: [never, new_device, always] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [email_otp_preference]
+                    properties:
+                      email_otp_preference: { type: string, enum: [never, new_device, always] }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/DeviceRestricted' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+
+  /account/kyc:
+    get:
+      tags: [Account]
+      summary: Identity verification status
+      operationId: getKycStatus
+      description: Read only. Starting a verification from the app is not offered yet; `can_start` says whether the provider is live at all.
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, verified, tier, can_start]
+                    properties:
+                      status: { type: [string, 'null'] }
+                      verified: { type: boolean }
+                      tier: { type: integer, description: '0 is unverified; higher tiers unlock higher limits.' }
+                      can_start: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+  # ------------------------------------------------------------------ Push
+
+  /push/token:
+    post:
+      tags: [Push]
+      summary: Register this phone's Expo push token
+      operationId: registerPushToken
+      description: Call on every launch and whenever the OS rotates the token. Upserts on the installation, so it is safe to call constantly. A token held by another account moves to this one.
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, pattern: '^Exp(o|onent)PushToken\[[A-Za-z0-9._\-]+\]$' }
+                platform: { type: string, enum: [ios, android] }
+                app_version: { type: string, maxLength: 40 }
+      responses:
+        '200':
+          description: '`status: registered`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Push]
+      summary: Remove this phone's push token
+      operationId: unregisterPushToken
+      security: [{ bearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/InstallationIdRequired' }]
+      responses:
+        '200':
+          description: '`status: unregistered`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusResponse' }
+        '400': { $ref: '#/components/responses/InstallationIdRequired' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+
+# ======================================================================
+
+components:
+
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: The `access_token` from a sign-in or refresh. Lasts one hour.
+
+  parameters:
+    InstallationIdRequired:
+      name: X-Installation-ID
+      in: header
+      required: true
+      description: A stable id generated once per install and kept in secure storage. Printable ASCII, 8 to 191 characters. Refused with `400 installation_id_required` when missing.
+      schema: { type: string, pattern: '^[\x21-\x7E]{8,191}$' }
+    InstallationId:
+      name: X-Installation-ID
+      in: header
+      required: false
+      description: Same id as everywhere else. Here it marks which device `is_current`, and applies the new-device hold for Google-only accounts.
+      schema: { type: string, pattern: '^[\x21-\x7E]{8,191}$' }
+    DisplayCurrency:
+      name: X-Display-Currency
+      in: header
+      required: false
+      description: Three-letter code from `display_currencies`. Prices come back converted into it, with `usd` alongside. Unknown or omitted means USD.
+      schema: { type: string, minLength: 3, maxLength: 3 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'A fresh random key per tap (a UUID is ideal). Printable ASCII, 8 to 255 characters. A retry with the same key and body returns the first answer with `Idempotent-Replay: true`. A different body under the same key is `422 idempotency_key_reused`. After any refusal, the next tap uses a new key. Keys are remembered for 24 hours.'
+      schema: { type: string, pattern: '^[\x21-\x7E]{8,255}$' }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+    Cursor:
+      name: cursor
+      in: query
+      description: '`page.next_cursor` from the previous page. Opaque; do not build or edit it.'
+      schema: { type: string, maxLength: 500 }
+    PaymentSessionId:
+      name: session
+      in: path
+      required: true
+      description: '`data.payment.id` from placing an order or funding a wallet.'
+      schema: { type: string, format: uuid }
+    CartItemId:
+      name: item
+      in: path
+      required: true
+      schema: { type: string }
+
+  headers:
+    RetryAfter:
+      description: Seconds to wait before trying again.
+      schema: { type: integer }
+    IdempotentReplay:
+      description: '`true` when this is the remembered answer to an earlier request with the same key.'
+      schema: { type: string, const: 'true' }
+
+  responses:
+    Cart:
+      description: The basket.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CartResponse' }
+    Payment:
+      description: The payment, with what to do next.
+      headers:
+        Idempotent-Replay: { $ref: '#/components/headers/IdempotentReplay' }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/PaymentSession' }
+    Preferences:
+      description: Notification preferences.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/NotificationPreferences' }
+    Unauthenticated:
+      description: '`unauthenticated`: no token, or an expired or revoked one. Refresh, and if that fails show the sign-in screen.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AccountInactive:
+      description: '`account_banned` or `account_closed`. Sign the customer out.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AccountSuspendedOrInactive:
+      description: '`account_suspended` (with a `suspension` object: `reason`, `until`), `account_protected` (recovery in progress), `account_banned` or `account_closed`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    DeviceRestricted:
+      description: '`device_restricted` (with `device_restricted: true`): this phone signed in less than 24 hours ago, so this action is held. Also `account_banned`, `account_closed`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InstallationIdRequired:
+      description: '`installation_id_required`: the header is missing or malformed. An app bug, not a customer error.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyKeyProblem:
+      description: '`idempotency_key_required` or `idempotency_key_invalid`. An app bug, not a customer error.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RequestInProgress:
+      description: '`request_in_progress`: the first attempt with this key is still running. Wait a moment and retry with the same key.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PaymentNotFound:
+      description: '`payment_not_found`: no such payment on this account.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: '`not_found`'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationFailed:
+      description: '`validation_failed`, with `fields` mapping each field to its messages.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    TooManyRequests:
+      description: '`too_many_requests` with `retry_after` seconds.'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: '#/components/schemas/Error' }
+
+    Error:
+      type: object
+      required: [type, message]
+      properties:
+        type: { $ref: '#/components/schemas/ErrorType' }
+        message: { type: string, description: 'For the customer. May change; never branch on it.' }
+        fields:
+          type: object
+          description: '`validation_failed` only: field name to list of messages.'
+          additionalProperties:
+            type: array
+            items: { type: string }
+        retry_after: { type: integer, description: 'Seconds. On `too_many_requests`, `payment_paused`, `resend_cooldown`, `verification_cooldown`, `verification_limit_reached`.' }
+        resend_retry_after: { type: integer, description: 'On `email_verification_required`: seconds before another verification email can be sent.' }
+        locked: { type: boolean, description: 'On `payment_paused`: a long lock rather than a short pause.' }
+        required_tier: { type: string, description: 'On `needs_identity_verification`.' }
+        in_review: { type: boolean, description: 'On `needs_identity_verification`: a verification is already being reviewed.' }
+        minimum_build: { type: integer, description: 'On `upgrade_required`.' }
+        device_restricted: { type: boolean }
+        suspension:
+          type: object
+          description: 'On `account_suspended`.'
+          properties:
+            reason: { type: [string, 'null'] }
+            until: { type: [string, 'null'], format: date-time }
+      additionalProperties: true
+
+    ErrorType:
+      type: string
+      description: |
+        Every `type` the API can answer with. Stable: a type is never renamed and
+        never reused for a different meaning. New ones may be added; treat an
+        unknown type as a generic failure with its `message`.
+      enum:
+        # Framework and envelope
+        - validation_failed
+        - malformed_request
+        - unauthenticated
+        - forbidden
+        - not_found
+        - method_not_allowed
+        - conflict
+        - payload_too_large
+        - upgrade_required
+        - too_many_requests
+        - request_failed
+        - service_unavailable
+        - server_error
+        # Account state and guards
+        - account_banned
+        - account_closed
+        - account_suspended
+        - account_protected
+        - email_verification_required
+        - device_restricted
+        - installation_id_required
+        - maintenance
+        # Idempotency
+        - idempotency_key_required
+        - idempotency_key_invalid
+        - idempotency_key_reused
+        - request_in_progress
+        # Sign-in
+        - invalid_credentials
+        - google_unavailable
+        - google_token_rejected
+        - google_link_failed
+        - challenge_expired
+        - challenge_device_mismatch
+        - code_invalid
+        - code_burned
+        - resend_cooldown
+        - resend_limit_reached
+        - refresh_token_invalid
+        - refresh_token_expired
+        - refresh_token_revoked
+        - refresh_token_reused
+        - reset_token_invalid
+        - verification_cooldown
+        - verification_limit_reached
+        # Catalogue and cart
+        - variant_unavailable
+        - variant_not_variable
+        - amount_not_accepted
+        - cart_not_found
+        - cart_item_not_found
+        - cart_empty
+        # Orders, wallets, notifications, account
+        - order_not_found
+        - unsupported_currency
+        - notification_not_found
+        - no_preferences_given
+        - device_not_found
+        # Checkout and payments
+        - checkout_unavailable
+        - payment_not_found
+        - payment_session_expired
+        - order_not_payable
+        - order_already_paid
+        - verification_unavailable
+        - payment_failed
+        - needs_identity_verification
+        - spending_limit_reached
+        - held_for_review
+        - payment_refused
+        - payment_paused
+        - gateway_unavailable
+        - gateway_disabled
+        - category_ineligible
+        - payment_method_not_allowed_for_items
+        - insufficient_balance
+        - transaction_pin_required
+        - wallet_on_hold
+        - coupon_invalid
+        - rates_unavailable
+        - wallet_funding_unavailable
+        # Transaction PIN
+        - transaction_pin_already_set
+        - transaction_pin_not_set
+
+    StatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status]
+          properties:
+            status: { type: string }
+
+    Page:
+      type: object
+      required: [per_page, next_cursor, has_more]
+      properties:
+        per_page: { type: integer }
+        next_cursor: { type: [string, 'null'], description: 'Pass as `cursor` for the next page. Null on the last page.' }
+        has_more: { type: boolean }
+
+    Money:
+      type: object
+      description: A price in the display currency, with the dollar figure we settle in.
+      required: [amount, currency, usd]
+      properties:
+        amount: { type: string, pattern: '^-?[0-9]+\.[0-9]{2}$', description: 'Decimal string, two places.' }
+        currency: { type: string, minLength: 3, maxLength: 5 }
+        usd: { type: string, pattern: '^-?[0-9]+\.[0-9]{4}$', description: 'Decimal string, four places.' }
+
+    MoneyNative:
+      type: object
+      description: An amount in its own currency. Not a price; never converted.
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?[0-9]+\.[0-9]{2}$' }
+        currency: { type: string, minLength: 3, maxLength: 5 }
+
+    TokenPair:
+      type: object
+      required: [access_token, token_type, expires_in, expires_at, refresh_token, refresh_expires_at]
+      properties:
+        access_token: { type: string, description: 'Send as `Authorization: Bearer`.' }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, description: 'Seconds until the access token expires.' }
+        expires_at: { type: string, format: date-time }
+        refresh_token: { type: string, description: 'Single use. Store securely; replace it with the one from each refresh.' }
+        refresh_expires_at: { type: string, format: date-time, description: 'After this the customer must sign in again.' }
+
+    AuthenticatedResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status, tokens, user]
+          properties:
+            status: { type: string, const: authenticated }
+            tokens: { $ref: '#/components/schemas/TokenPair' }
+            user: { $ref: '#/components/schemas/User' }
+
+    VerificationRequiredResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status, challenge_token, challenge_expires_at, sent_to, code_expires_in, resend_available_in]
+          properties:
+            status: { type: string, const: verification_required }
+            challenge_token: { type: string, description: 'Send with the code to `POST /auth/challenge/verify`. Not an access token.' }
+            challenge_expires_at: { type: string, format: date-time }
+            sent_to: { type: string, description: 'The masked email address the code went to.' }
+            code_expires_in: { type: integer, description: 'Seconds.' }
+            resend_available_in: { type: integer, description: 'Seconds until `POST /auth/challenge/resend` is allowed.' }
+
+    SignInResponse:
+      description: Branch on `data.status`.
+      oneOf:
+        - { $ref: '#/components/schemas/AuthenticatedResponse' }
+        - { $ref: '#/components/schemas/VerificationRequiredResponse' }
+
+    User:
+      type: object
+      required: [id, name, email, phone, country, gender, avatar_url, locale, display_currency, referral_code, kyc_status, email_verified, phone_verified, profile_completed, has_transaction_pin, is_suspended, created_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: [string, 'null'] }
+        country: { type: [string, 'null'] }
+        gender: { type: [string, 'null'] }
+        avatar_url: { type: [string, 'null'], format: uri }
+        locale: { type: [string, 'null'] }
+        display_currency: { type: [string, 'null'], description: 'Send this back as `X-Display-Currency`.' }
+        referral_code: { type: [string, 'null'] }
+        kyc_status: { type: [string, 'null'] }
+        email_verified: { type: boolean, description: 'Money actions need `true`.' }
+        phone_verified: { type: boolean }
+        profile_completed: { type: boolean }
+        has_transaction_pin: { type: boolean }
+        is_suspended: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+
+    Category:
+      type: object
+      required: [id, name, slug, type, icon, sort_order, is_enabled]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        type: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        is_enabled: { type: boolean, description: 'False means show it but do not sell from it right now.' }
+
+    Subcategory:
+      type: object
+      required: [id, name, slug, description, icon, banner_image, is_featured, sort_order]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+        banner_image: { type: [string, 'null'], format: uri }
+        is_featured: { type: boolean }
+        sort_order: { type: integer }
+        category: { $ref: '#/components/schemas/Category' }
+
+    Product:
+      type: object
+      required: [id, name, slug, country_code, currency_code, description, redeem_instructions, protip, terms_and_conditions, logo_url, featured_image, brand_color, is_featured, is_popular, is_out_of_stock, is_available]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        country_code: { type: [string, 'null'] }
+        currency_code: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        redeem_instructions: { type: [string, 'null'] }
+        protip: { type: [string, 'null'] }
+        terms_and_conditions: { type: [string, 'null'] }
+        logo_url: { type: [string, 'null'], format: uri }
+        featured_image: { type: [string, 'null'], format: uri }
+        brand_color: { type: [string, 'null'] }
+        is_featured: { type: boolean }
+        is_popular: { type: boolean }
+        is_out_of_stock: { type: boolean }
+        is_available: { type: boolean, description: 'In stock and its category is enabled.' }
+        price_from:
+          oneOf:
+            - { $ref: '#/components/schemas/Money' }
+            - type: 'null'
+          description: The cheapest variant. Null when nothing is priced.
+        category: { $ref: '#/components/schemas/Category' }
+        subcategory: { $ref: '#/components/schemas/Subcategory' }
+        variants:
+          type: array
+          description: 'Only on `GET /catalog/products/{slug}`.'
+          items: { $ref: '#/components/schemas/ProductVariant' }
+
+    ProductVariant:
+      type: object
+      required: [id, face_value, price, price_from, is_variable, min_amount, max_amount, esim]
+      properties:
+        id: { type: integer }
+        face_value:
+          oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }]
+          description: What the customer receives, in the product's own currency.
+        price:
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+          description: Null for a variable variant; use `price_from` and `POST /catalog/quote`.
+        price_from:
+          oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }]
+          description: For a variable variant, the price at its minimum amount.
+        is_variable: { type: boolean, description: 'The customer types an amount between `min_amount` and `max_amount`.' }
+        min_amount: { oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }] }
+        max_amount: { oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }] }
+        esim:
+          oneOf: [{ $ref: '#/components/schemas/EsimPlan' }, { type: 'null' }]
+
+    EsimPlan:
+      type: object
+      properties:
+        plan_type: { type: [string, 'null'] }
+        data_limit: { type: [string, 'null'] }
+        voice_limit: { type: [string, 'null'] }
+        sms_limit: { type: [string, 'null'] }
+        validity_days: { type: [integer, 'null'] }
+        supports_data: { type: boolean }
+        supports_voice: { type: boolean }
+        supports_sms: { type: boolean }
+        countries: { type: array, items: {} }
+        coverage_networks: { type: array, items: {} }
+        activation_policy: { type: [string, 'null'] }
+        is_rechargeable: { type: boolean }
+        operator_info: { type: array, items: {} }
+        other_info: { type: [string, 'null'] }
+
+    CartResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Cart' }
+
+    Cart:
+      type: object
+      required: [id, items, item_count, is_checkout_ready, issues, totals]
+      properties:
+        id: { type: string, format: uuid, description: 'Send as `cart_id` when placing the order.' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        item_count: { type: integer }
+        is_checkout_ready: { type: boolean, description: 'Non-empty and no `issues`.' }
+        issues:
+          type: object
+          description: Line id to list of problems (unavailable, out of range, missing delivery details). Empty object when fine.
+          additionalProperties: { type: array, items: { type: string } }
+        totals:
+          type: object
+          required: [subtotal, total, estimated_rcoin_reward]
+          properties:
+            subtotal: { $ref: '#/components/schemas/Money' }
+            total: { $ref: '#/components/schemas/Money' }
+            estimated_rcoin_reward: { type: integer }
+
+    CartItem:
+      type: object
+      required: [id, quantity, unit_price, subtotal, requested_amount, metadata]
+      properties:
+        id: { type: string }
+        quantity: { type: integer }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        requested_amount:
+          oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }]
+          description: For a variable variant, the amount the customer typed.
+        metadata:
+          type: object
+          properties:
+            recipient_phone: { type: string }
+            sender_phone: { type: string }
+            delivery_email: { type: string }
+            account_id: { type: string }
+        product:
+          type: object
+          required: [id, name, slug, logo_url]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            slug: { type: string }
+            logo_url: { type: [string, 'null'], format: uri }
+        variant:
+          type: object
+          required: [id, is_variable, face_value]
+          properties:
+            id: { type: integer }
+            is_variable: { type: boolean }
+            face_value: { oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }] }
+
+    Order:
+      type: object
+      required: [id, order_number, subtotal, total, payment_method, payment_method_label, payment_status, fulfillment_status, order_status, placed_at, completed_at, failed_at]
+      properties:
+        id: { type: string, format: uuid }
+        order_number: { type: string, description: 'What the customer quotes to support.' }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        total: { $ref: '#/components/schemas/Money' }
+        payment_method: { type: string, description: 'The customer''s word (`card`, `wallet`, `crypto`, `mobile_money`, …), never a gateway name.' }
+        payment_method_label: { type: string }
+        payment_status: { type: string, enum: [unpaid, pending, reserved, processing, paid, partially_paid, refunded, partially_refunded, failed, expired] }
+        fulfillment_status: { type: string }
+        order_status: { type: string, enum: [pending, processing, completed, partially_completed, failed, cancelled, refunded, requires_attention] }
+        placed_at: { type: [string, 'null'], format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
+        failed_at: { type: [string, 'null'], format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        payment:
+          oneOf:
+            - type: object
+              required: [checkout_url, expires_at]
+              properties:
+                checkout_url: { type: [string, 'null'], format: uri }
+                expires_at: { type: [string, 'null'], format: date-time }
+            - type: 'null'
+          description: Only while the order can still be paid.
+
+    OrderItem:
+      type: object
+      required: [id, product, quantity, subtotal, delivered_face_value, fulfillment_status, delivered_at, failed_at]
+      properties:
+        id: { type: string, format: uuid }
+        product:
+          type: object
+          required: [name, logo_url]
+          properties:
+            name: { type: [string, 'null'] }
+            logo_url: { type: [string, 'null'], format: uri }
+        quantity: { type: integer }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        delivered_face_value: { oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }] }
+        fulfillment_status: { type: string }
+        delivered_at: { type: [string, 'null'], format: date-time }
+        failed_at: { type: [string, 'null'], format: date-time }
+        delivery:
+          type: object
+          description: Only when fulfilled. What was delivered.
+          required: [pins, esim]
+          properties:
+            pins: { type: array, items: {}, description: 'Voucher codes or PINs, when the product has them.' }
+            esim:
+              oneOf:
+                - type: object
+                  properties:
+                    iccid: { type: string }
+                    lpaUrl: { type: string }
+                    manualActivationCode: { type: string }
+                    directInstallUrl: { type: string }
+                    sharingLink: { type: string }
+                    sharingAccessCode: { type: string }
+                - type: 'null'
+
+    PaymentSession:
+      type: object
+      description: A payment in flight. **Read `next_action` and do what it says.**
+      required: [id, status, amount, order_number, expires_at, is_expired, confirmed_at, failed_at, next_action, failure, underpayment]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, awaiting_method, awaiting_payment, awaiting_customer_action, awaiting_transfer, awaiting_redirect, awaiting_confirmation, processing, confirmed, failed, expired, cancelled]
+          description: For display and logging. Drive the UI from `next_action`, not from this.
+        amount: { $ref: '#/components/schemas/Money' }
+        order_number: { type: [string, 'null'], description: 'Null for a wallet top-up.' }
+        expires_at: { type: [string, 'null'], format: date-time }
+        is_expired: { type: boolean }
+        confirmed_at: { type: [string, 'null'], format: date-time }
+        failed_at: { type: [string, 'null'], format: date-time }
+        next_action: { $ref: '#/components/schemas/NextAction' }
+        failure:
+          oneOf:
+            - type: object
+              required: [code, reason]
+              properties:
+                code: { type: [string, 'null'], description: 'A stable customer-safe reason code, or null when unclassified.' }
+                reason: { type: string, description: 'A customer sentence.' }
+            - type: 'null'
+          description: Only when `status` is `failed`.
+        underpayment:
+          oneOf:
+            - type: object
+              required: [expected, received, shortfall, can_top_up]
+              properties:
+                expected: { $ref: '#/components/schemas/MoneyNative' }
+                received: { $ref: '#/components/schemas/MoneyNative' }
+                shortfall: { $ref: '#/components/schemas/MoneyNative' }
+                can_top_up: { type: boolean, description: 'Offer `POST /payments/{session}/top-up`.' }
+            - type: 'null'
+          description: A crypto payment that arrived short. It is never fulfilled as is.
+
+    NextAction:
+      type: object
+      description: What the app does next. Unknown types may appear in future; treat them as "poll and wait".
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [none, choose_method, confirm_with_pin, open_url, send_crypto, bank_transfer, enter_otp, enter_card_pin, await_approval, open_inline]
+        url: { type: string, format: uri, description: '`open_url`: open in a browser; on return call verify.' }
+        address: { type: [string, 'null'], description: '`send_crypto`.' }
+        memo: { type: [string, 'null'], description: '`send_crypto`: a destination tag some coins need.' }
+        amount:
+          oneOf: [{ $ref: '#/components/schemas/MoneyNative' }, { type: 'null' }]
+          description: '`send_crypto`: the exact coin amount to send. Never the fiat `amount`.'
+        network: { type: [string, 'null'], description: '`send_crypto`.' }
+        qr_payload: { type: [string, 'null'], description: '`send_crypto`: render as a QR code.' }
+        bank:
+          type: object
+          description: '`bank_transfer`: the account to pay into. Show it and poll.'
+          additionalProperties: true
+        inline:
+          type: object
+          description: '`open_inline`: the card gateway''s configuration for its own secure card form.'
+          additionalProperties: true
+
+    Wallet:
+      type: object
+      required: [id, currency, kind, balance, locked_balance, available_balance, is_active, last_activity_at]
+      properties:
+        id: { type: integer }
+        currency: { type: string }
+        kind: { type: string, enum: [cash, points] }
+        balance: { $ref: '#/components/schemas/MoneyNative' }
+        locked_balance: { $ref: '#/components/schemas/MoneyNative', description: 'Held against payments in progress.' }
+        available_balance: { $ref: '#/components/schemas/MoneyNative' }
+        is_active: { type: boolean, description: 'False means on hold; contact support.' }
+        last_activity_at: { type: [string, 'null'], format: date-time }
+
+    WalletTransaction:
+      type: object
+      required: [id, type, category, amount, balance_after, description, reference, created_at]
+      properties:
+        id: { type: integer }
+        type: { type: [string, 'null'], description: '`credit` or `debit`.' }
+        category: { type: [string, 'null'] }
+        amount: { $ref: '#/components/schemas/MoneyNative' }
+        balance_after: { $ref: '#/components/schemas/MoneyNative' }
+        description: { type: [string, 'null'] }
+        reference: { type: [string, 'null'] }
+        created_at: { type: [string, 'null'], format: date-time }
+
+    Notification:
+      type: object
+      required: [id, type, title, message, priority, read, read_at, created_at, target]
+      properties:
+        id: { type: string }
+        type: { type: [string, 'null'] }
+        title: { type: [string, 'null'] }
+        message: { type: [string, 'null'] }
+        priority: { type: [string, 'null'] }
+        read: { type: boolean }
+        read_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: [string, 'null'], format: date-time }
+        target:
+          type: object
+          required: [order_number, url]
+          properties:
+            order_number: { type: [string, 'null'], description: 'Open this order when tapped.' }
+            url: { type: [string, 'null'] }
+
+    CategoryChannels:
+      type: object
+      properties:
+        email: { type: boolean }
+        push: { type: boolean }
+
+    NotificationPreferences:
+      type: object
+      required: [channels, categories]
+      properties:
+        channels:
+          type: object
+          required: [email, push]
+          properties:
+            email: { type: boolean }
+            push: { type: boolean }
+        categories:
+          type: object
+          required: [wallet, orders, transactions, product_updates, marketing]
+          properties:
+            wallet: { $ref: '#/components/schemas/CategoryChannels' }
+            orders: { $ref: '#/components/schemas/CategoryChannels' }
+            transactions: { $ref: '#/components/schemas/CategoryChannels' }
+            product_updates: { $ref: '#/components/schemas/CategoryChannels' }
+            marketing: { $ref: '#/components/schemas/CategoryChannels' }
+
+    TrustedDevice:
+      type: object
+      required: [id, name, platform, browser, type, location, trusted, trusted_since, last_seen_at, is_current]
+      properties:
+        id: { type: integer }
+        name: { type: [string, 'null'] }
+        platform: { type: [string, 'null'] }
+        browser: { type: [string, 'null'] }
+        type: { type: [string, 'null'] }
+        location:
+          type: object
+          required: [city, country, country_code]
+          properties:
+            city: { type: [string, 'null'] }
+            country: { type: [string, 'null'] }
+            country_code: { type: [string, 'null'] }
+        trusted: { type: boolean }
+        trusted_since: { type: [string, 'null'], format: date-time }
+        last_seen_at: { type: [string, 'null'], format: date-time }
+        is_current: { type: boolean, description: 'This installation.' }

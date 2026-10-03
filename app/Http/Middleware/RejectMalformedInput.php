@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ApiV2Error;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -119,6 +120,14 @@ class RejectMalformedInput
     private function refuse(Request $request): Response
     {
         $message = 'The request contained malformed or oversized input.';
+
+        // /v2 promises the app ONE error shape. This middleware is global, so it
+        // sits in front of /v2 too, and a bare {"message": ...} here would be the
+        // one response the app cannot read: it branches on error.type, and an
+        // installed build cannot be corrected.
+        if ($request->is('v2', 'v2/*')) {
+            return ApiV2Error::make('malformed_request', $message, 422);
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['message' => $message], 422);

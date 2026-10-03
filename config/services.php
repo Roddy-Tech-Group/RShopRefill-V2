@@ -77,6 +77,21 @@ return [
         // Google Analytics 4 measurement ID (gtag.js). Empty = analytics off,
         // so local/dev and any deploy without the key render no tag.
         'analytics_id' => env('GOOGLE_ANALYTICS_ID'),
+
+        // Extra OAuth client IDs the MOBILE app signs in with. Google issues a
+        // separate client id per platform, so an ID token minted for the iOS or
+        // Android app carries one of these as its audience rather than the web
+        // client id above.
+        //
+        // This is a SECURITY allowlist, not configuration convenience. An ID
+        // token proves who the holder is to whoever it was issued FOR; without
+        // checking the audience, a token issued to any other Google app would
+        // sign that person into RShopRefill. Empty means mobile Google sign-in
+        // refuses, which is the right way round for an unconfigured deploy.
+        'mobile_client_ids' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('GOOGLE_MOBILE_CLIENT_IDS', '')),
+        ))),
     ],
 
     // Master switch allowing the payment providers to fall back to mock

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Security;
 
+use App\Models\CurrencyRate;
 use App\Models\NotificationInteraction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
@@ -133,9 +134,25 @@ class ScannerProbeHardeningTest extends TestCase
     /** Regression guard: a currency the locale modal can actually produce. */
     public function test_a_supported_currency_is_still_honoured(): void
     {
+        // A supported currency is one with a live rate. This test used to pass
+        // with no rate at all, because the rate lookup quietly treated an unknown
+        // code as the dollar; the cart said "NGN" while pricing at par with USD.
+        CurrencyRate::create(['code' => 'NGN', 'name' => 'Nigerian Naira', 'type' => 'fiat', 'rate_per_usd' => 1600.0, 'is_active' => true]);
+
         $this->get('/cart/data?currency=NGN')
             ->assertOk()
-            ->assertJson(['currency' => 'NGN']);
+            ->assertJson(['currency' => 'NGN', 'rate' => 1600, 'rate_stale' => false]);
+    }
+
+    /**
+     * A currency on the allowlist that has no rate right now is shown in dollars
+     * and flagged, rather than priced at a rate we do not hold.
+     */
+    public function test_a_supported_currency_with_no_rate_falls_back_to_dollars_and_says_so(): void
+    {
+        $this->get('/cart/data?currency=NGN')
+            ->assertOk()
+            ->assertJson(['currency' => 'USD', 'rate' => 1, 'rate_stale' => true]);
     }
 
     /** A scanner hammering the cart is cut off rather than served forever. */

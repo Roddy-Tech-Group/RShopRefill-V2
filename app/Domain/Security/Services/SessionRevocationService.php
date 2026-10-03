@@ -38,6 +38,7 @@ class SessionRevocationService
     public function __construct(
         private readonly DeviceTrustManager $devices,
         private readonly CommunicationManager $communications,
+        private readonly ApiTokenService $apiTokens,
     ) {}
 
     /**
@@ -58,6 +59,13 @@ class SessionRevocationService
             ->each(fn (UserSession $session) => $this->destroy($session));
 
         $this->purgeDatabaseSessions($user);
+
+        // The mobile app holds bearer tokens, not a session, so neither the
+        // session handler nor the session_version bump reaches it. Without this,
+        // "sign out everywhere" signed the customer out of every browser and left
+        // the phone logged in, which is the one device most likely to be the
+        // reason they pressed it.
+        $this->apiTokens->revokeEverything($user);
     }
 
     /**
@@ -75,6 +83,13 @@ class SessionRevocationService
             });
 
         $this->devices->revokeDevice($device);
+
+        // trusted_devices.device_uuid holds exactly the installation id the app
+        // reports in X-Installation-ID, so revoking a device here reaches the
+        // phone and not just its browser sessions.
+        if ($device->user !== null && $device->device_uuid !== null) {
+            $this->apiTokens->revokeByInstallation($device->user, (string) $device->device_uuid);
+        }
 
         if ($notifyOwner && $device->user !== null) {
             $this->notifyDeviceRemoved($device);

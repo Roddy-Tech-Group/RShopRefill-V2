@@ -10,6 +10,12 @@ Stack verified on 2026-09-17: **Laravel 12 + Blade + Livewire 4 + Alpine.js + Ta
 - Dependency locks describe resolved versions; `config` files describe defaults; the selected local drivers and production infrastructure can differ. Recheck before documenting them as current.
 - Documentation-only changes need source, link, and diff verification. Application changes use the relevant checks below.
 
+## Mobile API (/v2): read the contract first
+
+The Expo app talks to the token-authenticated API under `/v2` (`routes/api_v2.php`). Its contract is **[docs/api/v2/openapi.yaml](docs/api/v2/openapi.yaml)** and the flows guide is **[docs/api/v2/README.md](docs/api/v2/README.md)**. Before writing any mobile-app code, any `/v2` endpoint, or any client that calls `/v2`: read the README, then the YAML for the endpoints involved. Never guess a path, a field name or an error `type`; everything the app may rely on is in that file and nothing else is promised.
+
+The contract is enforced by `tests/Feature/Api/V2/OpenApiContractTest.php`: every `/v2` route must be in the YAML, every `ApiV2Error` type must be in its `ErrorType` list, and live responses must match their schemas. Changing a `/v2` endpoint means changing `openapi.yaml` in the same commit, or the suite fails. Admins can browse it at `/admin/management/api-docs`.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
@@ -25,6 +31,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/framework (LARAVEL) - v12
 - laravel/horizon (HORIZON) - v5
 - laravel/prompts (PROMPTS) - v0
+- laravel/sanctum (SANCTUM) - v4
 - laravel/socialite (SOCIALITE) - v5
 - livewire/flux (FLUXUI_FREE) - v2
 - livewire/livewire (LIVEWIRE) - v4

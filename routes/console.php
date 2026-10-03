@@ -42,6 +42,12 @@ Schedule::command('rates:fetch')->dailyAt('03:00')->name('rates:fetch-daily')->s
 Schedule::command('risk:report')->dailyAt('08:00')->name('risk:report-daily');
 Schedule::command('risk:prune')->dailyAt('02:30')->name('risk:prune-daily');
 
+// The mobile API's short-lived bookkeeping. Idempotency keys stop mattering
+// after their 24-hour replay window and are the fastest-growing table the API
+// owns; dead refresh tokens are kept a month so a support question about a
+// surprise sign-out can still be answered.
+Schedule::command('api:prune')->dailyAt('02:15')->withoutOverlapping()->name('api:prune-daily');
+
 // Audit retention: archive-then-delete rows past the two-year window
 // (config/audit.php). Monthly is plenty - the window moves a day at a time.
 Schedule::command('audit:prune')->monthlyOn(1, '02:45')->name('audit:prune-monthly');

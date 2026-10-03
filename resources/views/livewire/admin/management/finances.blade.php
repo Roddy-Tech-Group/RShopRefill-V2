@@ -119,20 +119,6 @@ class extends Component {
         return round((($current - $prior) / abs($prior)) * 100, 1);
     };
 
-    // A net figure with what came off it noted underneath, only when
-    // something did. Keeps the tables to the columns an owner reads.
-    // Money::codeAmount is what @moneyCode renders, so these cells match the
-    // rest of the table (and need no intl extension).
-    $netCell = function (float $net, float $adjustment, string $noun) {
-        $html = \App\Domain\Shared\Services\Money::codeAmount($net, 'USD');
-
-        if ($adjustment > 0) {
-            $html .= '<span class="block text-[11px] font-normal text-zinc-400">less '
-                .\App\Domain\Shared\Services\Money::codeAmount($adjustment, 'USD').' '.e($noun).'</span>';
-        }
-
-        return $html;
-    };
 
     $deltaBadge = function (?float $pct, bool $downIsGood = false) {
         if ($pct === null) {
@@ -202,25 +188,19 @@ class extends Component {
             $credits = $data['supplier_credits'];
 
             // Revenue and supplier cost are NET: refunds and supplier credits
-            // come off in the month they happen. The gross figure rides along
-            // underneath whenever something was taken off it.
-            $revenueSub = $totals['refunds_usd'] > 0
-                ? \App\Domain\Shared\Services\Money::codeAmount($totals['gross_revenue_usd'], 'USD').' gross, less refunds'
-                : '';
-            $costSub = $totals['supplier_credits_usd'] > 0
-                ? \App\Domain\Shared\Services\Money::codeAmount($totals['gross_cost_usd'], 'USD').' gross, less credits'
-                : '';
+            // come off in the month they happen. The Refunds tile beside them
+            // already says what came off, so the figures stand on their own.
             $refundSub = number_format($refunds['count']).' '.($refunds['count'] === 1 ? 'refund' : 'refunds');
             if ($credits['pending_count'] > 0) {
                 $refundSub .= ' · '.number_format($credits['pending_count']).' supplier '.($credits['pending_count'] === 1 ? 'claim' : 'claims').' pending';
             }
 
             $headlines = [
-                ['label' => 'Revenue', 'money' => $totals['revenue_usd'], 'sub' => $revenueSub, 'delta' => $delta($totals['revenue_usd'], $previous['revenue_usd'])],
+                ['label' => 'Revenue', 'money' => $totals['revenue_usd'], 'delta' => $delta($totals['revenue_usd'], $previous['revenue_usd'])],
                 // Up is green here like every other headline: supplier cost
                 // rises with sales, so a bigger number is more business, not
                 // a problem. Marking it "down is good" painted growth red.
-                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'sub' => $costSub, 'delta' => $delta($totals['cost_usd'], $previous['cost_usd'])],
+                ['label' => 'Supplier cost', 'money' => $totals['cost_usd'], 'delta' => $delta($totals['cost_usd'], $previous['cost_usd'])],
                 ['label' => 'Gross profit', 'money' => $totals['profit_usd'], 'delta' => $delta($totals['profit_usd'], $previous['profit_usd'])],
                 ['label' => 'Gross margin', 'value' => number_format($totals['margin_pct'], 2).'%', 'delta' => $delta($totals['margin_pct'], $previous['margin_pct'])],
                 ['label' => 'Completed orders', 'value' => number_format($totals['orders']), 'delta' => $delta((float) $totals['orders'], (float) $previous['orders'])],
@@ -246,16 +226,26 @@ class extends Component {
             <h2 class="{{ $sectionTitle }}">By providers</h2>
         </header>
         <div class="overflow-x-auto p-3">
-            <table class="w-full admin-table">
+            <table class="w-full table-fixed admin-table">
+                {{-- Shared column plan with the category table below, so the two line up down the page. --}}
+                <colgroup>
+                    <col style="width: 28%">
+                    <col style="width: 10%">
+                    <col style="width: 10%">
+                    <col style="width: 15%">
+                    <col style="width: 15%">
+                    <col style="width: 13%">
+                    <col style="width: 9%">
+                </colgroup>
                 <thead class="">
                     <tr>
                         <th class="{{ $th }} pl-5">Provider</th>
-                        <th class="{{ $th }} text-right">Orders</th>
-                        <th class="{{ $th }} text-right">Units</th>
-                        <th class="{{ $th }} text-right">Revenue</th>
-                        <th class="{{ $th }} text-right">Cost price</th>
-                        <th class="{{ $th }} text-right">Gross profit</th>
-                        <th class="{{ $th }} pr-5 text-right">Margin</th>
+                        <th class="{{ $th }} !text-right">Orders</th>
+                        <th class="{{ $th }} !text-right">Units</th>
+                        <th class="{{ $th }} !text-right">Revenue</th>
+                        <th class="{{ $th }} !text-right">Cost price</th>
+                        <th class="{{ $th }} !text-right">Gross profit</th>
+                        <th class="{{ $th }} pr-5 !text-right">Margin</th>
                     </tr>
                 </thead>
                 <tbody class="">
@@ -264,8 +254,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['label'] }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['orders']) }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['units']) }}</td>
-                            <td class="{{ $td }} text-right">{!! $netCell($row['revenue_usd'], $row['refunds_usd'], 'refunded') !!}</td>
-                            <td class="{{ $td }} text-right">{!! $netCell($row['cost_usd'], $row['supplier_credits_usd'], 'credited') !!}</td>
+                            <td class="{{ $td }} text-right">@moneyCode($row['revenue_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right">@moneyCode($row['cost_usd'], 'USD')</td>
                             <td class="{{ $td }} text-right font-semibold {{ $row['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($row['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right">{{ number_format($row['margin_pct'], 2) }}%</td>
                         </tr>
@@ -279,8 +269,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-bold text-zinc-900 dark:text-white">Company total</td>
                             <td class="{{ $td }} text-right font-bold">{{ number_format($totals['orders']) }}</td>
                             <td class="{{ $td }} text-right font-bold">{{ number_format($totals['units']) }}</td>
-                            <td class="{{ $td }} text-right font-bold">{!! $netCell($totals['revenue_usd'], $totals['refunds_usd'], 'refunded') !!}</td>
-                            <td class="{{ $td }} text-right font-bold">{!! $netCell($totals['cost_usd'], $totals['supplier_credits_usd'], 'credited') !!}</td>
+                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['revenue_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['cost_usd'], 'USD')</td>
                             <td class="{{ $td }} text-right font-bold {{ $totals['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($totals['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right font-bold">{{ number_format($totals['margin_pct'], 2) }}%</td>
                         </tr>
@@ -296,16 +286,26 @@ class extends Component {
             <h2 class="{{ $sectionTitle }}">By product category</h2>
         </header>
         <div class="overflow-x-auto p-3">
-            <table class="w-full admin-table">
+            <table class="w-full table-fixed admin-table">
+                {{-- Shared column plan with the category table below, so the two line up down the page. --}}
+                <colgroup>
+                    <col style="width: 28%">
+                    <col style="width: 10%">
+                    <col style="width: 10%">
+                    <col style="width: 15%">
+                    <col style="width: 15%">
+                    <col style="width: 13%">
+                    <col style="width: 9%">
+                </colgroup>
                 <thead class="">
                     <tr>
                         <th class="{{ $th }} pl-5">Category</th>
-                        <th class="{{ $th }} text-right">Orders</th>
-                        <th class="{{ $th }} text-right">Units</th>
-                        <th class="{{ $th }} text-right">Revenue</th>
-                        <th class="{{ $th }} text-right">Cost price</th>
-                        <th class="{{ $th }} text-right">Gross profit</th>
-                        <th class="{{ $th }} pr-5 text-right">Margin</th>
+                        <th class="{{ $th }} !text-right">Orders</th>
+                        <th class="{{ $th }} !text-right">Units</th>
+                        <th class="{{ $th }} !text-right">Revenue</th>
+                        <th class="{{ $th }} !text-right">Cost price</th>
+                        <th class="{{ $th }} !text-right">Gross profit</th>
+                        <th class="{{ $th }} pr-5 !text-right">Margin</th>
                     </tr>
                 </thead>
                 <tbody class="">
@@ -314,8 +314,8 @@ class extends Component {
                             <td class="{{ $td }} pl-5 font-semibold text-zinc-900 dark:text-white">{{ $row['category'] }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['orders']) }}</td>
                             <td class="{{ $td }} text-right">{{ number_format($row['units']) }}</td>
-                            <td class="{{ $td }} text-right">{!! $netCell($row['revenue_usd'], $row['refunds_usd'], 'refunded') !!}</td>
-                            <td class="{{ $td }} text-right">{!! $netCell($row['cost_usd'], $row['supplier_credits_usd'], 'credited') !!}</td>
+                            <td class="{{ $td }} text-right">@moneyCode($row['revenue_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right">@moneyCode($row['cost_usd'], 'USD')</td>
                             <td class="{{ $td }} text-right font-semibold {{ $row['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($row['profit_usd'], 'USD')</td>
                             <td class="{{ $td }} pr-5 text-right">{{ number_format($row['margin_pct'], 2) }}%</td>
                         </tr>
@@ -323,6 +323,19 @@ class extends Component {
                         <tr><td colspan="7" class="{{ $td }} pl-5 py-8 text-center text-zinc-400">No completed orders in this month.</td></tr>
                     @endforelse
                 </tbody>
+                @if (count($data['categories']) > 1)
+                    <tfoot class="border-t border-zinc-200 bg-zinc-50/60 dark:border-white/10 dark:bg-white/5">
+                        <tr>
+                            <td class="{{ $td }} pl-5 font-bold text-zinc-900 dark:text-white">Company total</td>
+                            <td class="{{ $td }} text-right font-bold">{{ number_format($totals['orders']) }}</td>
+                            <td class="{{ $td }} text-right font-bold">{{ number_format($totals['units']) }}</td>
+                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['revenue_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right font-bold">@moneyCode($totals['cost_usd'], 'USD')</td>
+                            <td class="{{ $td }} text-right font-bold {{ $totals['profit_usd'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300' }}">@moneyCode($totals['profit_usd'], 'USD')</td>
+                            <td class="{{ $td }} pr-5 text-right font-bold">{{ number_format($totals['margin_pct'], 2) }}%</td>
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
     </section>

@@ -9,6 +9,7 @@ use App\Domain\Wallet\Services\TransactionPinService;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
+use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
@@ -51,6 +52,10 @@ class PaymentMethodTelemetryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // The naira checkout below needs a live rate: checkout now refuses a
+        // currency it cannot price rather than charging it at par with the dollar.
+        CurrencyRate::create(['code' => 'NGN', 'name' => 'Nigerian Naira', 'type' => 'fiat', 'rate_per_usd' => 1400.0, 'is_active' => true]);
 
         config([
             'services.zendit.api_key' => 'ZENDIT_API_KEY_MOCK',
