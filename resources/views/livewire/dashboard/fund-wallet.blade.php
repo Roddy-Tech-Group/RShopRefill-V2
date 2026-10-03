@@ -1335,6 +1335,7 @@ new class extends Component
                     <span class="flex shrink-0 items-center border-r border-zinc-200 bg-[#f4f6f5] px-3 text-sm font-semibold text-zinc-600">{{ $this->symbol() }}</span>
                     <input
                         type="number"
+                        inputmode="decimal"
                         step="any"
                         min="0"
                         wire:model="amount"

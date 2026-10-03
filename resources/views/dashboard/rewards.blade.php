@@ -917,6 +917,7 @@
                             @csrf
                             <input
                                 type="number"
+                                inputmode="numeric"
                                 name="convert_amount"
                                 min="{{ $convertThreshold }}"
                                 max="{{ $rcoinBalance }}"
@@ -978,6 +979,7 @@
                             @csrf
                             <input
                                 type="number"
+                                inputmode="numeric"
                                 name="withdraw_amount"
                                 x-model="amount"
                                 min="{{ $withdrawThreshold }}"
