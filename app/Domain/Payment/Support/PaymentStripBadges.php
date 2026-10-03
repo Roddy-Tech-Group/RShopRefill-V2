@@ -81,7 +81,17 @@ final class PaymentStripBadges
      */
     public static function all(): array
     {
-        return [...self::FIXED, ...self::cryptoBadges()];
+        // A badge is a promise that checkout takes the method. A method held
+        // back from checkout (SupportedPaymentMethods::withheld) loses its
+        // badge here too, with no second list to keep in step.
+        $offered = SupportedPaymentMethods::allMethods();
+
+        $fixed = array_values(array_filter(
+            self::FIXED,
+            fn (array $badge) => in_array($badge['method'], $offered, true),
+        ));
+
+        return [...$fixed, ...self::cryptoBadges()];
     }
 
     /**

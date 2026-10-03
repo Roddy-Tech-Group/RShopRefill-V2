@@ -540,8 +540,12 @@ class EmbeddedPaymentOrchestrationTest extends TestCase
             'method' => 'apple_pay',
         ]);
 
-        $payResponse->assertStatus(200)
-            ->assertJsonPath('data.status', 'confirmed');
+        // Apple Pay is held back from every surface until Flutterwave enables
+        // it on the live account (SupportedPaymentMethods::withheld), so the
+        // pay step refuses it like any method the currency does not offer.
+        // ApplePayChargeTest keeps the charge itself proven for that day.
+        $payResponse->assertStatus(422)
+            ->assertJsonFragment(['message' => 'The payment method apple_pay is not available for currency USD.']);
     }
 
     /**

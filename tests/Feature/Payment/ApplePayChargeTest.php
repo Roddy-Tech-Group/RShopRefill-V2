@@ -89,14 +89,19 @@ class ApplePayChargeTest extends TestCase
         });
     }
 
-    public function test_apple_pay_is_offered_only_where_the_gateway_collects_it(): void
+    /**
+     * The charge above stays proven for the day Flutterwave enables Apple Pay on
+     * the live account. Until then it is withheld from every currency, including
+     * the three the sandbox accepted it in (see ApplePayWithheldTest). Lifting
+     * the hold is deleting one line in SupportedPaymentMethods; this test then
+     * fails on purpose so the USD/GBP/NGN assertion is restored with it.
+     */
+    public function test_apple_pay_is_withheld_everywhere_until_the_live_account_takes_it(): void
     {
-        foreach (['USD', 'GBP', 'NGN'] as $currency) {
-            $this->assertTrue(SupportedPaymentMethods::allows($currency, 'apple_pay'), "{$currency} should offer Apple Pay");
-        }
+        $this->assertArrayHasKey('apple_pay', SupportedPaymentMethods::withheld());
 
-        foreach (['EUR', 'GHS', 'XAF', 'XOF', 'KES', 'UGX', 'RWF', 'ZAR'] as $currency) {
-            $this->assertFalse(SupportedPaymentMethods::allows($currency, 'apple_pay'), "{$currency} must not offer Apple Pay");
+        foreach (['USD', 'GBP', 'NGN', 'EUR', 'GHS', 'XAF', 'XOF', 'KES', 'UGX', 'RWF', 'ZAR'] as $currency) {
+            $this->assertFalse(SupportedPaymentMethods::allows($currency, 'apple_pay'), "{$currency} must not offer Apple Pay while it is withheld");
         }
     }
 }
