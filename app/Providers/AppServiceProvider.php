@@ -33,6 +33,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A single query-string value, or the default. request()->query('q')
+        // hands back an ARRAY for ?q[]=x, and casting that to a string is a
+        // fatal error, which is how one crafted link took the top-ups page
+        // down (Sentry 7770706387). Every page that reads a filter from the
+        // URL reads it through this, so a shape nobody asked for is simply
+        // not a filter.
+        Request::macro('queryString', function (string $key, string $default = ''): string {
+            /** @var Request $this */
+            $value = $this->query($key);
+
+            return is_scalar($value) ? (string) $value : $default;
+        });
+
+        // The same guard for a posted field read outside validation: a form
+        // field renamed to `currency[]` by a tampered page is an array too.
+        Request::macro('inputString', function (string $key, string $default = ''): string {
+            /** @var Request $this */
+            $value = $this->input($key);
+
+            return is_scalar($value) ? (string) $value : $default;
+        });
+
         // The one password policy every form uses (register, reset, change,
         // admin accounts). NIST-style: length plus a breached-password check
         // (Have I Been Pwned's k-anonymity range API, which never sees the

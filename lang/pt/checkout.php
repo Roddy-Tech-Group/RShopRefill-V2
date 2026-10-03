@@ -318,6 +318,8 @@ return [
     'failure_reason_gateway_config_error' => 'Este método de pagamento não está disponível para a sua encomenda neste momento. Escolha outro método. A nossa equipa foi avisada.',
     'failure_reason_system_error' => 'Algo correu mal do nosso lado e nada foi cobrado. Tente de novo ou contacte o apoio se voltar a acontecer.',
     'failure_reason_mobile_money_unknown' => 'O seu operador de dinheiro móvel não aprovou este pagamento. Verifique o saldo e o limite diário e tente de novo.',
+    'failure_reason_card_not_enrolled' => 'Este cartão não está habilitado para pagamentos online seguros. Peça ao seu banco para ativar os pagamentos online ou use outro cartão.',
+    'failure_reason_payment_not_completed' => 'Não foi possível concluir este pagamento. Tente novamente ou use outro método de pagamento.',
     'payment_window_failed' => 'Não foi possível carregar a janela de pagamento. Desative qualquer bloqueador de anúncios e tente novamente.',
     'payment_not_verified' => 'Não foi possível verificar o pagamento.',
     'payment_verify_connection' => 'Não foi possível verificar o pagamento. Verifique sua conexão.',

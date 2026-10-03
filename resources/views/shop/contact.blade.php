@@ -66,7 +66,7 @@
     // If the value matches a list item exactly we select it; if it carries an
     // order ID we route to "Order not delivered" and seed the order_id +
     // message fields so support has context without the user having to retype.
-    $queriedSubject = trim((string) request()->query('subject', ''));
+    $queriedSubject = trim(request()->queryString('subject', ''));
     $defaultSubject = $subjects[0];
     $defaultOrderId = '';
     $defaultMessage = '';

@@ -318,6 +318,8 @@ return [
     'failure_reason_gateway_config_error' => 'Wannan hanyar biyan ba ta samuwa ga odarka a yanzu. Da fatan za ka zaɓi wata hanya. An sanar da ƙungiyarmu.',
     'failure_reason_system_error' => 'Wani abu ya ɓaci daga ɓangarenmu kuma ba a cire komai ba. Sake gwadawa, ko tuntuɓi tallafi idan ya sake faruwa.',
     'failure_reason_mobile_money_unknown' => 'Mai ba da sabis ɗin kuɗin waya bai amince da wannan biyan ba. Duba ma\'aunin asusunka da iyakar yau, sannan ka sake gwadawa.',
+    'failure_reason_card_not_enrolled' => 'Ba a saita wannan katin don biyan kuɗi lafiya ta intanet ba. Ka roƙi bankinka ya kunna biyan ta intanet a kansa, ko ka yi amfani da wani katin.',
+    'failure_reason_payment_not_completed' => 'Ba a iya kammala wannan biyan ba. Sake gwadawa ko ka yi amfani da wata hanyar biyan.',
     'payment_window_failed' => 'Tagar biya ba ta iya buɗewa ba. Da fatan ka kashe duk wani mai toshe talla ka sake gwadawa.',
     'payment_not_verified' => 'Ba a iya tabbatar da biyan ba.',
     'payment_verify_connection' => 'Ba a iya tabbatar da biya ba. Da fatan ka duba haɗin intanet ɗinka.',

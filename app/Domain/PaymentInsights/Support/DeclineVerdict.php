@@ -50,6 +50,11 @@ final class DeclineVerdict
         'provider_error',
         'provider_rate_limited',
         'authentication_failed',
+        // The bank never switched online verification on for the card, and a
+        // gateway rail down for maintenance: neither says anything about who
+        // holds the card.
+        'card_not_enrolled',
+        'provider_maintenance',
         'unknown_error',
         'unrecognised_gateway_message',
         'orphaned_timeout',

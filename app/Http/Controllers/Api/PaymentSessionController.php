@@ -465,6 +465,17 @@ class PaymentSessionController extends Controller
                     'details.network' => 'nullable|string',
                 ]);
 
+                // A number with no digits in it (letters, punctuation, a pasted
+                // label) passed `required` and reached the gateway empty once
+                // the rail stripped it to digits: "phonenumber is required",
+                // and a failed order for a typo. Refused here instead, so the
+                // customer fixes the number and the payment carries on.
+                if (strlen(MobileMoneyRail::normalisePhone((string) $details['phone_number'])) < 8) {
+                    return response()->json([
+                        'message' => 'Enter the mobile money phone number, with its country code if it is not a local number.',
+                    ], 422);
+                }
+
                 // Checked against the rail here, not at the gateway: a network
                 // the market does not have is a stale screen, and answering it
                 // with a failed order would turn a display bug into a lost sale.

@@ -318,6 +318,8 @@ return [
     'failure_reason_gateway_config_error' => 'Questo metodo di pagamento non è disponibile per il tuo ordine in questo momento. Scegli un altro metodo. Il nostro team è stato avvisato.',
     'failure_reason_system_error' => 'Qualcosa è andato storto da parte nostra e non è stato addebitato nulla. Riprova, o contatta l\'assistenza se si ripete.',
     'failure_reason_mobile_money_unknown' => 'Il tuo operatore mobile money non ha approvato questo pagamento. Controlla il saldo e il limite giornaliero, poi riprova.',
+    'failure_reason_card_not_enrolled' => 'Questa carta non è abilitata ai pagamenti online sicuri. Chiedi alla tua banca di attivarli oppure usa un\'altra carta.',
+    'failure_reason_payment_not_completed' => 'Non è stato possibile completare questo pagamento. Riprova o usa un altro metodo di pagamento.',
     'payment_window_failed' => 'Impossibile caricare la finestra di pagamento. Disattivi eventuali blocchi pubblicitari e riprovi.',
     'payment_not_verified' => 'Non è stato possibile verificare il pagamento.',
     'payment_verify_connection' => 'Impossibile verificare il pagamento. Controlli la connessione.',

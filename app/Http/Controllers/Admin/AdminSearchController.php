@@ -23,7 +23,7 @@ class AdminSearchController extends Controller
         $admin = $request->user('admin');
 
         return response()->json(
-            $this->search->search((string) $request->query('q', ''), $admin)
+            $this->search->search($request->queryString('q', ''), $admin)
         );
     }
 }

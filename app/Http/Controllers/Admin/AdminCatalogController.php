@@ -50,7 +50,7 @@ class AdminCatalogController extends Controller
     public function products(Request $request)
     {
         $products = Product::with(['category', 'subcategory', 'variants'])
-            ->when($request->query('search'), fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
+            ->when($request->queryString('search'), fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
             ->latest()
             ->paginate((int) $request->query('per_page', 25));
 

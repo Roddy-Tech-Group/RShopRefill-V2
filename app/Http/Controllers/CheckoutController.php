@@ -95,7 +95,7 @@ class CheckoutController extends Controller
 
         // Display currency comes from the customer's locale (hidden field on the
         // checkout form). Settlement is always USD; this is presentation only.
-        $displayCurrency = strtoupper((string) $request->input('currency', 'USD'));
+        $displayCurrency = strtoupper($request->inputString('currency', 'USD'));
         if (strlen($displayCurrency) !== 3) {
             $displayCurrency = 'USD';
         }
@@ -358,7 +358,7 @@ class CheckoutController extends Controller
         abort_unless($request->user(), 403);
         abort_unless($attempt->user_id === $request->user()->id, 403);
 
-        $reportedStatus = strtolower((string) $request->query('status'));
+        $reportedStatus = strtolower($request->queryString('status'));
 
         // Flutterwave reports an explicit status in the query string; the
         // backup gateways (Paystack) send only the transaction reference, so

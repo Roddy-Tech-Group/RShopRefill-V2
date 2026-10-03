@@ -111,7 +111,7 @@
         // Refer & Earn opens the page: it is the one tab a partner comes here to
         // act on. Rcoin Earnings is where they check a balance, which is a second
         // question, and ?tab= still links straight to either.
-        $partnerTab = array_key_exists((string) request('tab'), $partnerTabs) ? (string) request('tab') : 'refer';
+        $partnerTab = array_key_exists(request()->queryString('tab'), $partnerTabs) ? request()->queryString('tab') : 'refer';
 
         // Refer & Earn figures. Every number is live: the reward rules come
         // from the admin rewards settings, the counts from this customer's own
@@ -917,6 +917,7 @@
                             @csrf
                             <input
                                 type="number"
+                                inputmode="numeric"
                                 name="convert_amount"
                                 min="{{ $convertThreshold }}"
                                 max="{{ $rcoinBalance }}"
@@ -978,6 +979,7 @@
                             @csrf
                             <input
                                 type="number"
+                                inputmode="numeric"
                                 name="withdraw_amount"
                                 x-model="amount"
                                 min="{{ $withdrawThreshold }}"

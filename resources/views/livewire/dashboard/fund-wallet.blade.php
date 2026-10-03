@@ -71,12 +71,12 @@ new class extends Component
         $this->currency = $resolved === 'RCOIN' ? 'USD' : $resolved;
         $this->variant = $variant;
 
-        $requested = strtoupper(trim((string) request()->query('fund', '')));
+        $requested = strtoupper(trim(request()->queryString('fund', '')));
 
         if ($requested !== '' && $requested === $this->currency) {
             $this->openOnLoad = true;
 
-            $amount = (float) request()->query('amount', 0);
+            $amount = (float) request()->queryString('amount', '0');
             if ($amount > 0) {
                 $this->amount = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
             }
@@ -1335,6 +1335,7 @@ new class extends Component
                     <span class="flex shrink-0 items-center border-r border-zinc-200 bg-[#f4f6f5] px-3 text-sm font-semibold text-zinc-600">{{ $this->symbol() }}</span>
                     <input
                         type="number"
+                        inputmode="decimal"
                         step="any"
                         min="0"
                         wire:model="amount"

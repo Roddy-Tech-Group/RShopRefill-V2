@@ -27,7 +27,9 @@ final class SupportedPaymentMethods
         // Apple Pay only where the gateway collects it: USD, GBP and NGN.
         // Every other currency answers "Currency not supported for Apple Pay"
         // before the merchant is even looked at (sandbox-verified 2026-09-10),
-        // so offering the tile there was a guaranteed failure.
+        // so offering the tile there was a guaranteed failure. It is listed
+        // here as the gateway's capability and HELD BACK by WITHHELD below
+        // until the live account takes it; do not delete it from these rows.
         // Mobile money on USD rides the Francophone rail in CFA francs (see
         // MobileMoneyRail): a dollar order can be paid over MTN or Orange
         // without the customer switching currency first.
@@ -50,11 +52,43 @@ final class SupportedPaymentMethods
     private const FALLBACK = ['card'];
 
     /**
+     * Methods the gateway lists but the live account cannot take, so they are
+     * offered nowhere: not the checkout tiles, not the wallet sheet, not the
+     * storefront strip, not the pay step. Keyed by method with the reason, so
+     * the day the reason stops being true the line is deleted and every surface
+     * gets the method back at once.
+     *
+     * apple_pay: 17 of 17 production attempts were refused by Flutterwave
+     * between 2026-09-02 and 2026-10-01 ("failed compliance checks", then "the
+     * currency for this payment is currently not supported"), in the very
+     * currencies the sandbox accepted it in. Apple Pay is not enabled on the
+     * live merchant account. Every attempt cost a customer a failed checkout
+     * and a strike toward the payment pause.
+     *
+     * @var array<string, string>
+     */
+    private const WITHHELD = [
+        'apple_pay' => 'Not enabled on the live Flutterwave account: every production attempt was refused as of 2026-10-01.',
+    ];
+
+    /**
      * @return list<string>
      */
     public static function forCurrency(string $currency): array
     {
-        return self::BY_CURRENCY[strtoupper(trim($currency))] ?? self::FALLBACK;
+        $methods = self::BY_CURRENCY[strtoupper(trim($currency))] ?? self::FALLBACK;
+
+        return array_values(array_diff($methods, array_keys(self::WITHHELD)));
+    }
+
+    /**
+     * The methods currently held back from every surface, with why.
+     *
+     * @return array<string, string>
+     */
+    public static function withheld(): array
+    {
+        return self::WITHHELD;
     }
 
     /**
@@ -85,6 +119,8 @@ final class SupportedPaymentMethods
      */
     public static function allMethods(): array
     {
-        return array_values(array_unique(array_merge(...array_values(self::BY_CURRENCY))));
+        $methods = array_unique(array_merge(...array_values(self::BY_CURRENCY)));
+
+        return array_values(array_diff($methods, array_keys(self::WITHHELD)));
     }
 }

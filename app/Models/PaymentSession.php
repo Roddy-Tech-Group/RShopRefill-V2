@@ -233,8 +233,11 @@ class PaymentSession extends Model
             'supported_brands' => ['visa', 'mastercard', 'verve'],
         ];
 
-        // 2. Apple Pay is supported globally (USD, EUR, GBP, NGN, GHS, XAF, XOF)
-        if (in_array($currency, ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'XAF', 'XOF'])) {
+        // 2. Apple Pay, where the shared method list offers it. This used to
+        //    carry its own list of seven currencies, four of which the gateway
+        //    refuses Apple Pay in, and it kept offering it after the shared
+        //    list held it back.
+        if (SupportedPaymentMethods::allows($currency, 'apple_pay')) {
             $methods[] = [
                 'type' => 'apple_pay',
                 'provider' => 'flutterwave',

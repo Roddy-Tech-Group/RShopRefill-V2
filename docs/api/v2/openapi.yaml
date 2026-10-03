@@ -973,8 +973,8 @@ paths:
               properties:
                 method:
                   type: string
-                  enum: [card, apple_pay, mobile_money, crypto, wallet, pay_with_bank, bank_transfer, ussd, bank_qr, mobile_wallet]
-                  description: Must be one the payment's currency accepts; a wallet payment accepts only `wallet`, a crypto one only `crypto`. A wallet top-up never accepts `wallet`.
+                  enum: [card, mobile_money, crypto, wallet, pay_with_bank, bank_transfer, ussd, bank_qr, mobile_wallet]
+                  description: Must be one the payment's currency accepts; a wallet payment accepts only `wallet`, a crypto one only `crypto`. A wallet top-up never accepts `wallet`. Apple Pay is not offered at present (the live gateway account does not take it); offer only the methods the API lists, never a fixed set.
                 details:
                   type: object
                   properties:

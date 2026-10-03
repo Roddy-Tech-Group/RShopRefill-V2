@@ -107,7 +107,7 @@ class PaymentSessionResource extends JsonResource
             // gets the generic sentence rather than the raw text the session was
             // failed with, which can be a gateway's or an exception's.
             'reason' => CustomerFailureCopy::sentence($code)
-                ?? 'This payment could not be completed. Please try another payment method.',
+                ?? (string) CustomerFailureCopy::sentence('payment_not_completed'),
         ];
     }
 

@@ -92,7 +92,19 @@ class FailureReasonClassifier
         ['invalid otp', FailureCategory::Customer, 'authentication_failed', true],
         ['incorrect otp', FailureCategory::Customer, 'authentication_failed', true],
         ['otp validation failed', FailureCategory::Customer, 'authentication_failed', true],
+        // "Sorry, your card is not enrolled for 3-D Secure Payments". The bank
+        // has not switched online verification on for the card, so the same
+        // card can never pass; another card, or the bank, can. Ahead of the
+        // generic 3-D Secure rule, which reads it as a failed verification.
+        // Tied to the 3-D Secure wording on purpose: a bare "not enrolled"
+        // would also catch a mobile money "customer not enrolled" and tell
+        // that customer to fix a card they never used.
+        ['enrolled for 3-d secure', FailureCategory::Customer, 'card_not_enrolled', false],
+        ['enrolled for 3d secure', FailureCategory::Customer, 'card_not_enrolled', false],
         ['3d secure', FailureCategory::Customer, 'authentication_failed', true],
+        // The gateway's own spelling carries a hyphen, which "3d secure" never
+        // matched.
+        ['3-d secure', FailureCategory::Customer, 'authentication_failed', true],
         ['authentication failed', FailureCategory::Customer, 'authentication_failed', true],
         ['invalid card', FailureCategory::Customer, 'invalid_card_details', true],
         ['incorrect card', FailureCategory::Customer, 'invalid_card_details', true],
@@ -108,6 +120,9 @@ class FailureReasonClassifier
         ['limit exceeded', FailureCategory::Customer, 'limit_exceeded', true],
         ['transaction limit', FailureCategory::Customer, 'limit_exceeded', true],
         ['address verification', FailureCategory::Customer, 'avs_failed', true],
+        // "Policy error, please contact your bank": the issuer refusing under
+        // its own rules, with nothing more specific given.
+        ['policy error', FailureCategory::Customer, 'bank_declined', true],
 
         // Mobile money verdicts: the operator's prose relayed by the gateway
         // in processor_response. Before the transport bucket, because "timed
@@ -170,6 +185,13 @@ class FailureReasonClassifier
         // Internal system markers ('orphaned_timeout' is a sweeper verdict,
         // not a gateway timeout — must outrank the provider bucket below)
         ['orphaned_timeout', FailureCategory::System, 'orphaned_timeout', true],
+        // "Payment option currently undergoing maintenance updates. Please try
+        // another": the rail is down on the gateway's side for a while. Its own
+        // code so the dashboard can tell an outage from an ordinary error, and
+        // ahead of the bare 'system' marker below so "system under maintenance"
+        // is a provider outage, not a platform fault that pages somebody.
+        ['undergoing maintenance', FailureCategory::Provider, 'provider_maintenance', true],
+        ['under maintenance', FailureCategory::Provider, 'provider_maintenance', true],
         ['internal server error', FailureCategory::System, 'system_error', true],
         ['system', FailureCategory::System, 'system_error', true],
 
@@ -180,7 +202,21 @@ class FailureReasonClassifier
         ['connection refused', FailureCategory::Provider, 'provider_unreachable', true],
         ['gateway unavailable', FailureCategory::Provider, 'provider_error', true],
         ['provider error', FailureCategory::Provider, 'provider_error', true],
+        // "We are currently unable to process your request. Please try again
+        // after some time": the gateway's generic busy answer. Only the first
+        // half is the rule: "please try again" also ends bank declines.
+        ['unable to process your request', FailureCategory::Provider, 'provider_error', true],
         ['currency not supported', FailureCategory::System, 'gateway_config_error', false],
+        // "The currency for this payment is currently not supported": the
+        // same refusal in the words the hosted checkout uses. We offered a
+        // method in a currency the gateway will not take it in; ours. Tied to
+        // the currency wording: "this card type is currently not supported"
+        // is a different refusal and must not be filed as our configuration.
+        ['currency for this payment is currently not supported', FailureCategory::System, 'gateway_config_error', false],
+        // "phonenumber is required": a charge left our side without the
+        // number the rail needs. Ours, never the customer's.
+        ['phonenumber is required', FailureCategory::System, 'gateway_config_error', false],
+        ['phone number is required', FailureCategory::System, 'gateway_config_error', false],
         // The gateway refusing a method/currency pairing we offered. This is
         // how every Ghana mobile-money attempt failed for weeks (2026-09-09)
         // while grading as "unknown": our integration asked for something the
@@ -235,6 +271,7 @@ class FailureReasonClassifier
         'expired_card' => 'Expired card',
         'incorrect_pin' => 'Incorrect PIN',
         'authentication_failed' => 'OTP / 3DS authentication failed',
+        'card_not_enrolled' => 'Card not enrolled for secure online (3-D Secure) payments',
         'invalid_card_details' => 'Invalid card details',
         'card_reported_lost' => 'Card reported lost or stolen',
         'suspected_fraud' => 'Flagged as suspected fraud',
@@ -253,6 +290,7 @@ class FailureReasonClassifier
         'provider_timeout' => 'Gateway timed out',
         'provider_unreachable' => 'Gateway unreachable',
         'provider_error' => 'Gateway error',
+        'provider_maintenance' => 'Payment option under maintenance at the gateway',
         'provider_rate_limited' => 'Gateway rate-limited us',
         'gateway_config_error' => 'Gateway configuration error (ours)',
         'gateway_compliance_block' => 'Gateway compliance check refused the charge',

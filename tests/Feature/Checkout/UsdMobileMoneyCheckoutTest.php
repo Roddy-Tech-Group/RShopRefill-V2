@@ -26,7 +26,7 @@ class UsdMobileMoneyCheckoutTest extends TestCase
     {
         $this->assertContains('mobile_money', SupportedPaymentMethods::forCurrency('USD'));
         $this->assertStringContainsString(
-            "'USD': ['card', 'mobile_money', 'crypto', 'apple_pay', 'wallet']",
+            "'USD': ['card', 'mobile_money', 'crypto', 'wallet']",
             $this->checkout()
         );
     }

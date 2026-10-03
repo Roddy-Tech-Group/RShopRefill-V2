@@ -1696,10 +1696,10 @@
                     // rail in CFA francs (MobileMoneyRail), second in the grid
                     // so a card-first market keeps its card first.
                     const mapping = {
-                        'USD': ['card', 'mobile_money', 'crypto', 'apple_pay', 'wallet'],
+                        'USD': ['card', 'mobile_money', 'crypto', 'wallet'],
                         'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
-                        'GBP': ['card', 'pay_with_bank', 'crypto', 'apple_pay', 'wallet'],
-                        'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'apple_pay', 'crypto', 'wallet'],
+                        'GBP': ['card', 'pay_with_bank', 'crypto', 'wallet'],
+                        'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'crypto', 'wallet'],
                         'GHS': ['mobile_money', 'card', 'crypto', 'wallet'],
                         'XAF': ['mobile_money', 'card', 'crypto', 'wallet'],
                         'XOF': ['mobile_money', 'card', 'crypto', 'wallet'],

@@ -316,6 +316,8 @@ return [
     'failure_reason_gateway_config_error' => 'Diese Zahlungsmethode ist für Ihre Bestellung gerade nicht verfügbar. Bitte wählen Sie eine andere Methode. Unser Team wurde informiert.',
     'failure_reason_system_error' => 'Auf unserer Seite ist etwas schiefgelaufen und es wurde nichts abgebucht. Versuchen Sie es erneut oder wenden Sie sich an den Support, falls es wieder passiert.',
     'failure_reason_mobile_money_unknown' => 'Ihr Mobile-Money-Anbieter hat diese Zahlung nicht freigegeben. Prüfen Sie Ihr Guthaben und Ihr Tageslimit und versuchen Sie es erneut.',
+    'failure_reason_card_not_enrolled' => 'Diese Karte ist nicht für sichere Online-Zahlungen eingerichtet. Bitten Sie Ihre Bank, Online-Zahlungen dafür freizuschalten, oder verwenden Sie eine andere Karte.',
+    'failure_reason_payment_not_completed' => 'Diese Zahlung konnte nicht abgeschlossen werden. Versuchen Sie es erneut oder verwenden Sie eine andere Zahlungsmethode.',
     'payment_window_failed' => 'Das Zahlungsfenster konnte nicht geladen werden. Bitte deaktivieren Sie Werbeblocker und versuchen Sie es erneut.',
     'payment_not_verified' => 'Die Zahlung konnte nicht bestätigt werden.',
     'payment_verify_connection' => 'Die Zahlung konnte nicht geprüft werden. Bitte prüfen Sie Ihre Verbindung.',

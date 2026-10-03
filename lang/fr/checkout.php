@@ -317,6 +317,8 @@ return [
     'failure_reason_gateway_config_error' => 'Ce moyen de paiement n\'est pas disponible pour votre commande en ce moment. Choisissez un autre moyen. Notre équipe a été prévenue.',
     'failure_reason_system_error' => 'Un problème est survenu de notre côté et rien n\'a été débité. Réessayez, ou contactez le support si cela se reproduit.',
     'failure_reason_mobile_money_unknown' => 'Votre opérateur mobile money n\'a pas approuvé ce paiement. Vérifiez votre solde et votre plafond journalier, puis réessayez.',
+    'failure_reason_card_not_enrolled' => 'Cette carte n\'est pas activée pour les paiements en ligne sécurisés. Demandez à votre banque de les activer, ou utilisez une autre carte.',
+    'failure_reason_payment_not_completed' => 'Ce paiement n\'a pas pu être effectué. Réessayez ou utilisez un autre moyen de paiement.',
     'payment_window_failed' => 'La fenêtre de paiement n’a pas pu se charger. Veuillez désactiver tout bloqueur de publicités et réessayer.',
     'payment_not_verified' => 'Le paiement n’a pas pu être vérifié.',
     'payment_verify_connection' => 'Impossible de vérifier le paiement. Veuillez vérifier votre connexion.',

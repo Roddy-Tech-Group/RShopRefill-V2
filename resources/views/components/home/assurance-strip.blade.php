@@ -36,7 +36,6 @@
 
     $shown = [
         ...$pick('mobile_money', 2),   // MoMo, Orange Money
-        ...$pick('apple_pay', 1),
         ...$pick('card', 2),           // the two networks nearly everyone holds
         ...$pick('crypto', 4),
     ];

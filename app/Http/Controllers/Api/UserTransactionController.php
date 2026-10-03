@@ -11,8 +11,8 @@ class UserTransactionController extends Controller
     public function index(Request $request)
     {
         $transactions = $request->user()->walletTransactions()
-            ->when($request->query('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
-            ->when($request->query('type'), fn ($q, $t) => $q->where('type', $t))
+            ->when($request->queryString('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
+            ->when($request->queryString('type'), fn ($q, $t) => $q->where('type', $t))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 

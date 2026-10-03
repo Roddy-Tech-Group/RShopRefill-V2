@@ -110,6 +110,13 @@ class RecordPaymentOutcomeJob implements ShouldQueue
             }
         }
 
+        // A payment that went through has no failure to describe. It used to be
+        // graded like one, from the placeholder reason 'unknown', so every
+        // successful payment carried failure_reason_code 'unknown_error' and
+        // any query that forgot to filter on the outcome counted successes as
+        // diagnostic gaps (71 wallet payments did exactly that).
+        $isFailure = $this->outcomeType !== OutcomeType::Confirmed;
+
         $outcome = PaymentOutcome::updateOrCreate(
             [
                 'payment_session_id' => $session->id,
@@ -124,18 +131,18 @@ class RecordPaymentOutcomeJob implements ShouldQueue
                 // session payload key nothing ever wrote, so every outcome was
                 // methodless and the "By Payment Method" table stayed empty.
                 'payment_method' => $attempt?->payment_method ?? $session->payment_payload['payment_method'] ?? null,
-                'failure_stage' => $classification['stage']->value,
-                'failure_category' => $classification['category']->value,
-                'failure_reason_code' => $classification['code'],
-                'provider_code' => $classification['provider_code'],
-                'retryable' => $classification['retryable'],
+                'failure_stage' => $isFailure ? $classification['stage']->value : null,
+                'failure_category' => $isFailure ? $classification['category']->value : null,
+                'failure_reason_code' => $isFailure ? $classification['code'] : null,
+                'provider_code' => $isFailure ? $classification['provider_code'] : null,
+                'retryable' => $isFailure ? $classification['retryable'] : null,
                 'consecutive_failure_count' => $consecutiveFailures,
                 'session_duration_seconds' => $duration,
                 'device_uuid' => $session->device_uuid,
                 'customer_ip' => $session->customer_ip,
                 'correlation_id' => $session->correlation_id,
                 'metadata' => [
-                    'raw_reason' => $reasonText,
+                    'raw_reason' => $isFailure ? $reasonText : null,
                     'failure_details' => $failureDetails,
                     'provider_payload' => $session->metadata['failure_payload'] ?? null,
                     // Written by the refused-card recorder when the gateway

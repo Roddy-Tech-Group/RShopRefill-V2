@@ -12,11 +12,11 @@
     // brand_key); the detail page reuses the shared `shop.product` view.
     $billCategory = Category::where('slug', 'bill-payments')->first();
 
-    $search   = (string) request()->query('q', '');
+    $search   = request()->queryString('q', '');
     $country  = strtoupper((string) ($region ?? 'US'));
-    $currency = strtoupper((string) request()->query('currency', ''));
-    $sub      = (string) request()->query('subcategory', '');
-    $sort     = (string) request()->query('sort', 'popular');
+    $currency = strtoupper(request()->queryString('currency', ''));
+    $sub      = request()->queryString('subcategory', '');
+    $sort     = request()->queryString('sort', 'popular');
 
     // Resolve a partial country-name search to ISO codes.
     $searchCountryCodes = [];

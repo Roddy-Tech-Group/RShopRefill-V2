@@ -21,8 +21,8 @@ class AdminFintechController extends Controller
     public function transactions(Request $request)
     {
         $transactions = WalletTransaction::with('user')
-            ->when($request->query('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
-            ->when($request->query('type'), fn ($q, $t) => $q->where('type', $t))
+            ->when($request->queryString('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
+            ->when($request->queryString('type'), fn ($q, $t) => $q->where('type', $t))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 
@@ -32,7 +32,7 @@ class AdminFintechController extends Controller
     public function fundings(Request $request)
     {
         $fundings = WalletFunding::with(['user', 'wallet'])
-            ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($request->queryString('status'), fn ($q, $s) => $q->where('status', $s))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 
@@ -42,7 +42,7 @@ class AdminFintechController extends Controller
     public function wallets(Request $request)
     {
         $wallets = Wallet::with('user')
-            ->when($request->query('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
+            ->when($request->queryString('currency'), fn ($q, $c) => $q->where('currency', strtoupper($c)))
             ->orderByDesc('balance')
             ->paginate((int) $request->query('per_page', 15));
 
@@ -52,8 +52,8 @@ class AdminFintechController extends Controller
     public function paymentAttempts(Request $request)
     {
         $attempts = PaymentAttempt::with(['user'])
-            ->when($request->query('gateway'), fn ($q, $g) => $q->where('gateway', $g))
-            ->when($request->query('status'), fn ($q, $s) => $q->where('payment_status', $s))
+            ->when($request->queryString('gateway'), fn ($q, $g) => $q->where('gateway', $g))
+            ->when($request->queryString('status'), fn ($q, $s) => $q->where('payment_status', $s))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 
@@ -63,8 +63,8 @@ class AdminFintechController extends Controller
     public function paymentWebhooks(Request $request)
     {
         $webhooks = PaymentWebhook::query()
-            ->when($request->query('gateway'), fn ($q, $g) => $q->where('gateway', $g))
-            ->when($request->query('processing_status'), fn ($q, $p) => $q->where('processing_status', $p))
+            ->when($request->queryString('gateway'), fn ($q, $g) => $q->where('gateway', $g))
+            ->when($request->queryString('processing_status'), fn ($q, $p) => $q->where('processing_status', $p))
             ->when($request->has('processed'), fn ($q) => $q->where('processed', $request->boolean('processed')))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));

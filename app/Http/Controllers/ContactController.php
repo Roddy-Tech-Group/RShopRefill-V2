@@ -92,7 +92,7 @@ class ContactController extends Controller
         // A link typed without its scheme ("instagram.com/handle") is still a
         // link. Fill the scheme in so the url rule can judge the rest, rather
         // than failing a creator for leaving out what browsers hide anyway.
-        $link = trim((string) $request->input('company_url', ''));
+        $link = trim($request->inputString('company_url', ''));
 
         if ($link !== '' && ! preg_match('~^[a-z][a-z0-9+.-]*://~i', $link)) {
             $request->merge(['company_url' => 'https://'.$link]);

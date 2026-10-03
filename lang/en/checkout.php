@@ -327,6 +327,8 @@ return [
     'failure_reason_gateway_config_error' => 'This payment method is not available for your order right now. Please choose another method. Our team has been notified.',
     'failure_reason_system_error' => 'Something went wrong on our side and nothing was charged. Please try again, or contact support if it happens again.',
     'failure_reason_mobile_money_unknown' => 'Your mobile money provider did not approve this payment. Check your balance and daily limit, then try again.',
+    'failure_reason_card_not_enrolled' => 'This card is not set up for secure online payments. Ask your bank to turn on online payments for it, or use another card.',
+    'failure_reason_payment_not_completed' => 'This payment could not be completed. Please try again or use another payment method.',
     'payment_window_failed' => 'The payment window could not load. Please disable any ad blocker and try again.',
     'payment_not_verified' => 'Payment could not be verified.',
     'payment_verify_connection' => 'Could not verify payment. Please check your connection.',

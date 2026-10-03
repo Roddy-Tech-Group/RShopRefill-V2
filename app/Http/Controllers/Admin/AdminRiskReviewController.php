@@ -41,7 +41,7 @@ class AdminRiskReviewController extends Controller
 
     public function index(Request $request): View
     {
-        $status = $request->query('status', RiskReviewStatus::Pending->value);
+        $status = $request->queryString('status', RiskReviewStatus::Pending->value);
 
         $query = RiskReview::query()
             ->with(['user', 'assessment'])

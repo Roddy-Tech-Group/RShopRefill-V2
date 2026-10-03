@@ -21,7 +21,7 @@ class EsimCatalogController extends Controller
             ->orderBy('name');
 
         // Optional filtering by region/search
-        $query->when($request->query('search'), fn ($q, $search) => $q->where('name', 'like', "%{$search}%")
+        $query->when($request->queryString('search'), fn ($q, $search) => $q->where('name', 'like', "%{$search}%")
         );
 
         return ProductResource::collection(

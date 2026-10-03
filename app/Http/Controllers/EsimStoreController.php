@@ -27,7 +27,7 @@ class EsimStoreController extends Controller
     public function index(Request $request)
     {
         $allowed = ['popular', 'local', 'regional', 'global', 'all'];
-        $scope = strtolower((string) $request->query('scope', 'popular'));
+        $scope = strtolower($request->queryString('scope', 'popular'));
         if (! in_array($scope, $allowed, true)) {
             $scope = 'popular';
         }

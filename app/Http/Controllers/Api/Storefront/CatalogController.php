@@ -27,9 +27,9 @@ class CatalogController extends Controller
         $query = Subcategory::whereHas('category', function ($q) {
             $q->where('is_active', true);
         })
-            ->when($request->query('category'), fn ($q, $slug) => $q->whereHas('category', fn ($cq) => $cq->where('slug', $slug))
+            ->when($request->queryString('category'), fn ($q, $slug) => $q->whereHas('category', fn ($cq) => $cq->where('slug', $slug))
             )
-            ->when($request->query('is_featured'), fn ($q) => $q->where('is_featured', true))
+            ->when($request->queryString('is_featured'), fn ($q) => $q->where('is_featured', true))
             ->orderBy('sort_order');
 
         return SubcategoryResource::collection($query->get());
@@ -41,12 +41,12 @@ class CatalogController extends Controller
             ->with(['subcategory', 'variants' => function ($q) {
                 $q->where('is_available', true);
             }])
-            ->when($request->query('country'), fn ($q, $c) => $q->where('country_code', strtoupper($c)))
-            ->when($request->query('subcategory'), fn ($q, $slug) => $q->whereHas('subcategory', fn ($sq) => $sq->where('slug', $slug))
+            ->when($request->queryString('country'), fn ($q, $c) => $q->where('country_code', strtoupper($c)))
+            ->when($request->queryString('subcategory'), fn ($q, $slug) => $q->whereHas('subcategory', fn ($sq) => $sq->where('slug', $slug))
             )
-            ->when($request->query('is_featured'), fn ($q) => $q->where('is_featured', true))
-            ->when($request->query('is_popular'), fn ($q) => $q->where('is_popular', true))
-            ->when($request->query('search'), fn ($q, $search) => $q->where('name', 'like', "%{$search}%")
+            ->when($request->queryString('is_featured'), fn ($q) => $q->where('is_featured', true))
+            ->when($request->queryString('is_popular'), fn ($q) => $q->where('is_popular', true))
+            ->when($request->queryString('search'), fn ($q, $search) => $q->where('name', 'like', "%{$search}%")
             );
 
         return ProductResource::collection(
