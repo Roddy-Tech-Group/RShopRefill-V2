@@ -130,6 +130,12 @@ class FailureReasonClassifier
         // gateway that hung, and before the generic "declined".
         ['not enough balance', FailureCategory::Customer, 'insufficient_funds', true],
         ['low balance', FailureCategory::Customer, 'insufficient_funds', true],
+        // "Transaction Failed Reason: LOW_BALANCE_OR_PAYEE_LIMIT_REACHED_OR_NOT_ALLOWED"
+        // (Flutterwave relaying MTN, production 2026-09-22). One operator code
+        // for three causes, so the verdict is the customer's mobile money
+        // provider refusing, and the sentence tells them to check balance and
+        // limit. Underscored, so the spaced rules above never see it.
+        ['low_balance_or_payee_limit', FailureCategory::Customer, 'mobile_money_refused', true],
         ['insufficient wallet', FailureCategory::Customer, 'insufficient_funds', true],
         ['daily limit', FailureCategory::Customer, 'limit_exceeded', true],
         ['exceeds the limit', FailureCategory::Customer, 'limit_exceeded', true],
@@ -281,6 +287,7 @@ class FailureReasonClassifier
         'prompt_declined' => 'Customer declined the phone prompt',
         'prompt_timed_out' => 'Phone prompt not approved in time',
         'mobile_account_not_found' => 'No mobile money account for that number',
+        'mobile_money_refused' => 'Mobile money provider refused (balance, limit or not allowed)',
         'user_cancelled' => 'Customer cancelled',
         'session_expired' => 'Session expired (abandoned)',
         'crypto_quote_expired' => 'Crypto quote expired unpaid',

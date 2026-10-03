@@ -65,6 +65,9 @@ final class CustomerFailureCopy
         'provider_unreachable' => 'provider_error',
         'provider_rate_limited' => 'provider_error',
         'provider_maintenance' => 'provider_error',
+        // The operator's one code for low balance, limit reached or not
+        // allowed: the mobile money sentence already says to check all three.
+        'mobile_money_refused' => 'mobile_money_unknown',
         'gateway_compliance_block' => 'gateway_config_error',
         'orphaned_timeout' => 'provider_timeout',
     ];
