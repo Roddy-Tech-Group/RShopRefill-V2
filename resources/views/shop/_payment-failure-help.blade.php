@@ -43,7 +43,7 @@
             if (['provider_timeout', 'provider_error'].includes(code)) return 'provider';
             if (['gateway_config_error', 'system_error'].includes(code)) return 'platform';
             if (['prompt_declined', 'prompt_timed_out', 'mobile_account_not_found', 'mobile_money_unknown'].includes(code)) return 'mobile_money';
-            if (['do_not_honor', 'bank_declined', 'expired_card', 'incorrect_pin', 'authentication_failed', 'invalid_card_details', 'card_restricted', 'avs_failed', 'insufficient_funds', 'limit_exceeded'].includes(code)) return momo ? 'mobile_money' : 'card';
+            if (['do_not_honor', 'bank_declined', 'expired_card', 'incorrect_pin', 'authentication_failed', 'invalid_card_details', 'card_restricted', 'card_not_enrolled', 'avs_failed', 'insufficient_funds', 'limit_exceeded'].includes(code)) return momo ? 'mobile_money' : 'card';
             if (code === 'user_cancelled') return 'generic';
             return momo ? 'mobile_money' : (['card', 'apple_pay'].includes(chosen) ? 'card' : 'generic');
         },

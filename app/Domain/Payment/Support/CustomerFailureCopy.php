@@ -47,6 +47,10 @@ final class CustomerFailureCopy
         'gateway_config_error',
         'system_error',
         'mobile_money_unknown',
+        'card_not_enrolled',
+        // Not a classifier code: the honest sentence for a card refusal whose
+        // words no rule recognises yet. See forVerdict().
+        'payment_not_completed',
     ];
 
     /**
@@ -60,6 +64,7 @@ final class CustomerFailureCopy
         'card_reported_lost' => 'bank_declined',
         'provider_unreachable' => 'provider_error',
         'provider_rate_limited' => 'provider_error',
+        'provider_maintenance' => 'provider_error',
         'gateway_compliance_block' => 'gateway_config_error',
         'orphaned_timeout' => 'provider_timeout',
     ];
@@ -90,15 +95,20 @@ final class CustomerFailureCopy
     /**
      * The sentence for a verdict the gateway reported on a charge, by the rail
      * it came over. A mobile money verdict the classifier has no rule for
-     * still tells the customer to check balance and limits; a card one, that
-     * their bank said no.
+     * still tells the customer to check balance and limits, the overwhelming
+     * cause on those rails.
+     *
+     * A card verdict with no rule says only that the payment did not go
+     * through. It used to say the bank declined it, which sent customers to
+     * argue with banks over refusals that were ours or the gateway's
+     * ("The currency for this payment is currently not supported").
      *
      * @param  array{code: string}  $classification
      */
     public static function forVerdict(array $classification, bool $mobileMoney, ?string $locale = null): string
     {
         return self::sentence($classification['code'], $locale)
-            ?? (string) self::sentence($mobileMoney ? 'mobile_money_unknown' : 'bank_declined', $locale);
+            ?? (string) self::sentence($mobileMoney ? 'mobile_money_unknown' : 'payment_not_completed', $locale);
     }
 
     /**

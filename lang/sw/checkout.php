@@ -316,6 +316,8 @@ return [
     'failure_reason_gateway_config_error' => 'Njia hii ya malipo haipatikani kwa agizo lako kwa sasa. Tafadhali chagua njia nyingine. Timu yetu imearifiwa.',
     'failure_reason_system_error' => 'Kuna hitilafu upande wetu na hakuna kilichotozwa. Jaribu tena, au wasiliana na usaidizi ikiwa itatokea tena.',
     'failure_reason_mobile_money_unknown' => 'Mtoa huduma wako wa pesa za simu hakuidhinisha malipo haya. Angalia salio lako na kikomo cha siku, kisha ujaribu tena.',
+    'failure_reason_card_not_enrolled' => 'Kadi hii haijawekwa kwa malipo salama mtandaoni. Omba benki yako iwashe malipo ya mtandaoni kwa kadi hii, au tumia kadi nyingine.',
+    'failure_reason_payment_not_completed' => 'Malipo haya hayakuweza kukamilika. Jaribu tena au tumia njia nyingine ya malipo.',
     'payment_window_failed' => 'Dirisha la malipo halikuweza kufunguka. Tafadhali zima kizuia matangazo na ujaribu tena.',
     'payment_not_verified' => 'Malipo hayakuweza kuthibitishwa.',
     'payment_verify_connection' => 'Imeshindikana kuthibitisha malipo. Tafadhali kagua muunganisho wako.',

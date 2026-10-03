@@ -452,4 +452,37 @@ class MobileMoneyRailTest extends TestCase
         $this->assertSame([], $onOrderPage('KES')['supported_networks'], 'M-Pesa takes the number alone');
         $this->assertNull($onOrderPage('EUR'), 'no rail, no tile');
     }
+
+    /**
+     * A number with no digits passed `required` and reached the gateway empty
+     * once the rail stripped it to digits: "phonenumber is required" in
+     * production on 2026-09-28, and a failed order for a typo. It is refused
+     * before anything is sent, and the payment stays open to fix it.
+     */
+    public function test_a_phone_number_with_no_digits_is_refused_before_the_gateway(): void
+    {
+        Http::fake();
+
+        $order = $this->checkout('USD');
+        $session = $order->paymentAttempts->first()->paymentSession;
+
+        $this->pay($order, ['phone_number' => 'my number', 'network' => 'MTN'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Enter the mobile money phone number, with its country code if it is not a local number.');
+
+        Http::assertNothingSent();
+        $this->assertSame('awaiting_method', $session->fresh()->status, 'a typo must not fail the order');
+    }
+
+    /** Too few digits to be a phone number is the same mistake. */
+    public function test_a_phone_number_too_short_to_be_real_is_refused_before_the_gateway(): void
+    {
+        Http::fake();
+
+        $order = $this->checkout('USD');
+
+        $this->pay($order, ['phone_number' => '+237 67', 'network' => 'MTN'])->assertStatus(422);
+
+        Http::assertNothingSent();
+    }
 }

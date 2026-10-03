@@ -33,6 +33,7 @@ class ReclassifyPaymentOutcomesCommand extends Command
         $days = $this->option('days') !== null ? max(1, (int) $this->option('days')) : null;
 
         $this->backfillPaymentMethods($dryRun, $days);
+        $this->clearSuccessfulOutcomes($dryRun, $days);
 
         $query = PaymentOutcome::query()
             ->whereIn('outcome', [OutcomeType::Failed->value, OutcomeType::Expired->value, OutcomeType::Cancelled->value])
@@ -139,6 +140,39 @@ class ReclassifyPaymentOutcomesCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Successful payments recorded before the outcome job stopped grading them
+     * carry a failure verdict built from the placeholder reason 'unknown'.
+     * There was no failure to describe, so the fields are emptied.
+     */
+    private function clearSuccessfulOutcomes(bool $dryRun, ?int $days): void
+    {
+        $query = PaymentOutcome::query()
+            ->where('outcome', OutcomeType::Confirmed->value)
+            ->where(fn ($q) => $q->whereNotNull('failure_reason_code')
+                ->orWhereNotNull('failure_category')
+                ->orWhereNotNull('failure_stage'))
+            ->when($days, fn ($q) => $q->where('created_at', '>=', now()->subDays($days)));
+
+        $count = (clone $query)->count();
+
+        if (! $dryRun && $count > 0) {
+            $query->update([
+                'failure_stage' => null,
+                'failure_category' => null,
+                'failure_reason_code' => null,
+                'provider_code' => null,
+                'retryable' => null,
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->components->twoColumnDetail(
+            $dryRun ? '<fg=yellow>Successful payments carrying a failure code (dry run)</>' : '<fg=green>Successful payments cleared of a failure code</>',
+            number_format($count),
+        );
     }
 
     /**

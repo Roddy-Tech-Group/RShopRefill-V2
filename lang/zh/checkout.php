@@ -316,6 +316,8 @@ return [
     'failure_reason_gateway_config_error' => '此付款方式目前不适用于您的订单。请选择其他方式。我们的团队已收到通知。',
     'failure_reason_system_error' => '我们这边出了问题，未扣除任何款项。请重试，如再次发生请联系客服。',
     'failure_reason_mobile_money_unknown' => '您的移动钱包服务商未批准此次付款。请检查余额和每日限额后重试。',
+    'failure_reason_card_not_enrolled' => '此卡未开通安全在线支付。请联系发卡银行开通在线支付，或使用其他银行卡。',
+    'failure_reason_payment_not_completed' => '此次付款未能完成。请重试或使用其他付款方式。',
     'payment_window_failed' => '付款窗口无法加载。请关闭广告拦截工具后重试。',
     'payment_not_verified' => '无法验证付款。',
     'payment_verify_connection' => '无法验证付款，请检查网络连接。',
