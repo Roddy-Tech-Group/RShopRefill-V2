@@ -156,6 +156,12 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $user->phone = $phoneE164;
 
         $previousEmail = $user->getOriginal('email');
+        // A new number is an unverified number. Keeping the old verification
+        // let the KYC phone tier survive a swap to a line nobody has proved.
+        if ($user->isDirty('phone')) {
+            $user->phone_verified_at = null;
+        }
+
         $emailChanged = $user->isDirty('email');
 
         if ($emailChanged) {
