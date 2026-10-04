@@ -148,6 +148,32 @@ class GatewayMessageRulesTest extends TestCase
         $this->assertMatchesRegularExpression("/\\[[^\\]]*'card_not_enrolled'[^\\]]*\\]\\.includes\\(code\\)\\) return momo \\? 'mobile_money' : 'card'/", $source);
     }
 
+    /**
+     * The seventh phrase, found after the first reclassify in production: the
+     * operator's one underscored code for low balance, limit reached or not
+     * allowed. Two mobile money customers had been told their bank declined.
+     */
+    public function test_the_operators_low_balance_or_limit_code_is_a_mobile_money_refusal(): void
+    {
+        $words = 'Transaction Failed Reason: LOW_BALANCE_OR_PAYEE_LIMIT_REACHED_OR_NOT_ALLOWED';
+
+        $verdict = app(FailureReasonClassifier::class)->classify(
+            'flutterwave',
+            'Your bank declined this payment. Please check with your bank or try another card.',
+            'awaiting_confirmation',
+            ['provider_code' => $words, 'provider_message' => $words, 'http_status' => null],
+        );
+
+        $this->assertSame('mobile_money_refused', $verdict['code']);
+        $this->assertSame(FailureCategory::Customer, $verdict['category']);
+        $this->assertTrue($verdict['retryable']);
+        $this->assertArrayHasKey('mobile_money_refused', FailureReasonClassifier::LABELS);
+
+        $sentence = CustomerFailureCopy::forVerdict($verdict, mobileMoney: true);
+        $this->assertSame(__('checkout.failure_reason_mobile_money_unknown'), $sentence);
+        $this->assertStringNotContainsStringIgnoringCase('bank', $sentence);
+    }
+
     /** Mobile money keeps its own advice: balance and limits are the usual cause there. */
     public function test_an_unrecognised_mobile_money_refusal_keeps_its_own_sentence(): void
     {
