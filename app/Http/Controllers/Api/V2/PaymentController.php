@@ -36,8 +36,8 @@ use Throwable;
  * discarded and the session is re-read into the shape the app was promised. On
  * failure the response passes through NormaliseV2ErrorEnvelope, which keeps their
  * customer-ready message and flags while giving the app the envelope it reads, with
- * one exception: their catch-all "Payment processing failed: <exception>" is replaced,
- * because the text after the colon is an exception message, not a customer sentence.
+ * one exception: their catch-all (flagged payment_failed) becomes the payment_failed
+ * type, so the app routes on a type rather than on the wording.
  *
  * Two guards sit in FRONT of the delegate, because it checks the session's own state
  * and not the order's: a session whose order has since been cancelled (superseded by
@@ -278,16 +278,13 @@ class PaymentController extends Controller
                 return ApiV2Error::fromHttpStatus($status);
             }
 
-            // Their refusal, their wording, EXCEPT the catch-all. "Payment processing
-            // failed: <exception message>" is an exception string wearing a 400, and
-            // can carry a gateway's verbatim text, a database error or a config
-            // key. The customer gets a sentence; the message goes to the log.
-            $message = (string) ($response->getData(true)['message'] ?? '');
-
-            if (str_starts_with($message, 'Payment processing failed:')) {
+            // Their refusal, their wording, EXCEPT the catch-all, which the
+            // storefront marks with payment_failed: an exception it caught, already
+            // logged there with the exception's own text. The app gets a stable
+            // type to route on.
+            if (($response->getData(true)['payment_failed'] ?? false) === true) {
                 Log::warning('api.v2.payment_delegate_catch_all', [
                     'session_id' => $session->id,
-                    'message' => $message,
                 ]);
 
                 return ApiV2Error::make(

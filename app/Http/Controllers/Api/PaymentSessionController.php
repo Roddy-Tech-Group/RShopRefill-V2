@@ -690,9 +690,18 @@ class PaymentSessionController extends Controller
 
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
-            Log::error('Payment session pay failed: '.$e->getMessage());
+            // The exception's own text (a gateway's words, SQL, a config key)
+            // is ours to read, never the customer's. It used to be appended to
+            // the message shown on the payment screen.
+            Log::error('Payment session pay failed: '.$e->getMessage(), [
+                'session_id' => $session->id,
+                'exception' => $e::class,
+            ]);
 
-            return response()->json(['message' => 'Payment processing failed: '.$e->getMessage()], 400);
+            return response()->json([
+                'message' => 'This payment could not be processed. Please try again or choose another payment method.',
+                'payment_failed' => true,
+            ], 400);
         }
     }
 

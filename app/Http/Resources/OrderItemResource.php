@@ -14,7 +14,6 @@ class OrderItemResource extends JsonResource
             'product_id' => $this->product_id,
             'product_name' => $this->product_snapshot['name'] ?? null,
             'product_logo' => $this->product_snapshot['logo_url'] ?? null,
-            'provider_offer_id' => $this->provider_offer_id,
             'quantity' => $this->quantity,
             'display_currency' => $this->display_currency,
             'display_amount' => (float) $this->display_amount,
