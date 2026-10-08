@@ -185,6 +185,45 @@ class PaystackPaymentProvider implements PaymentProviderInterface
         }
     }
 
+    /**
+     * Paystack's in-page popup, restricted to the one channel the customer
+     * picked: card, bank transfer, USSD or pay-with-bank all happen inside it
+     * on our page. No redirect; verification is by our reference afterwards.
+     *
+     * @return array<string, mixed>
+     */
+    public function inlineConfig(PaymentAttempt $attempt, string $methodKey): array
+    {
+        $channel = match ($methodKey) {
+            'card' => 'card',
+            'apple_pay' => 'apple_pay',
+            'bank_transfer' => 'bank_transfer',
+            'pay_with_bank' => 'bank',
+            'ussd' => 'ussd',
+            'mobile_money' => 'mobile_money',
+            'bank_qr' => 'qr',
+            default => $methodKey,
+        };
+
+        return [
+            'provider' => 'paystack',
+            'key' => (string) config('services.paystack.public_key'),
+            'email' => $attempt->user->email,
+            // Integer subunits (kobo / cents), never the major unit.
+            'amount' => (int) round(((float) $attempt->amount) * 100),
+            'currency' => strtoupper((string) $attempt->currency),
+            'reference' => $attempt->idempotency_key,
+            'channels' => [$channel],
+            'metadata' => [
+                'custom_fields' => [[
+                    'display_name' => 'Order',
+                    'variable_name' => 'order_number',
+                    'value' => $attempt->order?->order_number ?? $attempt->idempotency_key,
+                ]],
+            ],
+        ];
+    }
+
     public function verifyPayment(PaymentAttempt $attempt): bool
     {
         if ($this->mock) {

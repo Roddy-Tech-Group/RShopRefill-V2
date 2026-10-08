@@ -561,4 +561,15 @@ class MobileMoneyRailTest extends TestCase
 
         $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
     }
+
+    /** Gateways that want the number international get it with the right dialling code. */
+    public function test_a_number_is_made_international_for_its_market(): void
+    {
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '670000000'));
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '+237 6 70 00 00 00'));
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XOF', '+221 77 000 0000'), 'a Senegalese code is kept');
+        $this->assertSame('2250700000000', MobileMoneyRail::internationalNumber('XOF', '0700000000'), "a local number in XOF is Côte d'Ivoire");
+        $this->assertSame('233244000000', MobileMoneyRail::internationalNumber('GHS', '0244000000'));
+        $this->assertSame('254700000000', MobileMoneyRail::internationalNumber('KES', '0700000000'));
+    }
 }

@@ -250,6 +250,58 @@ final class MobileMoneyRail
         return $default;
     }
 
+    /**
+     * Dialling codes for the countries our mobile money rails serve.
+     *
+     * @var array<string, string>
+     */
+    private const DIAL_CODES = [
+        'CM' => '237', 'GA' => '241', 'CG' => '242', 'TD' => '235', 'CF' => '236', 'GQ' => '240',
+        'SN' => '221', 'CI' => '225', 'BF' => '226', 'ML' => '223', 'BJ' => '229', 'TG' => '228', 'NE' => '227', 'GW' => '245',
+        'GH' => '233', 'KE' => '254', 'UG' => '256', 'RW' => '250', 'TZ' => '255', 'EG' => '20',
+    ];
+
+    /**
+     * The country a number in this currency belongs to when it carries no
+     * dialling code: the francophone rail's default, or the currency's one
+     * country.
+     */
+    public static function homeCountry(string $currency): ?string
+    {
+        return self::countryFor($currency, '') ?? match (self::key($currency)) {
+            'GHS' => 'GH', 'KES' => 'KE', 'UGX' => 'UG', 'RWF' => 'RW', 'TZS' => 'TZ', 'EGP' => 'EG',
+            default => null,
+        };
+    }
+
+    /**
+     * The number as a gateway that wants it international expects it: digits
+     * only, with the country's dialling code in front. "0670000000" typed in
+     * Cameroon becomes "237670000000"; a number already carrying a known code
+     * is left alone.
+     */
+    public static function internationalNumber(string $currency, string $phoneNumber): string
+    {
+        $digits = self::normalisePhone($phoneNumber);
+
+        foreach (self::DIAL_CODES as $code) {
+            if (strlen($digits) >= 11 && str_starts_with($digits, $code)) {
+                return $digits;
+            }
+        }
+
+        $home = self::homeCountry($currency);
+        $code = $home !== null ? (self::DIAL_CODES[$home] ?? '') : '';
+
+        // Only markets with a trunk zero drop it (0244 in Ghana becomes 233 244);
+        // a Côte d'Ivoire number keeps its leading 0, it is part of the number.
+        if (in_array($home, ['GH', 'KE', 'UG', 'RW', 'TZ', 'EG'], true)) {
+            $digits = ltrim($digits, '0');
+        }
+
+        return $code.$digits;
+    }
+
     public static function description(string $currency): string
     {
         return self::RAILS[self::key($currency)]['description'] ?? 'Mobile Money';

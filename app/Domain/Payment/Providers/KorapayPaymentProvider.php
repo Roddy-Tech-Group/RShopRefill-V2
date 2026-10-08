@@ -5,6 +5,7 @@ namespace App\Domain\Payment\Providers;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\Payment\Support\MobileMoneyApproval;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\MockMode;
 use App\Models\PaymentAttempt;
@@ -177,6 +178,230 @@ class KorapayPaymentProvider implements PaymentProviderInterface
                 'failure' => GatewayFailure::fromException($e),
             ];
         }
+    }
+
+    /**
+     * Mobile money through Kora's own API, so the customer stays in our
+     * checkout: we send the number, Kora pushes the prompt to the phone, and
+     * the customer approves with their PIN there, exactly as on Flutterwave.
+     * Kora answers with one of three authorisation models: STK_PROMPT (the
+     * prompt is on the phone), OTP (a one-time code to type first, Ghana and
+     * Côte d'Ivoire), or REDIRECT (the operator's own page, rare).
+     *
+     * @return array<string, mixed>
+     */
+    public function chargeMobileMoney(PaymentAttempt $attempt, string $phoneNumber, ?string $network = null, ?string $returnUrl = null): array
+    {
+        $currency = strtoupper((string) $attempt->currency);
+        $number = MobileMoneyRail::internationalNumber($currency, $phoneNumber);
+        $country = MobileMoneyRail::countryFor($currency, $phoneNumber) ?? MobileMoneyRail::homeCountry($currency);
+        $chargeAmount = $this->chargeAmountFor($attempt);
+        $chargeLabel = number_format($chargeAmount, MobileMoneyRail::precision($currency)).' '.$currency;
+        $waiting = fn (?string $message = null): array => $this->mobileMoneyWaiting($phoneNumber, $chargeLabel, $network, $country, $message);
+
+        if ($this->mock) {
+            return $waiting();
+        }
+
+        try {
+            $response = Http::withToken($this->secretKey)
+                ->timeout(40)
+                ->post("{$this->baseUrl}/charges/mobile-money", [
+                    'reference' => $attempt->idempotency_key,
+                    'amount' => $chargeAmount,
+                    'currency' => $currency,
+                    'customer' => [
+                        'email' => $attempt->user->email,
+                        'name' => $attempt->user->name,
+                    ],
+                    'mobile_money' => ['number' => $number],
+                    'notification_url' => $this->webhookUrl(),
+                    'description' => $attempt->order
+                        ? "Order #{$attempt->order->order_number}"
+                        : "Payment Ref #{$attempt->idempotency_key}",
+                ]);
+        } catch (\Exception $e) {
+            return [
+                'status' => 'failed',
+                'message' => 'Failed to initialize mobile money: '.$e->getMessage(),
+                'failure' => GatewayFailure::fromException($e),
+            ];
+        }
+
+        if ($response->failed() || ($response->json('status') ?? false) !== true) {
+            Log::warning('Korapay mobile money charge refused', [
+                'reference' => $attempt->idempotency_key,
+                'currency' => $currency,
+                'http_status' => $response->status(),
+                'message' => $response->json('message'),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'message' => 'Failed to initialize mobile money: '.($response->json('message') ?? 'Unknown error'),
+                'failure' => GatewayFailure::fromKorapay($response->json(), $response->status()),
+            ];
+        }
+
+        $data = $response->json('data') ?? [];
+
+        // Kora's own id is what its authorise call wants back; ours stays the
+        // reference everything else is verified by.
+        $attempt->metadata = array_merge($attempt->metadata ?? [], [
+            'korapay' => [
+                'transaction_reference' => $data['transaction_reference'] ?? null,
+                'auth_model' => $data['auth_model'] ?? null,
+                'number' => $number,
+            ],
+        ]);
+        $attempt->save();
+
+        return $this->mobileMoneyStep($data, $waiting);
+    }
+
+    /**
+     * The one-time code the customer typed, sent to Kora. A valid code is
+     * followed by the prompt on the phone; an invalid one is asked for again.
+     *
+     * @return array<string, mixed>
+     */
+    public function authorizeMobileMoney(PaymentAttempt $attempt, string $otp): array
+    {
+        $korapay = (array) data_get($attempt->metadata, 'korapay', []);
+        $currency = strtoupper((string) $attempt->currency);
+        $number = (string) ($korapay['number'] ?? '');
+        $country = MobileMoneyRail::countryFor($currency, $number) ?? MobileMoneyRail::homeCountry($currency);
+        $chargeLabel = number_format($this->chargeAmountFor($attempt), MobileMoneyRail::precision($currency)).' '.$currency;
+        $waiting = fn (?string $message = null): array => $this->mobileMoneyWaiting($number, $chargeLabel, null, $country, $message);
+
+        if ($this->mock) {
+            return $waiting();
+        }
+
+        if (empty($korapay['transaction_reference'])) {
+            return ['status' => 'failed', 'message' => 'This payment has no code to confirm. Please start again.', 'failure' => GatewayFailure::internal('korapay_otp_without_charge', 'authorize called with no transaction_reference on the attempt')];
+        }
+
+        try {
+            $response = Http::withToken($this->secretKey)
+                ->timeout(40)
+                ->post("{$this->baseUrl}/charges/mobile-money/authorize", [
+                    'reference' => $korapay['transaction_reference'],
+                    'token' => trim($otp),
+                ]);
+        } catch (\Exception $e) {
+            return ['status' => 'failed', 'message' => 'The code could not be checked: '.$e->getMessage(), 'failure' => GatewayFailure::fromException($e)];
+        }
+
+        if ($response->failed() || ($response->json('status') ?? false) !== true) {
+            $message = (string) ($response->json('message') ?? '');
+
+            // A wrong code is the customer's to retype, not the end of the payment.
+            if (stripos($message, 'otp') !== false || stripos($message, 'token') !== false || stripos($message, 'invalid') !== false) {
+                return [
+                    'status' => 'awaiting_customer_action',
+                    'action' => 'otp',
+                    'message' => 'That code was not accepted. Check it and try again.',
+                ];
+            }
+
+            return [
+                'status' => 'failed',
+                'message' => 'The code could not be confirmed: '.($message !== '' ? $message : 'Unknown error'),
+                'failure' => GatewayFailure::fromKorapay($response->json(), $response->status()),
+            ];
+        }
+
+        return $this->mobileMoneyStep($response->json('data') ?? [], $waiting);
+    }
+
+    /**
+     * What a Kora mobile money answer asks of the customer next.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  callable(?string): array<string, mixed>  $waiting
+     * @return array<string, mixed>
+     */
+    private function mobileMoneyStep(array $data, callable $waiting): array
+    {
+        if (($data['status'] ?? null) === 'success') {
+            return ['status' => 'confirmed', 'transaction_id' => $data['transaction_reference'] ?? null];
+        }
+
+        return match ($data['auth_model'] ?? null) {
+            'OTP' => [
+                'status' => 'awaiting_customer_action',
+                'action' => 'otp',
+                'message' => $data['message'] ?? 'Enter the code sent to your phone to continue.',
+            ],
+            'REDIRECT' => isset($data['authorization']['redirect_url'])
+                ? ['status' => 'awaiting_redirect', 'redirect_url' => $data['authorization']['redirect_url'], 'method' => 'mobile_money']
+                : $waiting($data['message'] ?? null),
+            default => $waiting($data['message'] ?? null),
+        };
+    }
+
+    /**
+     * The waiting state checkout shows while the prompt is on the phone, the
+     * same shape Flutterwave's rail produces.
+     *
+     * @return array<string, mixed>
+     */
+    private function mobileMoneyWaiting(string $phoneNumber, string $chargeLabel, ?string $networkLabel, ?string $country, ?string $message = null): array
+    {
+        return [
+            'status' => 'awaiting_confirmation',
+            'message' => $message ?: __('checkout.momo_prompt_sent', ['amount' => $chargeLabel, 'phone' => $phoneNumber]),
+            'mobile_money' => [
+                'network' => $networkLabel,
+                'country' => $country,
+                'phone_number' => $phoneNumber,
+                'charge_label' => $chargeLabel,
+            ],
+            'approval' => MobileMoneyApproval::for($country, $networkLabel),
+        ];
+    }
+
+    /**
+     * Kora's in-page checkout (an iframe opened by its script on our page),
+     * restricted to the one method the customer picked. Cards never touch
+     * our server, there is no redirect, and the payment is verified by our
+     * reference when the modal reports success.
+     *
+     * @return array<string, mixed>
+     */
+    public function inlineConfig(PaymentAttempt $attempt, string $methodKey): array
+    {
+        $channel = match ($methodKey) {
+            'card' => 'card',
+            'bank_transfer' => 'bank_transfer',
+            'pay_with_bank' => 'pay_with_bank',
+            'mobile_money' => 'mobile_money',
+            default => $methodKey,
+        };
+
+        return [
+            'provider' => 'korapay',
+            'key' => (string) config('services.korapay.public_key'),
+            'reference' => $attempt->idempotency_key,
+            'amount' => $this->chargeAmountFor($attempt),
+            'currency' => strtoupper((string) $attempt->currency),
+            'customer' => [
+                'name' => $attempt->user->name,
+                'email' => $attempt->user->email,
+            ],
+            'channels' => [$channel],
+            'default_channel' => $channel,
+            'notification_url' => $this->webhookUrl(),
+            'narration' => $attempt->order
+                ? "Order #{$attempt->order->order_number}"
+                : "Payment Ref #{$attempt->idempotency_key}",
+        ];
+    }
+
+    private function webhookUrl(): string
+    {
+        return (string) (config('services.korapay.webhook_url') ?: url('/api/webhooks/korapay'));
     }
 
     public function verifyPayment(PaymentAttempt $attempt): bool

@@ -144,7 +144,7 @@ class PaystackFailoverTest extends TestCase
         $this->assertNull(FiatGatewayRouter::resolve('bank_qr', 'NGN'), 'no backup serves bank QR');
     }
 
-    public function test_failover_checkout_stamps_paystack_and_charges_through_the_hosted_redirect(): void
+    public function test_failover_checkout_stamps_paystack_and_opens_its_popup_on_our_page(): void
     {
         $this->failover();
 
@@ -160,7 +160,14 @@ class PaystackFailoverTest extends TestCase
         ]);
 
         $response->assertOk();
-        $this->assertSame('awaiting_redirect', $response->json('status') ?? $response->json('data.status'), 'card must go out as a hosted redirect on the backup');
+        $response->assertOk();
+        $this->assertSame('awaiting_payment', $session->fresh()->status, 'the card popup opens on our page; nobody is redirected');
+        $inline = $session->fresh()->payment_payload['inline'];
+        $this->assertSame('paystack', $inline['provider']);
+        $this->assertSame(['card'], $inline['channels']);
+        $this->assertSame((int) round($attempt->amount * 100), $inline['amount'], 'kobo, never naira');
+        $this->assertSame($attempt->idempotency_key, $inline['reference']);
+        $this->assertArrayNotHasKey('redirect_url', $session->fresh()->payment_payload);
     }
 
     public function test_a_flutterwave_order_reroutes_to_paystack_at_method_commitment(): void

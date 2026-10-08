@@ -107,6 +107,31 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         ];
     }
 
+    /**
+     * The inline popup, restricted to the one method the customer picked.
+     * USSD, pay with bank, bank QR and the Nigerian e-wallets used to go out
+     * as a hosted page the customer was sent away to; the same popup that
+     * takes cards renders each of them on our page when told which one.
+     *
+     * @return array<string, mixed>
+     */
+    public function inlineConfig(PaymentAttempt $attempt, string $methodKey): array
+    {
+        $config = $this->initializePayment($attempt);
+
+        $config['payment_options'] = match ($methodKey) {
+            'card' => 'card',
+            'ussd' => 'ussd',
+            'pay_with_bank' => 'account',
+            'bank_qr' => 'qr',
+            'mobile_wallet' => 'opay,enaira,mobilemoneynigeria',
+            'apple_pay' => 'applepay',
+            default => $methodKey,
+        };
+
+        return $config;
+    }
+
     public function getEncryptionKey(): string
     {
         $key = config('services.flutterwave.encryption_key');

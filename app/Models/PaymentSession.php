@@ -140,7 +140,9 @@ class PaymentSession extends Model
             'pending' => ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_customer_action', 'cancelled', 'failed', 'expired'],
             'awaiting_payment' => ['processing', 'expired', 'cancelled', 'confirmed', 'failed'],
             'awaiting_method' => ['awaiting_payment', 'awaiting_customer_action', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'processing', 'confirmed', 'failed', 'expired', 'cancelled'],
-            'awaiting_customer_action' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],
+            // A mobile money one-time code, once accepted, is followed by the
+            // prompt on the phone: the session moves on to waiting for it.
+            'awaiting_customer_action' => ['awaiting_confirmation', 'processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_transfer' => ['awaiting_confirmation', 'processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_redirect' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_confirmation' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],

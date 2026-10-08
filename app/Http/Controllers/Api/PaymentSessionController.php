@@ -473,15 +473,25 @@ class PaymentSessionController extends Controller
         try {
             $result = null;
 
-            if ($fiatGateway !== null && $fiatGateway !== 'flutterwave') {
-                // Backup gateways (Paystack today, Kora next) run EVERY fiat
-                // method through their hosted checkout: one channel-restricted
-                // redirect out, verification on return. No inline card entry,
-                // no per-method API surface, so a backup cannot half-support
-                // a method the router said it covers.
+            if ($fiatGateway !== null && $fiatGateway !== 'flutterwave' && ! ($fiatGateway === 'korapay' && $method === 'mobile_money')) {
+                // Kora and Paystack open their own secure popup ON our page,
+                // restricted to the one method the customer picked: card
+                // details never touch our server and nobody is redirected
+                // away. The popup reports success, the page asks us to verify
+                // by our reference, and the webhook is the second authority.
+                // Kora's mobile money goes further still: a direct charge
+                // puts the prompt on the phone, handled with the other mobile
+                // money rails below.
                 $backupProvider = $gatewayFactory->getProvider($fiatGateway);
-                $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
-                $result = $backupProvider->chargeHosted($attempt, $method, $returnUrl);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $backupProvider->inlineConfig($attempt, $method)],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'card') {
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
 
@@ -525,9 +535,15 @@ class PaymentSessionController extends Controller
                     $details,
                     route('shop.checkout.return', ['session' => $session->id]),
                 );
+            } elseif ($method === 'mobile_money' && $fiatGateway === 'korapay' && ($otp = $request->input('otp'))) {
+                // The one-time code Kora asked for (Ghana, Côte d'Ivoire): a
+                // valid one is followed by the prompt on the phone.
+                $result = $gatewayFactory->getProvider('korapay')->authorizeMobileMoney($attempt, (string) $otp);
             } elseif ($method === 'mobile_money') {
                 // The number, country and network were checked above, before
                 // routing, against what the switched-on gateways can take.
+                // Flutterwave and Kora share this contract: the charge goes out,
+                // the prompt lands on the phone, and checkout waits.
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $result = $flwProvider->chargeMobileMoney(
                     $attempt,
@@ -586,15 +602,20 @@ class PaymentSessionController extends Controller
                 $npProvider = $gatewayFactory->getProvider('nowpayments');
                 $result = $npProvider->chargeCrypto($attempt, $details['pay_currency']);
             } elseif (in_array($method, ['ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'], true)) {
-                // Hosted-redirect family: USSD, Pay With Bank, Bank QR (NQR),
-                // and Nigerian e-wallets (OPay/eNaira) all share the same flow.
-                // We call Flutterwave's /payments endpoint with a method-specific
-                // `payment_options` value so the hosted page renders only that
-                // method, then redirect the customer there. They return to
-                // /checkout/return where we verify and finalise.
+                // USSD, pay with bank, bank QR and the Nigerian e-wallets open
+                // in Flutterwave's popup on our page, restricted to the one
+                // method picked. They used to be a hosted page the customer
+                // was sent away to and had to find their way back from.
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
-                $result = $flwProvider->chargeHosted($attempt, $method, $returnUrl);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $flwProvider->inlineConfig($attempt, $method)],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'wallet') {
                 $request->validate([
                     'details.auth_token' => 'required|string',

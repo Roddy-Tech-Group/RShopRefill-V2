@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentSession;
 use App\Models\PaymentWebhook;
 use App\Models\PricingRule;
 use App\Models\Product;
@@ -173,7 +174,115 @@ class KorapayFailoverTest extends TestCase
         ]);
 
         $response->assertOk();
-        $this->assertSame('awaiting_redirect', $response->json('status') ?? $response->json('data.status'), 'Kora mobile money goes out as a hosted redirect');
+        $this->assertSame('awaiting_confirmation', $response->json('status') ?? $response->json('data.status'), 'Kora mobile money stays in our checkout: the prompt goes to the phone');
+        $this->assertNull($response->json('payment_payload.redirect_url') ?? $response->json('data.payment_payload.redirect_url'), 'no redirect, ever');
+    }
+
+    // ------------------------------------------ mobile money in our checkout
+
+    /**
+     * @return array{0: Order, 1: PaymentAttempt, 2: PaymentSession}
+     */
+    private function koraLiveOrder(string $currency = 'XAF'): array
+    {
+        config(['services.korapay.secret_key' => 'sk_live_korapay_realish', 'services.korapay.webhook_url' => 'https://tunnel.example/api/webhooks/korapay']);
+        $this->setGateway('flutterwave', false);
+        $this->setGateway('korapay', true);
+
+        if ($currency === 'GHS') {
+            CurrencyRate::create(['code' => 'GHS', 'name' => 'Cedi', 'type' => 'fiat', 'rate_per_usd' => 15.5, 'is_active' => true]);
+        }
+
+        $order = $this->checkout($currency);
+        $attempt = $order->paymentAttempts->first();
+
+        return [$order, $attempt, $attempt->paymentSession];
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function koraAnswers(string $urlPattern, array $data, bool $ok = true, int $status = 200): void
+    {
+        Http::fake([$urlPattern => Http::response(['status' => $ok, 'message' => $ok ? 'Authorization required' : ($data['message'] ?? 'error'), 'data' => $ok ? $data : null], $status)]);
+    }
+
+    /** Cameroon: Kora pushes the PIN prompt straight to the phone; the customer never leaves our page. */
+    public function test_a_kora_mobile_money_charge_puts_the_prompt_on_the_phone_from_our_checkout(): void
+    {
+        [, $attempt, $session] = $this->koraLiveOrder('XAF');
+        $this->koraAnswers('api.korapay.com/merchant/api/v1/charges/mobile-money', [
+            'amount' => 6600, 'currency' => 'XAF', 'auth_model' => 'STK_PROMPT',
+            'transaction_reference' => 'KPY-CA-abc123', 'payment_reference' => $attempt->idempotency_key, 'status' => 'processing',
+            'message' => 'You will receive a pin prompt on your mobile number +237670000000 for XAF 6600. Kindly enter your wallet PIN to authorize the payment',
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'mobile_money',
+            'details' => ['phone_number' => '670000000', 'network' => 'MTN'],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $session->fresh()->status);
+        $this->assertStringContainsString('pin prompt', $session->fresh()->payment_payload['message']);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/charges/mobile-money')
+            && $request['mobile_money']['number'] === '237670000000'
+            && $request['currency'] === 'XAF'
+            && $request['reference'] === $attempt->idempotency_key
+            && $request['notification_url'] === 'https://tunnel.example/api/webhooks/korapay');
+
+        $this->assertSame('KPY-CA-abc123', data_get($attempt->fresh()->metadata, 'korapay.transaction_reference'));
+    }
+
+    /** Ghana: a one-time code first, typed in our checkout; a valid code is followed by the prompt. */
+    public function test_a_kora_mobile_money_charge_that_needs_a_code_takes_it_in_our_checkout(): void
+    {
+        [, $attempt, $session] = $this->koraLiveOrder('GHS');
+        $this->koraAnswers('api.korapay.com/merchant/api/v1/charges/mobile-money', [
+            'amount' => 170, 'currency' => 'GHS', 'auth_model' => 'OTP',
+            'transaction_reference' => 'KPY-CA-otp1', 'payment_reference' => $attempt->idempotency_key, 'status' => 'processing',
+            'message' => 'Token generated and sent out successfully',
+        ]);
+
+        $details = ['phone_number' => '+233 24 000 0000', 'network' => 'MTN'];
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", ['method' => 'mobile_money', 'details' => $details])->assertOk();
+
+        $session->refresh();
+        $this->assertSame('awaiting_customer_action', $session->status);
+        $this->assertSame('otp', $session->payment_payload['action']);
+
+        // The code goes to Kora's authorise call with Kora's own id, and the prompt follows.
+        Http::fake([
+            'api.korapay.com/merchant/api/v1/charges/mobile-money/authorize' => Http::response(['status' => true, 'message' => 'Authorization required', 'data' => [
+                'auth_model' => 'STK_PROMPT', 'transaction_reference' => 'KPY-CA-otp1', 'status' => 'processing',
+                'message' => 'You will receive a prompt on mobile number +233240000000. Kindly enter your wallet PIN.',
+            ]], 200),
+        ]);
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", ['method' => 'mobile_money', 'details' => $details, 'otp' => '123456'])->assertOk();
+
+        $this->assertSame('awaiting_confirmation', $session->fresh()->status);
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/mobile-money/authorize')
+            && $request['reference'] === 'KPY-CA-otp1'
+            && $request['token'] === '123456');
+    }
+
+    /** A wrong code is asked for again; the payment is not failed. */
+    public function test_a_wrong_code_is_asked_for_again(): void
+    {
+        [, $attempt, $session] = $this->koraLiveOrder('GHS');
+        $session->forceFill(['status' => 'awaiting_customer_action', 'payment_payload' => ['action' => 'otp']])->save();
+        $attempt->forceFill(['metadata' => ['korapay' => ['transaction_reference' => 'KPY-CA-otp2', 'number' => '233240000000']]])->save();
+
+        $this->koraAnswers('api.korapay.com/merchant/api/v1/charges/mobile-money/authorize', ['message' => 'The OTP you provided is invalid'], false, 400);
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'mobile_money', 'details' => ['phone_number' => '+233 24 000 0000', 'network' => 'MTN'], 'otp' => '000000',
+        ])->assertOk();
+
+        $session->refresh();
+        $this->assertSame('awaiting_customer_action', $session->status);
+        $this->assertSame('otp', $session->payment_payload['action']);
+        $this->assertStringContainsString('not accepted', $session->payment_payload['message']);
     }
 
     public function test_kora_never_sees_traffic_while_flutterwave_is_on(): void
