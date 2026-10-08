@@ -51,6 +51,12 @@ final class MobileMoneyRail
             'country' => null,
             'description' => 'MTN or Airtel Mobile Money',
         ],
+        'TZS' => [
+            'type' => 'mobile_money_tanzania',
+            'networks' => [],
+            'country' => null,
+            'description' => 'Mobile Money',
+        ],
         'RWF' => [
             'type' => 'mobile_money_rwanda',
             'networks' => [],
@@ -66,9 +72,9 @@ final class MobileMoneyRail
         ],
         'XOF' => [
             'type' => 'mobile_money_franco',
-            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE'],
+            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE', 'Moov' => 'MOOV', 'Wave' => 'WAVE', 'Mobicash' => 'MOBICASH'],
             'country' => 'CI',
-            'description' => 'MTN Mobile Money or Orange Money',
+            'description' => 'MTN, Orange, Moov or Wave Mobile Money',
             'precision' => 0,
         ],
         // No rail takes dollars, so a USD order is charged as CFA francs on
@@ -78,7 +84,7 @@ final class MobileMoneyRail
         // and refunds read what the rail was actually asked for.
         'USD' => [
             'type' => 'mobile_money_franco',
-            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE'],
+            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE', 'Moov' => 'MOOV', 'Wave' => 'WAVE', 'Mobicash' => 'MOBICASH'],
             'country' => 'CM',
             'description' => 'MTN Mobile Money or Orange Money',
             'charged_in' => 'XAF',
@@ -108,26 +114,65 @@ final class MobileMoneyRail
         return self::RAILS[self::key($currency)]['type'] ?? null;
     }
 
-    /** Whether the rail needs a network in the charge, and so the picker must show. */
+    /**
+     * Whether the customer has a network to choose: more than one network is
+     * offered across the switched-on gateways on this currency's row. A
+     * market with one network (M-Pesa in Kenya on Flutterwave alone) takes
+     * the number only.
+     */
     public static function requiresNetwork(string $currency): bool
     {
         return self::networkOptions($currency) !== [];
     }
 
     /**
-     * Network labels for the pickers, in display order.
+     * The network labels to offer for this currency: the union of what the
+     * switched-on gateways on its row can take, in row order, across every
+     * country the currency covers. Empty when there is nothing to choose.
      *
      * @return list<string>
      */
     public static function networkOptions(string $currency): array
     {
-        return array_keys(self::RAILS[self::key($currency)]['networks'] ?? []);
+        $labels = [];
+
+        foreach (self::coverageOffered($currency) as $networks) {
+            foreach ($networks as $label) {
+                $labels[$label] = true;
+            }
+        }
+
+        $labels = array_keys($labels);
+
+        return count($labels) > 1 ? $labels : [];
     }
 
     /**
-     * The gateway's code for what the customer picked, matched without regard
-     * to case against either the label or the code itself. Null when the rail
-     * takes no network or the value is not one of its options.
+     * Country => network labels offered for this currency right now.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function coverageOffered(string $currency): array
+    {
+        return GatewayCapabilities::mobileMoneyUnion(
+            FiatGatewayRouter::liveGatewaysFor('mobile_money', self::key($currency)),
+            self::key($currency),
+        );
+    }
+
+    /**
+     * Whether Flutterwave's rail for this currency wants a network code on
+     * the charge (Ghana, Uganda and the francophone rails do; M-Pesa and
+     * Rwanda take the number alone).
+     */
+    public static function codeRequired(string $currency): bool
+    {
+        return (self::RAILS[self::key($currency)]['networks'] ?? []) !== [];
+    }
+
+    /**
+     * Flutterwave's code for the network the customer picked, or null when
+     * its rail for this currency has no code for it.
      */
     public static function gatewayNetwork(string $currency, ?string $input): ?string
     {
@@ -148,26 +193,26 @@ final class MobileMoneyRail
     }
 
     /**
-     * The label the screens show for what the customer picked, matched the
-     * way gatewayNetwork() matches. Null when the rail takes no network or
-     * the value is not one of its options.
+     * The label the screens show for what the customer picked, matched
+     * without regard to case against every network any gateway offers for
+     * this currency. Null when the value is not one of them.
      */
     public static function networkLabel(string $currency, ?string $input): ?string
     {
-        $networks = self::RAILS[self::key($currency)]['networks'] ?? [];
-        $needle = strtolower(trim((string) $input));
+        $labels = [];
 
-        if ($needle === '') {
-            return null;
+        foreach (self::coverageOffered($currency) as $networks) {
+            array_push($labels, ...$networks);
         }
 
-        foreach ($networks as $label => $code) {
-            if (strtolower($label) === $needle || strtolower($code) === $needle) {
-                return $label;
+        // A Flutterwave code typed in place of its label still resolves.
+        foreach (self::RAILS[self::key($currency)]['networks'] ?? [] as $label => $code) {
+            if (strtolower($code) === strtolower(trim((string) $input))) {
+                $input = $label;
             }
         }
 
-        return null;
+        return GatewayCapabilities::labelIn($input, $labels);
     }
 
     /**
@@ -282,7 +327,13 @@ final class MobileMoneyRail
      */
     public static function networksByCurrency(): array
     {
-        return array_map(fn (array $rail): array => array_keys($rail['networks']), self::RAILS);
+        $map = [];
+
+        foreach (array_keys(self::RAILS) as $currency) {
+            $map[$currency] = self::networkOptions($currency);
+        }
+
+        return $map;
     }
 
     /**

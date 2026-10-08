@@ -78,6 +78,10 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         // session no sweep could see: RCOIN stayed locked and the coupon slot
         // stayed held forever.
         'awaiting_redirect',
+        // A wallet payment claims its session into "processing" before the
+        // hold is taken; a failure after that left the session here for good,
+        // with the customer's money frozen in the hold and no sweep looking.
+        'processing',
     ];
 
     /**
@@ -170,6 +174,13 @@ class ExpireStalePaymentSessionsJob implements ShouldQueue
         foreach ($stale as $session) {
             try {
                 $attempt = $session->paymentAttempt;
+
+                // "processing" is the wallet claim state. A gateway session
+                // parked there is mid-clearing and belongs to the verify chain,
+                // not to this sweep.
+                if ($session->status === 'processing' && $attempt?->gateway !== 'wallet') {
+                    continue;
+                }
 
                 // 0. PROMISED-WINDOW FLOOR. Never terminate a gateway-backed
                 //    session before the window the customer was told they had -

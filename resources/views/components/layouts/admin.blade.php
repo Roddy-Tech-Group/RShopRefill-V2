@@ -532,6 +532,7 @@
                     <div x-show="open" x-collapse class="nav-submenu ml-5 flex flex-col gap-1 border-l border-zinc-200 pl-4">
                         <a href="{{ route('admin.management.monitoring') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.monitoring')) }}">Monitoring</a>
                         <a href="{{ route('admin.payment-insights') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.payment-insights*')) }}">Payment Insights</a>
+                        <a href="{{ route('admin.management.gateways') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.gateways')) }}">Gateway settings</a>
                         <a href="{{ route('admin.management.finances') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.finances')) }}">Finances</a>
                         <a href="{{ route('admin.management.runbooks') }}" wire:navigate class="{{ $mgmtSubItemClass($isCurrent('admin.management.runbooks')) }}">Runbooks</a>
                     </div>

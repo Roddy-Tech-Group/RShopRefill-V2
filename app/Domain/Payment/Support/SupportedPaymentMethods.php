@@ -3,96 +3,143 @@
 namespace App\Domain\Payment\Support;
 
 /**
- * Single source of truth for which payment methods a display currency accepts.
+ * Which payment methods each display currency offers, in tile order.
  *
- * Three layers have to agree on this list: the checkout page's method tabs,
- * CheckoutController (which creates the order + PaymentAttempt) and
- * PaymentSessionController::pay (which actually charges it). When the pay step
- * held a shorter list than checkout, a customer could pick USSD / Pay With Bank
- * / Bank QR / Mobile Wallet, get a real order, and then be told the method was
- * "not available for currency" - leaving an order that could not be paid by any
- * means. Both controllers now read this list so they cannot drift again.
+ * The answer comes from the payment switchboard (payment_routes, edited in
+ * Management > Gateway settings), through PaymentRouteTable. Every surface that
+ * offers or charges a method reads it here: the checkout tiles,
+ * CheckoutController, the pay step, the wallet sheet, the mobile API and the
+ * storefront strip. When the pay step once held a shorter list than checkout, a
+ * customer could pick a method, get a real order, and then be refused at the
+ * pay step; one source stops that coming back.
  *
- * The mapping mirrors what is enabled on the gateway dashboard, so we never
- * offer a method the provider would then reject.
+ * The constants below are no longer the live list. They are what the platform
+ * did before the switchboard existed, used only when the table cannot be read,
+ * so a database fault degrades to the old behaviour rather than to no methods.
  */
 final class SupportedPaymentMethods
 {
     /**
-     * Display currency => allowed method keys.
+     * The pre-switchboard method lists in tile order, kept as the fallback.
+     * Mirrors the 2026-10-05 seed migration.
      *
      * @var array<string, list<string>>
      */
-    private const BY_CURRENCY = [
-        // Apple Pay only where the gateway collects it: USD, GBP and NGN.
-        // Every other currency answers "Currency not supported for Apple Pay"
-        // before the merchant is even looked at (sandbox-verified 2026-09-10),
-        // so offering the tile there was a guaranteed failure. It is listed
-        // here as the gateway's capability and HELD BACK by WITHHELD below
-        // until the live account takes it; do not delete it from these rows.
-        // Mobile money on USD rides the Francophone rail in CFA francs (see
-        // MobileMoneyRail): a dollar order can be paid over MTN or Orange
-        // without the customer switching currency first.
-        'USD' => ['card', 'apple_pay', 'mobile_money', 'crypto', 'wallet'],
-        'EUR' => ['card', 'crypto', 'wallet', 'pay_with_bank'],
-        'GBP' => ['card', 'apple_pay', 'crypto', 'wallet', 'pay_with_bank'],
-        'NGN' => ['card', 'apple_pay', 'bank_transfer', 'crypto', 'wallet', 'ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'],
+    public const DEFAULTS = [
+        'USD' => ['card', 'mobile_money', 'apple_pay', 'crypto', 'wallet'],
+        'EUR' => ['card', 'pay_with_bank', 'crypto', 'wallet'],
+        'GBP' => ['card', 'pay_with_bank', 'apple_pay', 'crypto', 'wallet'],
+        'NGN' => ['card', 'bank_transfer', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'apple_pay', 'crypto', 'wallet'],
         'GHS' => ['card', 'mobile_money', 'crypto', 'wallet'],
         'XAF' => ['card', 'mobile_money', 'crypto', 'wallet'],
         'XOF' => ['card', 'mobile_money', 'crypto', 'wallet'],
         'KES' => ['card', 'mobile_money', 'crypto', 'wallet'],
         'UGX' => ['card', 'mobile_money', 'crypto', 'wallet'],
         'RWF' => ['card', 'mobile_money', 'crypto', 'wallet'],
+        'EGP' => ['card', 'mobile_money'],
+        'TZS' => ['card', 'mobile_money'],
+        'ZMW' => ['card'],
+        'ZAR' => ['card'],
     ];
 
     /**
-     * Currencies without an explicit entry only get the globally available
-     * methods.
+     * Methods listed in the defaults but switched off, with why.
+     *
+     * @var array<string, string>
+     */
+    public const DEFAULT_WITHHELD = [
+        'apple_pay' => 'Not enabled',
+    ];
+
+    /**
+     * Per currency, methods listed but switched off until a real payment
+     * proves them. Mirrors the seed.
+     *
+     * @var array<string, list<string>>
+     */
+    public const DEFAULT_OFF_UNTIL_TESTED = [
+        'EGP' => ['mobile_money'],
+        'TZS' => ['mobile_money'],
+    ];
+
+    public const OFF_UNTIL_TESTED_NOTE = 'Not live yet: switch on after one real test payment succeeds';
+
+    /**
+     * Currencies with no row of their own only get the card, which every
+     * fiat gateway can take.
      */
     private const FALLBACK = ['card'];
 
     /**
-     * Methods the gateway lists but the live account cannot take, so they are
-     * offered nowhere: not the checkout tiles, not the wallet sheet, not the
-     * storefront strip, not the pay step. Keyed by method with the reason, so
-     * the day the reason stops being true the line is deleted and every surface
-     * gets the method back at once.
+     * The methods a currency offers, in the order its tiles render.
      *
-     * apple_pay: 17 of 17 production attempts were refused by Flutterwave
-     * between 2026-09-02 and 2026-10-01 ("failed compliance checks", then "the
-     * currency for this payment is currently not supported"), in the very
-     * currencies the sandbox accepted it in. Apple Pay is not enabled on the
-     * live merchant account. Every attempt cost a customer a failed checkout
-     * and a strike toward the payment pause.
-     *
-     * @var array<string, string>
-     */
-    private const WITHHELD = [
-        'apple_pay' => 'Not enabled on the live Flutterwave account: every production attempt was refused as of 2026-10-01.',
-    ];
-
-    /**
      * @return list<string>
      */
     public static function forCurrency(string $currency): array
     {
-        $methods = self::BY_CURRENCY[strtoupper(trim($currency))] ?? self::FALLBACK;
+        $rows = PaymentRouteTable::forCurrency($currency);
 
-        return array_values(array_diff($methods, array_keys(self::WITHHELD)));
+        if ($rows === null) {
+            return self::FALLBACK;
+        }
+
+        return array_values(array_map(
+            fn (array $row): string => $row['method'],
+            array_filter($rows, fn (array $row): bool => $row['offered']),
+        ));
     }
 
     /**
-     * The methods currently held back from every surface, with why.
+     * Every currency's offered methods in tile order, for page scripts that
+     * render the tiles themselves.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function byCurrency(): array
+    {
+        $map = [];
+
+        foreach (self::knownCurrencies() as $currency) {
+            $map[$currency] = self::forCurrency($currency);
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function fallback(): array
+    {
+        return self::FALLBACK;
+    }
+
+    /**
+     * Methods listed somewhere but offered nowhere, with the reason recorded on
+     * their rows.
      *
      * @return array<string, string>
      */
     public static function withheld(): array
     {
-        return self::WITHHELD;
+        $listed = [];
+        $offered = [];
+
+        foreach (PaymentRouteTable::all() as $rows) {
+            foreach ($rows as $row) {
+                $listed[$row['method']] ??= (string) ($row['note'] ?? '');
+
+                if ($row['offered']) {
+                    $offered[$row['method']] = true;
+                }
+            }
+        }
+
+        return array_diff_key($listed, $offered);
     }
 
     /**
-     * @return bool True when the currency accepts the method.
+     * @return bool True when the currency offers the method.
      */
     public static function allows(string $currency, ?string $method): bool
     {
@@ -100,17 +147,34 @@ final class SupportedPaymentMethods
     }
 
     /**
-     * Every currency with an explicit method list.
+     * Every currency with rows of its own.
      *
      * @return list<string>
      */
     public static function knownCurrencies(): array
     {
-        return array_keys(self::BY_CURRENCY);
+        return array_keys(PaymentRouteTable::all());
     }
 
     /**
-     * Every method key accepted by at least one currency.
+     * Currencies a product page may hand a customer over to: those offering
+     * a local rail beyond the card, so a pick never lands on a checkout whose
+     * only method is a card nobody promised. A currency with a row but card
+     * alone (Egypt, Tanzania, Zambia, South Africa until their rails are
+     * proven) is priced and payable, but not pushed.
+     *
+     * @return list<string>
+     */
+    public static function handoverCurrencies(): array
+    {
+        return array_values(array_filter(
+            self::knownCurrencies(),
+            fn (string $currency): bool => self::forCurrency($currency) !== ['card'] && self::forCurrency($currency) !== [],
+        ));
+    }
+
+    /**
+     * Every method offered in at least one currency.
      *
      * Used to prove the storefront's "Pay your way" strip only advertises rails
      * checkout can actually take - see PaymentStripBadgesTest.
@@ -119,8 +183,12 @@ final class SupportedPaymentMethods
      */
     public static function allMethods(): array
     {
-        $methods = array_unique(array_merge(...array_values(self::BY_CURRENCY)));
+        $methods = [];
 
-        return array_values(array_diff($methods, array_keys(self::WITHHELD)));
+        foreach (self::knownCurrencies() as $currency) {
+            array_push($methods, ...self::forCurrency($currency));
+        }
+
+        return array_values(array_unique($methods));
     }
 }

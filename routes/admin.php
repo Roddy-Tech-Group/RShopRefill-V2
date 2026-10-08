@@ -287,6 +287,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Volt::route('runbooks/{runbook?}', 'admin.management.runbooks')->name('runbooks');
             // The mobile API's contract (docs/api/v2), rendered, plus the raw
             // OpenAPI file for Roddy's tooling. Admin-only on purpose.
+            // Gateway switches, per-currency payment routing and eligibility.
+            Volt::route('gateways', 'admin.management.gateways')->name('gateways');
             Route::get('api-docs', [AdminApiDocsController::class, 'page'])->name('api-docs');
             Route::get('api-docs/openapi.yaml', [AdminApiDocsController::class, 'spec'])->name('api-docs.spec');
         });

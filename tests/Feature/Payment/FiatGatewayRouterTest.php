@@ -4,6 +4,7 @@ namespace Tests\Feature\Payment;
 
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\Currency;
 use App\Models\CurrencyRate;
@@ -32,6 +33,13 @@ class FiatGatewayRouterTest extends TestCase
     {
         foreach (array_keys(FiatGatewayRouter::METHOD_PRIORITY) as $method) {
             foreach (['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'XAF', 'KES'] as $currency) {
+                // Mobile money exists only where Flutterwave has a rail for it.
+                if ($method === 'mobile_money' && ! MobileMoneyRail::supports($currency)) {
+                    $this->assertNull(FiatGatewayRouter::resolve($method, $currency), "no rail serves mobile money in {$currency}");
+
+                    continue;
+                }
+
                 $this->assertSame(
                     'flutterwave',
                     FiatGatewayRouter::resolve($method, $currency),
@@ -54,8 +62,10 @@ class FiatGatewayRouterTest extends TestCase
         $this->assertFalse(FiatGatewayRouter::supports('paystack', 'card', 'EUR'), 'Paystack cannot charge EUR at all');
         $this->assertTrue(FiatGatewayRouter::supports('paystack', 'bank_transfer', 'NGN'));
         $this->assertTrue(FiatGatewayRouter::supports('paystack', 'ussd', 'NGN'));
-        $this->assertTrue(FiatGatewayRouter::supports('paystack', 'mobile_money', 'GHS'));
-        $this->assertTrue(FiatGatewayRouter::supports('paystack', 'mobile_money', 'KES'));
+        // Paystack offers mobile money only to businesses registered in Ghana,
+        // Kenya or Côte d'Ivoire; ours is Nigerian (docs read 2026-10-06).
+        $this->assertFalse(FiatGatewayRouter::supports('paystack', 'mobile_money', 'GHS'));
+        $this->assertFalse(FiatGatewayRouter::supports('paystack', 'mobile_money', 'KES'));
         $this->assertFalse(FiatGatewayRouter::supports('paystack', 'mobile_money', 'XAF'), 'Paystack has no Cameroon coverage');
 
         // The account upgrade is an env change, not a deploy.

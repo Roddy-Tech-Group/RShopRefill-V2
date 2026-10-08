@@ -24,10 +24,15 @@ class ReconcileOrphanedSessionsCommand extends Command
             'started_at' => now(),
         ]);
 
-        // Find sessions pending or awaiting action for more than 10 minutes
+        // Only sessions that never reached a gateway. A session awaiting the
+        // customer's action (a 3-D Secure page, a bank's app) has a charge
+        // the gateway may still complete; ending it here by the clock, with
+        // no gateway check, told the customer it failed, sent them to pay
+        // again, and let the first payment land afterwards: two charges.
+        // Those sessions belong to the expiry sweeper, which asks the gateway
+        // first and honours the window the customer was promised.
         $threshold = Carbon::now()->subMinutes(10);
-
-        $orphanedSessions = PaymentSession::whereIn('status', ['pending', 'awaiting_customer_action'])
+        $orphanedSessions = PaymentSession::where('status', 'pending')
             ->where('created_at', '<', $threshold)
             ->get();
 

@@ -5,6 +5,7 @@ namespace App\Domain\Payment\Providers;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Support\GatewayFailure;
+use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\MockMode;
 use App\Models\PaymentAttempt;
 use Illuminate\Support\Facades\Http;
@@ -98,12 +99,18 @@ class KorapayPaymentProvider implements PaymentProviderInterface
             ];
         }
 
+        // MAJOR units: ₦16,500 goes out as 16500. Francs have no minor unit,
+        // so a franc figure with decimals (a wallet top-up priced off a rate)
+        // is rounded UP to the whole franc and recorded on the attempt: verify
+        // and any refund then read what Kora was actually asked for, and the
+        // platform only ever gains the rounding.
+        $chargeAmount = $this->chargeAmountFor($attempt);
+
         try {
             $response = Http::withToken($this->secretKey)
                 ->post("{$this->baseUrl}/charges/initialize", [
                     'reference' => $attempt->idempotency_key,
-                    // MAJOR units: ₦16,500 goes out as 16500.
-                    'amount' => (float) $attempt->amount,
+                    'amount' => $chargeAmount,
                     'currency' => strtoupper($attempt->currency),
                     'customer' => [
                         'email' => $attempt->user->email,
@@ -198,24 +205,30 @@ class KorapayPaymentProvider implements PaymentProviderInterface
             $data = $response->json('data') ?? [];
 
             // Cross-bind, same defence as every other provider: the reported
-            // reference must be OURS before any status is believed.
-            $reportedRef = (string) ($data['reference'] ?? '');
-            if ($reportedRef === '' || ! hash_equals((string) $attempt->idempotency_key, $reportedRef)) {
+            // reference must be OURS before any status is believed. Kora puts
+            // its own KPY- id in `reference` on some responses and our
+            // reference in `payment_reference` (its docs show both shapes), so
+            // either field may carry ours; neither may carry someone else's.
+            if (! $this->carriesOurReference($data, (string) $attempt->idempotency_key)) {
                 Log::warning('Korapay verification rejected: reference mismatch', [
                     'attempt_id' => $attempt->id,
                     'expected' => $attempt->idempotency_key,
-                    'reported' => $reportedRef,
+                    'reported' => $data['reference'] ?? null,
+                    'reported_payment_reference' => $data['payment_reference'] ?? null,
                 ]);
 
                 return false;
             }
 
-            // MAJOR units, arrives as a string ("2000.00"). amount_paid can
-            // trail amount on partial payments, so prefer it when present.
-            $paid = (float) ($data['amount_paid'] ?? $data['amount'] ?? 0);
+            // MAJOR units, arriving as strings ("2000.00"). Kora's docs say to
+            // give value from `amount_accepted` (what it processed, after its
+            // over/underpayment rules); `amount_paid` is 0 on a successful
+            // mobile money charge in Kora's own example, so it only counts
+            // when it is a real figure, and `amount` stands when neither is.
+            $paid = $this->acceptedAmount($data);
 
             if (($data['status'] ?? null) === 'success'
-                && $paid >= (float) $attempt->amount
+                && $paid >= $this->chargeAmountFor($attempt)
                 && strtoupper((string) ($data['currency'] ?? '')) === strtoupper((string) $attempt->currency)
             ) {
                 $attempt->payment_status = PaymentStatus::Paid;
@@ -243,12 +256,18 @@ class KorapayPaymentProvider implements PaymentProviderInterface
             return true;
         }
 
+        // Kora requires OUR unique reference per refund. Derived from the
+        // caller's reference (or the attempt) rather than minted afresh, so a
+        // retry after a timeout asks for the same refund instead of a second
+        // one. Kora's limit is 50 characters.
+        $refundReference = Str::limit('RF-'.$attempt->id.'-'.($reference ?? 'refund'), 50, '');
+
         try {
             $response = Http::withToken($this->secretKey)
                 ->post("{$this->baseUrl}/refunds/initiate", [
                     'payment_reference' => $attempt->idempotency_key,
-                    'reference' => 'RF-'.Str::upper(Str::random(20)),
-                    'amount' => $amount,
+                    'reference' => $refundReference,
+                    'amount' => round($amount, MobileMoneyRail::precision((string) $attempt->currency)),
                     'reason' => 'RshopRefill refund',
                 ]);
 
@@ -267,6 +286,64 @@ class KorapayPaymentProvider implements PaymentProviderInterface
 
             return false;
         }
+    }
+
+    /**
+     * The figure Kora is asked for: the attempt's amount, rounded up to the
+     * currency's precision (whole francs for XAF/XOF), recorded on the attempt
+     * the first time it differs so every later read agrees with the charge.
+     */
+    private function chargeAmountFor(PaymentAttempt $attempt): float
+    {
+        $recorded = $attempt->pay_amount;
+
+        if ($recorded !== null && strtoupper((string) $attempt->pay_currency) === strtoupper((string) $attempt->currency)) {
+            return (float) $recorded;
+        }
+
+        $precision = MobileMoneyRail::precision((string) $attempt->currency);
+        $factor = 10 ** $precision;
+        $amount = ceil(((float) $attempt->amount) * $factor - 1e-9) / $factor;
+
+        if ($amount !== (float) $attempt->amount) {
+            $attempt->pay_currency = strtoupper((string) $attempt->currency);
+            $attempt->pay_amount = $amount;
+            $attempt->save();
+        }
+
+        return $amount;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function carriesOurReference(array $data, string $ours): bool
+    {
+        foreach (['payment_reference', 'reference'] as $field) {
+            $reported = (string) ($data[$field] ?? '');
+
+            if ($reported !== '' && hash_equals($ours, $reported)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function acceptedAmount(array $data): float
+    {
+        if (isset($data['amount_accepted']) && (float) $data['amount_accepted'] > 0) {
+            return (float) $data['amount_accepted'];
+        }
+
+        if (isset($data['amount_paid']) && (float) $data['amount_paid'] > 0) {
+            return (float) $data['amount_paid'];
+        }
+
+        return (float) ($data['amount'] ?? 0);
     }
 
     public function normalizeWebhook(array $payload): array

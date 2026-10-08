@@ -21,6 +21,7 @@ use App\Models\SiteSetting;
 use App\Models\Subcategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -139,10 +140,10 @@ class KorapayFailoverTest extends TestCase
         $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
         $this->assertSame('paystack', FiatGatewayRouter::resolve('bank_transfer', 'NGN'), 'bank_transfer prefers Paystack per the chain order');
 
-        // With Kora dark, its mobile-money corridors fall to Paystack where
-        // Paystack has coverage (GHS/KES/XOF), and grey where it does not.
+        // With Kora dark, mobile money greys everywhere: Paystack offers it
+        // only to businesses registered in Ghana, Kenya or Côte d'Ivoire.
         $this->setGateway('korapay', false);
-        $this->assertSame('paystack', FiatGatewayRouter::resolve('mobile_money', 'GHS'));
+        $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'GHS'));
         $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'XAF'), 'no Paystack coverage for Cameroon');
         $this->setGateway('korapay', true);
 
@@ -190,7 +191,7 @@ class KorapayFailoverTest extends TestCase
     /**
      * @return array{0: PaymentAttempt, 1: bool}
      */
-    private function verifyAttemptAgainst(array $data): array
+    private function verifyAttemptAgainst(array $data, ?\Closure $shape = null): array
     {
         config(['services.korapay.secret_key' => 'sk_live_korapay_realish']);
 
@@ -211,7 +212,7 @@ class KorapayFailoverTest extends TestCase
                     'amount' => number_format((float) $attempt->amount, 2, '.', ''),
                     'amount_paid' => number_format((float) $attempt->amount, 2, '.', ''),
                     'currency' => 'XAF',
-                ], $data),
+                ], $shape ? $shape($data, $attempt) : $data),
             ], 200),
         ]);
 
@@ -340,5 +341,169 @@ class KorapayFailoverTest extends TestCase
         $response->assertRedirect();
         $this->assertStringContainsString($order->order_number, $response->headers->get('Location'));
         $this->assertSame(PaymentStatus::Paid, $order->paymentAttempts->first()->fresh()->payment_status);
+    }
+    // ------------------------------------------- what Kora's documentation says
+
+    /**
+     * The verify response Kora's sandbox really returned for a completed XAF
+     * mobile money checkout (RSRPROBE-HC-2BBFE3B1, 2026-10-08): our reference
+     * in `reference`, amount_paid equal to the amount, a UTC transaction_date.
+     * Pinned so the verify path is proven against the real shape, not only the
+     * documented one.
+     */
+    public function test_verification_accepts_the_shape_koras_sandbox_really_returns(): void
+    {
+        [$attempt, $verified] = $this->verifyAttemptAgainst([], fn (array $data, $attempt) => [
+            'reference' => $attempt->idempotency_key,
+            'status' => 'success',
+            'amount' => number_format((float) $attempt->amount, 2, '.', ''),
+            'amount_paid' => number_format((float) $attempt->amount, 2, '.', ''),
+            'fee' => 0,
+            'currency' => 'XAF',
+            'description' => 'RShopRefill sandbox check',
+            'transaction_date' => '2026-10-08T14:37:57.000Z',
+            'customer' => ['name' => 'Sandbox Probe', 'email' => 'probe@rshoprefill.com'],
+            'mobile_money' => ['mobile_number' => '+237655123456'],
+        ]);
+
+        $this->assertTrue($verified);
+        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+    }
+
+    /**
+     * Kora's verify response may carry ITS id in `reference` and ours in
+     * `payment_reference` (both shapes appear in its docs). Ours in either
+     * field is a match; someone else's in both is not.
+     */
+    public function test_verification_accepts_our_reference_in_payment_reference(): void
+    {
+        [$attempt, $verified] = $this->verifyAttemptAgainst(
+            ['reference' => 'KPY-PAY-rYF4c5ZWioeb'],
+            fn (array $data, $attempt) => array_merge($data, ['payment_reference' => $attempt->idempotency_key]),
+        );
+
+        $this->assertTrue($verified, 'our reference in payment_reference must verify');
+        $this->assertSame(PaymentStatus::Paid, $attempt->fresh()->payment_status);
+    }
+
+    public function test_verification_rejects_a_foreign_reference_in_both_fields(): void
+    {
+        [, $verified] = $this->verifyAttemptAgainst([
+            'reference' => 'KPY-PAY-someone',
+            'payment_reference' => 'someone-elses-order',
+        ]);
+
+        $this->assertFalse($verified);
+    }
+
+    /**
+     * Kora's own successful mobile money example reports amount_paid 0 and
+     * says to give value from amount_accepted. Neither may stop a real
+     * payment from settling, and a short amount_accepted must.
+     */
+    public function test_verification_settles_a_success_whose_amount_paid_is_zero(): void
+    {
+        [, $verified] = $this->verifyAttemptAgainst(['amount_paid' => 0]);
+
+        $this->assertTrue($verified, "amount_paid 0 on a success is Kora's documented shape");
+    }
+
+    /** One stub per test: a second fake in the same test would answer with the first. */
+    public function test_verification_reads_a_short_accepted_amount_as_an_underpayment(): void
+    {
+        [, $verified] = $this->verifyAttemptAgainst(['amount_paid' => 0, 'amount_accepted' => '1.00']);
+
+        $this->assertFalse($verified, 'amount_accepted is what Kora processed; short of the order it must not settle');
+    }
+
+    /** Francs have no minor unit: a figure with decimals goes out rounded up, and verify reads that figure. */
+    public function test_a_franc_amount_with_decimals_is_charged_as_whole_francs(): void
+    {
+        config(['services.korapay.secret_key' => 'sk_live_korapay_realish']);
+        $this->setGateway('flutterwave', false);
+        $this->setGateway('korapay', true);
+
+        $order = $this->checkout('XAF');
+        $attempt = $order->paymentAttempts->first();
+        $attempt->forceFill(['amount' => 3015.617])->save();
+
+        Http::fake([
+            'api.korapay.com/merchant/api/v1/charges/initialize' => Http::response([
+                'status' => true,
+                'data' => ['checkout_url' => 'https://checkout.korapay.com/x', 'reference' => $attempt->idempotency_key],
+            ], 200),
+        ]);
+
+        app(KorapayPaymentProvider::class)->chargeHosted($attempt->fresh(), 'mobile_money', 'https://rshoprefill.test/return');
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'charges/initialize')
+            && $request['amount'] === 3016.0
+            && $request['currency'] === 'XAF');
+
+        $attempt->refresh();
+        $this->assertSame('XAF', $attempt->pay_currency);
+        $this->assertEqualsWithDelta(3016.0, (float) $attempt->pay_amount, 0.0001);
+
+        // Kora reports what it was asked for; the attempt's own figure is lower.
+        Http::fake([
+            'api.korapay.com/merchant/api/v1/charges/*' => Http::response([
+                'status' => true,
+                'data' => ['reference' => $attempt->idempotency_key, 'status' => 'success', 'amount' => '3016.00', 'amount_paid' => 0, 'currency' => 'XAF'],
+            ], 200),
+        ]);
+        $this->assertTrue(app(KorapayPaymentProvider::class)->verifyPayment($attempt->fresh()));
+    }
+
+    /** A retried refund asks Kora for the same refund, never a second one. */
+    public function test_a_refund_keeps_the_same_reference_across_retries(): void
+    {
+        config(['services.korapay.secret_key' => 'sk_live_korapay_realish']);
+        $this->setGateway('korapay', true);
+
+        $order = $this->checkout('XAF');
+        $attempt = $order->paymentAttempts->first();
+        $attempt->forceFill(['gateway' => 'korapay', 'payment_status' => PaymentStatus::Paid])->save();
+
+        Http::fake(['api.korapay.com/merchant/api/v1/refunds/initiate' => Http::response(['status' => true, 'data' => []], 200)]);
+
+        $provider = app(KorapayPaymentProvider::class);
+        $provider->refundPayment($attempt->fresh(), 1000.0, 'item-42');
+        $provider->refundPayment($attempt->fresh(), 1000.0, 'item-42');
+
+        $references = [];
+        Http::assertSent(function (Request $request) use (&$references) {
+            $references[] = $request['reference'];
+
+            return true;
+        });
+
+        $this->assertCount(2, $references);
+        $this->assertSame(["RF-{$attempt->id}-item-42", "RF-{$attempt->id}-item-42"], $references);
+        $this->assertSame(1000.0, Http::recorded()->first()[0]['amount'], 'whole francs');
+    }
+
+    /**
+     * Kora signs the `data` object as IT serialised it. A body with a slash
+     * and an accented name, signed the way JSON.stringify writes them, must
+     * verify although PHP's default json_encode would escape both.
+     */
+    public function test_a_webhook_signed_over_koras_own_bytes_verifies(): void
+    {
+        config(['services.korapay.secret_key' => 'sk_live_korapay_realish']);
+        $this->setGateway('korapay', true);
+
+        $order = $this->checkout('XAF');
+        $attempt = $order->paymentAttempts->first();
+        $attempt->forceFill(['gateway' => 'korapay'])->save();
+
+        $data = '{"fee":10,"amount":"'.number_format((float) $attempt->amount, 2, '.', '').'","status":"success","currency":"XAF","reference":"KPY-PAY-4uore940","payment_method":"mobile_money","payment_reference":"'.$attempt->idempotency_key.'","description":"Order/Aïcha "}';
+        $body = '{"event":"charge.success","data":'.$data.'}';
+
+        $this->call('POST', '/api/webhooks/korapay', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KORAPAY_SIGNATURE' => hash_hmac('sha256', $data, 'sk_live_korapay_realish'),
+        ], $body)->assertOk();
+
+        $this->assertDatabaseHas('payment_webhooks', ['gateway' => 'korapay', 'reference' => $attempt->idempotency_key]);
     }
 }

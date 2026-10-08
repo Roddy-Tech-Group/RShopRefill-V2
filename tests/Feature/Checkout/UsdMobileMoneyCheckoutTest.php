@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Checkout;
 
+use App\Domain\Payment\Support\GatewayCapabilities;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use Illuminate\Support\Facades\File;
@@ -21,20 +22,26 @@ class UsdMobileMoneyCheckoutTest extends TestCase
         return File::get(resource_path('views/shop/checkout.blade.php'));
     }
 
-    /** The server's allow-list and the page's tile grid agree on USD. */
+    /**
+     * The server offers mobile money under USD, and the page renders the
+     * server's list rather than a copy of its own.
+     */
     public function test_the_tile_is_offered_under_usd_on_both_sides(): void
     {
-        $this->assertContains('mobile_money', SupportedPaymentMethods::forCurrency('USD'));
-        $this->assertStringContainsString(
-            "'USD': ['card', 'mobile_money', 'crypto', 'wallet']",
-            $this->checkout()
-        );
+        $this->assertSame(['card', 'mobile_money', 'crypto', 'wallet'], SupportedPaymentMethods::forCurrency('USD'));
+        $this->assertStringContainsString('SupportedPaymentMethods::byCurrency()', $this->checkout());
     }
 
     /** The networks under USD are the Francophone rail's, and the charge is in XAF. */
     public function test_usd_rides_the_francophone_rail(): void
     {
-        $this->assertSame(['MTN', 'Orange'], MobileMoneyRail::networksByCurrency()['USD']);
+        // A dollar customer is charged in francs, so Flutterwave's rail offers
+        // every network the franc countries have between them; the number's
+        // country decides which are accepted at the pay step.
+        $this->assertSame(
+            ['CM' => ['MTN', 'Orange'], 'CI' => ['MTN', 'Orange', 'Moov', 'Wave'], 'SN' => ['Orange', 'Wave'], 'BF' => ['Mobicash']],
+            GatewayCapabilities::mobileMoneyUnion(['flutterwave'], 'USD'),
+        );
         $this->assertSame(['USD' => 'XAF'], MobileMoneyRail::chargeCurrencyByCurrency());
         $this->assertSame(0, MobileMoneyRail::precision('XAF'), 'francs have no minor unit');
         $this->assertSame(0, MobileMoneyRail::precision('XOF'));

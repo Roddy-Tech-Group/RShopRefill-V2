@@ -7,6 +7,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\PaystackPaymentProvider;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\Cart;
 use App\Models\CartItem;
@@ -14,6 +15,8 @@ use App\Models\Category;
 use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentRoute;
+use App\Models\PaymentSession;
 use App\Models\PaymentWebhook;
 use App\Models\PricingRule;
 use App\Models\Product;
@@ -135,7 +138,7 @@ class PaystackFailoverTest extends TestCase
 
         $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
         $this->assertSame('paystack', FiatGatewayRouter::resolve('ussd', 'NGN'));
-        $this->assertSame('paystack', FiatGatewayRouter::resolve('mobile_money', 'GHS'));
+        $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'GHS'), 'Paystack offers mobile money only to businesses registered in Ghana, Kenya or Côte d\'Ivoire');
         $this->assertNull(FiatGatewayRouter::resolve('card', 'USD'), 'USD cards need account approval before failover serves them');
         $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'XAF'), 'XAF is Kora territory, not Paystack');
         $this->assertNull(FiatGatewayRouter::resolve('bank_qr', 'NGN'), 'no backup serves bank QR');
@@ -216,6 +219,127 @@ class PaystackFailoverTest extends TestCase
         app(PaymentSessionService::class)->confirmSession($session, ['transaction_id' => 'FLW_'.Str::random(8)]);
 
         $this->assertSame('confirmed', $session->fresh()->status, 'failover stranded an in-flight primary payment');
+    }
+
+    // ------------------------------------------- switchboard edits mid-payment
+
+    /**
+     * A card payment the customer has already started on Flutterwave.
+     *
+     * @return array{0: PaymentAttempt, 1: PaymentSession}
+     */
+    private function cardPaymentUnderWay(): array
+    {
+        $order = $this->checkout();
+        $attempt = $order->paymentAttempts->first();
+        $attempt->forceFill(['payment_method' => 'card'])->save();
+        $session = $attempt->paymentSession;
+        $session->forceFill(['status' => 'awaiting_payment'])->save();
+
+        return [$attempt->fresh(), $session->fresh()];
+    }
+
+    /** Putting Paystack first on a row moves new payments only. */
+    public function test_a_payment_under_way_keeps_its_gateway_when_another_is_put_first(): void
+    {
+        [$attempt, $session] = $this->cardPaymentUnderWay();
+
+        $this->setGateway('paystack', true);
+        PaymentRoute::where('currency', 'NGN')->where('method', 'card')->sole()
+            ->update(['gateways' => ['paystack', 'flutterwave']]);
+        $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'), 'new payments go to Paystack');
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'card',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway);
+        $this->assertSame('flutterwave', $session->fresh()->provider);
+    }
+
+    /** Switching a method off stops new payments, not one already started with it. */
+    public function test_a_payment_under_way_survives_its_method_being_switched_off(): void
+    {
+        [$attempt, $session] = $this->cardPaymentUnderWay();
+
+        PaymentRoute::where('currency', 'NGN')->where('method', 'card')->sole()->update(['is_offered' => false]);
+        $this->assertNotContains('card', SupportedPaymentMethods::forCurrency('NGN'));
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'card',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway);
+    }
+
+    /**
+     * Taking the gateway off the row moves NEW payments. A payment already
+     * under way on it still finishes there while it is switched on: refusing
+     * it looped the customer on "unavailable" until the session expired.
+     */
+    public function test_a_payment_under_way_finishes_on_its_gateway_even_when_taken_off_its_row(): void
+    {
+        [$attempt, $session] = $this->cardPaymentUnderWay();
+
+        $this->setGateway('paystack', true);
+        PaymentRoute::where('currency', 'NGN')->where('method', 'card')->sole()->update(['gateways' => ['paystack']]);
+        $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'), 'new payments go to Paystack');
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'card',
+        ])->assertOk();
+
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway, 'a started payment is never re-stamped');
+    }
+
+    /** ...but a gateway really switched off still refuses, as before the switchboard. */
+    public function test_a_payment_under_way_on_a_switched_off_gateway_is_refused(): void
+    {
+        [$attempt, $session] = $this->cardPaymentUnderWay();
+
+        $this->failover();
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'card',
+        ])->assertStatus(503)->assertJson(['gateway_disabled' => true]);
+
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway);
+    }
+
+    /** Only the method it started with is carried on; a new method routes as a new payment. */
+    public function test_a_different_method_picked_mid_payment_follows_its_own_row(): void
+    {
+        [$attempt, $session] = $this->cardPaymentUnderWay();
+
+        $this->setGateway('paystack', true);
+        PaymentRoute::where('currency', 'NGN')->where('method', 'bank_transfer')->sole()
+            ->update(['gateways' => ['paystack', 'flutterwave']]);
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'bank_transfer',
+        ])->assertStatus(503);
+
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway);
+    }
+
+    /** ...while a payment that has not picked a method yet follows the row. */
+    public function test_a_payment_not_yet_started_follows_the_new_row_order(): void
+    {
+        $order = $this->checkout();
+        $attempt = $order->paymentAttempts->first();
+        $session = $attempt->paymentSession;
+
+        $this->setGateway('paystack', true);
+        PaymentRoute::where('currency', 'NGN')->where('method', 'card')->sole()
+            ->update(['gateways' => ['paystack', 'flutterwave']]);
+
+        $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'card',
+        ])->assertOk();
+
+        $this->assertSame('paystack', $attempt->fresh()->gateway);
     }
 
     // --------------------------------------------------------- verification

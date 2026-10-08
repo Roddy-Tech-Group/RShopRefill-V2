@@ -89,8 +89,9 @@ class CheckoutCurrencyHandoffTest extends TestCase
 
         $source = $this->checkout();
 
-        $this->assertStringContainsString("const allowedKeys = mapping[currency] || ['card'];", $source);
-        $this->assertStringNotContainsString("mapping[currency] || ['card', 'crypto']", $source);
+        $this->assertSame(['card'], SupportedPaymentMethods::fallback());
+        $this->assertStringContainsString('const allowedKeys = this.methodsByCurrency[currency] || this.fallbackMethods;', $source);
+        $this->assertStringContainsString('fallbackMethods: @js(\App\Domain\Payment\Support\SupportedPaymentMethods::fallback())', $source);
     }
 
     /**
@@ -133,12 +134,12 @@ class CheckoutCurrencyHandoffTest extends TestCase
         $js = file_get_contents(resource_path('js/app.js'));
 
         $this->assertStringContainsString("picked.type !== 'fiat'", $product);
-        $this->assertStringContainsString('SupportedPaymentMethods::knownCurrencies()', $product);
+        $this->assertStringContainsString('SupportedPaymentMethods::handoverCurrencies()', $product);
         $this->assertStringContainsString('! supported.includes(code)', $js);
 
         // The list itself: rails AND a country that uses them.
         $allowed = array_values(array_intersect(
-            SupportedPaymentMethods::knownCurrencies(),
+            SupportedPaymentMethods::handoverCurrencies(),
             array_values(config('country_currency.map', []))
         ));
 

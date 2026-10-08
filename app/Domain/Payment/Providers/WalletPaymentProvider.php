@@ -52,12 +52,11 @@ class WalletPaymentProvider implements PaymentProviderInterface
     public function initializePayment(PaymentAttempt $attempt): array
     {
         $user = $attempt->user;
-        $currencyEnum = Currency::tryFrom(strtoupper($attempt->currency));
 
-        if (! $currencyEnum) {
-            throw new \Exception("Unsupported wallet currency: {$attempt->currency}");
-        }
-
+        // The order's currency need not be one a wallet is held in (XOF, KES,
+        // UGX, RWF...): the order is paid from a wallet the customer does hold,
+        // at the rate frozen here. Refusing the order currency itself turned
+        // the wallet tile into a dead end in every such currency.
         $this->chooseWallet($attempt);
 
         if (! $user->hasTransactionPin()) {

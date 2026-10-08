@@ -287,11 +287,11 @@
         : ($cryptoRatesForJs->firstWhere('code', 'USD') ? 'USD' : ($cryptoRatesForJs->first()['code'] ?? 'USDT'));
 
     // Picking one of these beside the price sets what checkout will charge in.
-    // The list is the currencies with a verified rail list AND a country that
-    // uses them, so a pick can never leave a customer on a checkout whose only
-    // method is a card we did not promise them.
+    // The list is the currencies with a local rail beyond the card AND a
+    // country that uses them, so a pick can never leave a customer on a
+    // checkout whose only method is a card we did not promise them.
     $checkoutCurrencies = array_values(array_intersect(
-        \App\Domain\Payment\Support\SupportedPaymentMethods::knownCurrencies(),
+        \App\Domain\Payment\Support\SupportedPaymentMethods::handoverCurrencies(),
         array_values(config('country_currency.map', []))
     ));
 

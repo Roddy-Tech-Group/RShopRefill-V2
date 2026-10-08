@@ -1627,6 +1627,13 @@
                 fiatMethods: @js(array_keys(\App\Domain\Payment\Support\FiatGatewayRouter::METHOD_PRIORITY)),
                 fiatUnavailableByCurrency: @js(\App\Domain\Payment\Support\FiatGatewayRouter::unavailableFiatMethodsByCurrency()),
 
+                // Currency -> offered methods in tile order, from the payment
+                // switchboard (Management > Gateway settings). This page used
+                // to keep its own copy, which had to be hand-edited every time
+                // a method changed; now it renders whatever the server offers.
+                methodsByCurrency: @js(\App\Domain\Payment\Support\SupportedPaymentMethods::byCurrency()),
+                fallbackMethods: @js(\App\Domain\Payment\Support\SupportedPaymentMethods::fallback()),
+
                 // Methods this cart's compliance categories make ineligible, per
                 // currency. Resolved server-side by the payment eligibility gate
                 // and empty while it runs in shadow mode, so the tiles only change
@@ -1679,48 +1686,26 @@
 
                 getFilteredMethods() {
                     const currency = this.$store.cart.currency;
-                    // Currency -> allowed method keys. Mirrors what's enabled on
-                    // the Flutterwave dashboard so we never offer a method that
-                    // their modal would then reject. Order matters: it's the
-                    // order tabs render in the grid.
-                    // Ordering is by DOMINANT local method first so the customer
-                    // sees their familiar option at top-left of the grid:
-                    //   - Francophone Africa (XAF/XOF) → MTN MoMo first
-                    //   - Nigeria (NGN) → Bank Transfer first (most-used FW method)
-                    //   - Ghana / Kenya / Uganda / Rwanda → Mobile money first
-                    //   - US / EU / UK → Card first, crypto for the savvy users
-                    // Apple Pay only in USD, GBP and NGN: the gateway refuses
-                    // it in every other currency before looking at anything
-                    // else (mirrors SupportedPaymentMethods).
-                    // USD also carries mobile money: it rides the Francophone
-                    // rail in CFA francs (MobileMoneyRail), second in the grid
-                    // so a card-first market keeps its card first.
-                    const mapping = {
-                        'USD': ['card', 'mobile_money', 'crypto', 'wallet'],
-                        'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
-                        'GBP': ['card', 'pay_with_bank', 'crypto', 'wallet'],
-                        'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'crypto', 'wallet'],
-                        'GHS': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'XAF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'XOF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'KES': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'UGX': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'RWF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                    };
-                    // A currency with no list of its own gets card only, matching
-                    // SupportedPaymentMethods::FALLBACK. Offering Crypto here drew a
-                    // 422 from the pay step, and with no currency chooser on this
-                    // page there is no longer any way out of it.
-                    const allowedKeys = mapping[currency] || ['card'];
-                    return this.allMethods.filter(m => {
-                        if (m.key === 'wallet' && !this.isLoggedIn) {
-                            return false;
-                        }
-                        if (m.key === 'apple_pay' && !this.applePayAvailable) {
-                            return false;
-                        }
-                        return allowedKeys.includes(m.key);
-                    });
+                    // The server's offered methods for this currency, in the
+                    // tile order set in Gateway settings (seeded card first, the
+                    // order this page always rendered). A currency with no row
+                    // of its own gets card only, the same fallback the pay step uses.
+                    const allowedKeys = this.methodsByCurrency[currency] || this.fallbackMethods;
+                    const byKey = Object.fromEntries(this.allMethods.map(m => [m.key, m]));
+                    return allowedKeys
+                        .map(key => byKey[key])
+                        .filter(m => {
+                            if (!m) {
+                                return false;
+                            }
+                            if (m.key === 'wallet' && !this.isLoggedIn) {
+                                return false;
+                            }
+                            if (m.key === 'apple_pay' && !this.applePayAvailable) {
+                                return false;
+                            }
+                            return true;
+                        });
                 },
 
                 // Wizard State

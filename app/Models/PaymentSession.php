@@ -144,7 +144,9 @@ class PaymentSession extends Model
             'awaiting_transfer' => ['awaiting_confirmation', 'processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_redirect' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],
             'awaiting_confirmation' => ['processing', 'confirmed', 'failed', 'expired', 'cancelled'],
-            'processing' => ['confirmed', 'failed'],
+            // A wallet payment that broke after its hold was taken sits here; the
+            // sweeper must be able to expire it and give the hold back.
+            'processing' => ['confirmed', 'failed', 'expired'],
             'confirmed' => [],
             // 'failed' can still confirm: browser telemetry may report a
             // failure (tab closed mid-payment) for money the gateway webhook
@@ -152,7 +154,10 @@ class PaymentSession extends Model
             // leave the customer charged but unfulfilled.
             'failed' => ['confirmed'],
             'expired' => ['confirmed', 'failed'],
-            'cancelled' => [],
+            // A customer's cancel, like our expiry, is not the gateway's last
+            // word: a prompt approved after the tap still pays, and that late
+            // arrival must be able to confirm the session it belongs to.
+            'cancelled' => ['confirmed'],
         ];
 
         $currentStatus = $this->status;

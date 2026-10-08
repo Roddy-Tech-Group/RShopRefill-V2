@@ -6,13 +6,16 @@ use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Support\FeatureFlag;
 
 /**
- * Per-method failover routing across the fiat gateways.
+ * Per-method, per-currency routing across the fiat gateways.
  *
- * Flutterwave is the primary for every fiat rail. The backups (Paystack for
- * cards / Apple Pay / USSD / NGN transfers, Kora for francophone mobile money
- * and NGN pay-with-bank) receive traffic ONLY while the Flutterwave flag is
- * off: while it is on, resolve() short-circuits on the first priority entry
- * and the backups are unreachable no matter what their flags say.
+ * The order comes from the payment switchboard (Management > Gateway settings):
+ * each method in each currency names its gateways first choice first. The
+ * router takes the first one that is switched on and able to charge the method
+ * in that currency; the rest are its automatic fallbacks. With the seeded
+ * order, Flutterwave is first everywhere and the backups take traffic only when
+ * it is off, which is how the platform behaved before the switchboard. Making
+ * Kora first for a mobile money currency is a row edit, and while Kora's own
+ * switch is off the router skips it and Flutterwave keeps the payment.
  *
  * Routing is decided per method AND currency, because the backups cover
  * different slices of the matrix (Paystack cannot charge XAF, Kora cannot
@@ -52,39 +55,15 @@ final class FiatGatewayRouter
         'ussd' => ['flutterwave', 'paystack'],
         'bank_qr' => ['flutterwave'],
         'mobile_wallet' => ['flutterwave'],
-        'mobile_money' => ['flutterwave', 'korapay', 'paystack'],
+        // Paystack offers mobile money only to businesses registered in Ghana,
+        // Kenya or Côte d'Ivoire; ours is Nigerian, so it is not a backup here.
+        'mobile_money' => ['flutterwave', 'korapay'],
     ];
 
-    /**
-     * Currency coverage per backup gateway and method, from each provider's
-     * documentation (verified 2026-08-07):
-     *
-     *  - Paystack (Nigerian merchant account): cards NGN, plus USD only once
-     *    international USD collection is enabled on the account, which is why
-     *    the card/apple_pay list is config-driven rather than constant.
-     *    Mobile money GHS (MTN/Telecel/AirtelTigo), KES (M-PESA), XOF
-     *    (MTN/Wave/Orange). Bank transfer + USSD are NGN rails.
-     *  - Kora: cards NGN only; mobile money XAF/XOF/GHS/KES/EGP/TZS;
-     *    bank transfer + pay-with-bank NGN.
-     *
-     * Flutterwave is deliberately absent: it keeps today's behavior of
-     * accepting every method/currency pair SupportedPaymentMethods offers.
-     *
-     * @var array<string, array<string, list<string>>>
+    /*
+     * Coverage per gateway (method, currency, country, network) lives in
+     * GatewayCapabilities, one table for the router and every screen.
      */
-    private const BACKUP_CAPABILITIES = [
-        'paystack' => [
-            'bank_transfer' => ['NGN'],
-            'ussd' => ['NGN'],
-            'mobile_money' => ['GHS', 'KES', 'XOF'],
-        ],
-        'korapay' => [
-            'card' => ['NGN'],
-            'bank_transfer' => ['NGN'],
-            'pay_with_bank' => ['NGN'],
-            'mobile_money' => ['XAF', 'XOF', 'GHS', 'KES', 'EGP', 'TZS'],
-        ],
-    ];
 
     /**
      * The gateway that will charge this method in this currency right now,
@@ -95,9 +74,9 @@ final class FiatGatewayRouter
      * candidates() in PaymentEligibilityService::routeGateway, which filters this
      * ordered list down to the gateways approved for the cart.
      */
-    public static function resolve(string $method, string $currency): ?string
+    public static function resolve(string $method, string $currency, ?string $country = null, ?string $network = null): ?string
     {
-        return self::candidates($method, $currency)[0] ?? null;
+        return self::candidates($method, $currency, $country, $network)[0] ?? null;
     }
 
     /**
@@ -108,28 +87,75 @@ final class FiatGatewayRouter
      *
      * @return list<string>
      */
-    public static function candidates(string $method, string $currency): array
+    public static function candidates(string $method, string $currency, ?string $country = null, ?string $network = null): array
     {
         $currency = strtoupper(trim($currency));
 
         return array_values(array_filter(
-            self::METHOD_PRIORITY[$method] ?? [],
-            fn (string $gateway): bool => self::isLive($gateway) && self::supports($gateway, $method, $currency),
+            self::order($method, $currency),
+            fn (string $gateway): bool => self::isLive($gateway) && self::supports($gateway, $method, $currency, $country, $network),
         ));
     }
 
     /**
-     * Can this gateway charge this method in this currency, flags aside?
+     * The switched-on gateways on this row that can take the method in this
+     * currency, in row order: what the storefront may offer right now.
+     *
+     * @return list<string>
      */
-    public static function supports(string $gateway, string $method, string $currency): bool
+    public static function liveGatewaysFor(string $method, string $currency): array
     {
-        if ($gateway === 'flutterwave') {
-            return true;
+        return self::candidates($method, $currency);
+    }
+
+    /**
+     * The gateway order the switchboard sets for this method in this currency,
+     * whether or not each gateway is switched on or able: the full preference
+     * the router then filters. Falls back to the default order for a currency
+     * with no row of its own (the card-only fallback currencies).
+     *
+     * Only fiat gateways survive, so a hand-edited row can never send a fiat
+     * method to the crypto or wallet rail.
+     *
+     * @return list<string>
+     */
+    public static function order(string $method, string $currency): array
+    {
+        if (! array_key_exists($method, self::METHOD_PRIORITY)) {
+            return [];
         }
 
-        $currencies = self::capabilities($gateway)[$method] ?? null;
+        $order = PaymentRouteTable::gatewayOrder($method, $currency) ?? self::METHOD_PRIORITY[$method];
 
-        return $currencies !== null && in_array(strtoupper($currency), $currencies, true);
+        return array_values(array_unique(array_filter(
+            $order,
+            fn (string $gateway): bool => in_array($gateway, self::FIAT_GATEWAYS, true),
+        )));
+    }
+
+    /**
+     * The order a method had before the switchboard, for seeding and for the
+     * fallback when the table cannot be read. Crypto and wallet each have one
+     * rail of their own.
+     *
+     * @return list<string>
+     */
+    public static function defaultOrder(string $method): array
+    {
+        return self::METHOD_PRIORITY[$method] ?? match ($method) {
+            'crypto' => ['nowpayments'],
+            'wallet' => ['wallet'],
+            default => [],
+        };
+    }
+
+    /**
+     * Can this gateway charge this method in this currency, and (for mobile
+     * money, when given) in this country on this network? Flags aside.
+     */
+    public static function supports(string $gateway, string $method, string $currency, ?string $country = null, ?string $network = null): bool
+    {
+        return GatewayCapabilities::supports($gateway, $method, $currency, $country, $network);
     }
 
     /**
@@ -209,28 +235,5 @@ final class FiatGatewayRouter
         }
 
         return $map;
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    private static function capabilities(string $gateway): array
-    {
-        $capabilities = self::BACKUP_CAPABILITIES[$gateway] ?? [];
-
-        // Paystack card + Apple Pay currencies follow the merchant account:
-        // NGN always, USD only after international USD collection (and its
-        // domiciliary settlement account) is approved. Config so the upgrade
-        // is an env change, not a deploy.
-        if ($gateway === 'paystack') {
-            $chargeCurrencies = array_map(
-                'strtoupper',
-                (array) config('services.paystack.charge_currencies', ['NGN']),
-            );
-            $capabilities['card'] = $chargeCurrencies;
-            $capabilities['apple_pay'] = $chargeCurrencies;
-        }
-
-        return $capabilities;
     }
 }

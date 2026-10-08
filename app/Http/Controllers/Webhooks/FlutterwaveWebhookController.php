@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Webhooks;
 
+use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\InvalidWebhookException;
 use App\Domain\Payment\Services\FlutterwaveService;
 use App\Domain\Wallet\Jobs\ProcessFundingWebhookJob;
@@ -96,7 +97,19 @@ class FlutterwaveWebhookController extends Controller
 
             if ($att && ($att->payable_type === Order::class || ! empty($att->order_id))) {
                 $att->webhook_payload = $payload;
-                $att->gateway_reference = $data['id'] ?? ($payload['id'] ?? $att->gateway_reference);
+
+                // Only a successful charge's id is worth keeping, and never
+                // over an attempt already paid: one popup can see card A
+                // declined and card B pay under the same reference, and the
+                // declined id arriving last made every later lookup read
+                // "failed" and strand card B's money.
+                $status = strtolower((string) ($data['status'] ?? ($payload['status'] ?? '')));
+                $chargeId = $data['id'] ?? ($payload['id'] ?? null);
+
+                if ($chargeId !== null && $status === 'successful' && $att->payment_status !== PaymentStatus::Paid) {
+                    $att->gateway_reference = $chargeId;
+                }
+
                 $att->save();
             }
 

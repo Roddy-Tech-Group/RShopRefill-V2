@@ -4,11 +4,14 @@ namespace Tests\Feature\Payment;
 
 use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Order\Services\GatewayRefundService;
+use App\Domain\Order\Services\OrderService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Wallet\Services\WalletService;
 use App\Models\Category;
+use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentAttempt;
@@ -223,6 +226,89 @@ class GatewayRefundOnFailureTest extends TestCase
             ->first();
         $this->assertNotNull($tx);
         $this->assertEqualsWithDelta(6510.00, (float) $tx->amount, 0.01);
+    }
+
+    /**
+     * An order paid in a currency no wallet is held in (XOF, KES, UGX, RWF, or
+     * any card-only currency) is refunded at its value, never its face figure:
+     * 5,000 XOF is about $8, not $5,000. The value is taken at the rate frozen
+     * when the customer paid, not today's.
+     */
+    public function test_a_currency_with_no_wallet_of_its_own_is_refunded_at_its_value_not_its_figure(): void
+    {
+        Event::fake([RefundIssued::class]);
+        CurrencyRate::create(['code' => 'XOF', 'name' => 'CFA Franc BCEAO', 'type' => 'fiat', 'rate_per_usd' => 600.0, 'is_active' => true]);
+        $item = $this->failedMomoOrder(5000.00, 'XOF');
+        $item->order->paymentAttempts()->update(['exchange_rate_snapshot' => 625.0]);
+
+        app(GatewayRefundService::class)->refundFailedItemToWallet($item);
+
+        $credited = WalletTransaction::where('user_id', $item->order->user_id)
+            ->where('transaction_category', TransactionCategory::Refund)
+            ->sole();
+        $usd = app(WalletService::class)->getOrCreateWallet($item->order->user, Currency::USD);
+
+        $this->assertSame('USD', $credited->currency->value);
+        $this->assertEqualsWithDelta(8.00, (float) $credited->amount, 0.001, '5,000 XOF at the frozen 625 per dollar');
+        $this->assertEqualsWithDelta(8.00, (float) $usd->fresh()->balance, 0.001);
+
+        // The order's refund ledger stays in the order's own currency, so the
+        // admin refund cap still adds up against the 5,000 XOF charged.
+        $this->assertEqualsWithDelta(5000.00, app(OrderService::class)->refundedTotalFor($item->order->fresh()), 0.001);
+
+        Event::assertDispatched(RefundIssued::class, fn (RefundIssued $event) => $event->amount === 5000.0
+            && str_contains($event->reason, 'as USD 8.00'));
+    }
+
+    /** An attempt that never recorded a rate (the column default, 1) is valued at today's rate. */
+    public function test_an_attempt_without_a_frozen_rate_is_valued_at_todays_rate(): void
+    {
+        CurrencyRate::create(['code' => 'KES', 'name' => 'Kenyan Shilling', 'type' => 'fiat', 'rate_per_usd' => 125.0, 'is_active' => true]);
+        $item = $this->failedMomoOrder(1250.00, 'KES');
+        $item->order->paymentAttempts()->update(['exchange_rate_snapshot' => 1.0]);
+
+        app(GatewayRefundService::class)->refundFailedItemToWallet($item);
+
+        $usd = app(WalletService::class)->getOrCreateWallet($item->order->user, Currency::USD);
+        $this->assertEqualsWithDelta(10.00, (float) $usd->fresh()->balance, 0.001);
+    }
+
+    /** No rate anywhere: nothing is guessed, nothing moves, and a person is told. */
+    public function test_a_refund_that_cannot_be_valued_moves_nothing_and_alerts(): void
+    {
+        $alerts = [];
+        $this->mock(OperationalAlerter::class, function ($mock) use (&$alerts): void {
+            $mock->shouldReceive('send')->andReturnUsing(function (...$args) use (&$alerts): bool {
+                $alerts[] = $args;
+
+                return true;
+            });
+        });
+
+        $item = $this->failedMomoOrder(4000.00, 'UGX');
+        $item->order->paymentAttempts()->update(['exchange_rate_snapshot' => 1.0]);
+
+        app(GatewayRefundService::class)->refundFailedItemToWallet($item);
+
+        $this->assertSame(0, WalletTransaction::where('user_id', $item->order->user_id)->count());
+        $this->assertEqualsWithDelta(0.0, app(OrderService::class)->refundedTotalFor($item->order->fresh()), 0.001);
+        $this->assertCount(1, $alerts);
+        $this->assertSame("gateway-refund-unvalued:{$item->id}", $alerts[0][1]);
+    }
+
+    /** A replayed refund of a converted item still moves money only once. */
+    public function test_a_converted_refund_is_idempotent_across_retries(): void
+    {
+        CurrencyRate::create(['code' => 'RWF', 'name' => 'Rwandan Franc', 'type' => 'fiat', 'rate_per_usd' => 1400.0, 'is_active' => true]);
+        $item = $this->failedMomoOrder(14000.00, 'RWF');
+        $item->order->paymentAttempts()->update(['exchange_rate_snapshot' => 1400.0]);
+
+        app(GatewayRefundService::class)->refundFailedItemToWallet($item);
+        app(GatewayRefundService::class)->refundFailedItemToWallet($item->fresh());
+
+        $usd = app(WalletService::class)->getOrCreateWallet($item->order->user, Currency::USD);
+        $this->assertEqualsWithDelta(10.00, (float) $usd->fresh()->balance, 0.001);
+        $this->assertSame(1, WalletTransaction::where('user_id', $item->order->user_id)->count());
     }
 
     public function test_an_automatic_refund_tells_the_customer_exactly_once(): void

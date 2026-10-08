@@ -5,6 +5,7 @@ namespace Tests\Feature\Payment;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\FundingMethodCatalog;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
@@ -342,7 +343,7 @@ class MobileMoneyRailTest extends TestCase
         $this->fakePushRail();
 
         $order = $this->checkout('USD');
-        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'MTN'])->assertOk();
+        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'Orange'])->assertOk();
 
         $request = $this->sentCharge();
         $this->assertSame('XOF', $request['currency']);
@@ -440,7 +441,7 @@ class MobileMoneyRailTest extends TestCase
     public function test_a_dollar_customer_is_offered_mtn_and_orange_on_every_surface(): void
     {
         $sheet = collect(FundingMethodCatalog::forCurrency('USD'))->firstWhere('type', 'mobile_money');
-        $this->assertSame(['MTN', 'Orange'], $sheet['supported_networks']);
+        $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave', 'Mobicash'], $sheet['supported_networks']);
         $this->assertSame('MTN Mobile Money or Orange Money', $sheet['description']);
 
         // The order page reads the session's own list, which used to name
@@ -448,7 +449,7 @@ class MobileMoneyRailTest extends TestCase
         $onOrderPage = fn (string $currency) => collect((new PaymentSession(['session_type' => 'card', 'currency' => $currency]))->getAvailableMethods())
             ->firstWhere('type', 'mobile_money');
 
-        $this->assertSame(['MTN', 'Orange'], $onOrderPage('USD')['supported_networks']);
+        $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave', 'Mobicash'], $onOrderPage('USD')['supported_networks']);
         $this->assertSame([], $onOrderPage('KES')['supported_networks'], 'M-Pesa takes the number alone');
         $this->assertNull($onOrderPage('EUR'), 'no rail, no tile');
     }
@@ -484,5 +485,80 @@ class MobileMoneyRailTest extends TestCase
         $this->pay($order, ['phone_number' => '+237 67', 'network' => 'MTN'])->assertStatus(422);
 
         Http::assertNothingSent();
+    }
+    // -------------------------------------------- coverage per country and network
+
+    /** Côte d'Ivoire has Moov and Wave on Flutterwave's rail; both were missing from the picker. */
+    public function test_an_ivorian_number_can_pay_with_wave(): void
+    {
+        $this->fakePushRail();
+
+        $this->assertContains('Wave', MobileMoneyRail::networkOptions('XOF'));
+        $this->assertContains('Moov', MobileMoneyRail::networkOptions('XOF'));
+
+        $order = $this->checkout('USD');
+        $this->pay($order, ['phone_number' => '+225 07 00 00 00 00', 'network' => 'Wave'])->assertOk();
+
+        $request = $this->sentCharge();
+        $this->assertSame('CI', $request['country']);
+        $this->assertSame('WAVE', $request['network']);
+    }
+
+    /** Senegal has Orange and Wave, no MTN: the pay step says so instead of charging. */
+    public function test_a_network_the_customers_country_does_not_have_is_refused_by_name(): void
+    {
+        $order = $this->checkout('USD');
+
+        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'MTN'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'MTN is not available in Senegal. Choose Orange or Wave.');
+
+        Http::assertNothingSent();
+    }
+
+    /** No gateway serves Mali's mobile money: the customer is told, and pointed to card. */
+    public function test_a_country_no_gateway_serves_is_refused_before_the_gateway(): void
+    {
+        $order = $this->checkout('USD');
+
+        $this->pay($order, ['phone_number' => '+223 70 00 00 00', 'network' => 'Orange'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Mobile money is not available in Mali yet. Please pay by card instead.');
+
+        Http::assertNothingSent();
+        $this->assertSame('awaiting_method', $order->paymentAttempts->first()->paymentSession->fresh()->status);
+    }
+
+    /**
+     * Switching Kora on widens what Kenya is offered, with no deploy: Airtel
+     * and Equitel appear and route to Kora, while M-Pesa stays on Flutterwave.
+     */
+    public function test_switching_kora_on_adds_its_kenyan_networks_and_routes_them_to_it(): void
+    {
+        $this->assertSame([], MobileMoneyRail::networkOptions('KES'), 'M-Pesa alone: nothing to choose');
+        $this->assertSame('flutterwave', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'M-Pesa'));
+        $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Airtel'));
+
+        SiteSetting::put('features.gateway_korapay_enabled', 'on', 'features');
+
+        $this->assertSame(['M-Pesa', 'Airtel', 'Equitel'], MobileMoneyRail::networkOptions('KES'));
+        $this->assertSame('flutterwave', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'M-Pesa'), 'Flutterwave stays first where it can');
+        $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Airtel'));
+        $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Equitel'));
+    }
+
+    /** Paystack is a Nigerian merchant account: it never takes mobile money, whatever is switched on. */
+    public function test_paystack_is_never_a_mobile_money_candidate(): void
+    {
+        SiteSetting::put('features.gateway_flutterwave_enabled', 'off', 'features');
+        SiteSetting::put('features.gateway_korapay_enabled', 'off', 'features');
+        SiteSetting::put('features.gateway_paystack_enabled', 'on', 'features');
+
+        foreach (['GHS', 'KES', 'XOF', 'XAF'] as $currency) {
+            $this->assertFalse(FiatGatewayRouter::supports('paystack', 'mobile_money', $currency));
+            $this->assertNull(FiatGatewayRouter::resolve('mobile_money', $currency));
+        }
+
+        $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
     }
 }
