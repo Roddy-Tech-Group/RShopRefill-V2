@@ -167,6 +167,16 @@ class PaymentSwitchboardTest extends TestCase
         $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'EGP'));
     }
 
+    /** With Flutterwave off, a dollar mobile money order greys out rather than reaching a gateway that cannot convert it. */
+    public function test_usd_mobile_money_never_falls_through_to_kora(): void
+    {
+        $this->gateway('flutterwave', false);
+        $this->gateway('korapay', true);
+
+        $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'USD'));
+        $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'XAF'), 'francs priced as francs still go to Kora');
+    }
+
     public function test_apple_pay_stays_withheld_with_its_reason(): void
     {
         $this->assertSame('Not enabled', SupportedPaymentMethods::withheld()['apple_pay']);

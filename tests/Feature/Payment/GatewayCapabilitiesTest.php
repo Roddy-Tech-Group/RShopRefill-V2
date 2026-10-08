@@ -37,6 +37,15 @@ class GatewayCapabilitiesTest extends TestCase
         $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave'], $coverage['CI']);
     }
 
+    /** Only Flutterwave converts a dollar order into francs; Kora would be sent USD and refuse it. */
+    public function test_no_gateway_but_flutterwave_takes_usd_mobile_money(): void
+    {
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'USD', 'CM', 'MTN'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'mobile_money', 'USD'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'mobile_money', 'USD'));
+        $this->assertSame([], GatewayCapabilities::mobileMoneyCoverage('korapay', 'USD'));
+    }
+
     public function test_kora_takes_ngn_bank_methods_and_mobile_money_in_six_markets(): void
     {
         $this->assertTrue(GatewayCapabilities::supports('korapay', 'card', 'NGN'));

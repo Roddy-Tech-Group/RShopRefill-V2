@@ -98,13 +98,15 @@ final class GatewayCapabilities
     ];
 
     /**
-     * A USD mobile money order is charged in CFA francs on the francophone
-     * rail, so its coverage is the franc countries' coverage.
+     * A USD mobile money order is charged in CFA francs on Flutterwave's
+     * francophone rail, so there its coverage is the franc countries'. Only
+     * Flutterwave converts: every other gateway is sent the order's own
+     * currency, and none of them collects dollars by mobile money.
      *
-     * @var array<string, list<string>>
+     * @var array<string, array<string, list<string>>>
      */
     private const CHARGED_AS = [
-        'USD' => ['XAF', 'XOF'],
+        'flutterwave' => ['USD' => ['XAF', 'XOF']],
     ];
 
     /** @var array<string, string> */
@@ -164,7 +166,7 @@ final class GatewayCapabilities
         $table = self::MOBILE_MONEY[$gateway] ?? [];
         $coverage = [];
 
-        foreach (self::CHARGED_AS[$currency] ?? [$currency] as $charged) {
+        foreach (self::CHARGED_AS[$gateway][$currency] ?? [$currency] as $charged) {
             foreach ($table[$charged] ?? [] as $country => $networks) {
                 $coverage[$country] = array_values(array_unique([...($coverage[$country] ?? []), ...$networks]));
             }
