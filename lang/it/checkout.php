@@ -119,6 +119,7 @@ return [
     'momo_network_label' => 'Operatore',
     'momo_number_label' => 'Numero di denaro mobile',
     'momo_phone_placeholder' => 'Numero di telefono',
+    'currency_note' => 'Puoi selezionare la valuta preferita nelle Preferenze.',
     'momo_charge_hint' => 'Sul tuo conto di denaro mobile verranno addebitati circa :amount, il totale convertito al tasso di oggi.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'Abbiamo inviato una richiesta di pagamento di :amount al :phone. Approvala sul tuo telefono per completare il pagamento.',

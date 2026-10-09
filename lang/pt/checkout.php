@@ -119,6 +119,7 @@ return [
     'momo_network_label' => 'Operadora',
     'momo_number_label' => 'Número do dinheiro móvel',
     'momo_phone_placeholder' => 'Número de telefone',
+    'currency_note' => 'Pode selecionar a sua moeda preferida nas Preferências.',
     'momo_charge_hint' => 'A sua conta de dinheiro móvel será debitada em cerca de :amount, o total convertido à taxa de hoje.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'Enviámos um pedido de pagamento de :amount para :phone. Aprove-o no seu telemóvel para concluir este pagamento.',

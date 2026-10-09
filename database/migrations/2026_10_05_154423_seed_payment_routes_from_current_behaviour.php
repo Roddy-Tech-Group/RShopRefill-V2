@@ -70,7 +70,7 @@ return new class extends Migration
 
     /**
      * Currency => methods listed but switched off until a real payment proves
-     * them, with the note the Routing tab shows.
+     * them.
      *
      * @var array<string, list<string>>
      */
@@ -78,8 +78,6 @@ return new class extends Migration
         'EGP' => ['mobile_money'],
         'TZS' => ['mobile_money'],
     ];
-
-    private const OFF_UNTIL_TESTED_NOTE = 'Not live yet: switch on after one real test payment succeeds';
 
     public function up(): void
     {
@@ -94,8 +92,7 @@ return new class extends Migration
                     'is_offered' => ! isset(self::WITHHELD[$method]) && ! in_array($method, self::OFF_UNTIL_TESTED[$currency] ?? [], true),
                     'sort_order' => ($position + 1) * 10,
                     'gateways' => json_encode(self::GATEWAYS[$method]),
-                    'note' => self::WITHHELD[$method]
-                        ?? (in_array($method, self::OFF_UNTIL_TESTED[$currency] ?? [], true) ? self::OFF_UNTIL_TESTED_NOTE : null),
+                    'note' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];

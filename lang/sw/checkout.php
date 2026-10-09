@@ -117,6 +117,7 @@ return [
     'momo_network_label' => 'Mtandao',
     'momo_number_label' => 'Namba ya pesa kwa simu',
     'momo_phone_placeholder' => 'Namba ya simu',
+    'currency_note' => 'Unaweza kuchagua sarafu unayopendelea katika Mapendeleo.',
     'momo_charge_hint' => 'Akaunti yako ya pesa kwa simu itatozwa takriban :amount, jumla iliyobadilishwa kwa kiwango cha leo.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'Tumetuma ombi la malipo la :amount kwa :phone. Idhinisha kwenye simu yako ili kukamilisha malipo haya.',

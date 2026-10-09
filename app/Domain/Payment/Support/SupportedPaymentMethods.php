@@ -62,8 +62,6 @@ final class SupportedPaymentMethods
         'TZS' => ['mobile_money'],
     ];
 
-    public const OFF_UNTIL_TESTED_NOTE = 'Not live yet: switch on after one real test payment succeeds';
-
     /**
      * Currencies with no row of their own only get the card, which every
      * fiat gateway can take.
@@ -127,7 +125,8 @@ final class SupportedPaymentMethods
 
         foreach (PaymentRouteTable::all() as $rows) {
             foreach ($rows as $row) {
-                $listed[$row['method']] ??= (string) ($row['note'] ?? '');
+                // The admin's own note when there is one, else the standing reason.
+                $listed[$row['method']] ??= (string) ($row['note'] ?? self::DEFAULT_WITHHELD[$row['method']] ?? '');
 
                 if ($row['offered']) {
                     $offered[$row['method']] = true;

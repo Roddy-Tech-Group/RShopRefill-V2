@@ -224,47 +224,45 @@ final class GatewayCapabilities
     }
 
     /**
-     * What this gateway can take, in a sentence for the admin screens, read
-     * off the table so the screen can never say more than the router does.
+     * What this gateway can take, structured for the admin screen: every
+     * method with the currencies it serves, then every mobile money market
+     * with its networks. Read off the table the router uses, so the screen
+     * can never say more than the router does.
+     *
+     * @return array{methods: list<array{key: string, label: string, where: string}>, mobile_money: list<array{country: string, currency: string, networks: list<string>}>}
      */
-    public static function summary(string $gateway): string
+    public static function coverage(string $gateway): array
     {
-        $parts = [];
         $methods = self::METHODS[$gateway] ?? [];
         $labels = [
-            'card' => 'cards', 'apple_pay' => 'Apple Pay', 'bank_transfer' => 'bank transfer',
-            'pay_with_bank' => 'pay with bank', 'ussd' => 'USSD', 'bank_qr' => 'bank QR', 'mobile_wallet' => 'mobile wallets',
+            'card' => 'Cards', 'apple_pay' => 'Apple Pay', 'bank_transfer' => 'Bank transfer',
+            'pay_with_bank' => 'Pay with bank', 'ussd' => 'USSD', 'bank_qr' => 'Bank QR', 'mobile_wallet' => 'Mobile wallets',
         ];
 
         if ($gateway === 'paystack') {
             $methods = ['card' => null, 'apple_pay' => null] + $methods;
         }
 
-        $byCurrency = [];
+        $list = [];
 
-        foreach ($methods as $method => $currencies) {
+        foreach (array_keys($methods) as $method) {
             $currencies = self::methodCurrencies($gateway, $method);
-            $key = $currencies === self::ANY ? 'every currency we price in' : implode(', ', (array) $currencies);
-            $byCurrency[$key][] = $labels[$method] ?? $method;
-        }
-
-        foreach ($byCurrency as $where => $what) {
-            $parts[] = ucfirst(implode(', ', $what)).' in '.$where;
+            $list[] = [
+                'key' => $method,
+                'label' => $labels[$method] ?? $method,
+                'where' => $currencies === self::ANY ? 'Every currency we price in' : implode(', ', (array) $currencies),
+            ];
         }
 
         $markets = [];
 
         foreach (self::MOBILE_MONEY[$gateway] ?? [] as $currency => $countries) {
             foreach ($countries as $country => $networks) {
-                $markets[] = self::countryName($country).($networks === [] ? '' : ' ('.implode(', ', $networks).')');
+                $markets[] = ['country' => self::countryName($country), 'currency' => $currency, 'networks' => $networks];
             }
         }
 
-        if ($markets !== []) {
-            $parts[] = 'mobile money in '.implode(', ', $markets);
-        }
-
-        return $parts === [] ? 'Nothing yet' : implode('; ', $parts).'.';
+        return ['methods' => $list, 'mobile_money' => $markets];
     }
 
     /**

@@ -141,15 +141,16 @@ class PaymentSwitchboardTest extends TestCase
 
     /**
      * Egypt and Tanzania mobile money exist as rows so they can be managed,
-     * but stay off, with the reason, until a real payment proves them.
+     * but stay off until a real payment proves them. No canned note: the
+     * Routing tab shows the state, not prose.
      */
-    public function test_untested_markets_are_listed_switched_off_with_the_reason(): void
+    public function test_untested_markets_are_listed_switched_off(): void
     {
         foreach (['EGP', 'TZS'] as $currency) {
             $row = PaymentRoute::where('currency', $currency)->where('method', 'mobile_money')->sole();
 
             $this->assertFalse($row->is_offered, "{$currency} mobile money must start switched off");
-            $this->assertSame(SupportedPaymentMethods::OFF_UNTIL_TESTED_NOTE, $row->note);
+            $this->assertNull($row->note, "{$currency} carries no canned note");
             $this->assertSame(['card'], SupportedPaymentMethods::forCurrency($currency));
             $this->assertSame('flutterwave', FiatGatewayRouter::resolve('card', $currency));
         }

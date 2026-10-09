@@ -572,6 +572,97 @@ class MobileMoneyRailTest extends TestCase
         $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
     }
 
+    /** The country picked beside the number decides the code; a number carrying its own code is left alone. */
+    public function test_the_country_chip_decides_the_dialling_code(): void
+    {
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XOF', '77 000 0000', 'SN'));
+        $this->assertSame('2250700000000', MobileMoneyRail::internationalNumber('XOF', '0700000000', 'CI'), "Côte d'Ivoire keeps its leading zero");
+        $this->assertSame('233244000000', MobileMoneyRail::internationalNumber('GHS', '0244000000', 'GH'), 'Ghana drops its trunk zero');
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XAF', '+221 77 000 0000', 'CM'), 'a full number wins over the chip');
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '670000000', 'ZZ'), 'an unknown country falls back to the home country');
+    }
+
+    /** The chip offers the countries the live gateways serve, home country first. */
+    public function test_the_number_field_shows_the_dialling_codes_the_live_gateways_serve(): void
+    {
+        $dials = MobileMoneyRail::dialCodesByCurrency();
+
+        $this->assertSame([['country' => 'CM', 'name' => 'Cameroon', 'dial' => '237']], $dials['XAF']);
+        $this->assertSame([['country' => 'GH', 'name' => 'Ghana', 'dial' => '233']], $dials['GHS']);
+        $this->assertSame('CI', $dials['XOF'][0]['country'], 'the home country leads');
+        $this->assertSame(['BF', 'CI', 'SN'], collect($dials['XOF'])->pluck('country')->sort()->values()->all());
+        $this->assertSame('221', collect($dials['XOF'])->firstWhere('country', 'SN')['dial']);
+    }
+
+    /** The chips follow the country: Senegal offers Orange and Wave, Burkina Faso only Mobicash. */
+    public function test_coverage_is_offered_per_country_for_the_chips(): void
+    {
+        $coverage = MobileMoneyRail::coverageByCurrency();
+
+        $this->assertSame(['MTN', 'Orange'], $coverage['XAF']['CM']);
+        $this->assertSame(['Orange', 'Wave'], $coverage['XOF']['SN']);
+        $this->assertSame(['Mobicash'], $coverage['XOF']['BF']);
+        $this->assertArrayHasKey('CM', $coverage['USD'], 'a dollar order can be paid from Cameroon');
+        $this->assertArrayHasKey('SN', $coverage['USD'], 'or from Senegal');
+    }
+
+    /** Burkina Faso has one network, so the page sends none and the only one is used. */
+    public function test_a_single_network_country_needs_no_network_chosen(): void
+    {
+        Http::fake([
+            'api.flutterwave.com/v3/charges*' => Http::response([
+                'status' => 'success',
+                'message' => 'Charge initiated',
+                'data' => ['status' => 'pending'],
+                'meta' => ['authorization' => ['mode' => 'callback']],
+            ]),
+        ]);
+
+        $order = $this->checkout('XOF');
+        $response = $this->pay($order, ['phone_number' => '70 00 00 00', 'network' => '', 'country' => 'BF']);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $response->json('data.status'));
+
+        $request = $this->sentCharge();
+        $this->assertSame('22670000000', $request['phone_number']);
+        $this->assertSame('BF', $request['country']);
+        $this->assertSame('MOBICASH', $request['network']);
+    }
+
+    /** A Senegalese customer on an XOF order is charged on a 221 number in Senegal. */
+    public function test_a_senegalese_number_picked_on_the_chip_is_charged_in_senegal(): void
+    {
+        Http::fake([
+            'api.flutterwave.com/v3/charges*' => Http::response([
+                'status' => 'success',
+                'message' => 'Charge initiated',
+                'data' => ['status' => 'pending'],
+                'meta' => ['authorization' => ['mode' => 'callback']],
+            ]),
+        ]);
+
+        $order = $this->checkout('XOF');
+        $response = $this->pay($order, ['phone_number' => '77 000 0000', 'network' => 'Orange', 'country' => 'SN']);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $response->json('data.status'));
+        $this->assertSame('SN', $response->json('data.payment_payload.mobile_money.country'));
+
+        $request = $this->sentCharge();
+        $this->assertSame('221770000000', $request['phone_number']);
+        $this->assertSame('SN', $request['country']);
+    }
+
+    /** A country the live gateways do not serve is ignored, never dialled. */
+    public function test_a_chip_country_outside_coverage_is_ignored(): void
+    {
+        $this->assertSame(
+            '237670000000',
+            MobileMoneyRail::internationalNumber('XAF', '670000000', array_key_exists('ZA', MobileMoneyRail::coverageOffered('XAF')) ? 'ZA' : null),
+        );
+    }
+
     /** Gateways that want the number international get it with the right dialling code. */
     public function test_a_number_is_made_international_for_its_market(): void
     {

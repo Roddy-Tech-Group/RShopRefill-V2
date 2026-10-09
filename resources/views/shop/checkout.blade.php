@@ -43,7 +43,11 @@
     // Mobile-money networks per currency, from the same map the charge reads,
     // so the picker follows the live checkout currency and never offers a
     // network the market's rail will refuse.
-    $momoNetworksByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::networksByCurrency();
+    $momoCoverageByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::coverageByCurrency();
+
+    // The dialling code shown beside the number, per currency: one chip for
+    // a single-country market, a short picker where the franc serves several.
+    $momoDialByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::dialCodesByCurrency();
 
     // Currencies whose mobile-money charge is taken in another currency (USD
     // rides the Francophone rail in CFA francs), with the rate the total is
@@ -475,6 +479,10 @@
 
                     <div class="mt-5">
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.payment_method') }}</h3>
+                        {{-- Plain awareness, whatever method is picked: the currency the
+                             customer pays in is chosen in Preferences (the header on desktop,
+                             the menu on a phone), not here. --}}
+                        <p class="mt-1 text-[13px] text-zinc-600 dark:text-zinc-400">{{ __('checkout.currency_note') }}</p>
                     </div>
 
                     {{-- Gateway outage notice. Server-rendered from the same
@@ -646,10 +654,18 @@
                         x-collapse
                         x-cloak
                         x-data="{
-                            networksByCurrency: @js($momoNetworksByCurrency),
+                            coverageByCurrency: @js($momoCoverageByCurrency),
+                            dialsByCurrency: @js($momoDialByCurrency),
                             chargeByCurrency: @js($momoChargeByCurrency),
+                            get momoDials() { return this.dialsByCurrency[this.$store.cart.currency] ?? []; },
                             networkIcons: { MTN: '/assets/mtn.svg', Orange: '/assets/orange.svg' },
-                            get momoNetworks() { return this.networksByCurrency[this.$store.cart.currency] ?? []; },
+                            // The networks of the country picked beside the number. A
+                            // country with one network still shows it, preselected, so
+                            // the customer can see what will be charged; only a rail that
+                            // takes the number alone (Rwanda) shows nothing.
+                            get momoNetworks() {
+                                return this.coverageByCurrency[this.$store.cart.currency]?.[this.momoCountry] ?? [];
+                            },
                             networkIcon(network) { return this.networkIcons[network] ?? null; },
                             // The rail currency and rate when the charge is not in the
                             // page's own currency; null wherever it is.
@@ -701,9 +717,57 @@
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <div x-init="momoCountry = momoDials[0]?.country ?? ''; $watch('momoDials', list => momoCountry = list[0]?.country ?? '')">
                             <label for="momo_phone" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_number_label') }}</label>
-                            <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ $fieldClass }}">
+                            <div class="mt-1.5 flex items-stretch gap-2">
+                                {{-- The dialling code, so nobody wonders whether to type the 237.
+                                     One country for this currency: a plain pill. Several (the
+                                     franc zones): a dropdown. The network chips follow the
+                                     country picked. --}}
+                                <span x-show="momoDials.length === 1" x-text="'+' + (momoDials[0]?.dial ?? '')" class="inline-flex h-11 shrink-0 items-center rounded-full border-2 border-zinc-200 bg-zinc-50 px-3.5 text-sm font-semibold tabular-nums text-zinc-700 dark:border-white/15 dark:bg-white/5 dark:text-zinc-200"></span>
+                                <div x-show="momoDials.length > 1" x-cloak x-data="{ open: false }" @click.away="open = false" @keydown.escape.prevent="open = false" class="relative shrink-0">
+                                    <button
+                                        type="button"
+                                        @click="open = ! open"
+                                        :aria-expanded="open.toString()"
+                                        aria-haspopup="listbox"
+                                        aria-label="{{ __('checkout.momo_number_label') }}"
+                                        class="flex h-11 items-center gap-1.5 rounded-full border-2 border-zinc-200 bg-zinc-50 pl-3.5 pr-2.5 text-sm font-semibold tabular-nums text-zinc-700 transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-edge dark:border-white/15 dark:bg-white/5 dark:text-zinc-200 dark:hover:border-white/25"
+                                    >
+                                        <span x-text="'+' + (momoDials.find(d => d.country === momoCountry)?.dial ?? momoDials[0]?.dial ?? '')"></span>
+                                        <svg class="h-4 w-4 text-zinc-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                    </button>
+                                    <ul
+                                        x-show="open"
+                                        x-cloak
+                                        x-transition.origin.top.left
+                                        role="listbox"
+                                        aria-label="{{ __('checkout.momo_number_label') }}"
+                                        @keydown.arrow-down.prevent="$focus.wrap().next()"
+                                        @keydown.arrow-up.prevent="$focus.wrap().previous()"
+                                        class="absolute left-0 top-full z-30 mt-1.5 min-w-[7.5rem] rounded-2xl border border-zinc-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#0c1a36]"
+                                    >
+                                        <template x-for="d in momoDials" :key="d.country">
+                                            <li
+                                                role="option"
+                                                tabindex="0"
+                                                :aria-selected="(d.country === momoCountry).toString()"
+                                                @click="momoCountry = d.country; open = false"
+                                                @keydown.enter.prevent="momoCountry = d.country; open = false"
+                                                @keydown.space.prevent="momoCountry = d.country; open = false"
+                                                :class="d.country === momoCountry
+                                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+                                                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"
+                                                class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                            >
+                                                <span x-text="'+' + d.dial"></span>
+                                                <svg x-show="d.country === momoCountry" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                                <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" x-model="momoPhone" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ str_replace('mt-1.5 ', 'min-w-0 flex-1 ', $fieldClass) }}">
+                            </div>
                         </div>
                         {{-- The rail takes CFA francs, not dollars: a USD order is
                              converted at charge time. Said here, beside the number
@@ -1534,6 +1598,10 @@
             return {
                 method: 'card',
                 crypto: '',
+                // The mobile money number as typed, and the country whose
+                // dialling code sits beside it; the button waits for the number.
+                momoPhone: '',
+                momoCountry: '',
                 submitting: false,
                 cryptoRates: cryptoRates || {},
                 walletBalances: walletBalances || {},
@@ -2287,6 +2355,10 @@
                     if (this.method === 'wallet') {
                         return this.hasSufficientWalletBalance();
                     }
+                    if (this.method === 'mobile_money') {
+                        // No number, no button: the shortest real number is 8 digits.
+                        return this.momoPhone.replace(/\D/g, '').length >= 8;
+                    }
                     return true;
                 },
 
@@ -2477,11 +2549,12 @@
                             // Empty for rails that take no network (M-Pesa, Rwanda); the
                             // server validates against the market's rail, never a default.
                             const networkInput = document.querySelector('input[name="momo_network"]')?.value || '';
-                            const phoneInput = document.getElementById('momo_phone')?.value || '';
+                            const phoneInput = this.momoPhone || document.getElementById('momo_phone')?.value || '';
 
                             this.momoDetails = {
                                 phone_number: phoneInput,
-                                network: networkInput
+                                network: networkInput,
+                                country: this.momoCountry || ''
                             };
 
                             this.paymentState = 'processing';

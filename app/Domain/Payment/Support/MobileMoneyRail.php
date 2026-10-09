@@ -306,7 +306,7 @@ final class MobileMoneyRail
      * Cameroon becomes "237670000000"; a number already carrying a known code
      * is left alone.
      */
-    public static function internationalNumber(string $currency, string $phoneNumber): string
+    public static function internationalNumber(string $currency, string $phoneNumber, ?string $country = null): string
     {
         $digits = self::normalisePhone($phoneNumber);
 
@@ -316,7 +316,12 @@ final class MobileMoneyRail
             }
         }
 
-        $home = self::homeCountry($currency);
+        // The country the customer picked beside the number wins over the
+        // currency's home country: a Senegalese number on an XOF order is
+        // dialled as 221, not 225.
+        $home = $country !== null && isset(self::DIAL_CODES[strtoupper($country)])
+            ? strtoupper($country)
+            : self::homeCountry($currency);
         $code = $home !== null ? (self::DIAL_CODES[$home] ?? '') : '';
 
         // Only markets with a trunk zero drop it (0244 in Ghana becomes 233 244);
@@ -398,17 +403,49 @@ final class MobileMoneyRail
     }
 
     /**
-     * Every currency's network labels, for a picker that follows the
-     * checkout's live currency client-side.
+     * Country => network labels offered per currency, for the network chips
+     * to follow the country picked beside the number.
      *
-     * @return array<string, list<string>>
+     * @return array<string, array<string, list<string>>>
      */
-    public static function networksByCurrency(): array
+    public static function coverageByCurrency(): array
     {
         $map = [];
 
         foreach (array_keys(self::RAILS) as $currency) {
-            $map[$currency] = self::networkOptions($currency);
+            $map[$currency] = self::coverageOffered($currency);
+        }
+
+        return $map;
+    }
+
+    /**
+     * The dialling codes the number field shows for each currency: the
+     * countries the switched-on gateways serve right now, home country first,
+     * or the home country alone when nothing is live, so the chip still
+     * reads right while the method is being refused.
+     *
+     * @return array<string, list<array{country: string, name: string, dial: string}>>
+     */
+    public static function dialCodesByCurrency(): array
+    {
+        $map = [];
+
+        foreach (array_keys(self::RAILS) as $currency) {
+            $home = self::homeCountry($currency);
+            $countries = array_keys(self::coverageOffered($currency));
+
+            if ($countries === [] && $home !== null) {
+                $countries = [$home];
+            }
+
+            usort($countries, fn (string $a, string $b) => ($a === $home ? 0 : 1) <=> ($b === $home ? 0 : 1) ?: strcmp($a, $b));
+
+            $map[$currency] = array_values(array_map(fn (string $country) => [
+                'country' => $country,
+                'name' => GatewayCapabilities::countryName($country),
+                'dial' => self::DIAL_CODES[$country] ?? '',
+            ], array_filter($countries, fn (string $country) => isset(self::DIAL_CODES[$country]))));
         }
 
         return $map;

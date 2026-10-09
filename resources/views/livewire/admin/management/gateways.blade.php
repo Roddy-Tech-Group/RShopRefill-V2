@@ -117,9 +117,6 @@ class extends Component {
         // (GatewayCapabilities), so this screen can never promise more than
         // checkout will route.
         $roles = [
-            'flutterwave' => GatewayCapabilities::summary('flutterwave'),
-            'paystack' => GatewayCapabilities::summary('paystack'),
-            'korapay' => GatewayCapabilities::summary('korapay'),
             'nowpayments' => 'Crypto',
             'wallet' => 'Customer wallet balance',
         ];
@@ -134,6 +131,14 @@ class extends Component {
                 'implemented' => $gateway === 'wallet' || PaymentGatewayFactory::isImplemented($gateway),
                 'keys' => $this->keyMode($gateway),
                 'role' => $roles[$gateway] ?? '',
+                // Cards and bank transfer named on the row; everything else
+                // behind "Show more", in a sheet, so the list stays tidy.
+                'coverage' => $coverage = in_array($gateway, ['flutterwave', 'paystack', 'korapay'], true) ? GatewayCapabilities::coverage($gateway) : null,
+                'teaser' => $coverage === null ? '' : implode(', ', array_slice(array_values(array_unique(array_merge(
+                    array_column(array_filter($coverage['methods'], fn (array $m) => in_array($m['key'], ['card', 'bank_transfer'], true)), 'label'),
+                    array_column($coverage['methods'], 'label'),
+                ))), 0, 2)),
+                'more' => $coverage === null ? 0 : max(0, count($coverage['methods']) - 2) + count($coverage['mobile_money']),
                 'alone_on' => $this->rowsOnlyThisGatewayServes($gateway),
             ];
         }
@@ -302,11 +307,6 @@ class extends Component {
                 'fiat' => $isFiat,
                 'gateways' => $gateways,
                 'taking' => $isFiat ? FiatGatewayRouter::resolve($route->method, $route->currency) : null,
-                // Mobile money: the countries and networks customers can use right
-                // now, the union of what the switched-on gateways on this row take.
-                'coverage' => $route->method === 'mobile_money' && $route->is_offered
-                    ? MobileMoneyRail::coverageOffered($route->currency)
-                    : [],
                 'updated' => $route->updatedBy?->name,
             ];
         }
@@ -655,13 +655,22 @@ class extends Component {
 
     {{-- ───────────────────────────── Gateways ───────────────────────────── --}}
     @if ($tab === 'gateways')
-        <section class="{{ $card }} !p-0 overflow-hidden" data-tab="gateways">
+        <section class="{{ $card }} !p-0 overflow-hidden" data-tab="gateways" x-data="{ coverageOpen: null }" @keydown.escape.window="coverageOpen = null">
             <ul class="divide-y divide-zinc-100 dark:divide-white/5">
                 @foreach ($this->gateways as $gateway)
                     <li class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-6">
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-bold text-zinc-900 dark:text-white">{{ $gateway['label'] }}</p>
-                            <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $gateway['role'] }}</p>
+                            @if ($gateway['coverage'] === null)
+                                <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $gateway['role'] }}</p>
+                            @else
+                                <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                    <span>{{ $gateway['teaser'] }}</span>
+                                    @if ($gateway['more'] > 0)
+                                        <button type="button" @click="coverageOpen = '{{ $gateway['key'] }}'" class="ml-1 font-semibold text-blue-600 hover:underline dark:text-blue-400" data-coverage-for="{{ $gateway['key'] }}">Show more</button>
+                                    @endif
+                                </p>
+                            @endif
                         </div>
                         <span @class([
                             'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold',
@@ -690,6 +699,65 @@ class extends Component {
                     </li>
                 @endforeach
             </ul>
+
+            {{-- Everything a gateway can take, one sheet per gateway, opened from
+                 "Show more" on its row. Same chrome as the confirm modal. --}}
+            @foreach ($this->gateways as $gateway)
+                @continue($gateway['coverage'] === null)
+                <div
+                    x-cloak
+                    x-show="coverageOpen === '{{ $gateway['key'] }}'"
+                    class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="coverage-title-{{ $gateway['key'] }}"
+                    data-coverage-sheet="{{ $gateway['key'] }}"
+                >
+                    <div x-show="coverageOpen === '{{ $gateway['key'] }}'" x-transition.opacity @click="coverageOpen = null" class="absolute inset-0 bg-zinc-900/50 dark:bg-zinc-950/70"></div>
+                    <div
+                        x-show="coverageOpen === '{{ $gateway['key'] }}'"
+                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave-start="opacity-100 scale-100"
+                        x-transition:leave-end="opacity-0 scale-95"
+                        class="relative w-full max-w-lg overflow-hidden rounded-[12px] bg-[#eff6ff] shadow-2xl dark:bg-[#0f1b2e]"
+                    >
+                        <div class="flex items-start justify-between gap-4 px-5 pt-5">
+                            <div>
+                                <h3 id="coverage-title-{{ $gateway['key'] }}" class="text-base font-bold text-zinc-900 dark:text-white">What {{ $gateway['label'] }} can take</h3>
+                            </div>
+                            <button type="button" @click="coverageOpen = null" class="shrink-0 rounded-full p-1.5 text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Close">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="max-h-[70vh] overflow-y-auto px-5 pb-5 pt-4">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Methods</p>
+                            <ul class="mt-2 divide-y divide-zinc-200/70 rounded-[10px] bg-white dark:divide-white/5 dark:bg-white/5">
+                                @foreach ($gateway['coverage']['methods'] as $method)
+                                    <li class="flex items-center justify-between gap-4 px-3.5 py-2.5 text-sm">
+                                        <span class="font-semibold text-zinc-900 dark:text-white">{{ $method['label'] }}</span>
+                                        <span class="text-right text-xs text-zinc-500 dark:text-zinc-400">{{ $method['where'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            @if ($gateway['coverage']['mobile_money'] !== [])
+                                <p class="mt-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Mobile money</p>
+                                <ul class="mt-2 divide-y divide-zinc-200/70 rounded-[10px] bg-white dark:divide-white/5 dark:bg-white/5">
+                                    @foreach ($gateway['coverage']['mobile_money'] as $market)
+                                        <li class="flex items-center justify-between gap-4 px-3.5 py-2.5 text-sm">
+                                            <span class="font-semibold text-zinc-900 dark:text-white">{{ $market['country'] }} <span class="ml-1 text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ $market['currency'] }}</span></span>
+                                            <span class="text-right text-xs text-zinc-500 dark:text-zinc-400">{{ $market['networks'] === [] ? 'Number only' : implode(', ', $market['networks']) }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </section>
     @endif
 
@@ -771,19 +839,6 @@ class extends Component {
                                     </li>
                                 @endforeach
                             </ol>
-                        @endif
-
-                        @if ($route['method'] === 'mobile_money' && $route['offered'])
-                            <p class="pl-8 text-xs text-zinc-500 dark:text-zinc-400">
-                                @if ($route['coverage'] === [])
-                                    No switched-on gateway takes mobile money in {{ $currency }} right now.
-                                @else
-                                    On offer now:
-                                    @foreach ($route['coverage'] as $country => $networks)
-                                        <span class="font-semibold text-zinc-700 dark:text-zinc-200">{{ \App\Domain\Payment\Support\GatewayCapabilities::countryName($country) }}</span>{{ $networks === [] ? '' : ' ('.implode(', ', $networks).')' }}@if (! $loop->last); @endif
-                                    @endforeach
-                                @endif
-                            </p>
                         @endif
 
                         @if (! $route['offered'] || $route['note'])

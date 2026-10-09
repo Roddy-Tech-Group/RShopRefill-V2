@@ -6,7 +6,6 @@ use App\Domain\Admin\Enums\AdminRole;
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Support\FiatGatewayRouter;
-use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Models\Admin;
 use App\Models\PaymentRoute;
 use App\Models\SiteSetting;
@@ -97,25 +96,40 @@ class GatewaySettingsPageTest extends TestCase
             ->assertDontSee('wire:confirm', false);
     }
 
-    /** The descriptions and the markets on offer come from the capability table, not from prose. */
+    /** Each row names cards and bank transfer; the rest sits in a "Show more" sheet built from the capability table. */
     public function test_the_page_describes_each_gateway_from_the_capability_table(): void
     {
         $this->actingAs($this->admin, 'admin')->withoutVite();
 
-        $this->get(route('admin.management.gateways'))
+        $html = $this->get(route('admin.management.gateways'))
             ->assertOk()
-            ->assertSee('mobile money in Cameroon (MTN, Orange)', false)
+            ->assertSee('Cards, Bank transfer', false)
+            ->assertSee('data-coverage-for="flutterwave"', false)
+            ->assertSee('Show more', false)
             ->assertDontSee('GHS/KES/XOF mobile money', false)
-            ->assertSee('Cards, Apple Pay, bank transfer, USSD in NGN', false);
+            ->assertDontSee('mobile money in Cameroon (MTN, Orange)', false)
+            ->getContent();
+
+        $sheet = str($html)->between('data-coverage-sheet="flutterwave"', 'data-coverage-sheet="paystack"')->toString();
+        $this->assertStringContainsString('What Flutterwave can take', $sheet);
+        $this->assertStringContainsString('Every currency we price in', $sheet);
+        $this->assertStringContainsString('Cameroon', $sheet);
+        $this->assertStringContainsString('MTN, Orange', $sheet);
+        $this->assertStringContainsString('Rwanda', $sheet);
+        $this->assertStringContainsString('Number only', $sheet);
+
+        $paystack = str($html)->between('data-coverage-sheet="paystack"', 'data-coverage-sheet="korapay"')->toString();
+        $this->assertStringContainsString('Apple Pay', $paystack);
+        $this->assertStringContainsString('USSD', $paystack);
+        $this->assertStringContainsString('NGN', $paystack);
 
         $this->get(route('admin.management.gateways', ['tab' => 'routing', 'currency' => 'XOF']))
             ->assertOk()
-            ->assertSee('On offer now:', false)
-            ->assertSee('Côte d&#039;Ivoire', false)
-            ->assertSee('(MTN, Orange, Moov, Wave)', false);
+            ->assertDontSee('On offer now:', false)
+            ->assertDontSee('(MTN, Orange, Moov, Wave)', false);
     }
 
-    /** The new markets are on the Routing tab from day one, switched off and saying why. */
+    /** The new markets are on the Routing tab from day one, switched off, with no canned note. */
     public function test_untested_markets_appear_on_the_routing_tab_switched_off(): void
     {
         $this->actingAs($this->admin, 'admin')->withoutVite();
@@ -124,7 +138,7 @@ class GatewaySettingsPageTest extends TestCase
             ->assertOk()
             ->assertSee('EGP')
             ->assertSee('TZS')
-            ->assertSee(SupportedPaymentMethods::OFF_UNTIL_TESTED_NOTE);
+            ->assertDontSee('Not live yet', false);
     }
 
     public function test_an_admin_without_the_management_grant_is_kept_out(): void

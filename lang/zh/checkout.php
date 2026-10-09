@@ -117,6 +117,7 @@ return [
     'momo_network_label' => '运营商',
     'momo_number_label' => '移动货币号码',
     'momo_phone_placeholder' => '手机号码',
+    'currency_note' => '您可以在偏好设置中选择您的首选货币。',
     'momo_charge_hint' => '你的移动货币账户将被扣除约 :amount，即按今日汇率换算的总额。',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => '我们已向 :phone 发送了 :amount 的付款请求。请在手机上批准以完成此次付款。',

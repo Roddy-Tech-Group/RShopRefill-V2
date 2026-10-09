@@ -86,14 +86,16 @@ class ShopSubnavPanelTest extends TestCase
      * deep-linking to the language list alone. The modal keeps accepting a
      * pane for the callers that do want one screen.
      */
-    public function test_the_account_menu_language_row_opens_the_preferences_modal(): void
+    public function test_the_account_menu_preferences_row_opens_the_preferences_modal(): void
     {
         $html = $this->withoutVite()->actingAs(User::factory()->create())->get('/dashboard')->assertOk()->getContent();
         $modal = $this->file('views/components/nav/locale-modal.blade.php');
 
-        $row = strpos($html, '>Language<');
-        $this->assertNotFalse($row, 'the Language row is missing');
+        // Named Preferences, not Language: the sheet it opens holds country, language and currency.
+        $row = strpos($html, '>Preferences<');
+        $this->assertNotFalse($row, 'the Preferences row is missing');
         $rowMarkup = substr($html, strrpos(substr($html, 0, $row), '<button'), $row - strrpos(substr($html, 0, $row), '<button'));
+        $this->assertStringNotContainsString('>Language<', $rowMarkup, 'the row is no longer called Language');
         $this->assertStringContainsString("\$dispatch('open-locale-modal')\"", $rowMarkup);
         $this->assertStringNotContainsString("pane: 'language'", $rowMarkup);
         $this->assertStringContainsString("['country', 'language', 'currency'].includes(\$event.detail.pane)", $modal);

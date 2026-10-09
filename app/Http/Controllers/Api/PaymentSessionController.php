@@ -338,6 +338,7 @@ class PaymentSessionController extends Controller
             $request->validate([
                 'details.phone_number' => 'required|string',
                 'details.network' => 'nullable|string',
+                'details.country' => 'nullable|string|size:2',
             ]);
 
             // A number with no digits in it (letters, punctuation, a pasted
@@ -349,6 +350,25 @@ class PaymentSessionController extends Controller
                 return response()->json([
                     'message' => 'Enter the mobile money phone number, with its country code if it is not a local number.',
                 ], 422);
+            }
+
+            // The country chip beside the number: honoured only when it is a
+            // country the switched-on gateways serve for this currency, so a
+            // crafted value cannot dial a market we do not offer. The number
+            // is made international here, once, and that is what every rail,
+            // refusal message and popup below receives.
+            $chipCountry = strtoupper((string) ($details['country'] ?? ''));
+            $details['phone_number'] = MobileMoneyRail::internationalNumber(
+                $currency,
+                (string) $details['phone_number'],
+                array_key_exists($chipCountry, MobileMoneyRail::coverageOffered($currency)) ? $chipCountry : null,
+            );
+
+            // A country with a single network (Burkina Faso, Mobicash) shows
+            // no chips, so none is sent; the only one there is, is meant.
+            $chipOffered = MobileMoneyRail::coverageOffered($currency)[MobileMoneyRail::countryFor($currency, (string) $details['phone_number']) ?? ''] ?? [];
+            if (trim((string) ($details['network'] ?? '')) === '' && count($chipOffered) === 1) {
+                $details['network'] = $chipOffered[0];
             }
 
             if ($refusal = $this->refuseUnservedMobileMoney($currency, (string) $details['phone_number'], $details['network'] ?? null)) {

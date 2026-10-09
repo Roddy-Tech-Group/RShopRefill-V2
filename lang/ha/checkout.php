@@ -119,6 +119,7 @@ return [
     'momo_network_label' => 'Kamfanin sadarwa',
     'momo_number_label' => 'Lambar kuɗin waya',
     'momo_phone_placeholder' => 'Lambar waya',
+    'currency_note' => 'Za ka iya zaɓar kuɗin da ka fi so a cikin Zaɓuɓɓuka.',
     'momo_charge_hint' => 'Za a cire kusan :amount daga asusun kuɗin wayarka, wato jimillar da aka canza da farashin yau.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'Mun aika buƙatar biyan :amount zuwa :phone. Amince da ita a wayarka don kammala wannan biyan.',

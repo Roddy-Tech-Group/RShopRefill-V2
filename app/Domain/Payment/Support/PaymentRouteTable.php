@@ -140,8 +140,7 @@ final class PaymentRouteTable
                     'offered' => ! isset(SupportedPaymentMethods::DEFAULT_WITHHELD[$method])
                         && ! in_array($method, SupportedPaymentMethods::DEFAULT_OFF_UNTIL_TESTED[$currency] ?? [], true),
                     'gateways' => FiatGatewayRouter::defaultOrder($method),
-                    'note' => SupportedPaymentMethods::DEFAULT_WITHHELD[$method]
-                        ?? (in_array($method, SupportedPaymentMethods::DEFAULT_OFF_UNTIL_TESTED[$currency] ?? [], true) ? SupportedPaymentMethods::OFF_UNTIL_TESTED_NOTE : null),
+                    'note' => null,
                 ];
             }
         }
