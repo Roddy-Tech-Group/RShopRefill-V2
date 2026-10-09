@@ -434,6 +434,14 @@ Schedule::command('reconcile:nowpayments --hours=48')
     ->withoutOverlapping()
     ->sentryMonitor('reconcile-nowpayments');
 
+// Kora's book against ours: every Kora attempt of the last two days is looked
+// up by our reference and each disagreement goes to Telegram. Report-only; a
+// human decides, or runs it again with --settle.
+Schedule::command('korapay:reconcile --hours=48')
+    ->hourly()
+    ->withoutOverlapping()
+    ->sentryMonitor('korapay-reconcile');
+
 // Surfaces crypto payments that settled short or over. Exits non-zero when the
 // queue is non-empty so the monitor trips and a human actually looks at it —
 // these have no automatic resolution and used to accumulate silently.

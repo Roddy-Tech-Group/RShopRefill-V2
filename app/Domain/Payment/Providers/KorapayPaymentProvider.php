@@ -472,6 +472,54 @@ class KorapayPaymentProvider implements PaymentProviderInterface
         }
     }
 
+    /**
+     * What Kora holds for this attempt under OUR reference, for reconciliation:
+     * whether a charge exists, whether it carries our reference, its status,
+     * the amount it accepted and in which currency, beside the figure we
+     * expect. Facts only; the verdict is the caller's. Null when Kora could
+     * not be asked (mock mode, network, 5xx), which is not a disagreement.
+     *
+     * @return array{found: bool, ours: bool, status: ?string, amount: ?float, currency: ?string, expected: float}|null
+     */
+    public function chargeFacts(PaymentAttempt $attempt): ?array
+    {
+        if ($this->mock) {
+            return null;
+        }
+
+        try {
+            $response = Http::withToken($this->secretKey)
+                ->timeout(20)
+                ->retry(2, 1000, throw: false)
+                ->get("{$this->baseUrl}/charges/".rawurlencode((string) $attempt->idempotency_key));
+        } catch (\Throwable $e) {
+            Log::warning('Korapay reconcile: charge lookup failed', ['attempt_id' => $attempt->id, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        $expected = $this->chargeAmountFor($attempt);
+
+        if ($response->status() === 404) {
+            return ['found' => false, 'ours' => false, 'status' => null, 'amount' => null, 'currency' => null, 'expected' => $expected];
+        }
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $data = $response->json('data') ?? [];
+
+        return [
+            'found' => true,
+            'ours' => $this->carriesOurReference($data, (string) $attempt->idempotency_key),
+            'status' => isset($data['status']) ? strtolower((string) $data['status']) : null,
+            'amount' => $this->acceptedAmount($data),
+            'currency' => strtoupper((string) ($data['currency'] ?? '')),
+            'expected' => $expected,
+        ];
+    }
+
     public function refundPayment(PaymentAttempt $attempt, float $amount, ?string $reference = null): bool
     {
         if ($this->mock) {

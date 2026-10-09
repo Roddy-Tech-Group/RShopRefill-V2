@@ -452,7 +452,14 @@ class PaymentSessionController extends Controller
                 $attempt->pay_amount = null;
                 $attempt->save();
 
+                // The payload still carried the first gateway's scaffold (a
+                // Flutterwave popup config on a Kora attempt): replaced by
+                // the gateway that is actually taking it.
                 $session->provider = $fiatGateway;
+                $session->payment_payload = array_merge(
+                    array_diff_key($session->payment_payload ?? [], array_flip(['public_key', 'customer', 'customizations', 'amount', 'currency'])),
+                    $gatewayFactory->getProvider($fiatGateway)->initializePayment($attempt),
+                );
                 $session->save();
 
                 // Wallet fundings carry their own gateway stamp, which the

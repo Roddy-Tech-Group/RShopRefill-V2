@@ -223,6 +223,9 @@ class KorapayFailoverTest extends TestCase
         $response->assertOk();
         $this->assertSame('awaiting_confirmation', $session->fresh()->status);
         $this->assertStringContainsString('pin prompt', $session->fresh()->payment_payload['message']);
+        // The payload names the gateway taking the attempt, not the first one stamped.
+        $this->assertSame('korapay', $session->fresh()->payment_payload['provider']);
+        $this->assertArrayNotHasKey('public_key', $session->fresh()->payment_payload);
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/charges/mobile-money')
             && $request['mobile_money']['number'] === '237670000000'
