@@ -169,7 +169,12 @@ class MobileMoneyRailTest extends TestCase
         return $sent;
     }
 
-    public function test_ghana_is_charged_on_the_ghana_rail_with_the_gateway_network_code(): void
+    /**
+     * Ghana's rail answers the API with the operator's own authorisation page,
+     * which the customer used to be sent away to. It now opens in Flutterwave's
+     * popup on our page; nothing is charged by API and nobody is redirected.
+     */
+    public function test_ghana_opens_in_the_popup_on_our_page_instead_of_the_operators_page(): void
     {
         $this->fakeRedirectRail();
 
@@ -179,16 +184,20 @@ class MobileMoneyRailTest extends TestCase
         $response = $this->pay($order, ['phone_number' => '+233 24 400 0000', 'network' => 'Vodafone']);
 
         $response->assertOk();
-        $this->assertSame('awaiting_redirect', $response->json('data.status'));
-        $this->assertSame('https://checkout.flutterwave.com/v3/hosted/pay/momo-gh', $response->json('data.payment_payload.redirect_url'));
+        $this->assertSame('awaiting_payment', $response->json('data.status'));
+        $this->assertSame('flutterwave', $response->json('data.payment_payload.inline.provider'));
+        $this->assertSame('mobilemoneyghana', $response->json('data.payment_payload.inline.payment_options'));
+        $this->assertSame('GHS', $response->json('data.payment_payload.inline.currency'));
+        $this->assertSame('233244000000', $response->json('data.payment_payload.inline.customer.phone_number'), 'the number typed on our page is not asked for again');
+        $this->assertNull($response->json('data.payment_payload.redirect_url'));
+        $this->assertSame('awaiting_payment', $session->fresh()->status);
+        Http::assertNothingSent();
 
-        $request = $this->sentCharge();
-        $this->assertStringContainsString('/charges?type=mobile_money_ghana', $request->url());
-        $this->assertSame('GHS', $request['currency']);
-        $this->assertSame('VODAFONE', $request['network'], 'the rail wants its own code, not the label the screen shows');
-        $this->assertSame('233244000000', $request['phone_number'], 'plus sign and spacing stripped');
-        $this->assertArrayNotHasKey('country', $request->data(), 'country is a Francophone-rail field');
-        $this->assertSame(route('shop.checkout.return', ['session' => $session->id]), $request['redirect_url']);
+        $this->assertSame('mobilemoneyuganda', MobileMoneyRail::popupOption('UGX'));
+        $this->assertSame('mobilemoneyrwanda', MobileMoneyRail::popupOption('RWF'));
+        $this->assertSame('mobilemoneytanzania', MobileMoneyRail::popupOption('TZS'));
+        $this->assertFalse(MobileMoneyRail::opensInPopup('XAF'), 'the franc rail prompts the handset from our page');
+        $this->assertFalse(MobileMoneyRail::opensInPopup('KES'), 'M-Pesa prompts the handset from our page');
     }
 
     public function test_kenya_is_charged_on_mpesa_with_no_network(): void
@@ -242,7 +251,8 @@ class MobileMoneyRailTest extends TestCase
 
     public function test_a_gateway_refusal_is_recorded_as_a_failed_charge_with_the_provider_message(): void
     {
-        // The exact answer the Francophone rail gave every Ghana attempt.
+        // The exact answer the Francophone rail once gave every Ghana attempt,
+        // replayed on a rail that is still charged by API from our page.
         Http::fake([
             'api.flutterwave.com/v3/charges*' => Http::response([
                 'status' => 'error',
@@ -250,8 +260,8 @@ class MobileMoneyRailTest extends TestCase
             ], 400),
         ]);
 
-        $order = $this->checkout('GHS');
-        $response = $this->pay($order, ['phone_number' => '0244000000', 'network' => 'MTN']);
+        $order = $this->checkout('XAF');
+        $response = $this->pay($order, ['phone_number' => '0670000000', 'network' => 'MTN']);
 
         $response->assertOk();
         $this->assertSame('failed', $response->json('data.status'));

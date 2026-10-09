@@ -228,6 +228,32 @@ final class MobileMoneyRail
         return in_array(self::chargeType($currency), ['mobile_money_franco', 'mpesa'], true);
     }
 
+    /**
+     * Rails whose API charge answers with the operator's own authorisation
+     * page (Ghana, Uganda, Rwanda, Tanzania). Rather than send the customer
+     * away to it, these open in Flutterwave's popup on our page, which
+     * renders the same step inline. The handset rails never need this: their
+     * prompt is on the phone before the API answers.
+     */
+    public static function opensInPopup(string $currency): bool
+    {
+        return self::supports($currency) && ! self::promptsOnHandset($currency);
+    }
+
+    /**
+     * Flutterwave's popup option for a rail that opens there.
+     */
+    public static function popupOption(string $currency): ?string
+    {
+        return match (self::chargeType($currency)) {
+            'mobile_money_ghana' => 'mobilemoneyghana',
+            'mobile_money_uganda' => 'mobilemoneyuganda',
+            'mobile_money_rwanda' => 'mobilemoneyrwanda',
+            'mobile_money_tanzania' => 'mobilemoneytanzania',
+            default => null,
+        };
+    }
+
     /** ISO country for rails that need one (Francophone only), else null. */
     public static function countryFor(string $currency, string $phoneNumber): ?string
     {

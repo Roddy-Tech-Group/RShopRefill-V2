@@ -115,9 +115,15 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
      *
      * @return array<string, mixed>
      */
-    public function inlineConfig(PaymentAttempt $attempt, string $methodKey): array
+    public function inlineConfig(PaymentAttempt $attempt, string $methodKey, ?string $phoneNumber = null): array
     {
         $config = $this->initializePayment($attempt);
+
+        // A mobile money number typed on our page is handed to the popup so
+        // the customer is not asked for it a second time.
+        if ($phoneNumber !== null && $phoneNumber !== '') {
+            $config['customer']['phone_number'] = $phoneNumber;
+        }
 
         $config['payment_options'] = match ($methodKey) {
             'card' => 'card',
@@ -126,6 +132,7 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
             'bank_qr' => 'qr',
             'mobile_wallet' => 'opay,enaira,mobilemoneynigeria',
             'apple_pay' => 'applepay',
+            'mobile_money' => MobileMoneyRail::popupOption((string) $attempt->currency) ?? 'mobilemoney',
             default => $methodKey,
         };
 

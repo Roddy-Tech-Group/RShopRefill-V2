@@ -539,6 +539,21 @@ class PaymentSessionController extends Controller
                 // The one-time code Kora asked for (Ghana, Côte d'Ivoire): a
                 // valid one is followed by the prompt on the phone.
                 $result = $gatewayFactory->getProvider('korapay')->authorizeMobileMoney($attempt, (string) $otp);
+            } elseif ($method === 'mobile_money' && $fiatGateway === 'flutterwave' && MobileMoneyRail::opensInPopup($currency)) {
+                // Ghana, Uganda, Rwanda and Tanzania: Flutterwave's API answers
+                // these with the operator's authorisation page the customer
+                // would be sent away to. Its popup renders that same step on
+                // our page instead, so it opens here for this one method.
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $flwProvider->inlineConfig($attempt, 'mobile_money', MobileMoneyRail::internationalNumber($currency, (string) $details['phone_number']))],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'mobile_money') {
                 // The number, country and network were checked above, before
                 // routing, against what the switched-on gateways can take.

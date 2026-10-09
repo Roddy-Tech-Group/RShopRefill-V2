@@ -222,21 +222,21 @@ class MobileMoneyApprovalInstructionsTest extends TestCase
         $this->assertNull($response->json('data.payment_payload.redirect_url'));
     }
 
-    public function test_a_rail_that_hands_over_a_page_is_redirected_under_either_spelling(): void
+    /**
+     * A rail that would hand the customer an operator page is never charged by
+     * API from here; it opens in the popup on our page, so there is no
+     * redirect under either spelling of the authorisation mode.
+     */
+    public function test_a_rail_that_hands_over_a_page_opens_in_the_popup_instead(): void
     {
-        Http::fake([
-            'api.flutterwave.com/v3/charges*' => Http::response([
-                'status' => 'success',
-                'message' => 'Charge initiated',
-                'data' => ['status' => 'pending'],
-                'meta' => ['authorization' => ['mode' => 'redirecturl', 'redirect_url' => 'https://checkout.flutterwave.com/v3/hosted/pay/momo-gh']],
-            ]),
-        ]);
+        Http::fake();
 
         $response = $this->pay($this->checkout('GHS'), ['phone_number' => '0244000000', 'network' => 'MTN']);
 
-        $this->assertSame('awaiting_redirect', $response->json('data.status'));
-        $this->assertSame('https://checkout.flutterwave.com/v3/hosted/pay/momo-gh', $response->json('data.payment_payload.redirect_url'));
+        $this->assertSame('awaiting_payment', $response->json('data.status'));
+        $this->assertSame('mobilemoneyghana', $response->json('data.payment_payload.inline.payment_options'));
+        $this->assertNull($response->json('data.payment_payload.redirect_url'));
+        Http::assertNothingSent();
     }
 
     public function test_the_checkout_and_wallet_pages_carry_the_no_prompt_panel(): void
