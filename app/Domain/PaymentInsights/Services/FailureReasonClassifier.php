@@ -212,6 +212,17 @@ class FailureReasonClassifier
         // after some time": the gateway's generic busy answer. Only the first
         // half is the rule: "please try again" also ends bank declines.
         ['unable to process your request', FailureCategory::Provider, 'provider_error', true],
+        // The processor behind the gateway refusing the gateway's own request:
+        // credentials, merchant setup, an acquiring route not enabled for the
+        // charge. The words are the same at every acquirer, and none of them
+        // is about the card. "Invalid credentials." on Flutterwave's USD card
+        // route (five customers, 2026-10-06 to 09) was told to customers as
+        // "your bank declined" while graded as unrecognised.
+        ['invalid credentials', FailureCategory::System, 'gateway_config_error', false],
+        ['invalid merchant', FailureCategory::System, 'gateway_config_error', false],
+        ['merchant not configured', FailureCategory::System, 'gateway_config_error', false],
+        ['merchant not enabled', FailureCategory::System, 'gateway_config_error', false],
+        ['merchant account not', FailureCategory::System, 'gateway_config_error', false],
         ['currency not supported', FailureCategory::System, 'gateway_config_error', false],
         // "The currency for this payment is currently not supported": the
         // same refusal in the words the hosted checkout uses. We offered a
@@ -313,7 +324,7 @@ class FailureReasonClassifier
         'network_offline' => 'Customer went offline',
         'network_timeout' => 'Customer network timed out',
         'slow_network' => 'Customer network too slow',
-        'unrecognised_gateway_message' => 'Gateway message not recognised yet (add a rule)',
+        'unrecognised_gateway_message' => 'Gateway message not yet classified',
         'unknown_error' => 'Unknown (no diagnostic captured)',
     ];
 

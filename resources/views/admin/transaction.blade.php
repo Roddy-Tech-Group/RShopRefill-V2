@@ -225,7 +225,7 @@
                         'Gateway said' => $verdict['gateway_said'],
                         'HTTP status' => $verdict['http_status'],
                         'Customer was at' => $verdict['stage'] ? str_replace('_', ' ', (string) $verdict['stage']) : null,
-                        'Worth a retry' => $verdict['retryable'] ? 'Yes' : 'No',
+                        'Worth a retry' => in_array($verdict['code'], ['unrecognised_gateway_message', 'unknown_error'], true) ? 'Unknown' : ($verdict['retryable'] ? 'Yes' : 'No'),
                         'Customer saw' => $verdict['customer_saw'],
                         'Mobile money' => $verdict['mobile_money'],
                         'Verdict seen' => $verdict['seen_at'] ? $fmtDate(\Illuminate\Support\Carbon::parse($verdict['seen_at'])) : null,

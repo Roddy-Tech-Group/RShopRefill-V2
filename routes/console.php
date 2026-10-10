@@ -158,6 +158,14 @@ Schedule::command('insights:alert-failures')
     ->name('insights:alert-failures-10m')
     ->sentryMonitor('insights-alert-failures');
 
+// Gateway words no rule reads yet, once a day and only when there are any:
+// each text with its count and customers, so rules are added in a batch
+// from one message rather than one hourly page per text.
+Schedule::command('insights:unclassified-digest')
+    ->dailyAt('08:30')
+    ->name('insights:unclassified-digest')
+    ->sentryMonitor('insights-unclassified-digest');
+
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.
 Artisan::command('payments:expire-stale', function () {
