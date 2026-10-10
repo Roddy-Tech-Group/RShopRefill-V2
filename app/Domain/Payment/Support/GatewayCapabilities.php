@@ -77,14 +77,18 @@ final class GatewayCapabilities
      * @var array<string, array<string, string|list<string>>>
      */
     private const METHODS = [
+        // Flutterwave, per its payment-methods table: cards everywhere it
+        // settles; "account" (pay with bank) in NGN, GBP, EUR, USD and ZAR;
+        // Apple Pay in the same five; bank transfer, USSD, NQR and the
+        // e-wallets (OPay, eNaira) are Nigerian only.
         'flutterwave' => [
             'card' => self::ANY,
-            'apple_pay' => self::ANY,
-            'bank_transfer' => self::ANY,
-            'pay_with_bank' => self::ANY,
-            'ussd' => self::ANY,
-            'bank_qr' => self::ANY,
-            'mobile_wallet' => self::ANY,
+            'apple_pay' => ['NGN', 'USD', 'EUR', 'GBP', 'ZAR'],
+            'bank_transfer' => ['NGN'],
+            'pay_with_bank' => ['NGN', 'GBP', 'EUR', 'USD', 'ZAR'],
+            'ussd' => ['NGN'],
+            'bank_qr' => ['NGN'],
+            'mobile_wallet' => ['NGN'],
         ],
         'korapay' => [
             'card' => ['NGN'],

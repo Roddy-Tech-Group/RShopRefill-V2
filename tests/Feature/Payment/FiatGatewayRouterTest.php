@@ -4,6 +4,7 @@ namespace Tests\Feature\Payment;
 
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\GatewayCapabilities;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\Shared\Enums\Currency;
@@ -36,6 +37,14 @@ class FiatGatewayRouterTest extends TestCase
                 // Mobile money exists only where Flutterwave has a rail for it.
                 if ($method === 'mobile_money' && ! MobileMoneyRail::supports($currency)) {
                     $this->assertNull(FiatGatewayRouter::resolve($method, $currency), "no rail serves mobile money in {$currency}");
+
+                    continue;
+                }
+
+                // Outside Flutterwave's documented coverage (Apple Pay in GHS, USSD
+                // in GBP) nothing resolves; the primary wins everywhere else.
+                if (! GatewayCapabilities::supports('flutterwave', $method, $currency)) {
+                    $this->assertNull(FiatGatewayRouter::resolve($method, $currency), "'{$method}' in {$currency} is outside Flutterwave's coverage");
 
                     continue;
                 }

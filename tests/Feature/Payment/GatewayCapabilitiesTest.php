@@ -11,11 +11,25 @@ use Tests\TestCase;
  */
 class GatewayCapabilitiesTest extends TestCase
 {
-    public function test_flutterwave_takes_cards_and_bank_methods_everywhere_and_mobile_money_per_market(): void
+    public function test_flutterwave_takes_cards_everywhere_bank_methods_where_documented_and_mobile_money_per_market(): void
     {
         foreach (['USD', 'EUR', 'GBP', 'NGN', 'XAF', 'COP'] as $currency) {
             $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'card', $currency));
         }
+
+        // Its payment-methods table: "account" and Apple Pay in NGN, GBP, EUR,
+        // USD and ZAR; bank transfer, USSD, NQR and the e-wallets Nigerian only.
+        foreach (['NGN', 'GBP', 'EUR', 'USD', 'ZAR'] as $currency) {
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'pay_with_bank', $currency));
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'apple_pay', $currency));
+        }
+        foreach (['bank_transfer', 'ussd', 'bank_qr', 'mobile_wallet'] as $method) {
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', $method, 'NGN'));
+            $this->assertFalse(GatewayCapabilities::supports('flutterwave', $method, 'GHS'), "{$method} is Nigerian only");
+            $this->assertFalse(GatewayCapabilities::supports('flutterwave', $method, 'GBP'), "{$method} is Nigerian only");
+        }
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'pay_with_bank', 'GHS'));
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'apple_pay', 'XAF'));
 
         $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XAF', 'CM', 'Orange'));
         $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XOF', 'CI', 'Wave'));
