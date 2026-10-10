@@ -572,11 +572,11 @@
                      Sub-items expand inline so the rail stays scannable when collapsed
                      they hide behind the parent label. --}}
                 @if ($can('admin.content.blog'))
-                @php $contentActive = $isCurrent('admin.content.*'); @endphp
+                @php $contentActive = $isCurrent('admin.content.*') && ! $isCurrent('admin.content.rewards*'); @endphp
                 <div
                     x-data="{
                         open: {{ $contentActive ? 'true' : 'false' }},
-                        active() { return window.location.pathname.includes('/admin/content'); },
+                        active() { const p = window.location.pathname; return p.includes('/admin/content') && ! p.includes('/admin/content/rewards'); },
                         sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
                     }"
                     {{-- Open state is derived from the live URL and re-synced on every
@@ -615,9 +615,48 @@
                         <a href="{{ route('admin.content.press') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.press')) }}">Press Articles</a>
                         <a href="{{ route('admin.content.reviews') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.reviews')) }}">Reviews</a>
                         <a href="{{ route('admin.content.faqs') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.faqs')) }}">FAQs</a>
-                        <a href="{{ route('admin.content.rewards') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.rewards')) }}">Rcoin Rewards</a>
-                        <a href="{{ route('admin.content.rewards.analytics') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.rewards.analytics')) }}">Rcoin Analytics</a>
-                        <a href="{{ route('admin.content.rewards.withdrawals') }}" wire:navigate class="{{ $subItem($isCurrent('admin.content.rewards.withdrawals')) }}">Rcoin Withdrawals</a>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Rcoin — the customer reward currency: programme settings,
+                     analytics and withdrawals. Its own grant (`rcoin`), apart
+                     from Content, because it moves customer value. --}}
+                @if ($can('admin.content.rewards'))
+                @php $rcoinActive = $isCurrent('admin.content.rewards*'); @endphp
+                <div
+                    x-data="{
+                        open: {{ $rcoinActive ? 'true' : 'false' }},
+                        active() { return window.location.pathname.includes('/admin/content/rewards'); },
+                        sync() { this.open = this.$store.adminSidebar?.collapsed ? true : this.active(); },
+                    }"
+                    x-effect="sync()"
+                    x-on:livewire:navigated.window="sync()"
+                    class="nav-group flex flex-col"
+                >
+                    <button
+                        type="button"
+                        @click="open = ! open"
+                        :aria-expanded="open.toString()"
+                        class="{{ $navItemClass($rcoinActive) }} w-full justify-between"
+                    >
+                        <span class="flex items-center gap-3">
+                            <img src="{{ asset('assets/' . rawurlencode('wallet 2.svg')) }}" alt="" class="{{ $imgIconClass($rcoinActive) }}" loading="lazy">
+                            Rcoin
+                        </span>
+                        <svg class="h-4 w-4 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-submenu mt-1 ml-3 flex flex-col gap-0.5 border-l border-zinc-200 pl-3">
+                        @php
+                            $rcoinItem = fn (bool $active) => $active
+                                ? 'block rounded-[8px] px-2.5 py-2 text-xs font-medium nav-item-active'
+                                : 'nav-item block rounded-[8px] px-2.5 py-2 text-xs font-medium text-zinc-700 transition-colors dark:text-zinc-300';
+                        @endphp
+                        <a href="{{ route('admin.content.rewards') }}" wire:navigate class="{{ $rcoinItem($isCurrent('admin.content.rewards')) }}">Rcoin Rewards</a>
+                        <a href="{{ route('admin.content.rewards.analytics') }}" wire:navigate class="{{ $rcoinItem($isCurrent('admin.content.rewards.analytics')) }}">Rcoin Analytics</a>
+                        <a href="{{ route('admin.content.rewards.withdrawals') }}" wire:navigate class="{{ $rcoinItem($isCurrent('admin.content.rewards.withdrawals')) }}">Rcoin Withdrawals</a>
                     </div>
                 </div>
                 @endif
@@ -1054,54 +1093,99 @@
         {{-- Global confirm modal — intercepts any form/button with `data-confirm`. --}}
         <x-confirm-modal />
 
-        {{-- Mobile menu popup. Triggered by the mobile hamburger via 'open-mobile-menu' window event.
-             Card grid of admin nav items instead of the Flux sidebar drawer. lg:hidden so it never shows on desktop. --}}
+        {{-- Mobile drawer. Opened by the top bar's hamburger (and anything else
+             that dispatches 'open-mobile-menu'), it slides in from the left in
+             the same navy panel the customer dashboard uses, the logo level
+             with the bar, then the desktop sidebar's rows in its own order and
+             groups, filtered by the SAME $can() the sidebar uses so a phone
+             never shows a page the signed-in admin cannot open. lg:hidden so
+             it never shows on desktop, where the real sidebar is. --}}
         @php
-            // Every sidebar destination, in sidebar order, filtered by the
-            // SAME $can() the sidebar uses so the mobile menu never shows a
-            // page the signed-in admin cannot open. Content sub-pages get
-            // their own tiles since the sheet has no expandable groups.
-            $adminMenuItems = collect([
-                ['label' => 'Home',          'route' => 'admin.dashboard',               'icon' => 'Home.svg',                    'tone' => 'bg-blue-500'],
-                ['label' => 'Catalogue',     'route' => 'admin.products',                'icon' => 'Shop.svg',                    'tone' => 'bg-pink-500'],
-                ['label' => 'Orders',        'route' => 'admin.orders',                  'icon' => 'order.svg',                   'tone' => 'bg-sky-500'],
-                ['label' => 'Customers',     'route' => 'admin.customers',               'icon' => 'customer.svg',                'tone' => 'bg-emerald-500'],
-                ['label' => 'Transactions',  'route' => 'admin.transactions',            'icon' => 'transactions.svg',            'tone' => 'bg-teal-500'],
-                ['label' => 'Wallets',       'route' => 'admin.wallets',                 'icon' => 'Wallet.svg',                  'tone' => 'bg-indigo-500'],
-                ['label' => 'Reports',       'route' => 'admin.reports',                 'icon' => 'report.svg',                  'tone' => 'bg-violet-500'],
-                ['label' => 'Newsletter',    'route' => 'admin.newsletter',              'icon' => 'marketing.svg',               'tone' => 'bg-fuchsia-500'],
-                ['label' => 'Campaigns',     'route' => 'admin.campaigns',               'icon' => 'notification 2.svg',          'tone' => 'bg-purple-500'],
-                ['label' => 'Pricing Rules', 'route' => 'admin.pricing-rules',           'icon' => 'total revenue.svg',           'tone' => 'bg-orange-600'],
-                ['label' => 'Hero Sections', 'route' => 'admin.content.hero-sections',   'icon' => 'Appearance.svg',              'tone' => 'bg-sky-600'],
-                ['label' => 'Blog Posts',    'route' => 'admin.content.blog',            'icon' => 'new info.svg',                'tone' => 'bg-blue-600'],
-                ['label' => 'Press',         'route' => 'admin.content.press',           'icon' => 'About svg 1.svg',             'tone' => 'bg-slate-500'],
-                ['label' => 'Reviews',       'route' => 'admin.content.reviews',         'icon' => 'trusted by millions.svg',     'tone' => 'bg-yellow-500'],
-                ['label' => 'FAQs',          'route' => 'admin.content.faqs',            'icon' => 'other.svg',                   'tone' => 'bg-stone-500'],
-                ['label' => 'Rcoin Rewards', 'route' => 'admin.content.rewards',         'icon' => 'wallet 2.svg',                'tone' => 'bg-yellow-600'],
-                ['label' => 'Rcoin Analytics', 'route' => 'admin.content.rewards.analytics', 'icon' => 'success rates admin.svg', 'tone' => 'bg-violet-600'],
-                ['label' => 'Rcoin Payouts', 'route' => 'admin.content.rewards.withdrawals', 'icon' => 'total transactions.svg',  'tone' => 'bg-red-500'],
-                ['label' => 'Support',       'route' => 'admin.support-tickets',         'icon' => 'support.svg',                 'tone' => 'bg-amber-500'],
-                ['label' => 'Admins',        'route' => 'admin.admins',                  'icon' => 'admin access.svg',            'tone' => 'bg-rose-500'],
-                ['label' => 'Rates',         'route' => 'admin.rates',                   'icon' => 'transactions.svg',            'tone' => 'bg-orange-500'],
-                ['label' => 'API Settings',  'route' => 'admin.api-settings',            'icon' => 'Network Svg.svg',             'tone' => 'bg-slate-600'],
-                ['label' => 'Settings',      'route' => 'admin.settings',                'icon' => 'system setting.svg',          'tone' => 'bg-cyan-500'],
-                ['label' => 'Audit Log',     'route' => 'admin.account-activity',        'icon' => 'account avtivities 3.svg',    'tone' => 'bg-zinc-500'],
-            ])
-                ->filter(fn ($item) => $can($item['route']))
-                ->map(fn ($item) => $item + ['href' => route($item['route'])])
+            // Icons: the sidebar's asset files where it uses them (drawn white on
+            // the panel), its inline strokes where it draws them itself.
+            $img = fn (string $file) => ['img' => $file];
+            $svg = fn (string $paths) => ['svg' => $paths];
+
+            $drawerSections = [
+                ['label' => null, 'items' => [
+                    ['label' => 'Overview', 'route' => 'admin.dashboard', 'active' => $isCurrent('admin.dashboard'), 'icon' => $img('Home.svg')],
+                    ['label' => 'Operations', 'route' => 'admin.operations', 'active' => $isCurrent('admin.operations'), 'icon' => $svg('<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z"/>')],
+                    ['label' => 'Catalogue', 'route' => 'admin.products', 'active' => $isCurrent('admin.products*', 'admin.gift-cards*', 'admin.esims*', 'admin.mobile-topups*', 'admin.bill-payments*', 'admin.flights*'), 'icon' => $img('Shop.svg')],
+                    ['label' => 'Orders', 'route' => 'admin.orders', 'active' => $isCurrent('admin.orders*'), 'icon' => $img('order.svg')],
+                    ['label' => 'Manage eSIMs', 'route' => 'admin.esims', 'active' => $isCurrent('admin.esims*'), 'icon' => $img('esims.svg')],
+                    ['label' => 'User Management', 'route' => 'admin.customers', 'active' => $isCurrent('admin.customers*', 'admin.users.*'), 'icon' => $img('customer.svg'), 'children' => [
+                        ['label' => 'Customers', 'route' => 'admin.customers', 'active' => $isCurrent('admin.customers*')],
+                        ['label' => 'Blocked & Restricted', 'route' => 'admin.users.blocked', 'active' => $isCurrent('admin.users.blocked')],
+                        ['label' => 'Closures', 'route' => 'admin.users.closures', 'active' => $isCurrent('admin.users.closures')],
+                        ['label' => 'Exit Feedback', 'route' => 'admin.users.feedback', 'active' => $isCurrent('admin.users.feedback')],
+                        ['label' => 'Audience Insights', 'route' => 'admin.users.insights', 'active' => $isCurrent('admin.users.insights')],
+                        ['label' => 'Leaderboards', 'route' => 'admin.users.leaderboards', 'active' => $isCurrent('admin.users.leaderboards')],
+                    ]],
+                    ['label' => 'Risk', 'route' => 'admin.risk.dashboard', 'active' => $isCurrent('admin.risk*'), 'icon' => $svg('<path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.9-7 9-4-1.1-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 10"/>')],
+                    ['label' => 'Transactions', 'route' => 'admin.transactions', 'active' => $isCurrent('admin.transactions*'), 'icon' => $img('transactions.svg')],
+                    ['label' => 'Wallets', 'route' => 'admin.wallets', 'active' => $isCurrent('admin.wallets*'), 'icon' => $img('Wallet.svg')],
+                    ['label' => 'Reports', 'route' => 'admin.reports', 'active' => $isCurrent('admin.reports*'), 'icon' => $img('report.svg')],
+                    ['label' => 'Management', 'route' => 'admin.management.monitoring', 'active' => $isCurrent('admin.management.*', 'admin.payment-insights*'), 'icon' => $svg('<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/>'), 'children' => [
+                        ['label' => 'Monitoring', 'route' => 'admin.management.monitoring', 'active' => $isCurrent('admin.management.monitoring')],
+                        ['label' => 'Payment Insights', 'route' => 'admin.payment-insights', 'active' => $isCurrent('admin.payment-insights*')],
+                        ['label' => 'Gateway settings', 'route' => 'admin.management.gateways', 'active' => $isCurrent('admin.management.gateways')],
+                        ['label' => 'Finances', 'route' => 'admin.management.finances', 'active' => $isCurrent('admin.management.finances')],
+                        ['label' => 'Runbooks', 'route' => 'admin.management.runbooks', 'active' => $isCurrent('admin.management.runbooks')],
+                    ]],
+                ]],
+                ['label' => 'Growth', 'items' => [
+                    ['label' => 'Newsletter', 'route' => 'admin.newsletter', 'active' => $isCurrent('admin.newsletter*'), 'icon' => $img('marketing.svg')],
+                    ['label' => 'Push Campaigns', 'route' => 'admin.campaigns', 'active' => $isCurrent('admin.campaigns*'), 'icon' => $img('notification 2.svg')],
+                    ['label' => 'Pricing Rules', 'route' => 'admin.pricing-rules', 'active' => $isCurrent('admin.pricing-rules*'), 'icon' => $svg('<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>')],
+                    ['label' => 'Content', 'route' => 'admin.content.blog', 'active' => $isCurrent('admin.content.*') && ! $isCurrent('admin.content.rewards*'), 'icon' => $svg('<path d="M4 4h16v4H4z"/><path d="M4 12h10v8H4z"/><path d="M16 12h4v8h-4z"/>'), 'children' => [
+                        ['label' => 'Hero Sections', 'route' => 'admin.content.hero-sections', 'active' => $isCurrent('admin.content.hero-sections')],
+                        ['label' => 'Blog Posts', 'route' => 'admin.content.blog', 'active' => $isCurrent('admin.content.blog')],
+                        ['label' => 'Press Articles', 'route' => 'admin.content.press', 'active' => $isCurrent('admin.content.press')],
+                        ['label' => 'Reviews', 'route' => 'admin.content.reviews', 'active' => $isCurrent('admin.content.reviews')],
+                        ['label' => 'FAQs', 'route' => 'admin.content.faqs', 'active' => $isCurrent('admin.content.faqs')],
+                    ]],
+                    ['label' => 'Rcoin', 'route' => 'admin.content.rewards', 'active' => $isCurrent('admin.content.rewards*'), 'icon' => $img('wallet 2.svg'), 'children' => [
+                        ['label' => 'Rcoin Rewards', 'route' => 'admin.content.rewards', 'active' => $isCurrent('admin.content.rewards')],
+                        ['label' => 'Rcoin Analytics', 'route' => 'admin.content.rewards.analytics', 'active' => $isCurrent('admin.content.rewards.analytics')],
+                        ['label' => 'Rcoin Withdrawals', 'route' => 'admin.content.rewards.withdrawals', 'active' => $isCurrent('admin.content.rewards.withdrawals')],
+                    ]],
+                ]],
+                ['label' => 'System', 'items' => [
+                    // The sidebar shows Audit Log to every admin; so does the drawer.
+                    ['label' => 'Audit Log', 'route' => 'admin.account-activity', 'active' => $isCurrent('admin.account-activity*'), 'icon' => $svg('<path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>'), 'always' => true],
+                    ['label' => 'Support Tickets', 'route' => 'admin.support-tickets', 'active' => $isCurrent('admin.support-tickets*'), 'icon' => $img('support.svg')],
+                    ['label' => 'Admins', 'route' => 'admin.admins', 'active' => $isCurrent('admin.admins*'), 'icon' => $img('admin access.svg')],
+                    ['label' => 'Rate Management', 'route' => 'admin.rates', 'active' => $isCurrent('admin.rates*'), 'icon' => $svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 8h4.25a2 2 0 010 4H9.5m0 0h4.5a2 2 0 010 4H9.5m0-8v8m0-8h-1m1 8h-1m2-10v2m0 8v2"/>')],
+                    ['label' => 'System Settings', 'route' => 'admin.settings', 'active' => $isCurrent('admin.settings*'), 'icon' => $img('system setting.svg')],
+                    ['label' => 'API & Integrations', 'route' => 'admin.api-settings', 'active' => $isCurrent('admin.api-settings*'), 'icon' => $img('Network Svg.svg')],
+                ]],
+            ];
+
+            // Gate every row by the sidebar's own check, and drop a section
+            // with nothing left in it.
+            $drawerSections = collect($drawerSections)
+                ->map(fn (array $section) => array_merge($section, ['items' => array_values(array_filter($section['items'], fn (array $item) => ($item['always'] ?? false) || $can($item['route'])))]))
+                ->filter(fn (array $section) => $section['items'] !== [])
                 ->values()
                 ->all();
+
+            // The dashboard drawer's rows: 15px semibold on the panel's colour,
+            // 20px icons, 10px corners, the current page on a soft white tile.
+            // Colours are app.css's (.dash-drawer), shared with the dashboard.
+            $drawerRow = fn (bool $active) => 'dash-drawer-row flex items-center justify-between gap-3 rounded-[8px] px-3 py-2 text-[15px] font-semibold transition-colors'.($active ? ' dash-drawer-row-active' : '');
+            $drawerSubRow = fn (bool $active) => 'dash-drawer-subrow flex items-center justify-between gap-3 rounded-[8px] px-3 py-2 text-sm font-medium transition-colors'.($active ? ' dash-drawer-subrow-active' : '');
         @endphp
-        {{-- Mobile menu wrapper: `contents` removes the div from Flux's grid layout so it
-             doesn't push flux:sidebar/header/main into an unexpected row. The fixed-position
-             children inside still anchor correctly to the viewport. --}}
+        {{-- `contents` keeps the wrapper out of Flux's grid so it cannot push
+             flux:sidebar/header/main into an unexpected row. --}}
         <div
             x-data="{ menuOpen: false }"
             x-on:open-mobile-menu.window="$nextTick(() => menuOpen = true)"
             x-on:keydown.escape.window="menuOpen = false"
+            x-on:livewire:navigated.window="menuOpen = false"
             x-effect="menuOpen ? window.rshopScrollLock?.lock() : window.rshopScrollLock?.unlock()"
             class="contents lg:hidden"
         >
+            {{-- Backdrop --}}
             <div
                 x-show="menuOpen"
                 x-transition:enter="transition-opacity ease-out duration-200"
@@ -1116,60 +1200,124 @@
                 aria-hidden="true"
             ></div>
 
-            <div
+            {{-- The drawer: the bar's colour, slid in from the left. --}}
+            <aside
                 x-show="menuOpen"
                 x-transition:enter="transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                x-transition:enter-start="translate-y-full"
-                x-transition:enter-end="translate-y-0"
-                x-transition:leave="transition-transform duration-250 ease-in"
-                x-transition:leave-start="translate-y-0"
-                x-transition:leave-end="translate-y-full"
+                x-transition:enter-start="-translate-x-full"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition-transform duration-200 ease-in"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="-translate-x-full"
                 style="display: none;"
-                class="modal-norise fixed inset-x-3 bottom-3 z-[70] max-h-[85vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white/70 ring-1 ring-white/40 backdrop-blur-2xl backdrop-saturate-150 shadow-2xl shadow-zinc-900/25 dark:bg-[#0c1a36]/70 dark:ring-white/10"
+                class="dash-drawer fixed inset-y-0 left-0 z-[70] flex w-[min(69vw,270px)] flex-col"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="admin-mobile-menu-title"
+                aria-label="Admin menu"
             >
-                <div class="flex justify-center pt-3">
-                    <span class="h-1.5 w-10 rounded-[12px] bg-zinc-300 dark:bg-white/25"></span>
+                <div class="dash-drawer-head flex shrink-0 items-center border-b border-white/20 px-4">
+                    <a href="{{ route('admin.dashboard') }}" wire:navigate @click="menuOpen = false" class="flex items-center rounded-[8px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                        <img src="{{ asset('assets/logo.webp').'?v=4' }}" alt="{{ config('app.name') }}" class="site-logo h-12 w-auto object-contain">
+                    </a>
                 </div>
 
-                <div class="px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4">
-                    {{-- No close X here — backdrop tap and the grab handle above
-                         already dismiss the sheet, so the button was redundant. --}}
-                    <h2 id="admin-mobile-menu-title" class="mb-5 text-lg font-bold text-zinc-900 dark:text-white">Admin menu</h2>
-
-                    {{-- The whole sheet scrolls (max-h on the panel), matching
-                         the customer dashboard menu. --}}
-                    <div class="skeleton-stagger-fast grid grid-cols-4 gap-3">
-                        @foreach ($adminMenuItems as $i => $item)
+                <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-6 pt-3" aria-label="Admin menu">
+                    @foreach ($drawerSections as $section)
+                        @if ($section['label'] !== null)
+                            <p class="dash-drawer-label mb-1 mt-5 px-3 text-[13px] font-semibold">{{ $section['label'] }}</p>
+                        @endif
+                        @foreach ($section['items'] as $item)
+                            @if (isset($item['children']))
+                                {{-- A group: the row drops its pages down beneath it, open
+                                     already when the admin is on one of them. --}}
+                                <div x-data="{ groupOpen: @js($item['active']) }" class="flex flex-col gap-0.5">
+                                    <button
+                                        type="button"
+                                        @click="groupOpen = ! groupOpen"
+                                        :aria-expanded="groupOpen.toString()"
+                                        class="{{ $drawerRow($item['active']) }} w-full text-left"
+                                    >
+                                        <span class="flex min-w-0 items-center gap-3">
+                                            @if (isset($item['icon']['img']))
+                                                <img src="{{ asset('assets/'.rawurlencode($item['icon']['img'])) }}" alt="" class="h-5 w-5 shrink-0 brightness-0 invert" loading="lazy">
+                                            @else
+                                                <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $item['icon']['svg'] !!}</svg>
+                                            @endif
+                                            <span class="truncate">{{ $item['label'] }}</span>
+                                        </span>
+                                        <svg :class="groupOpen && 'rotate-180'" class="h-4 w-4 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <div x-show="groupOpen" x-collapse class="ml-5 flex flex-col gap-0.5 border-l border-white/10 pl-3">
+                                        @foreach ($item['children'] as $child)
+                                            <a
+                                                href="{{ route($child['route']) }}"
+                                                wire:navigate
+                                                @click="menuOpen = false"
+                                                class="{{ $drawerSubRow($child['active']) }}"
+                                                @if ($child['active']) aria-current="page" @endif
+                                            >
+                                                <span class="truncate">{{ $child['label'] }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                @continue
+                            @endif
                             <a
-                                href="{{ $item['href'] }}"
-                                @if ($item['href'] !== '#') wire:navigate @endif
+                                href="{{ route($item['route']) }}"
+                                wire:navigate
                                 @click="menuOpen = false"
-                                style="--i: {{ $i }}"
-                                class="group flex flex-col items-center justify-center gap-2 rounded-[6px] px-2 py-3 text-center transition-transform duration-200 active:scale-95"
+                                class="{{ $drawerRow($item['active']) }}"
+                                @if ($item['active']) aria-current="page" @endif
                             >
-                                <span class="flex h-12 w-12 items-center justify-center rounded-[12px] {{ $item['tone'] }} shadow-sm transition-transform duration-200 group-hover:scale-105">
-                                    <img src="{{ asset('assets/' . rawurlencode($item['icon'])) }}" alt="" class="h-6 w-6 brightness-0 invert" loading="lazy">
+                                <span class="flex min-w-0 items-center gap-3">
+                                    @if (isset($item['icon']['img']))
+                                        <img src="{{ asset('assets/'.rawurlencode($item['icon']['img'])) }}" alt="" class="h-5 w-5 shrink-0 brightness-0 invert" loading="lazy">
+                                    @else
+                                        <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $item['icon']['svg'] !!}</svg>
+                                    @endif
+                                    <span class="truncate">{{ $item['label'] }}</span>
                                 </span>
-                                <span class="text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">{{ $item['label'] }}</span>
                             </a>
                         @endforeach
-                    </div>
+                    @endforeach
 
-                    <form method="POST" action="{{ route('admin.logout') }}" class="mt-5 border-t border-zinc-100 pt-4">
+                    {{-- Leaving: the one row the sidebar does not have, kept from
+                         the old sheet so a phone admin can still sign out here. --}}
+                    <form method="POST" action="{{ route('admin.logout') }}" class="mt-5 border-t border-white/20 pt-3">
                         @csrf
-                        <button
-                            type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-[12px] bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                        >
-                            <x-ui.logout-icon class="h-4 w-4" />
-                            Log out
+                        <button type="submit" class="{{ $drawerRow(false) }} w-full text-left">
+                            <span class="flex min-w-0 items-center gap-3">
+                                <x-ui.logout-icon class="h-5 w-5 shrink-0" />
+                                <span class="truncate">Log out</span>
+                            </span>
                         </button>
                     </form>
-                </div>
-            </div>
+                </nav>
+            </aside>
+
+            {{-- Close: outside the panel, on the backdrop beside its top edge,
+                 level with the bar and the logo. Tapping the backdrop closes too. --}}
+            <button
+                type="button"
+                x-show="menuOpen"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                @click="menuOpen = false"
+                style="display: none; left: calc(min(69vw, 270px) + 0.75rem); top: calc(env(safe-area-inset-top) + 0.75rem);"
+                aria-label="Close menu"
+                class="dash-drawer-close fixed z-[70] flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors active:bg-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
 
         {{-- Floating action toasts (session flashes) - auto-dismiss top-right.

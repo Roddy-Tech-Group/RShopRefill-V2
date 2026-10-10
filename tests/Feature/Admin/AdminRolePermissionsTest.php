@@ -86,6 +86,29 @@ class AdminRolePermissionsTest extends TestCase
         $this->assertFalse($admin->canAccessAdminRoute('admin.api-settings'));
     }
 
+    /** Rcoin is its own grant: Content does not carry it, the Admin preset leaves it out, a Super Admin can give it. */
+    public function test_rcoin_is_its_own_section_apart_from_content(): void
+    {
+        foreach (['admin.content.rewards', 'admin.content.rewards.analytics', 'admin.content.rewards.withdrawals', 'admin.api.rewards.settings.index'] as $route) {
+            $this->assertSame('rcoin', Admin::routeSection(substr($route, 6)), $route);
+        }
+        $this->assertSame('content', Admin::routeSection('content.blog'));
+
+        $moderator = $this->admin(AdminRole::Moderator);
+        $this->assertTrue($moderator->canAccessAdminRoute('admin.content.blog'));
+        $this->assertFalse($moderator->canAccessAdminRoute('admin.content.rewards'));
+
+        $admin = $this->admin(AdminRole::Admin);
+        $this->assertTrue($admin->canAccessAdminRoute('admin.content.faqs'));
+        $this->assertFalse($admin->canAccessAdminRoute('admin.content.rewards.withdrawals'));
+
+        $granted = $this->admin(AdminRole::Admin);
+        $granted->update(['permissions' => ['content', 'rcoin']]);
+        $this->assertTrue($granted->fresh()->canAccessAdminRoute('admin.content.rewards.withdrawals'));
+
+        $this->actingAs($moderator, 'admin')->get(route('admin.content.rewards'))->assertNotFound();
+    }
+
     public function test_middleware_blocks_a_moderator_from_a_denied_page(): void
     {
         $this->withoutVite();

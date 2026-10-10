@@ -94,9 +94,9 @@ class AdminGlobalSearchService
         ['label' => 'Press Articles', 'route' => 'admin.content.press', 'group' => 'Content', 'keywords' => 'media news cms'],
         ['label' => 'Reviews', 'route' => 'admin.content.reviews', 'group' => 'Content', 'keywords' => 'testimonials ratings cms'],
         ['label' => 'FAQs', 'route' => 'admin.content.faqs', 'group' => 'Content', 'keywords' => 'questions help cms'],
-        ['label' => 'Rcoin Rewards', 'route' => 'admin.content.rewards', 'group' => 'Content', 'keywords' => 'rcoin loyalty points'],
-        ['label' => 'Rcoin Analytics', 'route' => 'admin.content.rewards.analytics', 'group' => 'Content', 'keywords' => 'rcoin analytics supply'],
-        ['label' => 'Rcoin Withdrawals', 'route' => 'admin.content.rewards.withdrawals', 'group' => 'Content', 'keywords' => 'rcoin cashout withdrawals'],
+        ['label' => 'Rcoin Rewards', 'route' => 'admin.content.rewards', 'group' => 'Rcoin', 'keywords' => 'rcoin loyalty points'],
+        ['label' => 'Rcoin Analytics', 'route' => 'admin.content.rewards.analytics', 'group' => 'Rcoin', 'keywords' => 'rcoin analytics supply'],
+        ['label' => 'Rcoin Withdrawals', 'route' => 'admin.content.rewards.withdrawals', 'group' => 'Rcoin', 'keywords' => 'rcoin cashout withdrawals'],
 
         ['label' => 'Admins', 'route' => 'admin.admins', 'group' => 'System', 'keywords' => 'staff roles permissions team'],
         ['label' => 'System Settings', 'route' => 'admin.settings', 'group' => 'System', 'keywords' => 'config preferences maintenance'],

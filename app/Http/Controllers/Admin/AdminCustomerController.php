@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Admin\Support\CustomerImpersonation;
 use App\Domain\Audit\Services\AuditLogService;
 use App\Domain\Auth\Exceptions\AccountClosureException;
 use App\Domain\Auth\Services\AccountClosureService;
@@ -19,6 +20,7 @@ use App\Domain\Shared\Enums\TransactionCategory;
 use App\Domain\Wallet\Services\TransactionPinService;
 use App\Domain\Wallet\Services\WalletService;
 use App\Http\Controllers\Controller;
+use App\Models\Admin;
 use App\Models\Notification;
 use App\Models\User;
 use App\Support\PhoneCountries;
@@ -508,6 +510,12 @@ class AdminCustomerController extends Controller
      */
     public function loginAsCustomer(Request $request, User $user): RedirectResponse
     {
+        // A Super Admin's tool only. The route sits under the Customers grant
+        // (the page it lives on), so the role is checked here, and the answer
+        // is the same 404 the panel gives for every page outside a role.
+        $admin = Auth::guard('admin')->user();
+        abort_unless($admin instanceof Admin && $admin->isSuperAdmin(), 404);
+
         // Audit BEFORE switching guards, while the acting admin is still the
         // authenticated context - impersonation is the single most sensitive
         // admin capability and every use must be attributable.
@@ -517,6 +525,7 @@ class AdminCustomerController extends Controller
         );
 
         Auth::guard('web')->login($user);
+        CustomerImpersonation::start($admin, $user);
 
         Log::info('Admin impersonation started', [
             'admin_id' => Auth::guard('admin')->id(),
@@ -534,14 +543,16 @@ class AdminCustomerController extends Controller
      */
     public function leaveImpersonation(Request $request): RedirectResponse
     {
-        // Only a real impersonation (admin guard still authenticated) may switch
-        // back; otherwise this is just a normal customer and we leave them be.
-        if (! Auth::guard('admin')->check()) {
+        // Only a real impersonation may switch back: the one this admin started,
+        // for the customer now signed in. An admin signed into their own
+        // customer account in the same browser is a customer and is left be.
+        if (! CustomerImpersonation::active()) {
             return redirect()->route('dashboard');
         }
 
         $userId = Auth::guard('web')->id();
         Auth::guard('web')->logout();
+        CustomerImpersonation::end();
 
         // Bookends: the start is audited, so the end is too - the pair frames
         // exactly which window of customer activity was actually the admin.
