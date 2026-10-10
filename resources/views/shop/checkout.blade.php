@@ -43,7 +43,11 @@
     // Mobile-money networks per currency, from the same map the charge reads,
     // so the picker follows the live checkout currency and never offers a
     // network the market's rail will refuse.
-    $momoNetworksByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::networksByCurrency();
+    $momoCoverageByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::coverageByCurrency();
+
+    // The dialling code shown beside the number, per currency: one chip for
+    // a single-country market, a short picker where the franc serves several.
+    $momoDialByCurrency = \App\Domain\Payment\Support\MobileMoneyRail::dialCodesByCurrency();
 
     // Currencies whose mobile-money charge is taken in another currency (USD
     // rides the Francophone rail in CFA francs), with the rate the total is
@@ -123,6 +127,9 @@
 <x-shop.layout :title="__('checkout.checkout').' | '.$siteName">
 
     <script src="https://checkout.flutterwave.com/v3.js"></script>
+    {{-- Kora and Paystack open their secure popups on this page; nobody is redirected away. --}}
+    <script src="https://korablobstorage.blob.core.windows.net/modal-bucket/korapay-collections.min.js"></script>
+    <script src="https://js.paystack.co/v2/inline.js"></script>
 
     <div class="min-h-full bg-zinc-100 dark:bg-[#0c1a36]">
     <div class="mx-auto w-full max-w-7xl {{ $inDashboard ? '' : 'px-4 py-6 sm:px-6 lg:px-8 lg:py-10' }}">
@@ -472,6 +479,10 @@
 
                     <div class="mt-5">
                         <h3 class="text-sm font-bold text-zinc-900 dark:text-white">{{ __('checkout.payment_method') }}</h3>
+                        {{-- Plain awareness, whatever method is picked: the currency the
+                             customer pays in is chosen in Preferences (the header on desktop,
+                             the menu on a phone), not here. --}}
+                        <p class="mt-1 text-[13px] text-zinc-600 dark:text-zinc-400">{{ __('checkout.currency_note') }}</p>
                     </div>
 
                     {{-- Gateway outage notice. Server-rendered from the same
@@ -643,10 +654,18 @@
                         x-collapse
                         x-cloak
                         x-data="{
-                            networksByCurrency: @js($momoNetworksByCurrency),
+                            coverageByCurrency: @js($momoCoverageByCurrency),
+                            dialsByCurrency: @js($momoDialByCurrency),
                             chargeByCurrency: @js($momoChargeByCurrency),
+                            get momoDials() { return this.dialsByCurrency[this.$store.cart.currency] ?? []; },
                             networkIcons: { MTN: '/assets/mtn.svg', Orange: '/assets/orange.svg' },
-                            get momoNetworks() { return this.networksByCurrency[this.$store.cart.currency] ?? []; },
+                            // The networks of the country picked beside the number. A
+                            // country with one network still shows it, preselected, so
+                            // the customer can see what will be charged; only a rail that
+                            // takes the number alone (Rwanda) shows nothing.
+                            get momoNetworks() {
+                                return this.coverageByCurrency[this.$store.cart.currency]?.[this.momoCountry] ?? [];
+                            },
                             networkIcon(network) { return this.networkIcons[network] ?? null; },
                             // The rail currency and rate when the charge is not in the
                             // page's own currency; null wherever it is.
@@ -698,9 +717,57 @@
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <div x-init="momoCountry = momoDials[0]?.country ?? ''; $watch('momoDials', list => momoCountry = list[0]?.country ?? '')">
                             <label for="momo_phone" class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('checkout.momo_number_label') }}</label>
-                            <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ $fieldClass }}">
+                            <div class="mt-1.5 flex items-stretch gap-2">
+                                {{-- The dialling code, so nobody wonders whether to type the 237.
+                                     One country for this currency: a plain pill. Several (the
+                                     franc zones): a dropdown. The network chips follow the
+                                     country picked. --}}
+                                <span x-show="momoDials.length === 1" x-text="'+' + (momoDials[0]?.dial ?? '')" class="inline-flex h-11 shrink-0 items-center rounded-full border-2 border-zinc-200 bg-zinc-50 px-3.5 text-sm font-semibold tabular-nums text-zinc-700 dark:border-white/15 dark:bg-white/5 dark:text-zinc-200"></span>
+                                <div x-show="momoDials.length > 1" x-cloak x-data="{ open: false }" @click.away="open = false" @keydown.escape.prevent="open = false" class="relative shrink-0">
+                                    <button
+                                        type="button"
+                                        @click="open = ! open"
+                                        :aria-expanded="open.toString()"
+                                        aria-haspopup="listbox"
+                                        aria-label="{{ __('checkout.momo_number_label') }}"
+                                        class="flex h-11 items-center gap-1.5 rounded-full border-2 border-zinc-200 bg-zinc-50 pl-3.5 pr-2.5 text-sm font-semibold tabular-nums text-zinc-700 transition-colors hover:border-zinc-300 focus:outline-none focus-visible:border-edge dark:border-white/15 dark:bg-white/5 dark:text-zinc-200 dark:hover:border-white/25"
+                                    >
+                                        <span x-text="'+' + (momoDials.find(d => d.country === momoCountry)?.dial ?? momoDials[0]?.dial ?? '')"></span>
+                                        <svg class="h-4 w-4 text-zinc-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                    </button>
+                                    <ul
+                                        x-show="open"
+                                        x-cloak
+                                        x-transition.origin.top.left
+                                        role="listbox"
+                                        aria-label="{{ __('checkout.momo_number_label') }}"
+                                        @keydown.arrow-down.prevent="$focus.wrap().next()"
+                                        @keydown.arrow-up.prevent="$focus.wrap().previous()"
+                                        class="absolute left-0 top-full z-30 mt-1.5 min-w-[7.5rem] rounded-2xl border border-zinc-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#0c1a36]"
+                                    >
+                                        <template x-for="d in momoDials" :key="d.country">
+                                            <li
+                                                role="option"
+                                                tabindex="0"
+                                                :aria-selected="(d.country === momoCountry).toString()"
+                                                @click="momoCountry = d.country; open = false"
+                                                @keydown.enter.prevent="momoCountry = d.country; open = false"
+                                                @keydown.space.prevent="momoCountry = d.country; open = false"
+                                                :class="d.country === momoCountry
+                                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+                                                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"
+                                                class="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                            >
+                                                <span x-text="'+' + d.dial"></span>
+                                                <svg x-show="d.country === momoCountry" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                                <input id="momo_phone" name="momo_phone" type="tel" autocomplete="tel" x-model="momoPhone" placeholder="{{ __('checkout.momo_phone_placeholder') }}" class="{{ str_replace('mt-1.5 ', 'min-w-0 flex-1 ', $fieldClass) }}">
+                            </div>
                         </div>
                         {{-- The rail takes CFA francs, not dollars: a USD order is
                              converted at charge time. Said here, beside the number
@@ -1531,6 +1598,10 @@
             return {
                 method: 'card',
                 crypto: '',
+                // The mobile money number as typed, and the country whose
+                // dialling code sits beside it; the button waits for the number.
+                momoPhone: '',
+                momoCountry: '',
                 submitting: false,
                 cryptoRates: cryptoRates || {},
                 walletBalances: walletBalances || {},
@@ -1627,6 +1698,13 @@
                 fiatMethods: @js(array_keys(\App\Domain\Payment\Support\FiatGatewayRouter::METHOD_PRIORITY)),
                 fiatUnavailableByCurrency: @js(\App\Domain\Payment\Support\FiatGatewayRouter::unavailableFiatMethodsByCurrency()),
 
+                // Currency -> offered methods in tile order, from the payment
+                // switchboard (Management > Gateway settings). This page used
+                // to keep its own copy, which had to be hand-edited every time
+                // a method changed; now it renders whatever the server offers.
+                methodsByCurrency: @js(\App\Domain\Payment\Support\SupportedPaymentMethods::byCurrency()),
+                fallbackMethods: @js(\App\Domain\Payment\Support\SupportedPaymentMethods::fallback()),
+
                 // Methods this cart's compliance categories make ineligible, per
                 // currency. Resolved server-side by the payment eligibility gate
                 // and empty while it runs in shadow mode, so the tiles only change
@@ -1679,48 +1757,26 @@
 
                 getFilteredMethods() {
                     const currency = this.$store.cart.currency;
-                    // Currency -> allowed method keys. Mirrors what's enabled on
-                    // the Flutterwave dashboard so we never offer a method that
-                    // their modal would then reject. Order matters: it's the
-                    // order tabs render in the grid.
-                    // Ordering is by DOMINANT local method first so the customer
-                    // sees their familiar option at top-left of the grid:
-                    //   - Francophone Africa (XAF/XOF) → MTN MoMo first
-                    //   - Nigeria (NGN) → Bank Transfer first (most-used FW method)
-                    //   - Ghana / Kenya / Uganda / Rwanda → Mobile money first
-                    //   - US / EU / UK → Card first, crypto for the savvy users
-                    // Apple Pay only in USD, GBP and NGN: the gateway refuses
-                    // it in every other currency before looking at anything
-                    // else (mirrors SupportedPaymentMethods).
-                    // USD also carries mobile money: it rides the Francophone
-                    // rail in CFA francs (MobileMoneyRail), second in the grid
-                    // so a card-first market keeps its card first.
-                    const mapping = {
-                        'USD': ['card', 'mobile_money', 'crypto', 'wallet'],
-                        'EUR': ['card', 'pay_with_bank', 'crypto', 'wallet'],
-                        'GBP': ['card', 'pay_with_bank', 'crypto', 'wallet'],
-                        'NGN': ['bank_transfer', 'card', 'pay_with_bank', 'ussd', 'bank_qr', 'mobile_wallet', 'crypto', 'wallet'],
-                        'GHS': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'XAF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'XOF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'KES': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'UGX': ['mobile_money', 'card', 'crypto', 'wallet'],
-                        'RWF': ['mobile_money', 'card', 'crypto', 'wallet'],
-                    };
-                    // A currency with no list of its own gets card only, matching
-                    // SupportedPaymentMethods::FALLBACK. Offering Crypto here drew a
-                    // 422 from the pay step, and with no currency chooser on this
-                    // page there is no longer any way out of it.
-                    const allowedKeys = mapping[currency] || ['card'];
-                    return this.allMethods.filter(m => {
-                        if (m.key === 'wallet' && !this.isLoggedIn) {
-                            return false;
-                        }
-                        if (m.key === 'apple_pay' && !this.applePayAvailable) {
-                            return false;
-                        }
-                        return allowedKeys.includes(m.key);
-                    });
+                    // The server's offered methods for this currency, in the
+                    // tile order set in Gateway settings (seeded card first, the
+                    // order this page always rendered). A currency with no row
+                    // of its own gets card only, the same fallback the pay step uses.
+                    const allowedKeys = this.methodsByCurrency[currency] || this.fallbackMethods;
+                    const byKey = Object.fromEntries(this.allMethods.map(m => [m.key, m]));
+                    return allowedKeys
+                        .map(key => byKey[key])
+                        .filter(m => {
+                            if (!m) {
+                                return false;
+                            }
+                            if (m.key === 'wallet' && !this.isLoggedIn) {
+                                return false;
+                            }
+                            if (m.key === 'apple_pay' && !this.applePayAvailable) {
+                                return false;
+                            }
+                            return true;
+                        });
                 },
 
                 // Wizard State
@@ -2299,6 +2355,10 @@
                     if (this.method === 'wallet') {
                         return this.hasSufficientWalletBalance();
                     }
+                    if (this.method === 'mobile_money') {
+                        // No number, no button: the shortest real number is 8 digits.
+                        return this.momoPhone.replace(/\D/g, '').length >= 8;
+                    }
                     return true;
                 },
 
@@ -2489,11 +2549,12 @@
                             // Empty for rails that take no network (M-Pesa, Rwanda); the
                             // server validates against the market's rail, never a default.
                             const networkInput = document.querySelector('input[name="momo_network"]')?.value || '';
-                            const phoneInput = document.getElementById('momo_phone')?.value || '';
+                            const phoneInput = this.momoPhone || document.getElementById('momo_phone')?.value || '';
 
                             this.momoDetails = {
                                 phone_number: phoneInput,
-                                network: networkInput
+                                network: networkInput,
+                                country: this.momoCountry || ''
                             };
 
                             this.paymentState = 'processing';
@@ -2642,7 +2703,11 @@
                         this.errorMessage = this.failureMessage(sessionData.payment_payload, @js(__('checkout.transaction_not_completed')));
                     } else if (status === 'awaiting_payment') {
                         const inlineData = sessionData.payment_payload?.inline;
-                        if (inlineData) {
+                        if (inlineData && inlineData.provider === 'korapay') {
+                            this.openKorapayInline(inlineData);
+                        } else if (inlineData && inlineData.provider === 'paystack') {
+                            this.openPaystackInline(inlineData);
+                        } else if (inlineData) {
                             this.openFlutterwaveInline(inlineData);
                         } else {
                             this.paymentState = 'error';
@@ -2679,6 +2744,123 @@
                     }
                 },
 
+                // The popup reported success: ask our server to verify by our
+                // reference and settle, then show the result. Shared by every
+                // gateway's popup.
+                async settleInlinePayment(provider, transactionId, disarmTelemetry) {
+                    const self = this;
+                    disarmTelemetry();
+                    self.paymentState = 'processing';
+                    try {
+                        let verifyRes = await fetch(`/api/payment-sessions/${self.session.id}/verify`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
+                            },
+                            body: JSON.stringify({ transaction_id: transactionId || null })
+                        });
+                        let verifyData = await verifyRes.json();
+                        if (verifyData.status === 'confirmed') {
+                            self.paymentState = 'success';
+                            setTimeout(() => { window.location.href = self.redirectUrl; }, 2000);
+                        } else {
+                            self.paymentState = 'error';
+                            self.errorMessage = verifyData.message || @js(__('checkout.payment_not_verified'));
+                            self.open = true;
+                        }
+                    } catch (e) {
+                        if (window.PaymentTelemetry && self.session?.id) {
+                            window.PaymentTelemetry.recordSignal(self.session.id, 'network_timeout', { provider: provider, step: 'verify' });
+                        }
+                        self.paymentState = 'error';
+                        self.errorMessage = @js(__('checkout.payment_verify_connection'));
+                        self.open = true;
+                    }
+                },
+
+                // The customer closed a popup without paying: back to our modal.
+                popupClosed(provider, disarmTelemetry) {
+                    disarmTelemetry();
+                    if (this.paymentState !== 'success' && this.paymentState !== 'processing') {
+                        if (window.PaymentTelemetry && this.session?.id) {
+                            window.PaymentTelemetry.recordFailure(this.session.id, 'popup_closed', { provider: provider });
+                        }
+                        this.paymentState = 'idle';
+                        this.open = true;
+                        this.submitting = false;
+                    }
+                },
+
+                popupSdkMissing(provider) {
+                    if (window.PaymentTelemetry && this.session?.id) {
+                        window.PaymentTelemetry.recordFailure(this.session.id, 'sdk_load_failed', { provider: provider });
+                    }
+                    this.paymentState = 'error';
+                    this.errorMessage = @js(__('checkout.payment_window_failed'));
+                    this.open = true;
+                    this.submitting = false;
+                },
+
+                openKorapayInline(data) {
+                    const self = this;
+                    if (typeof window.Korapay === 'undefined') { return this.popupSdkMissing('korapay'); }
+
+                    this.paymentState = 'processing';
+                    this.open = false;
+                    const disarmTelemetry = window.PaymentTelemetry
+                        ? window.PaymentTelemetry.armSession(self.session?.id, { provider: 'korapay' })
+                        : function () {};
+
+                    window.Korapay.initialize({
+                        key: data.key,
+                        reference: data.reference,
+                        amount: data.amount,
+                        currency: data.currency,
+                        customer: data.customer,
+                        channels: data.channels,
+                        default_channel: data.default_channel,
+                        notification_url: data.notification_url,
+                        narration: data.narration,
+                        onSuccess: function (payment) { self.settleInlinePayment('korapay', payment?.reference || data.reference, disarmTelemetry); },
+                        // A bank transfer can take a while to clear: keep polling our side.
+                        onPending: function () { self.paymentState = 'processing'; self.startStatusPolling(); },
+                        onFailed: function (payment) {
+                            disarmTelemetry();
+                            self.paymentState = 'error';
+                            self.errorMessage = @js(__('checkout.transaction_not_completed'));
+                            self.open = true;
+                            self.submitting = false;
+                        },
+                        onClose: function () { self.popupClosed('korapay', disarmTelemetry); }
+                    });
+                },
+
+                openPaystackInline(data) {
+                    const self = this;
+                    if (typeof window.PaystackPop === 'undefined') { return this.popupSdkMissing('paystack'); }
+
+                    this.paymentState = 'processing';
+                    this.open = false;
+                    const disarmTelemetry = window.PaymentTelemetry
+                        ? window.PaymentTelemetry.armSession(self.session?.id, { provider: 'paystack' })
+                        : function () {};
+
+                    const popup = new window.PaystackPop();
+                    popup.newTransaction({
+                        key: data.key,
+                        email: data.email,
+                        amount: data.amount,
+                        currency: data.currency,
+                        reference: data.reference,
+                        channels: data.channels,
+                        metadata: data.metadata,
+                        onSuccess: function (transaction) { self.settleInlinePayment('paystack', transaction?.reference || data.reference, disarmTelemetry); },
+                        onCancel: function () { self.popupClosed('paystack', disarmTelemetry); }
+                    });
+                },
+
                 openFlutterwaveInline(data) {
                     const self = this;
 
@@ -2712,6 +2894,8 @@
                         currency: data.currency,
                         customer: data.customer,
                         customizations: data.customizations,
+                        // Only the method the customer picked on our page.
+                        payment_options: data.payment_options || 'card',
                         callback: async function(response) {
                             // Payment completed inside the popup
                             disarmTelemetry();

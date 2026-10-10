@@ -158,6 +158,14 @@ Schedule::command('insights:alert-failures')
     ->name('insights:alert-failures-10m')
     ->sentryMonitor('insights-alert-failures');
 
+// Gateway words no rule reads yet, once a day and only when there are any:
+// each text with its count and customers, so rules are added in a batch
+// from one message rather than one hourly page per text.
+Schedule::command('insights:unclassified-digest')
+    ->dailyAt('08:30')
+    ->name('insights:unclassified-digest')
+    ->sentryMonitor('insights-unclassified-digest');
+
 // Same job, on demand. Useful after a debugging session left dozens of Pending
 // orders, or any time you want to flush stale sessions without waiting for cron.
 Artisan::command('payments:expire-stale', function () {
@@ -433,6 +441,14 @@ Schedule::command('reconcile:nowpayments --hours=48')
     ->hourly()
     ->withoutOverlapping()
     ->sentryMonitor('reconcile-nowpayments');
+
+// Kora's book against ours: every Kora attempt of the last two days is looked
+// up by our reference and each disagreement goes to Telegram. Report-only; a
+// human decides, or runs it again with --settle.
+Schedule::command('korapay:reconcile --hours=48')
+    ->hourly()
+    ->withoutOverlapping()
+    ->sentryMonitor('korapay-reconcile');
 
 // Surfaces crypto payments that settled short or over. Exits non-zero when the
 // queue is non-empty so the monitor trips and a human actually looks at it —

@@ -152,9 +152,13 @@ class RefusedCardRecorder
         // expired card, a wrong PIN), so the customer learns what to change.
         // A fraud-class refusal is told as a plain bank decline: what was
         // detected is never said.
+        // A verdict no rule reads yet says only that the payment did not go
+        // through. It used to default to "your bank declined", which five
+        // customers were told in October 2026 for a refusal that was the
+        // gateway's own ("Invalid credentials.").
         $reason = CustomerFailureCopy::sentence(
             $latest->verdict_class === DeclineVerdict::CLASS_FRAUD ? 'bank_declined' : (string) $latest->reason_code
-        ) ?? (string) CustomerFailureCopy::sentence('bank_declined');
+        ) ?? (string) CustomerFailureCopy::sentence('payment_not_completed');
 
         return [
             'reason' => $reason,

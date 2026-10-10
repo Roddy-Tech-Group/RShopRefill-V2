@@ -115,6 +115,74 @@ class PaymentFailureAlertsTest extends TestCase
         $this->assertStringContainsString('cannot fix by retrying', $messages[0]);
     }
 
+    /** Words no rule reads are a to-do for the digest, not an hourly page. */
+    public function test_an_unclassified_gateway_message_does_not_page_as_a_platform_fault(): void
+    {
+        $user = User::factory()->create();
+
+        $this->outcome($user, [
+            'failure_category' => 'system',
+            'failure_reason_code' => 'unrecognised_gateway_message',
+            'retryable' => true,
+            'metadata' => ['failure_details' => ['provider_message' => 'Some new processor wording']],
+        ]);
+
+        $this->artisan('insights:alert-failures')->assertExitCode(0);
+
+        $this->assertSame([], $this->telegramMessages());
+    }
+
+    /** The digest: one message a day listing each unclassified text with its count, only when there is something. */
+    public function test_the_daily_digest_lists_each_unclassified_text_once_with_its_count(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        foreach ([$user, $user, $other] as $who) {
+            $this->outcome($who, [
+                'failure_category' => 'system',
+                'failure_reason_code' => 'unrecognised_gateway_message',
+                'metadata' => ['failure_details' => ['provider_message' => 'Invalid credentials.']],
+            ]);
+        }
+        $this->outcome($other, [
+            'failure_category' => 'system',
+            'failure_reason_code' => 'unrecognised_gateway_message',
+            'provider' => 'korapay',
+            'metadata' => ['failure_details' => ['provider_message' => 'Charge route closed']],
+        ]);
+        // Classified failures and old unclassified ones are not in the digest.
+        $this->outcome($user, ['failure_reason_code' => 'insufficient_funds']);
+        $stale = $this->outcome($user, [
+            'failure_category' => 'system',
+            'failure_reason_code' => 'unrecognised_gateway_message',
+            'metadata' => ['failure_details' => ['provider_message' => 'Yesterday wording']],
+        ]);
+        $stale->forceFill(['created_at' => now()->subHours(30)])->save();
+
+        $this->artisan('insights:unclassified-digest')->assertExitCode(0);
+
+        $messages = $this->telegramMessages();
+        $this->assertCount(1, $messages);
+        $this->assertStringContainsString('not yet classified', $messages[0]);
+        $this->assertStringContainsString('Invalid credentials.', $messages[0]);
+        $this->assertStringContainsString('3 failure(s), 2 customer(s)', $messages[0]);
+        $this->assertStringContainsString('Charge route closed', $messages[0]);
+        $this->assertStringNotContainsString('Yesterday wording', $messages[0]);
+        $this->assertStringContainsString('insights:reclassify', $messages[0]);
+    }
+
+    public function test_the_daily_digest_stays_silent_when_everything_is_classified(): void
+    {
+        $this->outcome(User::factory()->create(), ['failure_reason_code' => 'insufficient_funds']);
+
+        $this->artisan('insights:unclassified-digest')
+            ->expectsOutputToContain('Nothing unclassified')
+            ->assertExitCode(0);
+
+        $this->assertSame([], $this->telegramMessages());
+    }
+
     public function test_a_customer_failing_three_times_is_flagged_for_a_human(): void
     {
         $user = User::factory()->create();

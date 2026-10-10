@@ -6,6 +6,7 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Interfaces\PaymentProviderInterface;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
+use App\Domain\Shared\Enums\FundingVerdict;
 use App\Models\PaymentAttempt;
 use App\Models\WalletFunding;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,17 @@ class FundingVerificationService
      */
     public function verify(WalletFunding $funding): bool
     {
+        return $this->outcome($funding) === FundingVerdict::Paid;
+    }
+
+    /**
+     * Ask the gateway whether this top-up was paid, and say when it could not
+     * be asked. A caller that treated "could not be asked" as "not paid" failed
+     * the funding for good on a gateway hiccup; the customer's money then
+     * landed with nothing left to credit.
+     */
+    public function outcome(WalletFunding $funding): FundingVerdict
+    {
         $providerName = $funding->gateway;
 
         try {
@@ -32,18 +44,20 @@ class FundingVerificationService
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return FundingVerdict::Unknown;
         }
 
         if ($provider instanceof FlutterwavePaymentProvider) {
             $verification = $provider->verifyByReference($funding->reference);
 
+            // Nothing came back: the gateway was unreachable, rate limiting
+            // us, or has no record yet. That is not a verdict.
             if (! $verification) {
-                Log::warning('Flutterwave verification failed - no transaction data returned', [
+                Log::warning('Flutterwave verification unavailable - no transaction data returned', [
                     'reference' => $funding->reference,
                 ]);
 
-                return false;
+                return FundingVerdict::Unknown;
             }
 
             // Extract and compare response attributes to prevent tampering
@@ -58,7 +72,7 @@ class FundingVerificationService
                     'status' => $flwStatus,
                 ]);
 
-                return false;
+                return FundingVerdict::NotPaid;
             }
 
             // 2 + 3. Tamper prevention: amount and currency checks, against what
@@ -87,7 +101,7 @@ class FundingVerificationService
                     'received' => $flwAmount,
                 ]);
 
-                return false;
+                return FundingVerdict::NotPaid;
             }
 
             if ($expectedCurrency !== $flwCurrency) {
@@ -97,7 +111,7 @@ class FundingVerificationService
                     'received' => $flwCurrency,
                 ]);
 
-                return false;
+                return FundingVerdict::NotPaid;
             }
 
             // Update funding properties on success
@@ -106,7 +120,7 @@ class FundingVerificationService
             $funding->verified_at = now();
             $funding->save();
 
-            return true;
+            return FundingVerdict::Paid;
         }
 
         // Every non-Flutterwave gateway used to fall through to this log line and
@@ -119,7 +133,9 @@ class FundingVerificationService
         // The generic path below verifies through the provider contract, so any
         // gateway implementing PaymentProviderInterface works without another
         // bespoke branch here.
-        return $this->verifyViaPaymentAttempt($funding, $provider, $providerName);
+        return $this->verifyViaPaymentAttempt($funding, $provider, $providerName)
+            ? FundingVerdict::Paid
+            : FundingVerdict::NotPaid;
     }
 
     /**

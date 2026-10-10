@@ -70,6 +70,47 @@ class CheckoutRestyleTest extends TestCase
         );
     }
 
+    /** Mobile money cannot be continued without a number: the button waits for one. */
+    public function test_the_continue_button_waits_for_a_mobile_money_number(): void
+    {
+        $source = $this->source();
+
+        $this->assertStringContainsString('name="momo_phone" type="tel" autocomplete="tel" x-model="momoPhone"', $source);
+        $this->assertStringContainsString("if (this.method === 'mobile_money') {", $source);
+        $this->assertStringContainsString("return this.momoPhone.replace(/\D/g, '').length >= 8;", $source);
+    }
+
+    /** The dialling code sits beside the number: a chip for one country, a picker where the franc serves several. */
+    public function test_the_number_field_shows_its_dialling_code(): void
+    {
+        $source = $this->source();
+
+        $this->assertStringContainsString('dialsByCurrency: @js($momoDialByCurrency)', $source);
+        // One country: a plain pill. Several: a styled listbox, not the browser's select.
+        $this->assertStringContainsString('<span x-show="momoDials.length === 1" x-text="\'+\' + (momoDials[0]?.dial ?? \'\')"', $source);
+        $this->assertStringContainsString('<div x-show="momoDials.length > 1" x-cloak x-data="{ open: false }"', $source);
+        $this->assertStringNotContainsString('<select x-model="momoCountry"', $source);
+        $this->assertStringContainsString('aria-haspopup="listbox"', $source);
+
+        // Plain awareness under the payment method heading, whatever method is picked:
+        // the currency is chosen in Preferences. Not inside the mobile money panel.
+        $this->assertStringContainsString("{{ __('checkout.payment_method') }}</h3>", $source);
+        $this->assertStringContainsString("{{ __('checkout.currency_note') }}", $source);
+        $this->assertStringNotContainsString("{{ __('checkout.currency_note') }}", $mobileMoneyPanel = str($source)->between('{{-- Mobile money --}}', '{{-- Crypto --}}')->toString());
+        $this->assertStringNotContainsString('momoHasOtherMarkets', $source);
+        $this->assertSame('You can select your preferred currency in Preferences.', __('checkout.currency_note'));
+        $this->assertNotSame('checkout.currency_note', __('checkout.currency_note', [], 'fr'));
+        $this->assertStringContainsString('@click="momoCountry = d.country; open = false"', $source);
+        $this->assertStringContainsString('@keydown.arrow-down.prevent="$focus.wrap().next()"', $source);
+        $this->assertStringContainsString("x-text=\"'+' + d.dial\"", $source);
+        $this->assertStringNotContainsString("'+' + d.dial + ' ' + d.name", $source, 'codes only, no country names');
+        $this->assertStringContainsString("country: this.momoCountry || ''", $source);
+
+        // The network chips follow the country picked, from the same coverage the server checks.
+        $this->assertStringContainsString('coverageByCurrency: @js($momoCoverageByCurrency)', $source);
+        $this->assertStringContainsString('this.coverageByCurrency[this.$store.cart.currency]?.[this.momoCountry] ?? []', $source);
+    }
+
     /** Remove is an X now, which means it has to say what it is some other way. */
     public function test_remove_is_an_icon_that_still_names_itself(): void
     {
@@ -171,9 +212,11 @@ class CheckoutRestyleTest extends TestCase
         $this->assertStringContainsString('name="momo_network" :value="value"', $source);
         $this->assertStringContainsString(':src="networkIcon(net)"', $source);
 
+        // Networks stay chips; the only dropdown in the section is the dialling code beside the number.
         $mobileMoney = str($source)->between('{{-- Mobile money --}}', '{{-- Crypto --}}')->toString();
         $this->assertStringNotContainsString('@click="open = !open"', $mobileMoney);
-        $this->assertStringNotContainsString('role="listbox"', $mobileMoney);
+        $this->assertSame(1, substr_count($mobileMoney, 'role="listbox"'));
+        $this->assertMatchesRegularExpression('/role="listbox"\s+aria-label="\{\{ __\(\x27checkout\.momo_number_label\x27\) \}\}"/', $mobileMoney);
         $this->assertStringNotContainsString('methodGlyphs', $source);
         $this->assertStringNotContainsString('credit%20card%20payment.webp', $source);
         $this->assertStringNotContainsString('Bank%20transfer.webp', $source);

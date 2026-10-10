@@ -69,6 +69,13 @@ class GatewayMessageRulesTest extends TestCase
                 'phonenumber is required',
                 FailureCategory::System, 'gateway_config_error', false, 'gateway_config_error',
             ],
+            // Flutterwave's USD card route, 2026-10-06 to 09: the processor
+            // refusing the gateway's own credentials. Ours or the gateway's,
+            // never the card; no retry can change it.
+            'processor rejecting the gateway credentials' => [
+                'Invalid credentials.',
+                FailureCategory::System, 'gateway_config_error', false, 'gateway_config_error',
+            ],
         ];
     }
 

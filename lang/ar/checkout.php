@@ -118,6 +118,7 @@ return [
     'momo_network_label' => 'الشبكة',
     'momo_number_label' => 'رقم الأموال عبر الهاتف',
     'momo_phone_placeholder' => 'رقم الهاتف',
+    'currency_note' => 'يمكنك اختيار عملتك المفضلة من التفضيلات.',
     'momo_charge_hint' => 'سيُخصم من حساب الأموال عبر الهاتف نحو :amount، وهو الإجمالي محوّلًا بسعر صرف اليوم.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'أرسلنا طلب دفع بقيمة :amount إلى :phone. وافق عليه من هاتفك لإتمام هذه الدفعة.',

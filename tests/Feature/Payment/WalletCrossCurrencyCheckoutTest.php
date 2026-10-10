@@ -26,6 +26,7 @@ use App\Models\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -186,6 +187,158 @@ class WalletCrossCurrencyCheckoutTest extends TestCase
         $order->refresh();
         $this->assertSame('XAF', $order->metadata['paid_from_wallet_currency']);
         $this->assertEqualsWithDelta(6_600.00, (float) $order->metadata['paid_amount'], 0.001);
+    }
+
+    /**
+     * Wallet is offered in every currency checkout sells in, including the
+     * ones no wallet is held in (XOF, KES, UGX, RWF). The order is paid from a
+     * wallet the customer does hold, at the frozen rate; the order currency
+     * itself never needed a wallet of its own.
+     *
+     * @return array<string, array{0: string, 1: float}>
+     */
+    public static function currenciesWithoutTheirOwnWallet(): array
+    {
+        return [
+            'XOF' => ['XOF', 600.0],
+            'KES' => ['KES', 130.0],
+            'UGX' => ['UGX', 3700.0],
+            'RWF' => ['RWF', 1400.0],
+        ];
+    }
+
+    #[DataProvider('currenciesWithoutTheirOwnWallet')]
+    public function test_an_order_in_a_currency_with_no_wallet_of_its_own_is_paid_from_a_wallet_the_customer_holds(string $currency, float $ratePerUsd): void
+    {
+        Queue::fake([FulfillOrderItemJob::class]);
+        CurrencyRate::create(['code' => $currency, 'name' => $currency, 'type' => 'fiat', 'rate_per_usd' => $ratePerUsd, 'is_active' => true]);
+        $usd = $this->wallet('USD', 50);
+
+        $this->actingAs($this->user)
+            ->postJson(route('api.checkout.place-order'), [
+                'cart_id' => $this->cart->id,
+                'payment_method' => 'wallet',
+                'preferred_currency' => $currency,
+                'delivery_email' => 'customer@rshop.com',
+            ])
+            ->assertStatus(201);
+
+        $attempt = Order::firstOrFail()->paymentAttempts()->firstOrFail();
+        $this->assertSame($currency, strtoupper($attempt->currency));
+        $this->assertSame('USD', $attempt->metadata['wallet']['currency']);
+
+        $token = $this->actingAs($this->user)->postJson(route('api.wallets.pin.verify'), ['pin' => '5283'])->assertOk()->json('auth_token');
+        $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $attempt->paymentSession->id), [
+            'method' => 'wallet',
+            'details' => ['auth_token' => $token],
+        ])->assertOk();
+
+        $this->assertEqualsWithDelta((float) $attempt->metadata['wallet']['amount'], (float) $usd->fresh()->locked_balance, 0.001);
+
+        // Delivered: the held dollars are taken, at the rate frozen at checkout.
+        $this->fulfil($attempt->fresh());
+        $this->assertEqualsWithDelta(50 - (float) $attempt->metadata['wallet']['amount'], (float) $usd->fresh()->balance, 0.001);
+        $this->assertEqualsWithDelta(0.00, (float) $usd->fresh()->locked_balance, 0.001);
+        $this->assertEqualsWithDelta((float) $attempt->amount / $ratePerUsd, (float) $attempt->metadata['wallet']['amount'], 0.01);
+    }
+
+    /**
+     * An order placed for card can be paid with the wallet at the pay step
+     * (the mobile app's choose_method flow). The goods must never go out
+     * without the wallet being charged: either the switch is refused, or the
+     * wallet is debited exactly as a wallet checkout would be.
+     */
+    public function test_a_card_order_paid_with_the_wallet_never_ships_without_charging_it(): void
+    {
+        Queue::fake([FulfillOrderItemJob::class]);
+        $usd = $this->wallet('USD', 50);
+
+        $order = app(CheckoutService::class)->placeOrder(user: $this->user, cart: $this->cart, paymentMethod: 'flutterwave', displayCurrency: 'USD');
+        $attempt = $order->paymentAttempts->first();
+        $this->assertSame('flutterwave', $attempt->gateway);
+
+        $token = $this->actingAs($this->user)->postJson(route('api.wallets.pin.verify'), ['pin' => '5283'])->assertOk()->json('auth_token');
+        $response = $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $attempt->paymentSession->id), [
+            'method' => 'wallet',
+            'details' => ['auth_token' => $token],
+        ]);
+
+        if ($response->status() >= 400) {
+            $this->assertSame(0.0, (float) $usd->fresh()->locked_balance, 'refused, yet the wallet was held');
+            $this->assertSame(50.0, (float) $usd->fresh()->balance);
+
+            return;
+        }
+
+        $this->fulfil($attempt->fresh());
+
+        $this->assertEqualsWithDelta(39.00, (float) $usd->fresh()->balance, 0.001, 'the goods went out but the wallet was never debited');
+        $this->assertEqualsWithDelta(0.00, (float) $usd->fresh()->locked_balance, 0.001, 'the hold was never released');
+    }
+
+    /** The switched order is a wallet payment in every respect, not a card one holding wallet money. */
+    public function test_switching_a_card_order_to_the_wallet_makes_it_a_wallet_payment(): void
+    {
+        Queue::fake([FulfillOrderItemJob::class]);
+        $this->wallet('USD', 50);
+
+        $order = app(CheckoutService::class)->placeOrder(user: $this->user, cart: $this->cart, paymentMethod: 'flutterwave', displayCurrency: 'USD');
+        $attempt = $order->paymentAttempts->first();
+
+        $token = $this->actingAs($this->user)->postJson(route('api.wallets.pin.verify'), ['pin' => '5283'])->assertOk()->json('auth_token');
+        $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $attempt->paymentSession->id), [
+            'method' => 'wallet',
+            'details' => ['auth_token' => $token],
+        ])->assertOk();
+
+        $attempt->refresh();
+        $this->assertSame('wallet', $attempt->gateway);
+        $this->assertSame(PaymentStatus::Reserved, $attempt->payment_status);
+        $this->assertSame('USD', $attempt->metadata['wallet']['currency']);
+        $this->assertSame('wallet', $attempt->paymentSession->fresh()->session_type);
+        $this->assertSame('wallet', $attempt->paymentSession->fresh()->provider);
+    }
+
+    /** Once a card charge may be under way, the order cannot also be paid from the wallet. */
+    public function test_a_card_payment_already_started_cannot_switch_to_the_wallet(): void
+    {
+        $usd = $this->wallet('USD', 50);
+
+        $order = app(CheckoutService::class)->placeOrder(user: $this->user, cart: $this->cart, paymentMethod: 'flutterwave', displayCurrency: 'USD');
+        $attempt = $order->paymentAttempts->first();
+        $attempt->paymentSession->forceFill(['status' => 'awaiting_payment'])->save();
+
+        $token = $this->actingAs($this->user)->postJson(route('api.wallets.pin.verify'), ['pin' => '5283'])->assertOk()->json('auth_token');
+        $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $attempt->paymentSession->id), [
+            'method' => 'wallet',
+            'details' => ['auth_token' => $token],
+        ])->assertStatus(422);
+
+        $this->assertSame('flutterwave', $attempt->fresh()->gateway);
+        $this->assertEqualsWithDelta(0.00, (float) $usd->fresh()->locked_balance, 0.001);
+        $this->assertSame('awaiting_payment', $attempt->paymentSession->fresh()->status);
+    }
+
+    /** A switch the wallet cannot cover is refused and leaves the card order exactly as it was. */
+    public function test_a_refused_switch_to_the_wallet_leaves_the_card_order_untouched(): void
+    {
+        $usd = $this->wallet('USD', 5);
+
+        $order = app(CheckoutService::class)->placeOrder(user: $this->user, cart: $this->cart, paymentMethod: 'flutterwave', displayCurrency: 'USD');
+        $attempt = $order->paymentAttempts->first();
+
+        $token = $this->actingAs($this->user)->postJson(route('api.wallets.pin.verify'), ['pin' => '5283'])->assertOk()->json('auth_token');
+        $this->actingAs($this->user)->postJson(route('api.payment-sessions.pay', $attempt->paymentSession->id), [
+            'method' => 'wallet',
+            'details' => ['auth_token' => $token],
+        ])->assertStatus(400);
+
+        $attempt->refresh();
+        $this->assertSame('flutterwave', $attempt->gateway);
+        $this->assertArrayNotHasKey('wallet', $attempt->metadata ?? []);
+        $this->assertSame('awaiting_method', $attempt->paymentSession->fresh()->status);
+        $this->assertSame('card', $attempt->paymentSession->fresh()->session_type);
+        $this->assertEqualsWithDelta(0.00, (float) $usd->fresh()->locked_balance, 0.001);
     }
 
     public function test_the_cart_currency_wallet_is_preferred_when_it_covers_the_order(): void

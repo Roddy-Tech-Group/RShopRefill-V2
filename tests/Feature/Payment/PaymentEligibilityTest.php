@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payment;
 
+use App\Domain\Admin\Enums\AdminRole;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Services\PaymentEligibilityService;
@@ -10,6 +11,7 @@ use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Enums\AlertSeverity;
+use App\Models\Admin;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -480,24 +482,37 @@ class PaymentEligibilityTest extends TestCase
         $this->assertTrue($service->enforcementEnabled());
     }
 
+    /**
+     * The eligibility switches live on Management > Gateway settings now; the
+     * interlocks moved with them.
+     */
+    private function actAsSuperAdmin(): void
+    {
+        $this->actingAs(Admin::firstOrCreate(
+            ['email' => 'eligibility-super@example.test'],
+            ['name' => 'Eligibility Super', 'password' => 'password', 'role' => AdminRole::SuperAdmin, 'is_active' => true],
+        ), 'admin');
+    }
+
     public function test_the_admin_ui_refuses_to_switch_off_the_last_approved_cell_while_enforcing(): void
     {
+        $this->actAsSuperAdmin();
         $this->approve(ComplianceCategory::Airtime, ['korapay']);
         SiteSetting::put('features.payment_eligibility_enforce_enabled', 'on', 'features');
         Cache::flush();
 
-        Volt::test('admin.system-settings')
-            ->call('updateSetting', 'features.eligibility_korapay_airtime_enabled', 'off')
-            ->assertHasErrors('settings.features.eligibility_korapay_airtime_enabled');
+        Volt::test('admin.management.gateways', ['tab' => 'eligibility'])
+            ->call('toggleCell', 'korapay', 'airtime', false)
+            ->assertSet('refusal', fn (?string $refusal) => $refusal !== null);
 
         $this->assertSame(1, app(PaymentEligibilityService::class)->approvedCellCount(), 'the last cell is still approved');
 
         // With a second cell approved, the same cell can be switched off.
         $this->approve(ComplianceCategory::Airtime, ['paystack']);
 
-        Volt::test('admin.system-settings')
-            ->call('updateSetting', 'features.eligibility_korapay_airtime_enabled', 'off')
-            ->assertHasNoErrors();
+        Volt::test('admin.management.gateways', ['tab' => 'eligibility'])
+            ->call('toggleCell', 'korapay', 'airtime', false)
+            ->assertSet('refusal', null);
 
         Cache::flush();
         $this->assertSame(1, app(PaymentEligibilityService::class)->approvedCellCount());
@@ -506,16 +521,18 @@ class PaymentEligibilityTest extends TestCase
         SiteSetting::put('features.payment_eligibility_enforce_enabled', 'off', 'features');
         Cache::flush();
 
-        Volt::test('admin.system-settings')
-            ->call('updateSetting', 'features.eligibility_paystack_airtime_enabled', 'off')
-            ->assertHasNoErrors();
+        Volt::test('admin.management.gateways', ['tab' => 'eligibility'])
+            ->call('toggleCell', 'paystack', 'airtime', false)
+            ->assertSet('refusal', null);
     }
 
     public function test_the_admin_ui_refuses_to_enforce_with_zero_approved_cells(): void
     {
-        Volt::test('admin.system-settings')
-            ->call('updateSetting', 'features.payment_eligibility_enforce_enabled', 'on')
-            ->assertHasErrors('settings.features.payment_eligibility_enforce_enabled');
+        $this->actAsSuperAdmin();
+
+        Volt::test('admin.management.gateways', ['tab' => 'eligibility'])
+            ->call('toggleEnforcement', true)
+            ->assertSet('refusal', fn (?string $refusal) => $refusal !== null);
 
         // The flip must not have been persisted.
         $this->assertFalse(app(PaymentEligibilityService::class)->enforcementEnabled());
@@ -524,9 +541,9 @@ class PaymentEligibilityTest extends TestCase
         // With one cell approved the same flip is accepted.
         $this->approve(ComplianceCategory::Airtime, ['korapay']);
 
-        Volt::test('admin.system-settings')
-            ->call('updateSetting', 'features.payment_eligibility_enforce_enabled', 'on')
-            ->assertHasNoErrors();
+        Volt::test('admin.management.gateways', ['tab' => 'eligibility'])
+            ->call('toggleEnforcement', true)
+            ->assertSet('refusal', null);
 
         $this->assertTrue(app(PaymentEligibilityService::class)->enforcementEnabled());
     }

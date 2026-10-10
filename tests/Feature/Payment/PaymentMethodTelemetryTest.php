@@ -23,7 +23,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -324,9 +323,10 @@ class PaymentMethodTelemetryTest extends TestCase
         // pay" — so the failure is swallowed and logged instead.
         [, $attempt] = $this->flutterwaveSession();
 
-        // Force the write to fail the way a real outage would: the underlying
-        // table is gone by the time we try to save.
-        Schema::drop('payment_attempts');
+        // Force the write to fail the way a real outage would. Thrown from the
+        // save itself rather than by dropping the table: on MySQL a drop is
+        // refused by the foreign keys and ends the test's rollback early.
+        PaymentAttempt::saving(fn () => throw new \RuntimeException('MySQL server has gone away'));
 
         Log::shouldReceive('warning')->once();
 

@@ -106,12 +106,14 @@ class PaymentMethodAvailabilityTest extends TestCase
         );
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.status', 'awaiting_redirect');
+            ->assertJsonPath('data.status', 'awaiting_payment');
 
+        $this->assertSame('flutterwave', $response->json('data.payment_payload.inline.provider'));
         $this->assertNotEmpty(
-            $response->json('data.payment_payload.redirect_url'),
-            "No redirect link was issued for {$method}, so the customer has nowhere to pay.",
+            $response->json('data.payment_payload.inline.payment_options'),
+            "No popup method was set for {$method}, so the customer has nowhere to pay.",
         );
+        $this->assertNull($response->json('data.payment_payload.redirect_url'), 'nobody is redirected away from checkout');
     }
 
     public function test_gbp_order_can_be_paid_with_pay_with_bank(): void
@@ -124,7 +126,8 @@ class PaymentMethodAvailabilityTest extends TestCase
         );
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.status', 'awaiting_redirect');
+            ->assertJsonPath('data.status', 'awaiting_payment')
+            ->assertJsonPath('data.payment_payload.inline.payment_options', 'account');
     }
 
     /**

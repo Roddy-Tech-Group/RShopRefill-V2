@@ -29,12 +29,12 @@ class SystemSettingsSectionsTest extends TestCase
 
     public function test_every_flag_still_renders_under_its_section(): void
     {
-        // One representative per section, plus an eligibility cell (prefix
-        // match) - and no "Other" bucket, proving the map covers every seeded
-        // flag.
+        // One representative per section, and no "Other" bucket, proving the
+        // map covers every seeded flag. The gateway switches and eligibility
+        // cells moved to Management > Gateway settings and are not listed here.
         Volt::test('admin.system-settings')
-            ->assertSee('features.gateway_korapay_enabled')
-            ->assertSee('features.eligibility_korapay_esim_enabled')
+            ->assertDontSee('features.gateway_korapay_enabled')
+            ->assertDontSee('features.eligibility_korapay_esim_enabled')
             ->assertSee('features.risk_engine_enforce_enabled')
             ->assertSee('features.kyc_enforce_enabled')
             ->assertSee('features.kyc_tier2_threshold_usd')

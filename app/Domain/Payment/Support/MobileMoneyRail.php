@@ -51,6 +51,12 @@ final class MobileMoneyRail
             'country' => null,
             'description' => 'MTN or Airtel Mobile Money',
         ],
+        'TZS' => [
+            'type' => 'mobile_money_tanzania',
+            'networks' => [],
+            'country' => null,
+            'description' => 'Mobile Money',
+        ],
         'RWF' => [
             'type' => 'mobile_money_rwanda',
             'networks' => [],
@@ -66,9 +72,9 @@ final class MobileMoneyRail
         ],
         'XOF' => [
             'type' => 'mobile_money_franco',
-            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE'],
+            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE', 'Moov' => 'MOOV', 'Wave' => 'WAVE', 'Mobicash' => 'MOBICASH'],
             'country' => 'CI',
-            'description' => 'MTN Mobile Money or Orange Money',
+            'description' => 'MTN, Orange, Moov or Wave Mobile Money',
             'precision' => 0,
         ],
         // No rail takes dollars, so a USD order is charged as CFA francs on
@@ -78,7 +84,7 @@ final class MobileMoneyRail
         // and refunds read what the rail was actually asked for.
         'USD' => [
             'type' => 'mobile_money_franco',
-            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE'],
+            'networks' => ['MTN' => 'MTN', 'Orange' => 'ORANGE', 'Moov' => 'MOOV', 'Wave' => 'WAVE', 'Mobicash' => 'MOBICASH'],
             'country' => 'CM',
             'description' => 'MTN Mobile Money or Orange Money',
             'charged_in' => 'XAF',
@@ -108,26 +114,65 @@ final class MobileMoneyRail
         return self::RAILS[self::key($currency)]['type'] ?? null;
     }
 
-    /** Whether the rail needs a network in the charge, and so the picker must show. */
+    /**
+     * Whether the customer has a network to choose: more than one network is
+     * offered across the switched-on gateways on this currency's row. A
+     * market with one network (M-Pesa in Kenya on Flutterwave alone) takes
+     * the number only.
+     */
     public static function requiresNetwork(string $currency): bool
     {
         return self::networkOptions($currency) !== [];
     }
 
     /**
-     * Network labels for the pickers, in display order.
+     * The network labels to offer for this currency: the union of what the
+     * switched-on gateways on its row can take, in row order, across every
+     * country the currency covers. Empty when there is nothing to choose.
      *
      * @return list<string>
      */
     public static function networkOptions(string $currency): array
     {
-        return array_keys(self::RAILS[self::key($currency)]['networks'] ?? []);
+        $labels = [];
+
+        foreach (self::coverageOffered($currency) as $networks) {
+            foreach ($networks as $label) {
+                $labels[$label] = true;
+            }
+        }
+
+        $labels = array_keys($labels);
+
+        return count($labels) > 1 ? $labels : [];
     }
 
     /**
-     * The gateway's code for what the customer picked, matched without regard
-     * to case against either the label or the code itself. Null when the rail
-     * takes no network or the value is not one of its options.
+     * Country => network labels offered for this currency right now.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function coverageOffered(string $currency): array
+    {
+        return GatewayCapabilities::mobileMoneyUnion(
+            FiatGatewayRouter::liveGatewaysFor('mobile_money', self::key($currency)),
+            self::key($currency),
+        );
+    }
+
+    /**
+     * Whether Flutterwave's rail for this currency wants a network code on
+     * the charge (Ghana, Uganda and the francophone rails do; M-Pesa and
+     * Rwanda take the number alone).
+     */
+    public static function codeRequired(string $currency): bool
+    {
+        return (self::RAILS[self::key($currency)]['networks'] ?? []) !== [];
+    }
+
+    /**
+     * Flutterwave's code for the network the customer picked, or null when
+     * its rail for this currency has no code for it.
      */
     public static function gatewayNetwork(string $currency, ?string $input): ?string
     {
@@ -148,26 +193,26 @@ final class MobileMoneyRail
     }
 
     /**
-     * The label the screens show for what the customer picked, matched the
-     * way gatewayNetwork() matches. Null when the rail takes no network or
-     * the value is not one of its options.
+     * The label the screens show for what the customer picked, matched
+     * without regard to case against every network any gateway offers for
+     * this currency. Null when the value is not one of them.
      */
     public static function networkLabel(string $currency, ?string $input): ?string
     {
-        $networks = self::RAILS[self::key($currency)]['networks'] ?? [];
-        $needle = strtolower(trim((string) $input));
+        $labels = [];
 
-        if ($needle === '') {
-            return null;
+        foreach (self::coverageOffered($currency) as $networks) {
+            array_push($labels, ...$networks);
         }
 
-        foreach ($networks as $label => $code) {
-            if (strtolower($label) === $needle || strtolower($code) === $needle) {
-                return $label;
+        // A Flutterwave code typed in place of its label still resolves.
+        foreach (self::RAILS[self::key($currency)]['networks'] ?? [] as $label => $code) {
+            if (strtolower($code) === strtolower(trim((string) $input))) {
+                $input = $label;
             }
         }
 
-        return null;
+        return GatewayCapabilities::labelIn($input, $labels);
     }
 
     /**
@@ -181,6 +226,32 @@ final class MobileMoneyRail
     public static function promptsOnHandset(string $currency): bool
     {
         return in_array(self::chargeType($currency), ['mobile_money_franco', 'mpesa'], true);
+    }
+
+    /**
+     * Rails whose API charge answers with the operator's own authorisation
+     * page (Ghana, Uganda, Rwanda, Tanzania). Rather than send the customer
+     * away to it, these open in Flutterwave's popup on our page, which
+     * renders the same step inline. The handset rails never need this: their
+     * prompt is on the phone before the API answers.
+     */
+    public static function opensInPopup(string $currency): bool
+    {
+        return self::supports($currency) && ! self::promptsOnHandset($currency);
+    }
+
+    /**
+     * Flutterwave's popup option for a rail that opens there.
+     */
+    public static function popupOption(string $currency): ?string
+    {
+        return match (self::chargeType($currency)) {
+            'mobile_money_ghana' => 'mobilemoneyghana',
+            'mobile_money_uganda' => 'mobilemoneyuganda',
+            'mobile_money_rwanda' => 'mobilemoneyrwanda',
+            'mobile_money_tanzania' => 'mobilemoneytanzania',
+            default => null,
+        };
     }
 
     /** ISO country for rails that need one (Francophone only), else null. */
@@ -203,6 +274,63 @@ final class MobileMoneyRail
         }
 
         return $default;
+    }
+
+    /**
+     * Dialling codes for the countries our mobile money rails serve.
+     *
+     * @var array<string, string>
+     */
+    private const DIAL_CODES = [
+        'CM' => '237', 'GA' => '241', 'CG' => '242', 'TD' => '235', 'CF' => '236', 'GQ' => '240',
+        'SN' => '221', 'CI' => '225', 'BF' => '226', 'ML' => '223', 'BJ' => '229', 'TG' => '228', 'NE' => '227', 'GW' => '245',
+        'GH' => '233', 'KE' => '254', 'UG' => '256', 'RW' => '250', 'TZ' => '255', 'EG' => '20',
+    ];
+
+    /**
+     * The country a number in this currency belongs to when it carries no
+     * dialling code: the francophone rail's default, or the currency's one
+     * country.
+     */
+    public static function homeCountry(string $currency): ?string
+    {
+        return self::countryFor($currency, '') ?? match (self::key($currency)) {
+            'GHS' => 'GH', 'KES' => 'KE', 'UGX' => 'UG', 'RWF' => 'RW', 'TZS' => 'TZ', 'EGP' => 'EG',
+            default => null,
+        };
+    }
+
+    /**
+     * The number as a gateway that wants it international expects it: digits
+     * only, with the country's dialling code in front. "0670000000" typed in
+     * Cameroon becomes "237670000000"; a number already carrying a known code
+     * is left alone.
+     */
+    public static function internationalNumber(string $currency, string $phoneNumber, ?string $country = null): string
+    {
+        $digits = self::normalisePhone($phoneNumber);
+
+        foreach (self::DIAL_CODES as $code) {
+            if (strlen($digits) >= 11 && str_starts_with($digits, $code)) {
+                return $digits;
+            }
+        }
+
+        // The country the customer picked beside the number wins over the
+        // currency's home country: a Senegalese number on an XOF order is
+        // dialled as 221, not 225.
+        $home = $country !== null && isset(self::DIAL_CODES[strtoupper($country)])
+            ? strtoupper($country)
+            : self::homeCountry($currency);
+        $code = $home !== null ? (self::DIAL_CODES[$home] ?? '') : '';
+
+        // Only markets with a trunk zero drop it (0244 in Ghana becomes 233 244);
+        // a Côte d'Ivoire number keeps its leading 0, it is part of the number.
+        if (in_array($home, ['GH', 'KE', 'UG', 'RW', 'TZ', 'EG'], true)) {
+            $digits = ltrim($digits, '0');
+        }
+
+        return $code.$digits;
     }
 
     public static function description(string $currency): string
@@ -275,14 +403,52 @@ final class MobileMoneyRail
     }
 
     /**
-     * Every currency's network labels, for a picker that follows the
-     * checkout's live currency client-side.
+     * Country => network labels offered per currency, for the network chips
+     * to follow the country picked beside the number.
      *
-     * @return array<string, list<string>>
+     * @return array<string, array<string, list<string>>>
      */
-    public static function networksByCurrency(): array
+    public static function coverageByCurrency(): array
     {
-        return array_map(fn (array $rail): array => array_keys($rail['networks']), self::RAILS);
+        $map = [];
+
+        foreach (array_keys(self::RAILS) as $currency) {
+            $map[$currency] = self::coverageOffered($currency);
+        }
+
+        return $map;
+    }
+
+    /**
+     * The dialling codes the number field shows for each currency: the
+     * countries the switched-on gateways serve right now, home country first,
+     * or the home country alone when nothing is live, so the chip still
+     * reads right while the method is being refused.
+     *
+     * @return array<string, list<array{country: string, name: string, dial: string}>>
+     */
+    public static function dialCodesByCurrency(): array
+    {
+        $map = [];
+
+        foreach (array_keys(self::RAILS) as $currency) {
+            $home = self::homeCountry($currency);
+            $countries = array_keys(self::coverageOffered($currency));
+
+            if ($countries === [] && $home !== null) {
+                $countries = [$home];
+            }
+
+            usort($countries, fn (string $a, string $b) => ($a === $home ? 0 : 1) <=> ($b === $home ? 0 : 1) ?: strcmp($a, $b));
+
+            $map[$currency] = array_values(array_map(fn (string $country) => [
+                'country' => $country,
+                'name' => GatewayCapabilities::countryName($country),
+                'dial' => self::DIAL_CODES[$country] ?? '',
+            ], array_filter($countries, fn (string $country) => isset(self::DIAL_CODES[$country]))));
+        }
+
+        return $map;
     }
 
     /**

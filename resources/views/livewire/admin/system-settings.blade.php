@@ -1,6 +1,7 @@
 {{-- FILE: resources/views/livewire/admin/system-settings.blade.php --}}
 <?php
 
+use App\Domain\Admin\Services\FeatureSettingWriter;
 use App\Models\SiteSetting;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -208,7 +209,9 @@ class extends Component {
 
         // Integration / API keys live on the dedicated /admin/api-settings
         // page; exclude them here so they don't clutter system settings.
+        // Gateway switches and eligibility are managed on Gateway settings.
         return SiteSetting::query()->where('group', '!=', 'integrations')->get()
+            ->reject(fn (SiteSetting $setting) => FeatureSettingWriter::belongsToGatewaySettings($setting->key))
             ->sort(function ($a, $b) use ($keyOrder) {
                 $aPos = $keyOrder[$a->key] ?? 99;
                 $bPos = $keyOrder[$b->key] ?? 99;
@@ -233,55 +236,22 @@ class extends Component {
      */
     public function updateSetting(string $key, string $value): void
     {
-        $existing = SiteSetting::query()->where('key', $key)->first();
-        $previous = $existing?->value;
-
-        $decoded = json_decode($value, true);
-        $stored  = json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
-
-        // Safety interlock: enforcing the eligibility matrix with ZERO
-        // approved cells would refuse every restricted-category cart on every
-        // gateway - a one-toggle full-catalogue outage. Refuse the flip with a
-        // clear instruction instead. (PaymentEligibilityService carries the
-        // same guard as an un-bypassable runtime backstop.)
-        if ($key === 'features.payment_eligibility_enforce_enabled'
-            && in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
-            && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->approvedCellCount() === 0) {
-            $this->addError('settings.'.$key, 'Refused: no eligibility cell is approved yet. Approve at least one gateway x category cell before enforcing, or every cart would be refused.');
+        // Gateway switches and eligibility live on Gateway settings now. A
+        // stale tab posting one here is refused rather than quietly obeyed, so
+        // there is one place those are changed.
+        if (FeatureSettingWriter::belongsToGatewaySettings($key)) {
+            $this->addError('settings.'.$key, 'This setting moved to Management > Gateway settings.');
 
             return;
         }
 
-        // The same interlock from the other side: switching off the LAST
-        // approved cell while enforcing leaves a lockdown with nothing
-        // approved. Enforcement no longer falls back to shadow in that state
-        // (that turned a lockdown into allow-all), so the flip is refused
-        // here, where the admin can read why.
-        if (str_starts_with($key, 'features.eligibility_')
-            && ! in_array(strtolower((string) $stored), ['on', 'true', '1'], true)
-            && app(\App\Domain\Payment\Services\PaymentEligibilityService::class)->isLastApprovedCell($key)) {
-            $this->addError('settings.'.$key, 'Refused: this is the last approved cell and enforcement is on. Approve another cell first, or switch enforcement off, otherwise every restricted cart would be refused.');
+        // The safety interlocks and the audit trail live in the writer, shared
+        // with Gateway settings.
+        if ($refusal = app(FeatureSettingWriter::class)->write($key, $value)) {
+            $this->addError('settings.'.$key, $refusal);
 
             return;
         }
-
-        SiteSetting::put(
-            $key,
-            $stored,
-            $existing?->group ?? 'general',
-            $existing?->description,
-        );
-
-        // Governance: every settings/feature-flag change is audited with who,
-        // which key, and before -> after. This is what makes flipping an
-        // enforcement switch (risk, KYC, eligibility, limits) attributable.
-        app(\App\Domain\Audit\Services\AuditLogService::class)->log(
-            action: 'setting.updated',
-            model: $existing,
-            beforeState: ['value' => $previous],
-            afterState: ['value' => $stored],
-            metadata: ['key' => $key, 'group' => $existing?->group ?? 'general'],
-        );
 
         $this->savedKeys[$key] = now()->toTimeString();
         unset($this->settings);
@@ -324,6 +294,12 @@ class extends Component {
                         @if (is_string($setting))
                             <li class="mx-3 mt-4 mb-1 px-5">
                                 <p class="border-b border-blue-100 pb-1.5 text-[11px] font-extrabold uppercase tracking-widest text-blue-600 dark:border-blue-400/20 dark:text-blue-300">{{ $setting }}</p>
+                                @if ($setting === 'Payments & Gateways')
+                                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                        Gateway switches, payment routing and eligibility are on
+                                        <a href="{{ route('admin.management.gateways') }}" wire:navigate class="font-semibold text-blue-600 hover:underline dark:text-blue-300">Gateway settings</a>.
+                                    </p>
+                                @endif
                             </li>
                             @continue
                         @endif

@@ -395,15 +395,28 @@ class PaymentSessionService
                 'status_at_failure' => $session->status,
             ]);
 
+            $statusAtCancel = $session->status;
             $session->transitionTo('cancelled');
 
             $attempt = $session->paymentAttempt;
             $order = $attempt?->order;
 
             if ($attempt && ! $this->releaseReservedWalletFunds($attempt) && $attempt->payment_status !== PaymentStatus::Paid) {
+                // A charge the gateway may still complete (the prompt already on
+                // the phone, the popup open, the transfer account issued) is
+                // closed as Expired, the sweeper's own stamp, never Failed:
+                // Failed is final for the verify chain, and a customer who taps
+                // Cancel and then approves the prompt has still paid. Their
+                // money then settles as a late arrival, with ops told. A cancel
+                // before any charge was asked for has nothing to land.
+                $chargeMayLand = ! in_array($statusAtCancel, ['pending', 'awaiting_method'], true);
+
                 $attempt->update([
-                    'payment_status' => PaymentStatus::Failed,
+                    'payment_status' => $chargeMayLand ? PaymentStatus::Expired : PaymentStatus::Failed,
                     'failed_at' => now(),
+                    'metadata' => array_merge($attempt->metadata ?? [], [
+                        'cancelled' => ['by' => 'customer', 'session_status' => $statusAtCancel, 'at' => now()->toIso8601String()],
+                    ]),
                 ]);
             }
 
@@ -507,7 +520,7 @@ class PaymentSessionService
         DB::transaction(function () use ($session) {
             $session = PaymentSession::where('id', $session->id)->lockForUpdate()->firstOrFail();
 
-            if (! in_array($session->status, ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'awaiting_customer_action'])) {
+            if (! in_array($session->status, ['awaiting_payment', 'awaiting_method', 'awaiting_transfer', 'awaiting_redirect', 'awaiting_confirmation', 'awaiting_customer_action', 'processing'])) {
                 return;
             }
 
@@ -519,9 +532,18 @@ class PaymentSessionService
 
             $session->transitionTo('expired');
 
+            // A wallet hold taken for this session goes back to the customer:
+            // the debit only ever happens on fulfilment, which an expired
+            // session will never reach.
+            $attempt = $session->paymentAttempt;
+
+            if ($attempt) {
+                $this->releaseReservedWalletFunds($attempt);
+            }
+
             // Unlock RCOIN if it was locked during checkout. Recorded on the
             // order so a late confirm (expired -> confirmed) skips re-unlock.
-            $order = $session->paymentAttempt?->order;
+            $order = $attempt?->order;
             $this->releaseRcoinLock($order);
 
             if ($order) {

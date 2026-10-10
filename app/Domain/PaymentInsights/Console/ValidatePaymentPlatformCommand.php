@@ -1308,6 +1308,13 @@ class ValidatePaymentPlatformCommand extends Command
             // A payment already in flight when the switch flips...
             $inFlight = $this->makeSessionFor($user, $order);
 
+            // What the switchboard routes to with every switch as it is now, to
+            // prove the kill switch is undone exactly. Snapshotted rather than
+            // assumed, because an admin may have put another gateway first.
+            $cardUsdBefore = FiatGatewayRouter::resolve('card', 'USD');
+            $mobileMoneyXafBefore = FiatGatewayRouter::resolve('mobile_money', 'XAF');
+            $flutterwaveWasOn = FeatureFlag::gatewayEnabled('flutterwave');
+
             $this->setFlag('gateway_flutterwave', false);
             try {
                 $this->ensure(! FeatureFlag::gatewayEnabled('flutterwave'), 'flag off but gateway reports enabled');
@@ -1327,14 +1334,13 @@ class ValidatePaymentPlatformCommand extends Command
                 app(PaymentSessionService::class)->confirmSession($inFlight, ['transaction_id' => 'payval_kill_'.Str::random(6)]);
                 $this->ensure($inFlight->fresh()->status === 'confirmed', 'kill switch stranded an in-flight payment');
             } finally {
-                $this->setFlag('gateway_flutterwave', true);
+                $this->setFlag('gateway_flutterwave', $flutterwaveWasOn);
             }
 
-            // With the primary back on, every fiat method must route home to
-            // it, whatever the backup flags say: backups only ever serve
-            // while Flutterwave is off.
-            $this->ensure(FiatGatewayRouter::resolve('card', 'USD') === 'flutterwave', 'primary restored but router did not route home');
-            $this->ensure(FiatGatewayRouter::resolve('mobile_money', 'XAF') === 'flutterwave', 'primary restored but mobile money did not route home');
+            // With the primary restored, every fiat method must route exactly
+            // where it did before the switch was thrown.
+            $this->ensure(FiatGatewayRouter::resolve('card', 'USD') === $cardUsdBefore, 'primary restored but router did not route home');
+            $this->ensure(FiatGatewayRouter::resolve('mobile_money', 'XAF') === $mobileMoneyXafBefore, 'primary restored but mobile money did not route home');
         });
     }
 

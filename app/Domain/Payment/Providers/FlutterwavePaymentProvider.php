@@ -107,6 +107,38 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         ];
     }
 
+    /**
+     * The inline popup, restricted to the one method the customer picked.
+     * USSD, pay with bank, bank QR and the Nigerian e-wallets used to go out
+     * as a hosted page the customer was sent away to; the same popup that
+     * takes cards renders each of them on our page when told which one.
+     *
+     * @return array<string, mixed>
+     */
+    public function inlineConfig(PaymentAttempt $attempt, string $methodKey, ?string $phoneNumber = null): array
+    {
+        $config = $this->initializePayment($attempt);
+
+        // A mobile money number typed on our page is handed to the popup so
+        // the customer is not asked for it a second time.
+        if ($phoneNumber !== null && $phoneNumber !== '') {
+            $config['customer']['phone_number'] = $phoneNumber;
+        }
+
+        $config['payment_options'] = match ($methodKey) {
+            'card' => 'card',
+            'ussd' => 'ussd',
+            'pay_with_bank' => 'account',
+            'bank_qr' => 'qr',
+            'mobile_wallet' => 'opay,enaira,mobilemoneynigeria',
+            'apple_pay' => 'applepay',
+            'mobile_money' => MobileMoneyRail::popupOption((string) $attempt->currency) ?? 'mobilemoney',
+            default => $methodKey,
+        };
+
+        return $config;
+    }
+
     public function getEncryptionKey(): string
     {
         $key = config('services.flutterwave.encryption_key');
@@ -493,7 +525,9 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
         $gatewayNetwork = null;
 
-        if (MobileMoneyRail::requiresNetwork($currency)) {
+        // Rails that take a network code must be given one it knows; the
+        // M-Pesa and Rwanda rails take the number alone whatever was picked.
+        if (MobileMoneyRail::codeRequired($currency)) {
             $gatewayNetwork = MobileMoneyRail::gatewayNetwork($currency, $network);
 
             if ($gatewayNetwork === null) {
@@ -508,7 +542,18 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
         $chargeCurrency = MobileMoneyRail::chargeCurrency($currency, $phone);
         $chargeAmount = (float) $attempt->amount;
 
-        if ($chargeCurrency !== $currency) {
+        // A charge already sent under this reference fixed the franc figure.
+        // A retry (the customer taps Pay again while the first prompt is
+        // live) must ask for the same francs: re-pricing at today's rate left
+        // the approved prompt paying a figure our verification no longer
+        // matched, so the money was taken and never credited.
+        $alreadyCharged = $attempt->pay_currency !== null
+            && strtoupper((string) $attempt->pay_currency) === $chargeCurrency
+            && $attempt->pay_amount !== null;
+
+        if ($chargeCurrency !== $currency && $alreadyCharged) {
+            $chargeAmount = (float) $attempt->pay_amount;
+        } elseif ($chargeCurrency !== $currency) {
             $converted = $this->convertForRail($attempt, $chargeCurrency);
 
             if ($converted === null) {
@@ -1121,7 +1166,20 @@ class FlutterwavePaymentProvider implements PaymentProviderInterface
 
             $body = $response->json();
 
-            return $this->applyVerificationResult($attempt, $body['data'] ?? [], $body);
+            if ($this->applyVerificationResult($attempt, $body['data'] ?? [], $body)) {
+                return true;
+            }
+
+            // The id we hold may be a declined charge under this reference (a
+            // first card refused in the popup) while a later card paid. Only
+            // then is the reference looked up as well: a charge still pending
+            // is simply pending, and asking twice on every poll would spend
+            // the gateway budget the sweeper and the status page share.
+            if (($body['data']['status'] ?? null) === 'failed') {
+                return $this->verifyUsingReference($attempt);
+            }
+
+            return false;
         } catch (\Exception $e) {
             Log::error('Flutterwave verification error: '.$e->getMessage());
 

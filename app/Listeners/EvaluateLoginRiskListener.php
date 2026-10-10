@@ -2,12 +2,12 @@
 
 namespace App\Listeners;
 
+use App\Domain\Admin\Support\CustomerImpersonation;
 use App\Domain\Security\Services\DeviceOtpService;
 use App\Domain\Security\Services\LoginRiskEvaluator;
 use App\Domain\Security\Services\SessionSecurityManager;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Login;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
@@ -53,8 +53,11 @@ class EvaluateLoginRiskListener
             return;
         }
 
-        // Bypasses device verification if an admin is impersonating a customer
-        if (Auth::guard('admin')->check()) {
+        // A Super Admin signed in as this customer is not a new device of the
+        // customer's. Only a started impersonation counts: an admin signing
+        // into their own customer account in the same browser is verified like
+        // anyone else (the admin guard alone used to skip this).
+        if (CustomerImpersonation::active()) {
             return;
         }
 

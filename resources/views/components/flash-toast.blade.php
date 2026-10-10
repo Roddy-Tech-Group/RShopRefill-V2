@@ -17,7 +17,7 @@
             this.isError = err;
             this.show = true;
             clearTimeout(this.timeout);
-            this.timeout = setTimeout(() => this.show = false, 4500);
+            this.timeout = setTimeout(() => this.show = false, 5000);
         }
     }"
     x-init="if (message) $nextTick(() => triggerToast(message, isError))"

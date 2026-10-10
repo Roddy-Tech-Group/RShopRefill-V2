@@ -113,6 +113,10 @@ return [
         // webhook's `data` object (NOT the raw body) with HMAC-SHA256.
         'secret_key' => env('KORAPAY_SECRET_KEY'),
         'encryption_key' => env('KORAPAY_ENCRYPTION_KEY'),
+        // Where Kora posts charge events for charges we start through its
+        // API. Defaults to this app's own webhook route; set it to a public
+        // tunnel when testing from a local machine.
+        'webhook_url' => env('KORAPAY_WEBHOOK_URL'),
     ],
 
     'paystack' => [

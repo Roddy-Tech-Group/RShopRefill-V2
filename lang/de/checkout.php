@@ -117,6 +117,7 @@ return [
     'momo_network_label' => 'Netz',
     'momo_number_label' => 'Nummer für mobiles Geld',
     'momo_phone_placeholder' => 'Telefonnummer',
+    'currency_note' => 'Sie können Ihre bevorzugte Währung in den Einstellungen auswählen.',
     'momo_charge_hint' => 'Dein Mobile-Money-Konto wird mit etwa :amount belastet, dem zum heutigen Kurs umgerechneten Gesamtbetrag.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'Wir haben eine Zahlungsanfrage über :amount an :phone gesendet. Bestätigen Sie sie auf Ihrem Telefon, um die Zahlung abzuschließen.',

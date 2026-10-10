@@ -308,7 +308,9 @@
 
                     {{-- Log in as this customer (impersonation). Opens their
                          dashboard in the same browser; admin stays signed in on
-                         the admin guard and can return via the banner. --}}
+                         the admin guard and can return via the banner. A Super
+                         Admin's tool only; the route refuses everyone else. --}}
+                    @if (auth('admin')->user()?->isSuperAdmin())
                     <form method="POST" action="{{ route('admin.customer.login-as', $user) }}"
                           data-confirm="Log in as {{ $user->name }}? You will be switched into their account in this tab and can return to admin at any time."
                           data-confirm-title="Log in as customer"
@@ -320,6 +322,7 @@
                             Log in as customer
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
 

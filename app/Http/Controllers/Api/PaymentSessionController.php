@@ -9,17 +9,20 @@ use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\GatewayDisabledException;
 use App\Domain\Payment\Exceptions\PaymentCategoryIneligibleException;
 use App\Domain\Payment\Providers\NowPaymentsProvider;
+use App\Domain\Payment\Providers\WalletPaymentProvider;
 use App\Domain\Payment\Services\PaymentEligibilityService;
 use App\Domain\Payment\Services\PaymentGatewayFactory;
 use App\Domain\Payment\Services\PaymentSessionService;
 use App\Domain\Payment\Support\CryptoCoinGate;
 use App\Domain\Payment\Support\FiatGatewayRouter;
+use App\Domain\Payment\Support\GatewayCapabilities;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
 use App\Domain\PaymentInsights\Services\RefusedCardRecorder;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\FundingStatus;
 use App\Domain\Wallet\Exceptions\InsufficientBalanceException;
+use App\Domain\Wallet\Exceptions\MissingTransactionPinException;
 use App\Domain\Wallet\Exceptions\WalletOnHoldException;
 use App\Domain\Wallet\Services\WalletFundingService;
 use App\Http\Controllers\Controller;
@@ -290,7 +293,14 @@ class PaymentSessionController extends Controller
             $allowedMethods = array_values(array_diff($allowedMethods, ['wallet']));
         }
 
-        if (! in_array($method, $allowedMethods)) {
+        // A payment already under way (the popup opened, an OTP was asked
+        // for) carries on with the method it started with, even if an admin
+        // has since switched that method off for new payments.
+        $continuingStartedMethod = $session->status !== 'awaiting_method'
+            && $method !== null
+            && $attempt->payment_method === $method;
+
+        if (! $continuingStartedMethod && ! in_array($method, $allowedMethods)) {
             return response()->json([
                 'message' => "The payment method {$method} is not available for currency {$currency}.",
             ], 422);
@@ -316,6 +326,59 @@ class PaymentSessionController extends Controller
 
         $gatewayFactory = app(PaymentGatewayFactory::class);
 
+        // Mobile money is routed by country and network as well as currency:
+        // the customer's country comes off the dialling prefix, and a gateway
+        // is only a candidate when it serves that country on that network. A
+        // country or network no switched-on gateway serves is refused here in
+        // plain words, before anything is charged or stamped.
+        $momoCountry = null;
+        $momoNetwork = null;
+
+        if ($method === 'mobile_money') {
+            $request->validate([
+                'details.phone_number' => 'required|string',
+                'details.network' => 'nullable|string',
+                'details.country' => 'nullable|string|size:2',
+            ]);
+
+            // A number with no digits in it (letters, punctuation, a pasted
+            // label) passed `required` and reached the gateway empty once
+            // the rail stripped it to digits: "phonenumber is required",
+            // and a failed order for a typo. Refused here instead, so the
+            // customer fixes the number and the payment carries on.
+            if (strlen(MobileMoneyRail::normalisePhone((string) $details['phone_number'])) < 8) {
+                return response()->json([
+                    'message' => 'Enter the mobile money phone number, with its country code if it is not a local number.',
+                ], 422);
+            }
+
+            // The country chip beside the number: honoured only when it is a
+            // country the switched-on gateways serve for this currency, so a
+            // crafted value cannot dial a market we do not offer. The number
+            // is made international here, once, and that is what every rail,
+            // refusal message and popup below receives.
+            $chipCountry = strtoupper((string) ($details['country'] ?? ''));
+            $details['phone_number'] = MobileMoneyRail::internationalNumber(
+                $currency,
+                (string) $details['phone_number'],
+                array_key_exists($chipCountry, MobileMoneyRail::coverageOffered($currency)) ? $chipCountry : null,
+            );
+
+            // A country with a single network (Burkina Faso, Mobicash) shows
+            // no chips, so none is sent; the only one there is, is meant.
+            $chipOffered = MobileMoneyRail::coverageOffered($currency)[MobileMoneyRail::countryFor($currency, (string) $details['phone_number']) ?? ''] ?? [];
+            if (trim((string) ($details['network'] ?? '')) === '' && count($chipOffered) === 1) {
+                $details['network'] = $chipOffered[0];
+            }
+
+            if ($refusal = $this->refuseUnservedMobileMoney($currency, (string) $details['phone_number'], $details['network'] ?? null)) {
+                return $refusal;
+            }
+
+            $momoCountry = MobileMoneyRail::countryFor($currency, (string) $details['phone_number']);
+            $momoNetwork = MobileMoneyRail::networkLabel($currency, $details['network'] ?? null);
+        }
+
         // Per-method fiat routing. The gateway stamped at order placement was
         // only the router's default; the customer has now committed to a
         // method, which is the first moment the real gateway is knowable
@@ -331,14 +394,32 @@ class PaymentSessionController extends Controller
             // method/currency AND is approved for the cart, so a category one
             // gateway does not approve still routes to a backup that does instead
             // of being denied. Falls back to plain capability order in shadow mode.
-            $fiatGateway = $eligibility->routeGateway($method, $currency, $eligibilityCategories);
+            $fiatGateway = $eligibility->routeGateway($method, $currency, $eligibilityCategories, $momoCountry, $momoNetwork);
+
+            // A payment already under way keeps its gateway while that gateway
+            // is still switched on, able and (when enforcing) approved for the
+            // cart, even if an admin has since reordered its row or taken it
+            // off: the switchboard routes NEW payments only. Without this, a
+            // routine row edit told a customer retrying their open card popup
+            // that the gateway they were on was unavailable, and checkout reuse
+            // handed them the same session back, so they looped on that error
+            // until it expired. A different method picked mid-flight routes as
+            // a new payment would, and a gateway really switched off still
+            // refuses below, as before.
+            if ($continuingStartedMethod
+                && in_array($attempt->gateway, FiatGatewayRouter::FIAT_GATEWAYS, true)
+                && FeatureFlag::gatewayEnabled($attempt->gateway)
+                && FiatGatewayRouter::supports($attempt->gateway, $method, $currency, $momoCountry, $momoNetwork)
+                && (! $eligibility->enforcementEnabled() || $eligibility->allowsAll($eligibilityCategories, $attempt->gateway, $currency))) {
+                $fiatGateway = $attempt->gateway;
+            }
 
             if ($fiatGateway === null) {
                 // No live gateway both serves this method/currency AND is
                 // approved for the cart. Distinguish a plain outage (nothing
                 // capable) from a category refusal (capable, but none approved),
                 // so the customer sees the right message.
-                $candidates = FiatGatewayRouter::candidates($method, $currency);
+                $candidates = FiatGatewayRouter::candidates($method, $currency, $momoCountry, $momoNetwork);
 
                 if ($candidates === []) {
                     return response()->json([
@@ -363,10 +444,22 @@ class PaymentSessionController extends Controller
                     ], 503);
                 }
 
+                // The charge figure a previous gateway recorded (Kora's whole
+                // francs) is that gateway's, not this one's: verifying a
+                // Flutterwave card charge against it would never match.
                 $attempt->gateway = $fiatGateway;
+                $attempt->pay_currency = null;
+                $attempt->pay_amount = null;
                 $attempt->save();
 
+                // The payload still carried the first gateway's scaffold (a
+                // Flutterwave popup config on a Kora attempt): replaced by
+                // the gateway that is actually taking it.
                 $session->provider = $fiatGateway;
+                $session->payment_payload = array_merge(
+                    array_diff_key($session->payment_payload ?? [], array_flip(['public_key', 'customer', 'customizations', 'amount', 'currency'])),
+                    $gatewayFactory->getProvider($fiatGateway)->initializePayment($attempt),
+                );
                 $session->save();
 
                 // Wallet fundings carry their own gateway stamp, which the
@@ -407,15 +500,25 @@ class PaymentSessionController extends Controller
         try {
             $result = null;
 
-            if ($fiatGateway !== null && $fiatGateway !== 'flutterwave') {
-                // Backup gateways (Paystack today, Kora next) run EVERY fiat
-                // method through their hosted checkout: one channel-restricted
-                // redirect out, verification on return. No inline card entry,
-                // no per-method API surface, so a backup cannot half-support
-                // a method the router said it covers.
+            if ($fiatGateway !== null && $fiatGateway !== 'flutterwave' && ! ($fiatGateway === 'korapay' && $method === 'mobile_money')) {
+                // Kora and Paystack open their own secure popup ON our page,
+                // restricted to the one method the customer picked: card
+                // details never touch our server and nobody is redirected
+                // away. The popup reports success, the page asks us to verify
+                // by our reference, and the webhook is the second authority.
+                // Kora's mobile money goes further still: a direct charge
+                // puts the prompt on the phone, handled with the other mobile
+                // money rails below.
                 $backupProvider = $gatewayFactory->getProvider($fiatGateway);
-                $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
-                $result = $backupProvider->chargeHosted($attempt, $method, $returnUrl);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $backupProvider->inlineConfig($attempt, $method)],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'card') {
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
 
@@ -459,38 +562,35 @@ class PaymentSessionController extends Controller
                     $details,
                     route('shop.checkout.return', ['session' => $session->id]),
                 );
+            } elseif ($method === 'mobile_money' && $fiatGateway === 'korapay' && ($otp = $request->input('otp'))) {
+                // The one-time code Kora asked for (Ghana, Côte d'Ivoire): a
+                // valid one is followed by the prompt on the phone.
+                $result = $gatewayFactory->getProvider('korapay')->authorizeMobileMoney($attempt, (string) $otp);
+            } elseif ($method === 'mobile_money' && $fiatGateway === 'flutterwave' && MobileMoneyRail::opensInPopup($currency)) {
+                // Ghana, Uganda, Rwanda and Tanzania: Flutterwave's API answers
+                // these with the operator's authorisation page the customer
+                // would be sent away to. Its popup renders that same step on
+                // our page instead, so it opens here for this one method.
+                $flwProvider = $gatewayFactory->getProvider($fiatGateway);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $flwProvider->inlineConfig($attempt, 'mobile_money', MobileMoneyRail::internationalNumber($currency, (string) $details['phone_number']))],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'mobile_money') {
-                $request->validate([
-                    'details.phone_number' => 'required|string',
-                    'details.network' => 'nullable|string',
-                ]);
-
-                // A number with no digits in it (letters, punctuation, a pasted
-                // label) passed `required` and reached the gateway empty once
-                // the rail stripped it to digits: "phonenumber is required",
-                // and a failed order for a typo. Refused here instead, so the
-                // customer fixes the number and the payment carries on.
-                if (strlen(MobileMoneyRail::normalisePhone((string) $details['phone_number'])) < 8) {
-                    return response()->json([
-                        'message' => 'Enter the mobile money phone number, with its country code if it is not a local number.',
-                    ], 422);
-                }
-
-                // Checked against the rail here, not at the gateway: a network
-                // the market does not have is a stale screen, and answering it
-                // with a failed order would turn a display bug into a lost sale.
-                if (MobileMoneyRail::requiresNetwork($currency)
-                    && MobileMoneyRail::gatewayNetwork($currency, $details['network'] ?? null) === null) {
-                    return response()->json([
-                        'message' => "Choose a mobile money network available in {$currency}.",
-                    ], 422);
-                }
-
+                // The number, country and network were checked above, before
+                // routing, against what the switched-on gateways can take.
+                // Flutterwave and Kora share this contract: the charge goes out,
+                // the prompt lands on the phone, and checkout waits.
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
                 $result = $flwProvider->chargeMobileMoney(
                     $attempt,
                     $details['phone_number'],
-                    $details['network'] ?? null,
+                    $momoNetwork ?? ($details['network'] ?? null),
                     // Rails that answer with their own authorization page send
                     // the customer back through the hosted return leg.
                     route('shop.checkout.return', ['session' => $session->id]),
@@ -544,15 +644,20 @@ class PaymentSessionController extends Controller
                 $npProvider = $gatewayFactory->getProvider('nowpayments');
                 $result = $npProvider->chargeCrypto($attempt, $details['pay_currency']);
             } elseif (in_array($method, ['ussd', 'pay_with_bank', 'bank_qr', 'mobile_wallet'], true)) {
-                // Hosted-redirect family: USSD, Pay With Bank, Bank QR (NQR),
-                // and Nigerian e-wallets (OPay/eNaira) all share the same flow.
-                // We call Flutterwave's /payments endpoint with a method-specific
-                // `payment_options` value so the hosted page renders only that
-                // method, then redirect the customer there. They return to
-                // /checkout/return where we verify and finalise.
+                // USSD, pay with bank, bank QR and the Nigerian e-wallets open
+                // in Flutterwave's popup on our page, restricted to the one
+                // method picked. They used to be a hosted page the customer
+                // was sent away to and had to find their way back from.
                 $flwProvider = $gatewayFactory->getProvider($fiatGateway);
-                $returnUrl = route('shop.checkout.return', ['session' => $session->id]);
-                $result = $flwProvider->chargeHosted($attempt, $method, $returnUrl);
+
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $flwProvider->inlineConfig($attempt, $method)],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'wallet') {
                 $request->validate([
                     'details.auth_token' => 'required|string',
@@ -567,6 +672,20 @@ class PaymentSessionController extends Controller
                         'message' => GatewayDisabledException::customerMessageFor('wallet'),
                         'gateway_disabled' => true,
                     ], 503);
+                }
+
+                // An order placed for another rail (card, mobile money) and paid
+                // here with the wallet. Every later step (the debit on
+                // fulfilment, the release on failure or cancel, refunds) finds
+                // the wallet payment by its gateway, so the attempt must become
+                // a wallet payment before any money is held, exactly as if it
+                // had been placed that way: same gateway, same session type, the
+                // paying wallet and its rate recorded. Left as it was, the hold
+                // was taken, the goods were delivered, and the debit never ran.
+                if ($attempt->gateway !== 'wallet') {
+                    if ($refusal = $this->moveToWalletRail($attempt, $session, $gatewayFactory->getProvider('wallet'))) {
+                        return $refusal;
+                    }
                 }
 
                 // One authorisation per session. The PIN token is single-use, which
@@ -593,7 +712,7 @@ class PaymentSessionController extends Controller
                         'status' => 'confirmed',
                         'transaction_id' => $attempt->gateway_reference,
                     ];
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     $result = [
                         'status' => 'failed',
                         'message' => $e->getMessage(),
@@ -830,6 +949,95 @@ class PaymentSessionController extends Controller
      * re-reads, finds 'processing' or a terminal state, and is refused before
      * it touches the customer's token or balance.
      */
+    /**
+     * Re-stamp an order's attempt and session onto the wallet rail, choosing
+     * the paying wallet and freezing its rate, or say why it cannot be.
+     *
+     * Only before any other rail has started: once a card popup, mobile money
+     * prompt or transfer may be under way, that charge could still land, and
+     * the same order must never be paid twice. The whole move is one
+     * transaction, so a refusal (no PIN, no wallet that covers it, a held
+     * wallet) leaves the attempt exactly as it was.
+     */
+    private function moveToWalletRail(PaymentAttempt $attempt, PaymentSession $session, WalletPaymentProvider $walletProvider): ?JsonResponse
+    {
+        if ($attempt->order === null || $session->status !== 'awaiting_method') {
+            return response()->json([
+                'message' => 'This payment has already started with another method. Finish it there, or start a new checkout to pay with your wallet.',
+            ], 422);
+        }
+
+        try {
+            DB::transaction(function () use ($attempt, $session, $walletProvider): void {
+                $attempt->gateway = 'wallet';
+                $walletProvider->initializePayment($attempt);
+
+                $session->provider = 'wallet';
+                $session->session_type = 'wallet';
+                $session->save();
+            });
+        } catch (InsufficientBalanceException|WalletOnHoldException|MissingTransactionPinException $e) {
+            $attempt->refresh();
+            $session->refresh();
+
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+
+        return null;
+    }
+
+    /**
+     * Why mobile money cannot be charged for this number and network, in the
+     * customer's words, or null when some switched-on gateway can take it.
+     *
+     * Checked against the gateways' coverage here, not at the gateway: a
+     * country or network outside it is a dead end, and answering it with a
+     * failed order would turn a display gap into a lost sale.
+     */
+    private function refuseUnservedMobileMoney(string $currency, string $phone, ?string $network): ?JsonResponse
+    {
+        $offered = MobileMoneyRail::coverageOffered($currency);
+
+        if ($offered === []) {
+            return response()->json([
+                'message' => "Mobile money is not available in {$currency} right now. Please choose another payment method.",
+            ], 422);
+        }
+
+        $country = MobileMoneyRail::countryFor($currency, $phone);
+
+        if ($country !== null && ! array_key_exists($country, $offered)) {
+            return response()->json([
+                'message' => 'Mobile money is not available in '.GatewayCapabilities::countryName($country).' yet. Please pay by card instead.',
+            ], 422);
+        }
+
+        if (! MobileMoneyRail::requiresNetwork($currency)) {
+            return null;
+        }
+
+        $label = MobileMoneyRail::networkLabel($currency, $network);
+
+        if ($label === null) {
+            return response()->json([
+                'message' => "Choose a mobile money network available in {$currency}.",
+            ], 422);
+        }
+
+        if ($country !== null && GatewayCapabilities::labelIn($label, $offered[$country]) === null) {
+            $choices = $offered[$country];
+            $list = count($choices) > 1
+                ? implode(', ', array_slice($choices, 0, -1)).' or '.end($choices)
+                : (string) ($choices[0] ?? '');
+
+            return response()->json([
+                'message' => $label.' is not available in '.GatewayCapabilities::countryName($country).'. Choose '.$list.'.',
+            ], 422);
+        }
+
+        return null;
+    }
+
     private function claimForWalletPayment(PaymentSession $session): bool
     {
         $claimed = DB::transaction(function () use ($session) {

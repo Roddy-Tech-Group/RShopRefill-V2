@@ -18,11 +18,14 @@ use App\Domain\Risk\Services\RiskGate;
 use App\Domain\Shared\Enums\ComplianceCategory;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\FundingStatus;
+use App\Domain\Shared\Enums\FundingVerdict;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Transaction\Services\TransactionService;
 use App\Domain\Wallet\Events\FundingCompleted;
 use App\Domain\Wallet\Events\FundingFailed;
 use App\Domain\Wallet\Exceptions\WalletFundingException;
+use App\Enums\AlertSeverity;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentSession;
 use App\Models\User;
@@ -431,30 +434,39 @@ class WalletFundingService
             return;
         }
 
-        if ($funding->status === FundingStatus::Cancelled) {
+        // Only the gateway's own "no" is final. A funding WE closed (the
+        // customer cancelled, our sweeper expired the window) may still be
+        // paid: the prompt was already on the phone, the transfer account was
+        // already open. When the gateway then confirms the money, it is
+        // credited as a late arrival and a person is told. A crypto funding
+        // our sweep failed on the clock is the same case with coins.
+        if ($funding->status === FundingStatus::Failed && ! $this->closedByUs($funding)) {
             throw WalletFundingException::alreadyProcessed($txRef);
         }
 
-        // Failed is final for a fiat funding: the gateway said no, and a
-        // replayed webhook must not resurrect it. A CRYPTO funding is different.
-        // Our own expiry sweep fails one on the clock while the customer's coins
-        // may still be confirming on-chain, and NOWPayments then delivers a
-        // genuine `finished` for it. Refusing that here left real money at the
-        // gateway and the wallet never credited. So a failed crypto funding
-        // falls through to the server-to-server verification below: if the
-        // gateway confirms full settlement it is credited, otherwise
-        // failFunding() keeps it failed. The ledger idempotency key and the
-        // Completed check make a double credit impossible either way.
-        if ($funding->status === FundingStatus::Failed && ! in_array($funding->gateway, ['nowpayments', 'crypto'], true)) {
-            throw WalletFundingException::alreadyProcessed($txRef);
-        }
+        $reopening = in_array($funding->status, [FundingStatus::Failed, FundingStatus::Cancelled], true);
+        $previousStatus = $funding->status;
 
         // 2. Server-to-server verification with gateway OUTSIDE transaction so failures are stored
-        $verified = $this->verificationService->verify($funding);
+        $verdict = $this->verificationService->outcome($funding);
 
-        if (! $verified) {
+        if ($verdict === FundingVerdict::Unknown) {
+            // The gateway could not be asked. Nothing is known about the
+            // money, so nothing is failed: the queue retries, and the hourly
+            // reconcile asks again. Failing here turned every gateway hiccup
+            // into a top-up marked dead with the customer's money at the gateway.
+            throw WalletFundingException::verificationUnavailable($txRef);
+        }
+
+        if ($verdict === FundingVerdict::NotPaid) {
             $reason = 'Gateway verification failed or payload tampered.';
-            $this->failFunding($funding, $reason, $rawPayload);
+
+            // A funding already closed keeps the closure it has; only an open
+            // one is failed on this verdict.
+            if (! $reopening) {
+                $this->failFunding($funding, $reason, $rawPayload);
+            }
+
             throw WalletFundingException::verificationFailed($txRef, $reason);
         }
 
@@ -535,6 +547,32 @@ class WalletFundingService
         });
 
         Log::info('Wallet funding successfully processed.', ['tx_ref' => $txRef, 'amount' => $funding->amount]);
+
+        if ($reopening) {
+            app(OperationalAlerter::class)->send(
+                AlertSeverity::Sev2,
+                "funding-late-arrival:{$funding->id}",
+                'Wallet top-up paid after it was closed',
+                "Top-up {$funding->reference} ({$funding->amount} {$funding->currency->value}) was {$previousStatus->value} on our side when the gateway confirmed the payment. It has been credited; worth a look.",
+                ['funding' => $funding->reference, 'previous_status' => $previousStatus->value, 'gateway' => $funding->gateway],
+            );
+        }
+    }
+
+    /**
+     * Reasons that are OURS, not the gateway's: the window we closed, the
+     * cancel the customer tapped. Anything else on a failed funding is the
+     * gateway's verdict and stays final.
+     */
+    private const LOCAL_CLOSE_REASONS = ['session_expired', 'cancelled'];
+
+    private function closedByUs(WalletFunding $funding): bool
+    {
+        if (in_array($funding->gateway, ['nowpayments', 'crypto'], true)) {
+            return true;
+        }
+
+        return in_array((string) $funding->failed_reason, self::LOCAL_CLOSE_REASONS, true);
     }
 
     /**

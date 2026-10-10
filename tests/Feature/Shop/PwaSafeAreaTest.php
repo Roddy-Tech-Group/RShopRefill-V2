@@ -83,7 +83,7 @@ class PwaSafeAreaTest extends TestCase
         // The notification bottom sheet clears the home indicator; the drawer
         // owes the status bar at its head.
         $this->assertStringContainsString('padding-bottom: env(safe-area-inset-bottom);', $css);
-        $this->assertStringContainsString('body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }', $css);
+        $this->assertStringContainsString(':is(body.dashboard, body.admin) .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }', $css);
     }
 
     /**

@@ -296,6 +296,24 @@ class RefusedCardRecordingTest extends TestCase
         $this->assertTrue($outcome->retryable, 'a soft bank refusal is still worth a retry email');
     }
 
+    /** A verdict no rule reads is told as "could not be completed", never as the bank's decision. */
+    public function test_an_unreadable_verdict_never_blames_the_bank(): void
+    {
+        $user = User::factory()->create();
+        $session = $this->popupSession($user);
+        $this->gatewaySays([$this->refusedCharge(9011, 'Acquirer route 7 said no (new wording)')]);
+
+        $this->actingAs($user)
+            ->postJson("/api/payment-sessions/{$session->id}/cancel")
+            ->assertOk()
+            ->assertJson(['status' => 'failed']);
+
+        $payload = $session->fresh()->payment_payload;
+        $this->assertSame(__('checkout.failure_reason_payment_not_completed'), $payload['failure_reason']);
+        $this->assertStringNotContainsString('bank declined', (string) $payload['failure_reason']);
+        $this->assertSame('unrecognised_gateway_message', PaymentOutcome::where('payment_session_id', $session->id)->value('failure_reason_code'));
+    }
+
     // ------------------------------------------------------------ sweeper
 
     public function test_the_sweeper_files_a_declined_popup_as_declined_not_expired(): void

@@ -5,6 +5,7 @@ namespace Tests\Feature\Payment;
 use App\Domain\Order\Services\CheckoutService;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Providers\FlutterwavePaymentProvider;
+use App\Domain\Payment\Support\FiatGatewayRouter;
 use App\Domain\Payment\Support\FundingMethodCatalog;
 use App\Domain\Payment\Support\MobileMoneyRail;
 use App\Domain\Payment\Support\SupportedPaymentMethods;
@@ -168,7 +169,12 @@ class MobileMoneyRailTest extends TestCase
         return $sent;
     }
 
-    public function test_ghana_is_charged_on_the_ghana_rail_with_the_gateway_network_code(): void
+    /**
+     * Ghana's rail answers the API with the operator's own authorisation page,
+     * which the customer used to be sent away to. It now opens in Flutterwave's
+     * popup on our page; nothing is charged by API and nobody is redirected.
+     */
+    public function test_ghana_opens_in_the_popup_on_our_page_instead_of_the_operators_page(): void
     {
         $this->fakeRedirectRail();
 
@@ -178,16 +184,20 @@ class MobileMoneyRailTest extends TestCase
         $response = $this->pay($order, ['phone_number' => '+233 24 400 0000', 'network' => 'Vodafone']);
 
         $response->assertOk();
-        $this->assertSame('awaiting_redirect', $response->json('data.status'));
-        $this->assertSame('https://checkout.flutterwave.com/v3/hosted/pay/momo-gh', $response->json('data.payment_payload.redirect_url'));
+        $this->assertSame('awaiting_payment', $response->json('data.status'));
+        $this->assertSame('flutterwave', $response->json('data.payment_payload.inline.provider'));
+        $this->assertSame('mobilemoneyghana', $response->json('data.payment_payload.inline.payment_options'));
+        $this->assertSame('GHS', $response->json('data.payment_payload.inline.currency'));
+        $this->assertSame('233244000000', $response->json('data.payment_payload.inline.customer.phone_number'), 'the number typed on our page is not asked for again');
+        $this->assertNull($response->json('data.payment_payload.redirect_url'));
+        $this->assertSame('awaiting_payment', $session->fresh()->status);
+        Http::assertNothingSent();
 
-        $request = $this->sentCharge();
-        $this->assertStringContainsString('/charges?type=mobile_money_ghana', $request->url());
-        $this->assertSame('GHS', $request['currency']);
-        $this->assertSame('VODAFONE', $request['network'], 'the rail wants its own code, not the label the screen shows');
-        $this->assertSame('233244000000', $request['phone_number'], 'plus sign and spacing stripped');
-        $this->assertArrayNotHasKey('country', $request->data(), 'country is a Francophone-rail field');
-        $this->assertSame(route('shop.checkout.return', ['session' => $session->id]), $request['redirect_url']);
+        $this->assertSame('mobilemoneyuganda', MobileMoneyRail::popupOption('UGX'));
+        $this->assertSame('mobilemoneyrwanda', MobileMoneyRail::popupOption('RWF'));
+        $this->assertSame('mobilemoneytanzania', MobileMoneyRail::popupOption('TZS'));
+        $this->assertFalse(MobileMoneyRail::opensInPopup('XAF'), 'the franc rail prompts the handset from our page');
+        $this->assertFalse(MobileMoneyRail::opensInPopup('KES'), 'M-Pesa prompts the handset from our page');
     }
 
     public function test_kenya_is_charged_on_mpesa_with_no_network(): void
@@ -241,7 +251,8 @@ class MobileMoneyRailTest extends TestCase
 
     public function test_a_gateway_refusal_is_recorded_as_a_failed_charge_with_the_provider_message(): void
     {
-        // The exact answer the Francophone rail gave every Ghana attempt.
+        // The exact answer the Francophone rail once gave every Ghana attempt,
+        // replayed on a rail that is still charged by API from our page.
         Http::fake([
             'api.flutterwave.com/v3/charges*' => Http::response([
                 'status' => 'error',
@@ -249,8 +260,8 @@ class MobileMoneyRailTest extends TestCase
             ], 400),
         ]);
 
-        $order = $this->checkout('GHS');
-        $response = $this->pay($order, ['phone_number' => '0244000000', 'network' => 'MTN']);
+        $order = $this->checkout('XAF');
+        $response = $this->pay($order, ['phone_number' => '0670000000', 'network' => 'MTN']);
 
         $response->assertOk();
         $this->assertSame('failed', $response->json('data.status'));
@@ -342,7 +353,7 @@ class MobileMoneyRailTest extends TestCase
         $this->fakePushRail();
 
         $order = $this->checkout('USD');
-        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'MTN'])->assertOk();
+        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'Orange'])->assertOk();
 
         $request = $this->sentCharge();
         $this->assertSame('XOF', $request['currency']);
@@ -440,7 +451,7 @@ class MobileMoneyRailTest extends TestCase
     public function test_a_dollar_customer_is_offered_mtn_and_orange_on_every_surface(): void
     {
         $sheet = collect(FundingMethodCatalog::forCurrency('USD'))->firstWhere('type', 'mobile_money');
-        $this->assertSame(['MTN', 'Orange'], $sheet['supported_networks']);
+        $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave', 'Mobicash'], $sheet['supported_networks']);
         $this->assertSame('MTN Mobile Money or Orange Money', $sheet['description']);
 
         // The order page reads the session's own list, which used to name
@@ -448,7 +459,7 @@ class MobileMoneyRailTest extends TestCase
         $onOrderPage = fn (string $currency) => collect((new PaymentSession(['session_type' => 'card', 'currency' => $currency]))->getAvailableMethods())
             ->firstWhere('type', 'mobile_money');
 
-        $this->assertSame(['MTN', 'Orange'], $onOrderPage('USD')['supported_networks']);
+        $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave', 'Mobicash'], $onOrderPage('USD')['supported_networks']);
         $this->assertSame([], $onOrderPage('KES')['supported_networks'], 'M-Pesa takes the number alone');
         $this->assertNull($onOrderPage('EUR'), 'no rail, no tile');
     }
@@ -484,5 +495,182 @@ class MobileMoneyRailTest extends TestCase
         $this->pay($order, ['phone_number' => '+237 67', 'network' => 'MTN'])->assertStatus(422);
 
         Http::assertNothingSent();
+    }
+    // -------------------------------------------- coverage per country and network
+
+    /** Côte d'Ivoire has Moov and Wave on Flutterwave's rail; both were missing from the picker. */
+    public function test_an_ivorian_number_can_pay_with_wave(): void
+    {
+        $this->fakePushRail();
+
+        $this->assertContains('Wave', MobileMoneyRail::networkOptions('XOF'));
+        $this->assertContains('Moov', MobileMoneyRail::networkOptions('XOF'));
+
+        $order = $this->checkout('USD');
+        $this->pay($order, ['phone_number' => '+225 07 00 00 00 00', 'network' => 'Wave'])->assertOk();
+
+        $request = $this->sentCharge();
+        $this->assertSame('CI', $request['country']);
+        $this->assertSame('WAVE', $request['network']);
+    }
+
+    /** Senegal has Orange and Wave, no MTN: the pay step says so instead of charging. */
+    public function test_a_network_the_customers_country_does_not_have_is_refused_by_name(): void
+    {
+        $order = $this->checkout('USD');
+
+        $this->pay($order, ['phone_number' => '+221 77 000 0000', 'network' => 'MTN'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'MTN is not available in Senegal. Choose Orange or Wave.');
+
+        Http::assertNothingSent();
+    }
+
+    /** No gateway serves Mali's mobile money: the customer is told, and pointed to card. */
+    public function test_a_country_no_gateway_serves_is_refused_before_the_gateway(): void
+    {
+        $order = $this->checkout('USD');
+
+        $this->pay($order, ['phone_number' => '+223 70 00 00 00', 'network' => 'Orange'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Mobile money is not available in Mali yet. Please pay by card instead.');
+
+        Http::assertNothingSent();
+        $this->assertSame('awaiting_method', $order->paymentAttempts->first()->paymentSession->fresh()->status);
+    }
+
+    /**
+     * Switching Kora on widens what Kenya is offered, with no deploy: Airtel
+     * and Equitel appear and route to Kora, while M-Pesa stays on Flutterwave.
+     */
+    public function test_switching_kora_on_adds_its_kenyan_networks_and_routes_them_to_it(): void
+    {
+        $this->assertSame([], MobileMoneyRail::networkOptions('KES'), 'M-Pesa alone: nothing to choose');
+        $this->assertSame('flutterwave', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'M-Pesa'));
+        $this->assertNull(FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Airtel'));
+
+        SiteSetting::put('features.gateway_korapay_enabled', 'on', 'features');
+
+        $this->assertSame(['M-Pesa', 'Airtel', 'Equitel'], MobileMoneyRail::networkOptions('KES'));
+        $this->assertSame('flutterwave', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'M-Pesa'), 'Flutterwave stays first where it can');
+        $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Airtel'));
+        $this->assertSame('korapay', FiatGatewayRouter::resolve('mobile_money', 'KES', 'KE', 'Equitel'));
+    }
+
+    /** Paystack is a Nigerian merchant account: it never takes mobile money, whatever is switched on. */
+    public function test_paystack_is_never_a_mobile_money_candidate(): void
+    {
+        SiteSetting::put('features.gateway_flutterwave_enabled', 'off', 'features');
+        SiteSetting::put('features.gateway_korapay_enabled', 'off', 'features');
+        SiteSetting::put('features.gateway_paystack_enabled', 'on', 'features');
+
+        foreach (['GHS', 'KES', 'XOF', 'XAF'] as $currency) {
+            $this->assertFalse(FiatGatewayRouter::supports('paystack', 'mobile_money', $currency));
+            $this->assertNull(FiatGatewayRouter::resolve('mobile_money', $currency));
+        }
+
+        $this->assertSame('paystack', FiatGatewayRouter::resolve('card', 'NGN'));
+    }
+
+    /** The country picked beside the number decides the code; a number carrying its own code is left alone. */
+    public function test_the_country_chip_decides_the_dialling_code(): void
+    {
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XOF', '77 000 0000', 'SN'));
+        $this->assertSame('2250700000000', MobileMoneyRail::internationalNumber('XOF', '0700000000', 'CI'), "Côte d'Ivoire keeps its leading zero");
+        $this->assertSame('233244000000', MobileMoneyRail::internationalNumber('GHS', '0244000000', 'GH'), 'Ghana drops its trunk zero');
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XAF', '+221 77 000 0000', 'CM'), 'a full number wins over the chip');
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '670000000', 'ZZ'), 'an unknown country falls back to the home country');
+    }
+
+    /** The chip offers the countries the live gateways serve, home country first. */
+    public function test_the_number_field_shows_the_dialling_codes_the_live_gateways_serve(): void
+    {
+        $dials = MobileMoneyRail::dialCodesByCurrency();
+
+        $this->assertSame([['country' => 'CM', 'name' => 'Cameroon', 'dial' => '237']], $dials['XAF']);
+        $this->assertSame([['country' => 'GH', 'name' => 'Ghana', 'dial' => '233']], $dials['GHS']);
+        $this->assertSame('CI', $dials['XOF'][0]['country'], 'the home country leads');
+        $this->assertSame(['BF', 'CI', 'SN'], collect($dials['XOF'])->pluck('country')->sort()->values()->all());
+        $this->assertSame('221', collect($dials['XOF'])->firstWhere('country', 'SN')['dial']);
+    }
+
+    /** The chips follow the country: Senegal offers Orange and Wave, Burkina Faso only Mobicash. */
+    public function test_coverage_is_offered_per_country_for_the_chips(): void
+    {
+        $coverage = MobileMoneyRail::coverageByCurrency();
+
+        $this->assertSame(['MTN', 'Orange'], $coverage['XAF']['CM']);
+        $this->assertSame(['Orange', 'Wave'], $coverage['XOF']['SN']);
+        $this->assertSame(['Mobicash'], $coverage['XOF']['BF']);
+        $this->assertArrayHasKey('CM', $coverage['USD'], 'a dollar order can be paid from Cameroon');
+        $this->assertArrayHasKey('SN', $coverage['USD'], 'or from Senegal');
+    }
+
+    /** Burkina Faso has one network, so the page sends none and the only one is used. */
+    public function test_a_single_network_country_needs_no_network_chosen(): void
+    {
+        Http::fake([
+            'api.flutterwave.com/v3/charges*' => Http::response([
+                'status' => 'success',
+                'message' => 'Charge initiated',
+                'data' => ['status' => 'pending'],
+                'meta' => ['authorization' => ['mode' => 'callback']],
+            ]),
+        ]);
+
+        $order = $this->checkout('XOF');
+        $response = $this->pay($order, ['phone_number' => '70 00 00 00', 'network' => '', 'country' => 'BF']);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $response->json('data.status'));
+
+        $request = $this->sentCharge();
+        $this->assertSame('22670000000', $request['phone_number']);
+        $this->assertSame('BF', $request['country']);
+        $this->assertSame('MOBICASH', $request['network']);
+    }
+
+    /** A Senegalese customer on an XOF order is charged on a 221 number in Senegal. */
+    public function test_a_senegalese_number_picked_on_the_chip_is_charged_in_senegal(): void
+    {
+        Http::fake([
+            'api.flutterwave.com/v3/charges*' => Http::response([
+                'status' => 'success',
+                'message' => 'Charge initiated',
+                'data' => ['status' => 'pending'],
+                'meta' => ['authorization' => ['mode' => 'callback']],
+            ]),
+        ]);
+
+        $order = $this->checkout('XOF');
+        $response = $this->pay($order, ['phone_number' => '77 000 0000', 'network' => 'Orange', 'country' => 'SN']);
+
+        $response->assertOk();
+        $this->assertSame('awaiting_confirmation', $response->json('data.status'));
+        $this->assertSame('SN', $response->json('data.payment_payload.mobile_money.country'));
+
+        $request = $this->sentCharge();
+        $this->assertSame('221770000000', $request['phone_number']);
+        $this->assertSame('SN', $request['country']);
+    }
+
+    /** A country the live gateways do not serve is ignored, never dialled. */
+    public function test_a_chip_country_outside_coverage_is_ignored(): void
+    {
+        $this->assertSame(
+            '237670000000',
+            MobileMoneyRail::internationalNumber('XAF', '670000000', array_key_exists('ZA', MobileMoneyRail::coverageOffered('XAF')) ? 'ZA' : null),
+        );
+    }
+
+    /** Gateways that want the number international get it with the right dialling code. */
+    public function test_a_number_is_made_international_for_its_market(): void
+    {
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '670000000'));
+        $this->assertSame('237670000000', MobileMoneyRail::internationalNumber('XAF', '+237 6 70 00 00 00'));
+        $this->assertSame('221770000000', MobileMoneyRail::internationalNumber('XOF', '+221 77 000 0000'), 'a Senegalese code is kept');
+        $this->assertSame('2250700000000', MobileMoneyRail::internationalNumber('XOF', '0700000000'), "a local number in XOF is Côte d'Ivoire");
+        $this->assertSame('233244000000', MobileMoneyRail::internationalNumber('GHS', '0244000000'));
+        $this->assertSame('254700000000', MobileMoneyRail::internationalNumber('KES', '0700000000'));
     }
 }

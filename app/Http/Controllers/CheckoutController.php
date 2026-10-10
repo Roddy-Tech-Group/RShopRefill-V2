@@ -358,53 +358,47 @@ class CheckoutController extends Controller
         abort_unless($request->user(), 403);
         abort_unless($attempt->user_id === $request->user()->id, 403);
 
-        $reportedStatus = strtolower($request->queryString('status'));
+        // The query string is the browser's word, not the gateway's. A USSD or
+        // bank payment approved on the phone after the customer came back
+        // "cancelled" has still been paid; trusting the string sent them to
+        // pay again while the first payment landed behind them. Every return
+        // asks the gateway, and an unpaid one simply fails to verify.
 
-        // Flutterwave reports an explicit status in the query string; the
-        // backup gateways (Paystack) send only the transaction reference, so
-        // for them the verification call itself is the only trustworthy
-        // signal, and a cancelled payment simply fails to verify.
-        $shouldVerify = $attempt->gateway === 'flutterwave'
-            ? in_array($reportedStatus, ['successful', 'completed'], true)
-            : true;
+        // Verify against the gateway AND run the full settlement chain in
+        // one synchronous pass (VerifyPaymentJob: gateway verify, order ->
+        // Paid, session confirmed, cart cleared, confirmation email,
+        // fulfillment dispatched; for fundings it credits the wallet).
+        // The old code called verifyPayment() bare, which stamped the
+        // attempt Paid and then relied on the webhook - but the webhook
+        // path stands down when it finds the attempt already Paid, so the
+        // browser winning the race stranded the order in Pending forever.
+        try {
+            dispatch_sync(new VerifyPaymentJob($attempt));
+        } catch (Throwable $e) {
+            // Inline settlement failed (gateway hiccup, lock contention).
+            // Queue the same job so its retries finish the chain; the
+            // webhook remains a second settlement authority.
+            Log::warning('hostedReturn: inline settlement failed, queued for retry', [
+                'attempt_id' => $attempt->id,
+                'message' => $e->getMessage(),
+            ]);
+            VerifyPaymentJob::dispatch($attempt);
+        }
 
-        if ($shouldVerify) {
-            // Verify against the gateway AND run the full settlement chain in
-            // one synchronous pass (VerifyPaymentJob: gateway verify, order ->
-            // Paid, session confirmed, cart cleared, confirmation email,
-            // fulfillment dispatched; for fundings it credits the wallet).
-            // The old code called verifyPayment() bare, which stamped the
-            // attempt Paid and then relied on the webhook - but the webhook
-            // path stands down when it finds the attempt already Paid, so the
-            // browser winning the race stranded the order in Pending forever.
-            try {
-                dispatch_sync(new VerifyPaymentJob($attempt));
-            } catch (Throwable $e) {
-                // Inline settlement failed (gateway hiccup, lock contention).
-                // Queue the same job so its retries finish the chain; the
-                // webhook remains a second settlement authority.
-                Log::warning('hostedReturn: inline settlement failed, queued for retry', [
-                    'attempt_id' => $attempt->id,
-                    'message' => $e->getMessage(),
-                ]);
-                VerifyPaymentJob::dispatch($attempt);
-            }
+        $attempt->refresh();
+        $verified = $attempt->payment_status === PaymentStatus::Paid;
 
-            $attempt->refresh();
-            $verified = $attempt->payment_status === PaymentStatus::Paid;
+        if ($verified && $attempt->order) {
+            return redirect($this->shopRoute($request, 'order', $attempt->order->order_number));
+        }
 
-            if ($verified && $attempt->order) {
-                return redirect($this->shopRoute($request, 'order', $attempt->order->order_number));
-            }
-
-            // Wallet fundings arrive here too when a backup gateway's hosted
-            // page redirects back. VerifyPaymentJob has already credited the
-            // balance (idempotent, locked; the webhook doing it again stands
-            // down cleanly), so the wallet page loads correct.
-            if ($verified && $attempt->payable_type === WalletFunding::class) {
-                return redirect()->route('dashboard.wallet')
-                    ->with('wallet_status', 'Your wallet top-up was received and is being credited.');
-            }
+        // Wallet fundings arrive here too when a backup gateway's hosted
+        // page redirects back. VerifyPaymentJob has already credited the
+        // balance (idempotent, locked; the webhook doing it again stands
+        // down cleanly), so the wallet page loads correct.
+        if ($verified && $attempt->payable_type === WalletFunding::class) {
+            return redirect()->route('dashboard.wallet')
+                ->with('wallet_status', 'Your wallet top-up was received and is being credited.');
         }
 
         // Anything else (cancelled, failed, or unverified) returns the

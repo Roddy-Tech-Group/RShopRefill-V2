@@ -93,8 +93,8 @@ class ApplePayChargeTest extends TestCase
      * The charge above stays proven for the day Flutterwave enables Apple Pay on
      * the live account. Until then it is withheld from every currency, including
      * the three the sandbox accepted it in (see ApplePayWithheldTest). Lifting
-     * the hold is deleting one line in SupportedPaymentMethods; this test then
-     * fails on purpose so the USD/GBP/NGN assertion is restored with it.
+     * the hold is switching its rows back on in Management > Gateway settings;
+     * a test environment seeded with it on fails here on purpose.
      */
     public function test_apple_pay_is_withheld_everywhere_until_the_live_account_takes_it(): void
     {

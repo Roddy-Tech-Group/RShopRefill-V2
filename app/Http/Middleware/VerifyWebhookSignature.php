@@ -74,21 +74,28 @@ class VerifyWebhookSignature
                 return hash_equals(hash_hmac('sha512', $payload, $paystackSecret), $paystackSignature);
 
             case 'korapay':
-                // Kora's quirk: the HMAC-SHA256 covers json_encode of the
-                // webhook's `data` OBJECT ONLY, keyed with the merchant
-                // secret key. Hashing the raw body rejects every event.
+                // Kora's quirk: the HMAC-SHA256 covers the webhook's `data`
+                // OBJECT ONLY, serialised as Kora sent it, keyed with the
+                // merchant secret key. The bytes Kora signed are the `data`
+                // object exactly as it sits in the raw body, so that substring
+                // is hashed first; re-encodings of the parsed object (the
+                // request bag has been trimmed and emptied by the global
+                // middleware, and PHP escapes "/" and accents where Kora's
+                // JSON.stringify does not) are only fallbacks.
                 $korapaySecret = config('services.korapay.secret_key');
                 $korapaySignature = $request->header('x-korapay-signature');
-                $korapayData = $request->json('data');
 
-                if (! is_string($korapaySecret) || $korapaySecret === '' || ! is_string($korapaySignature) || ! is_array($korapayData)) {
+                if (! is_string($korapaySecret) || $korapaySecret === '' || ! is_string($korapaySignature)) {
                     return false;
                 }
 
-                return hash_equals(
-                    hash_hmac('sha256', (string) json_encode($korapayData), $korapaySecret),
-                    $korapaySignature
-                );
+                foreach ($this->korapaySignedCandidates($request->getContent()) as $candidate) {
+                    if (hash_equals(hash_hmac('sha256', $candidate, $korapaySecret), $korapaySignature)) {
+                        return true;
+                    }
+                }
+
+                return false;
 
             case 'nowpayments':
                 // NOWPayments signs key-sorted JSON, not the raw body — hashing
@@ -186,5 +193,74 @@ class VerifyWebhookSignature
             default:
                 return null;
         }
+    }
+
+    /**
+     * The byte strings Kora may have signed for this body: the `data` object
+     * cut out of the raw body first, then re-encodings of the parsed object.
+     *
+     * @return list<string>
+     */
+    private function korapaySignedCandidates(string $raw): array
+    {
+        $candidates = [];
+
+        if (($cut = $this->jsonObjectAfterKey($raw, 'data')) !== null) {
+            $candidates[] = $cut;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (is_array($decoded) && is_array($decoded['data'] ?? null)) {
+            $candidates[] = (string) json_encode($decoded['data'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $candidates[] = (string) json_encode($decoded['data']);
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
+    /**
+     * The raw text of the JSON object that is the value of a top-level key,
+     * or null when the body has no such object. Walks the braces, skipping
+     * over strings, so a brace inside a name cannot cut it short.
+     */
+    private function jsonObjectAfterKey(string $raw, string $key): ?string
+    {
+        if (! preg_match('/"'.preg_quote($key, '/').'"\s*:\s*\{/', $raw, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $start = $m[0][1] + strlen($m[0][0]) - 1;
+        $depth = 0;
+        $inString = false;
+        $length = strlen($raw);
+
+        for ($i = $start; $i < $length; $i++) {
+            $char = $raw[$i];
+
+            if ($inString) {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+
+                if ($depth === 0) {
+                    return substr($raw, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        return null;
     }
 }

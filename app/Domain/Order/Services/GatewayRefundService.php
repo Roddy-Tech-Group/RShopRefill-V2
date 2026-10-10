@@ -6,10 +6,14 @@ use App\Domain\Order\Events\RefundIssued;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Shared\Enums\Currency;
 use App\Domain\Shared\Enums\TransactionCategory;
+use App\Domain\Shared\Services\OperationalAlerter;
 use App\Domain\Transaction\Exceptions\DuplicateTransactionException;
 use App\Domain\Wallet\Services\WalletService;
+use App\Enums\AlertSeverity;
+use App\Models\CurrencyRate;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PaymentAttempt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -57,13 +61,33 @@ class GatewayRefundService
             return;
         }
 
-        $currency = Currency::tryFrom(strtoupper((string) $paid->currency)) ?? Currency::USD;
+        $credit = $this->walletCreditFor($paid, $share);
+
+        if ($credit === null) {
+            // No wallet in the paid currency and no rate to value it by: never
+            // guess. Nothing moves, nothing is recorded as refunded, and a
+            // person is told, so the customer is made whole by hand.
+            app(OperationalAlerter::class)->send(
+                AlertSeverity::Sev2,
+                "gateway-refund-unvalued:{$item->id}",
+                'Automatic refund needs a person',
+                "Item {$item->id} on order {$order->order_number} could not be delivered, but its "
+                    .number_format($share, 2).' '.strtoupper((string) $paid->currency)
+                    .' could not be valued for a wallet refund (no rate recorded or on file). Refund it by hand.',
+                ['order' => $order->order_number, 'item' => $item->id, 'amount' => $share, 'currency' => $paid->currency],
+            );
+
+            return;
+        }
+
+        [$currency, $creditAmount] = $credit;
+        $converted = $currency->value !== strtoupper((string) $paid->currency);
         $wallet = $this->walletService->getOrCreateWallet($order->user, $currency);
 
         try {
             $this->walletService->credit(
                 $wallet,
-                $share,
+                $creditAmount,
                 TransactionCategory::Refund,
                 "Refund for an undelivered item on order {$order->order_number}",
                 "refund-{$item->id}",
@@ -74,8 +98,15 @@ class GatewayRefundService
                 'order' => $order->order_number,
                 'item' => $item->id,
                 'amount' => $share,
+                'paid_currency' => strtoupper((string) $paid->currency),
+                'credited' => $creditAmount,
                 'currency' => $currency->value,
             ]);
+
+            $reason = $converted
+                ? 'An item on your order could not be delivered, so we refunded it to your wallet as '
+                    .$currency->value.' '.number_format($creditAmount, 2).'.'
+                : 'An item on your order could not be delivered, so we refunded it to your wallet.';
 
             // The customer hears about money that moved, once the move is
             // durable. The duplicate branch below deliberately does NOT
@@ -83,7 +114,7 @@ class GatewayRefundService
             DB::afterCommit(fn () => RefundIssued::dispatch(
                 $order,
                 $share,
-                'An item on your order could not be delivered, so we refunded it to your wallet.',
+                $reason,
                 "item-{$item->id}",
             ));
         } catch (DuplicateTransactionException) {
@@ -95,6 +126,50 @@ class GatewayRefundService
         // the admin refund cap must see automatic reversals or it will
         // happily pay the same money back a second time.
         app(OrderService::class)->recordRefundedAmount($order, $share, "item-{$item->id}");
+    }
+
+    /**
+     * The wallet a refund of $amount (in the paid currency) lands in, and how
+     * much it credits there, or null when it cannot be valued.
+     *
+     * A currency a wallet is held in is refunded into that wallet, figure for
+     * figure. Any other (XOF, KES, UGX, RWF, a card-only currency) has no
+     * wallet of its own, so its value goes to the USD wallet at the rate frozen
+     * when the customer paid: what they get back is what they paid, whatever
+     * the rate has done since. The figure itself is never carried across: 5,000
+     * XOF is about $8, and crediting $5,000 hands out money nobody paid.
+     *
+     * @return array{0: Currency, 1: float}|null
+     */
+    private function walletCreditFor(PaymentAttempt $paid, float $amount): ?array
+    {
+        $paidCurrency = strtoupper((string) $paid->currency);
+        $own = Currency::tryFrom($paidCurrency);
+
+        if ($own !== null && $own !== Currency::RCOIN) {
+            return [$own, $amount];
+        }
+
+        // Local currency units per US dollar, frozen at checkout. The column
+        // defaults to 1, which for these currencies means "never recorded"
+        // (an attempt made outside checkout), not parity with the dollar, so
+        // only then is today's rate used; with none on file, nothing is guessed.
+        $perUsd = (float) $paid->exchange_rate_snapshot;
+
+        if ($perUsd <= 0 || $perUsd === 1.0) {
+            $perUsd = (float) (CurrencyRate::query()
+                ->where('code', $paidCurrency)
+                ->where('is_active', true)
+                ->value('rate_per_usd') ?? 0);
+        }
+
+        if ($perUsd <= 0) {
+            return null;
+        }
+
+        $usd = round($amount / $perUsd, 2);
+
+        return $usd > 0 ? [Currency::USD, $usd] : null;
     }
 
     /**

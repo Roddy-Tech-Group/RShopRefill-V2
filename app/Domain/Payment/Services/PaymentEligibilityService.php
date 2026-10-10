@@ -251,9 +251,9 @@ class PaymentEligibilityService
      *
      * @param  iterable<ComplianceCategory>  $categories
      */
-    public function routeGateway(string $method, string $currency, iterable $categories): ?string
+    public function routeGateway(string $method, string $currency, iterable $categories, ?string $country = null, ?string $network = null): ?string
     {
-        $candidates = FiatGatewayRouter::candidates($method, $currency);
+        $candidates = FiatGatewayRouter::candidates($method, $currency, $country, $network);
 
         if (! $this->enforcementEnabled()) {
             return $candidates[0] ?? null;
@@ -399,8 +399,10 @@ class PaymentEligibilityService
     private function gatewaysServingMethod(string $method, string $currency): array
     {
         if (array_key_exists($method, FiatGatewayRouter::METHOD_PRIORITY)) {
+            // The switchboard's order for this row: a gateway taken off the row
+            // can no longer serve it, even if it is able to.
             return array_values(array_filter(
-                FiatGatewayRouter::METHOD_PRIORITY[$method],
+                FiatGatewayRouter::order($method, $currency),
                 fn (string $gateway): bool => FiatGatewayRouter::supports($gateway, $method, $currency),
             ));
         }

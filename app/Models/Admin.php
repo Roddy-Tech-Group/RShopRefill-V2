@@ -84,6 +84,7 @@ class Admin extends Authenticatable
         'campaigns' => 'Campaigns',
         'pricing-rules' => 'Pricing Rules',
         'content' => 'Content (CMS)',
+        'rcoin' => 'Rcoin',
         'support-tickets' => 'Support Tickets',
         'notifications' => 'Notifications',
         'admins' => 'Admins',
@@ -226,7 +227,10 @@ class Admin extends Authenticatable
             str_starts_with($name, 'newsletter') => 'newsletter',
             str_starts_with($name, 'campaigns') => 'campaigns',
             str_starts_with($name, 'pricing-rules') => 'pricing-rules',
-            str_starts_with($name, 'content.') || str_starts_with($name, 'api.rewards.') => 'content',
+            // Rcoin (rewards, analytics, withdrawals) is money, not marketing
+            // copy: its own grant, ahead of the content rule its routes sit under.
+            str_starts_with($name, 'content.rewards') || str_starts_with($name, 'api.rewards.') => 'rcoin',
+            str_starts_with($name, 'content.') => 'content',
             str_starts_with($name, 'support-tickets') => 'support-tickets',
             str_starts_with($name, 'notifications') || str_starts_with($name, 'api.notifications.') => 'notifications',
             str_starts_with($name, 'admins') => 'admins',

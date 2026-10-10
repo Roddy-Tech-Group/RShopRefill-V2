@@ -22,6 +22,12 @@
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Gateway keys never come from the developer's .env: tests mock every gateway unless they set a key themselves. -->
+        <env name="KORAPAY_PUBLIC_KEY" value=""/>
+        <env name="KORAPAY_SECRET_KEY" value=""/>
+        <env name="KORAPAY_ENCRYPTION_KEY" value=""/>
+        <env name="PAYSTACK_SECRET_KEY" value=""/>
+        <env name="PAYSTACK_PUBLIC_KEY" value=""/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>

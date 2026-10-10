@@ -61,7 +61,15 @@ class AlertPaymentFailuresCommand extends Command
      *
      * @var list<string>
      */
-    private const FAULTS_ALERTED_ELSEWHERE = ['orphaned_timeout'];
+    private const FAULTS_ALERTED_ELSEWHERE = [
+        'orphaned_timeout',
+        // Words no rule reads yet are not a platform fault, they are a
+        // to-do; paging on them every hour taught nobody anything. They go
+        // to the once-a-day digest (insights:unclassified-digest) instead,
+        // and the spike check still catches a sudden volume of them.
+        'unrecognised_gateway_message',
+        'unknown_error',
+    ];
 
     /**
      * Walk-aways are volume-driven: a busy hour spikes them without anything

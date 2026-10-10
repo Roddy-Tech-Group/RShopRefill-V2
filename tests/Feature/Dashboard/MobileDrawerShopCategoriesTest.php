@@ -90,9 +90,9 @@ class MobileDrawerShopCategoriesTest extends TestCase
     {
         $css = file_get_contents(resource_path('css/app.css'));
 
-        $this->assertStringContainsString('body.dashboard .dash-drawer-subrow { color: rgb(255 255 255 / .7); }', $css);
-        $this->assertStringContainsString('body.dashboard .dash-drawer-subrow:hover { background-color: rgb(255 255 255 / .06); color: #fff; }', $css);
-        $this->assertStringContainsString('body.dashboard .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }', $css);
+        $this->assertStringContainsString(':is(body.dashboard, body.admin) .dash-drawer-subrow { color: rgb(255 255 255 / .7); }', $css);
+        $this->assertStringContainsString(':is(body.dashboard, body.admin) .dash-drawer-subrow:hover { background-color: rgb(255 255 255 / .06); color: #fff; }', $css);
+        $this->assertStringContainsString(':is(body.dashboard, body.admin) .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }', $css);
     }
 
     public function test_the_drawer_logo_is_forty_eight_pixels_tall(): void

@@ -125,6 +125,7 @@ return [
     'momo_network_label' => 'Network',
     'momo_number_label' => 'Mobile money number',
     'momo_phone_placeholder' => 'Phone number',
+    'currency_note' => 'You can select your preferred currency in Preferences.',
     'momo_charge_hint' => 'Your mobile money account will be debited about :amount, the total converted at today’s rate.',
     // The mobile money waiting panel: the prompt, and the operator dial code when none arrives.
     'momo_prompt_sent' => 'We sent a payment request of :amount to :phone. Approve it on your phone to complete this payment.',

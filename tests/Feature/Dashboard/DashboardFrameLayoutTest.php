@@ -302,7 +302,7 @@ class DashboardFrameLayoutTest extends TestCase
         $this->assertStringContainsString('menu.person@example.com', $menu);
 
         $last = -1;
-        foreach (['>Profile<', '>Verify Identity<', '>For Partners<', '>Security<', '>Notifications<', '>Appearance<', '>Language<', 'Help &amp; support', '>Back to store<', '>Dark mode<', 'Log out'] as $row) {
+        foreach (['>Profile<', '>Verify Identity<', '>For Partners<', '>Security<', '>Notifications<', '>Appearance<', '>Preferences<', 'Help &amp; support', '>Back to store<', '>Dark mode<', 'Log out'] as $row) {
             $at = strpos($menu, $row);
             $this->assertNotFalse($at, $row.' is missing from the account menu.');
             $this->assertGreaterThan($last, $at, $row.' is out of order.');

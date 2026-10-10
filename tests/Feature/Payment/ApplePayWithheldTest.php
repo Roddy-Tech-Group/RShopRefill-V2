@@ -27,7 +27,7 @@ class ApplePayWithheldTest extends TestCase
         $withheld = SupportedPaymentMethods::withheld();
 
         $this->assertArrayHasKey('apple_pay', $withheld);
-        $this->assertStringContainsString('live Flutterwave account', $withheld['apple_pay']);
+        $this->assertSame('Not enabled', $withheld['apple_pay']);
     }
 
     public function test_no_currency_offers_apple_pay(): void
@@ -44,7 +44,7 @@ class ApplePayWithheldTest extends TestCase
     public function test_withholding_apple_pay_removes_nothing_else(): void
     {
         $this->assertSame(['card', 'mobile_money', 'crypto', 'wallet'], SupportedPaymentMethods::forCurrency('USD'));
-        $this->assertSame(['card', 'crypto', 'wallet', 'pay_with_bank'], SupportedPaymentMethods::forCurrency('GBP'));
+        $this->assertSame(['card', 'pay_with_bank', 'crypto', 'wallet'], SupportedPaymentMethods::forCurrency('GBP'));
         $this->assertContains('bank_transfer', SupportedPaymentMethods::forCurrency('NGN'));
     }
 
@@ -71,17 +71,11 @@ class ApplePayWithheldTest extends TestCase
         $this->assertNotContains('apple_pay', array_column($session->getAvailableMethods(), 'type'));
     }
 
-    /** The checkout page keeps its own copy of the currency map; it must agree. */
+    /** The checkout page renders the server's list, which does not name Apple Pay. */
     public function test_the_checkout_pages_currency_map_does_not_name_apple_pay(): void
     {
-        $source = (string) file_get_contents(resource_path('views/shop/checkout.blade.php'));
-
-        preg_match_all("/'(?:USD|GBP|NGN|EUR|GHS|XAF|XOF|KES|UGX|RWF)': \[([^\]]*)\]/", $source, $maps);
-
-        $this->assertNotEmpty($maps[1], 'the currency map was not found');
-
-        foreach ($maps[1] as $list) {
-            $this->assertStringNotContainsString('apple_pay', $list);
+        foreach (SupportedPaymentMethods::byCurrency() as $currency => $methods) {
+            $this->assertNotContains('apple_pay', $methods, "{$currency} offers Apple Pay");
         }
     }
 }

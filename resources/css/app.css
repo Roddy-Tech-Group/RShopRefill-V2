@@ -1271,25 +1271,25 @@ html.dark .wallet-glass {
 
     /* The sidebar drawer wears the bar's colour: navy, black in dark mode,
        the logo drawn white on it, the current page on a soft white tile. */
-    body.dashboard .dash-drawer { background-color: #0c1337; color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer { background-color: #0c1337; color: #fff; }
     /* Not pure black: the drawer runs flush to the top of the screen, behind
        the status bar, and at #000000 that whole strip read as switched-off
        glass rather than as a panel. It wears the page surface's own tone, so
        the drawer, the page under it and the bar above it are one family. */
-    html.dark body.dashboard .dash-drawer { background-color: #1e1e25; }
-    body.dashboard .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }
-    body.dashboard .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
-    body.dashboard .dash-drawer-row { color: rgb(255 255 255 / .85); }
-    body.dashboard .dash-drawer-row:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
-    body.dashboard .dash-drawer-row-active { background-color: rgb(255 255 255 / .12); color: #fff; }
-    body.dashboard .dash-drawer-row .anim-icon { color: rgb(255 255 255 / .85); }
-    body.dashboard .dash-drawer-row-active .anim-icon { color: #fff; }
-    body.dashboard .dash-drawer-label { color: rgb(255 255 255 / .5); }
+    html.dark :is(body.dashboard, body.admin) .dash-drawer { background-color: #1e1e25; }
+    :is(body.dashboard, body.admin) .dash-drawer .site-logo { filter: brightness(0) invert(1) !important; }
+    :is(body.dashboard, body.admin) .dash-drawer-head { min-height: calc(3.75rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+    :is(body.dashboard, body.admin) .dash-drawer-row { color: rgb(255 255 255 / .85); }
+    :is(body.dashboard, body.admin) .dash-drawer-row:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer-row-active { background-color: rgb(255 255 255 / .12); color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer-row .anim-icon { color: rgb(255 255 255 / .85); }
+    :is(body.dashboard, body.admin) .dash-drawer-row-active .anim-icon { color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer-label { color: rgb(255 255 255 / .5); }
     /* The categories under Shop: a shade quieter than the rows, the current
        one on the rows' tile. */
-    body.dashboard .dash-drawer-subrow { color: rgb(255 255 255 / .7); }
-    body.dashboard .dash-drawer-subrow:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
-    body.dashboard .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer-subrow { color: rgb(255 255 255 / .7); }
+    :is(body.dashboard, body.admin) .dash-drawer-subrow:hover { background-color: rgb(255 255 255 / .06); color: #fff; }
+    :is(body.dashboard, body.admin) .dash-drawer-subrow-active { background-color: rgb(255 255 255 / .12); color: #fff; }
 }
 
 /* Cart dropdown / sheet.

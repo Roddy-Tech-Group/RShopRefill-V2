@@ -1,0 +1,112 @@
+<?php
+
+namespace Tests\Feature\Payment;
+
+use App\Domain\Payment\Support\GatewayCapabilities;
+use Tests\TestCase;
+
+/**
+ * What each gateway can take, as its documentation states it (verified
+ * 2026-10-06). The storefront offers, and the router sends, only within this.
+ */
+class GatewayCapabilitiesTest extends TestCase
+{
+    public function test_flutterwave_takes_cards_everywhere_bank_methods_where_documented_and_mobile_money_per_market(): void
+    {
+        foreach (['USD', 'EUR', 'GBP', 'NGN', 'XAF', 'COP'] as $currency) {
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'card', $currency));
+        }
+
+        // Its payment-methods table: "account" and Apple Pay in NGN, GBP, EUR,
+        // USD and ZAR; bank transfer, USSD, NQR and the e-wallets Nigerian only.
+        foreach (['NGN', 'GBP', 'EUR', 'USD', 'ZAR'] as $currency) {
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'pay_with_bank', $currency));
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'apple_pay', $currency));
+        }
+        foreach (['bank_transfer', 'ussd', 'bank_qr', 'mobile_wallet'] as $method) {
+            $this->assertTrue(GatewayCapabilities::supports('flutterwave', $method, 'NGN'));
+            $this->assertFalse(GatewayCapabilities::supports('flutterwave', $method, 'GHS'), "{$method} is Nigerian only");
+            $this->assertFalse(GatewayCapabilities::supports('flutterwave', $method, 'GBP'), "{$method} is Nigerian only");
+        }
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'pay_with_bank', 'GHS'));
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'apple_pay', 'XAF'));
+
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XAF', 'CM', 'Orange'));
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XOF', 'CI', 'Wave'));
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XOF', 'SN', 'Wave'));
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XOF', 'SN', 'MTN'), 'Senegal has no MTN');
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XOF', 'ML'), 'Mali is not on the rail');
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'XAF', 'GA'), 'Gabon is not on the rail');
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'UGX'));
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'RWF'));
+        $this->assertFalse(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'EUR'));
+    }
+
+    public function test_a_usd_mobile_money_order_has_the_franc_countries_coverage(): void
+    {
+        $coverage = GatewayCapabilities::mobileMoneyCoverage('flutterwave', 'USD');
+
+        $this->assertSame(['CM', 'CI', 'SN', 'BF'], array_keys($coverage));
+        $this->assertSame(['MTN', 'Orange'], $coverage['CM']);
+        $this->assertSame(['MTN', 'Orange', 'Moov', 'Wave'], $coverage['CI']);
+    }
+
+    /** Only Flutterwave converts a dollar order into francs; Kora would be sent USD and refuse it. */
+    public function test_no_gateway_but_flutterwave_takes_usd_mobile_money(): void
+    {
+        $this->assertTrue(GatewayCapabilities::supports('flutterwave', 'mobile_money', 'USD', 'CM', 'MTN'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'mobile_money', 'USD'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'mobile_money', 'USD'));
+        $this->assertSame([], GatewayCapabilities::mobileMoneyCoverage('korapay', 'USD'));
+    }
+
+    public function test_kora_takes_ngn_bank_methods_and_mobile_money_in_six_markets(): void
+    {
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'card', 'NGN'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'card', 'USD'));
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'bank_transfer', 'NGN'));
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'pay_with_bank', 'NGN'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'ussd', 'NGN'));
+
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'mobile_money', 'KES', 'KE', 'Equitel'));
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'mobile_money', 'XOF', 'CI', 'Moov'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'mobile_money', 'XOF', 'SN'), 'Kora covers Côte d\'Ivoire only');
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'mobile_money', 'UGX'));
+        $this->assertFalse(GatewayCapabilities::supports('korapay', 'mobile_money', 'RWF'));
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'mobile_money', 'TZS'));
+        $this->assertTrue(GatewayCapabilities::supports('korapay', 'mobile_money', 'EGP'));
+    }
+
+    public function test_paystack_takes_ngn_only_plus_usd_cards_once_approved(): void
+    {
+        config(['services.paystack.charge_currencies' => ['NGN']]);
+
+        $this->assertTrue(GatewayCapabilities::supports('paystack', 'card', 'NGN'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'card', 'USD'));
+        $this->assertTrue(GatewayCapabilities::supports('paystack', 'bank_transfer', 'NGN'));
+        $this->assertTrue(GatewayCapabilities::supports('paystack', 'ussd', 'NGN'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'mobile_money', 'GHS'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'mobile_money', 'KES'));
+        $this->assertFalse(GatewayCapabilities::supports('paystack', 'pay_with_bank', 'NGN'));
+
+        config(['services.paystack.charge_currencies' => ['NGN', 'USD']]);
+
+        $this->assertTrue(GatewayCapabilities::supports('paystack', 'card', 'USD'));
+        $this->assertTrue(GatewayCapabilities::supports('paystack', 'apple_pay', 'USD'));
+    }
+
+    public function test_the_union_of_two_gateways_keeps_the_first_ones_order(): void
+    {
+        $union = GatewayCapabilities::mobileMoneyUnion(['flutterwave', 'korapay'], 'KES');
+
+        $this->assertSame(['KE' => ['M-Pesa', 'Airtel', 'Equitel']], $union);
+        $this->assertSame([], GatewayCapabilities::mobileMoneyUnion(['paystack'], 'KES'));
+    }
+
+    public function test_network_labels_match_without_regard_to_case(): void
+    {
+        $this->assertSame('M-Pesa', GatewayCapabilities::labelIn('m-pesa', ['M-Pesa', 'Airtel']));
+        $this->assertNull(GatewayCapabilities::labelIn('Safaricom', ['M-Pesa', 'Airtel']));
+        $this->assertSame('Mali', GatewayCapabilities::countryName('ML'));
+    }
+}
