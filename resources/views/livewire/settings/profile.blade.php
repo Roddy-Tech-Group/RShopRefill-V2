@@ -198,6 +198,36 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
         $this->dispatch('profile-updated', name: $user->name);
     }
 
+    /**
+     * Take the name the customer's ID document carries as their display name.
+     * Offered, never forced: the blue tick stays whichever name they choose,
+     * and admins always see the legal name beside it.
+     */
+    public function useVerifiedName(): void
+    {
+        $user = Auth::user();
+        $legalName = $user->verifiedIdentity()?->legalNameForDisplay();
+
+        if ($legalName === null) {
+            return;
+        }
+
+        $user->forceFill(['name' => $legalName])->save();
+        $this->name = $legalName;
+
+        $this->dispatch('profile-updated', name: $legalName);
+    }
+
+    /**
+     * The customer keeps the name they chose. The offer is not repeated; the
+     * legal name moves to a read-only row, because order and transaction
+     * reports carry it whatever the display name is.
+     */
+    public function keepDisplayName(): void
+    {
+        Auth::user()->verifiedIdentity()?->forceFill(['name_offer_declined_at' => now()])->save();
+    }
+
     private function maskEmail(string $email): string
     {
         [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
@@ -318,6 +348,13 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
     // Identity verification — backend hook: $user->kyc_status. Column not shipped yet,
     // so this resolves to null and the user shows as not identity-verified.
     $identityVerified = ($authUser?->kyc_status ?? null) === 'verified';
+    // The name on the customer's ID, offered when it is not the name they use.
+    $legalIdentity = $identityVerified ? $authUser->verifiedIdentity() : null;
+    $nameDiffers = $legalIdentity?->legal_name !== null && $legalIdentity->legalNameDiffersFrom($authUser->name);
+    // Offered once; if they keep their own name, the legal name stays on show
+    // as a read-only row, since reports carry it either way.
+    $offerVerifiedName = $nameDiffers && $legalIdentity->name_offer_declined_at === null;
+    $showLegalName = $nameDiffers && ! $offerVerifiedName;
     $googleConnected = !empty($authUser?->google_id);
     $lastLoginAt = $authUser?->updated_at;
     $firstName = $authUser?->name ? str($authUser->name)->before(' ') : 'there';
@@ -497,6 +534,31 @@ new #[Layout('components.layouts.dashboard')] class extends Component {
                         </svg>
                     </button>
                 </div>
+
+                {{-- The name on their ID, when it is not the name they use. --}}
+                @if ($offerVerifiedName)
+                    <div class="flex items-center justify-between gap-3 px-5 py-3 sm:px-6" data-verified-name-offer>
+                        <p class="min-w-0 text-xs text-zinc-600 dark:text-zinc-400">
+                            {{ __('Your ID says :name.', ['name' => $legalIdentity->legalNameForDisplay()]) }}
+                        </p>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button" wire:click="keepDisplayName" wire:loading.attr="disabled" class="rounded-full px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-white/10">
+                                {{ __('Keep mine') }}
+                            </button>
+                            <button type="button" wire:click="useVerifiedName" wire:loading.attr="disabled" class="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-[#0c1337] transition-colors hover:bg-zinc-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15">
+                                {{ __('Use this name') }}
+                            </button>
+                        </div>
+                    </div>
+                @elseif ($showLegalName)
+                    {{-- Read only: it comes from the document, not from the customer. --}}
+                    <div class="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6" data-legal-name-row>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">{{ __('Legal name') }}</p>
+                            <p class="mt-0.5 truncate text-sm font-medium text-black">{{ $legalIdentity->legalNameForDisplay() }}</p>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Email --}}
                 <div class="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-zinc-50/60 dark:hover:bg-white/5 sm:px-6">

@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  * @property string $email
  * @property string|null $phone
  * @property string|null $country
+ * @property string|null $legal_name
+ * @property string|null $date_of_birth
  * @property string|null $kyc_provider
  * @property string|null $kyc_reference
  * @property Carbon $closed_at
@@ -33,6 +35,8 @@ class ClosedAccountIdentity extends Model
         'email',
         'phone',
         'country',
+        'legal_name',
+        'date_of_birth',
         'kyc_provider',
         'kyc_reference',
         'closed_at',
@@ -48,6 +52,8 @@ class ClosedAccountIdentity extends Model
             'name' => 'encrypted',
             'email' => 'encrypted',
             'phone' => 'encrypted',
+            'legal_name' => 'encrypted',
+            'date_of_birth' => 'encrypted',
             'closed_at' => 'datetime',
             'retain_until' => 'datetime',
         ];

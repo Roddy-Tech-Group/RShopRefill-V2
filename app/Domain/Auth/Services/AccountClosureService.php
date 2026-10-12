@@ -12,6 +12,7 @@ use App\Domain\Shared\Enums\OrderStatus;
 use App\Models\AccountClosureFeedback;
 use App\Models\ClosedAccountIdentity;
 use App\Models\CurrencyRate;
+use App\Models\KycVerification;
 use App\Models\User;
 use App\Models\WalletFunding;
 use Illuminate\Database\Eloquent\Builder;
@@ -266,6 +267,18 @@ class AccountClosureService
         DB::transaction(function () use ($user): void {
             $this->preserveIdentityIfMoneyMoved($user);
 
+            // The legal identity leaves the verification rows: an account that
+            // moved money keeps it in the drawer above on the drawer's clock,
+            // and one that never did has nothing to answer for. The attempts
+            // themselves (reference, outcome) stay with the financial records.
+            KycVerification::query()->where('user_id', $user->id)->update([
+                'legal_name' => null,
+                'date_of_birth' => null,
+                'id_type' => null,
+                'id_country' => null,
+                'id_expires_on' => null,
+            ]);
+
             // Any session that survived the grace period dies here on every
             // driver; the table purge below only reaches the database driver.
             $this->sessions->revokeAll($user);
@@ -327,7 +340,10 @@ class AccountClosureService
             return;
         }
 
-        $kyc = $user->kycVerifications()->first();
+        // The pass that proved who they are, when there is one; otherwise the
+        // latest attempt, whose reference still finds the case at the provider.
+        $legal = $user->verifiedIdentity();
+        $kyc = $legal ?? $user->kycVerifications()->first();
         $closedAt = now();
 
         ClosedAccountIdentity::query()->updateOrCreate(
@@ -337,6 +353,8 @@ class AccountClosureService
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'country' => $user->country,
+                'legal_name' => $legal?->legal_name,
+                'date_of_birth' => $legal?->date_of_birth,
                 'kyc_provider' => $kyc?->provider,
                 'kyc_reference' => $kyc?->reference,
                 'closed_at' => $closedAt,
