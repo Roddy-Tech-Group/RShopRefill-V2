@@ -25,7 +25,7 @@ class RecordsOfProcessingTest extends TestCase
         foreach ([
             '# Records of Processing Activities',
             '| Account closure grace period | 30 days |',
-            'kept separately for 5 years',
+            'kept in the closed-account register for 5 years',
             'Up to 7 years after the account is closed',
             'delivery logs 730 days',
             'Nigeria Data Protection Commission',
