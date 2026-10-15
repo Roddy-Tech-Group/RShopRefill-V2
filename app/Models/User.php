@@ -517,6 +517,22 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     }
 
     /**
+     * The most recent approved verification that kept who the document says
+     * this customer is, or null. This is the legal identity; `name` stays the
+     * display name the customer chose.
+     */
+    public function verifiedIdentity(): ?KycVerification
+    {
+        return KycVerification::query()
+            ->where('user_id', $this->getKey())
+            ->where('status', 'approved')
+            ->where(fn ($query) => $query->whereNotNull('legal_name')->orWhereNotNull('date_of_birth'))
+            ->latest('decided_at')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Get all orders placed by this user.
      */
     public function kycTier(): BelongsTo

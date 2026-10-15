@@ -78,9 +78,15 @@ class TransactionReportService
             return ['missing' => true];
         }
 
+        // The name on the ID when the customer is identity verified: a report
+        // names who paid, whatever they chose to be called on the platform.
+        $identity = $user->isKycVerified() ? $user->verifiedIdentity() : null;
+
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'legal_name' => $identity?->legal_name,
+            'goes_by_another_name' => (bool) $identity?->legalNameDiffersFrom($user->name),
             'email' => $user->email,
         ];
     }

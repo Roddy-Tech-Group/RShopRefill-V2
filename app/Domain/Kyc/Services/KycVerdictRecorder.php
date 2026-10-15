@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Log;
  * A rejected verdict never demotes an already-verified customer: a stale or
  * retried job failing later must not undo a real verification.
  *
+ * An approval also keeps what the document said (legal name, date of birth,
+ * document type, issuing country, expiry) on the attempt it approved. Nothing
+ * on screen edits those; the customer's display name stays their own.
+ *
  * The customer is told the outcome once, when the verdict actually changes
  * something. A replayed callback for an attempt that is already decided moves
  * nothing and announces nothing.
@@ -56,6 +60,9 @@ class KycVerdictRecorder
                 'result_code' => is_scalar($resultCode) ? (string) $resultCode : null,
                 'result_text' => $verdict->reason,
                 'decided_at' => now(),
+                // Only a pass proves who the customer is; a failed document
+                // read names nobody we should keep.
+                ...($verdict->approved && $verdict->identity ? $verdict->identity->attributes() : []),
             ]);
 
             $resolvedAttempt = true;

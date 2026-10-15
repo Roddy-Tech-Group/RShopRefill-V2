@@ -80,6 +80,11 @@ class DataExportService
             'identity_verifications' => $user->kycVerifications()->get()->map(fn ($v) => [
                 'provider' => $v->provider,
                 'status' => $v->status,
+                'legal_name' => $v->legal_name,
+                'date_of_birth' => $v->date_of_birth,
+                'id_type' => $v->id_type,
+                'id_issuing_country' => $v->id_country,
+                'id_expires_on' => $v->id_expires_on?->toDateString(),
                 'decided_at' => $this->stamp($v->decided_at),
                 'created_at' => $this->stamp($v->created_at),
             ])->all(),

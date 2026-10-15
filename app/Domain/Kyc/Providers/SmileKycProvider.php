@@ -5,6 +5,7 @@ namespace App\Domain\Kyc\Providers;
 use App\Domain\Kyc\Contracts\KycProvider;
 use App\Domain\Kyc\DTOs\KycSession;
 use App\Domain\Kyc\DTOs\KycVerdict;
+use App\Domain\Kyc\DTOs\VerifiedIdentity;
 use App\Domain\Kyc\Enums\KycTier;
 use App\Domain\Kyc\Exceptions\KycAlreadyEnrolledException;
 use App\Domain\Kyc\Exceptions\KycProviderUnavailableException;
@@ -122,7 +123,7 @@ class SmileKycProvider implements KycProvider
         $resultCode = (string) ($payload['ResultCode'] ?? $payload['result_code'] ?? '');
 
         if ($this->isApproved($resultCode, $this->productForJob($reference, $partnerParams))) {
-            return KycVerdict::approved($reference, KycTier::IdentityVerified, $payload);
+            return KycVerdict::approved($reference, KycTier::IdentityVerified, $payload, VerifiedIdentity::fromSmile($payload));
         }
 
         $reason = $payload['ResultText'] ?? $payload['result_text'] ?? null;
@@ -170,7 +171,7 @@ class SmileKycProvider implements KycProvider
         $resultCode = (string) data_get($result, 'ResultCode', data_get($result, 'result_code', ''));
 
         if ($this->isApproved($resultCode, $this->productForJob($reference, (array) data_get($result, 'PartnerParams', [])))) {
-            return KycVerdict::approved($reference, KycTier::IdentityVerified, $result);
+            return KycVerdict::approved($reference, KycTier::IdentityVerified, $result, VerifiedIdentity::fromSmile($result));
         }
 
         $reason = data_get($result, 'ResultText', data_get($result, 'result_text'));

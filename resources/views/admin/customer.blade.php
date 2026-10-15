@@ -810,6 +810,46 @@
                 <x-admin.badge :tone="$kycTone">{{ $user->kyc_status }}</x-admin.badge>
             </div>
 
+            {{-- Legal details: what the document said on the latest pass. Read
+                 only; nobody edits these. The customer's display name above is
+                 their own choice and may differ. --}}
+            @php $legalIdentity = $user->verifiedIdentity(); @endphp
+            @if ($legalIdentity)
+                <div class="border-b border-zinc-100 px-5 py-4" data-legal-identity>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Legal details</p>
+                        <span class="text-[11px] font-medium text-zinc-600">From the document, verified {{ $legalIdentity->decided_at ? $fmtDate($legalIdentity->decided_at) : '' }}</span>
+                    </div>
+                    <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-4">
+                        <div class="col-span-2">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Legal name</dt>
+                            <dd class="mt-0.5 text-sm font-semibold text-zinc-900">{{ $legalIdentity->legal_name ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Date of birth</dt>
+                            <dd class="mt-0.5 font-medium text-zinc-700">{{ $legalIdentity->dateOfBirth()?->format('j M Y') ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Document</dt>
+                            <dd class="mt-0.5 font-medium text-zinc-700">{{ $legalIdentity->idTypeLabel() ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Issued by</dt>
+                            <dd class="mt-0.5 font-medium text-zinc-700">{{ $legalIdentity->idCountryName() ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-zinc-800">Expires</dt>
+                            <dd class="mt-0.5 font-medium {{ $legalIdentity->id_expires_on?->isPast() ? 'text-red-600' : 'text-zinc-700' }}">
+                                {{ $legalIdentity->id_expires_on?->format('j M Y') ?? '-' }}{{ $legalIdentity->id_expires_on?->isPast() ? ' (expired)' : '' }}
+                            </dd>
+                        </div>
+                    </dl>
+                    @if ($legalIdentity->legalNameDiffersFrom($user->name))
+                        <p class="mt-3 rounded-[12px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">The customer goes by "{{ $user->name }}" on the platform, which is not their legal name.</p>
+                    @endif
+                </div>
+            @endif
+
             {{-- Provider-era attempts (Smile ID). Verdicts arrive via webhook;
                  "Check with provider" reconciles a pending attempt whose
                  callback has not landed. --}}

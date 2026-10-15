@@ -100,7 +100,7 @@ class RetentionRopaCommand extends Command
         $lines[] = '';
         $lines[] = '## Security measures';
         $lines[] = '';
-        $lines[] = '- Passwords and transaction PINs stored as one-way hashes; two-factor secrets and the closed-account identity register encrypted at rest.';
+        $lines[] = '- Passwords and transaction PINs stored as one-way hashes; two-factor secrets, verified legal names and dates of birth, and the closed-account identity register encrypted at rest.';
         $lines[] = '- Access to customer records restricted to authenticated admin roles; every administrative change to sensitive fields is written to the audit log with the actor.';
         $lines[] = '- Financial tables reject deletion of a customer row at the database level; accounts are closed by anonymisation, never deleted.';
         $lines[] = '- Data export requires a one-time code to the account email; downloads are rate limited and audited.';

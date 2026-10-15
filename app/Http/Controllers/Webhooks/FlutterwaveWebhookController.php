@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Webhooks;
 use App\Domain\Payment\Enums\PaymentStatus;
 use App\Domain\Payment\Exceptions\InvalidWebhookException;
 use App\Domain\Payment\Services\FlutterwaveService;
+use App\Domain\Risk\Services\DisputeNoticeParser;
+use App\Domain\Risk\Services\DisputeRecorder;
 use App\Domain\Wallet\Jobs\ProcessFundingWebhookJob;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Webhooks\Concerns\RecordsDisputes;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
@@ -18,8 +21,12 @@ use Illuminate\Support\Facades\Log;
 
 class FlutterwaveWebhookController extends Controller
 {
+    use RecordsDisputes;
+
     public function __construct(
-        private readonly FlutterwaveService $flutterwaveService
+        private readonly FlutterwaveService $flutterwaveService,
+        private readonly DisputeNoticeParser $disputeParser,
+        private readonly DisputeRecorder $disputes,
     ) {}
 
     /**
@@ -64,6 +71,12 @@ class FlutterwaveWebhookController extends Controller
             ]);
 
             return response()->json(['message' => 'Unauthorized signature'], 401);
+        }
+
+        // 2a. Chargebacks are about a payment already settled, never a payment
+        // to verify: recorded as a dispute, then acknowledged.
+        if (is_string($eventType) && str_starts_with($eventType, 'chargeback.')) {
+            return $this->recordDispute($webhook, $this->disputeParser->flutterwave(is_array($data) ? $data : []));
         }
 
         // 2b. Transfer (payout) webhooks belonged to gift-card trading, which is

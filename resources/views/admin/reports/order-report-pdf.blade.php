@@ -136,7 +136,14 @@
         @else
             <div class="card">
                 <table class="kv">
-                    <tr><td class="k">Customer</td><td class="v">{{ $c['name'] }}{!! $c['is_guest'] ? ' <span class="muted">guest shadow account</span>' : '' !!}</td></tr>
+                    @if ($c['legal_name'] ?? null)
+                        <tr><td class="k">Legal name</td><td class="v">{{ $c['legal_name'] }}</td></tr>
+                        @if ($c['goes_by_another_name'] ?? false)
+                            <tr><td class="k">Name</td><td class="v">{{ $c['name'] }}</td></tr>
+                        @endif
+                    @else
+                        <tr><td class="k">Customer</td><td class="v">{{ $c['name'] }}{!! $c['is_guest'] ? ' <span class="muted">guest shadow account</span>' : '' !!}</td></tr>
+                    @endif
                     <tr><td class="k">Email</td><td class="v">{{ $c['email'] }}
                         @php [$eb, $ef] = $c['email_verified_at'] ? $pill('verified') : $pill('pending'); @endphp
                         <span class="pill" style="background: {{ $eb }}; color: {{ $ef }};">{{ $c['email_verified_at'] ? 'verified' : 'not verified' }}</span>

@@ -108,11 +108,11 @@ return [
         [
             'activity' => 'Identity verification (KYC)',
             'purpose' => 'Verify identity above value thresholds; anti-money-laundering compliance',
-            'data' => 'Verification reference, provider, result and decision date. Identity documents and selfies are held by the verification partner, not by us',
+            'data' => 'Verification reference, provider, result and decision date. On a pass, the legal name, date of birth, document type, issuing country and expiry date read from the document (encrypted at rest). The document number, the document images and selfies are held by the verification partner, not by us',
             'subjects' => 'Customers',
             'lawful_basis' => 'Legal obligation (MLPPA 2022)',
             'recipients' => 'Identity verification partner',
-            'retention' => 'Up to :closed_account_financial_years years after closure; the identity of a closed account that moved money is kept separately for :closed_account_identity_years years',
+            'retention' => 'Attempt records up to :closed_account_financial_years years after closure. At closure the legal identity leaves them: kept in the closed-account register for :closed_account_identity_years years when the account moved money, removed otherwise',
         ],
         [
             'activity' => 'Fraud and risk assessment',
