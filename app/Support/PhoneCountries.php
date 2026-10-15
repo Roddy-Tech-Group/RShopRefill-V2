@@ -28,7 +28,7 @@ final class PhoneCountries
     public const DEFAULT_ISO = 'US';
 
     /**
-     * Every dialable country, alphabetical by name.
+     * Every dialable country an account may be opened in, alphabetical by name.
      *
      * @return list<array{iso: string, name: string, dial: string, flag: string, example: string}>
      */
@@ -43,6 +43,14 @@ final class PhoneCountries
 
         foreach ((array) config('countries.codes', []) as $name => $iso) {
             $iso = strtoupper((string) $iso);
+
+            // No account is opened under comprehensive sanctions. Leaving them
+            // out here leaves them out of every dial picker and every
+            // Rule::in(isoCodes()) that validates an account's country.
+            if (SanctionedCountries::includes($iso)) {
+                continue;
+            }
+
             $dial = $util->getCountryCodeForRegion($iso);
 
             // A 0 dial code means libphonenumber has no numbering plan for the
