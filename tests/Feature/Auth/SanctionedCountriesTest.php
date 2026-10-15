@@ -36,9 +36,13 @@ class SanctionedCountriesTest extends TestCase
             $this->assertNotContains($iso, $offered, "{$iso} must not be offered as an account's country");
         }
 
+        // Russia and Belarus are left out by the business's own decision.
+        $this->assertNotContains('RU', $offered);
+        $this->assertNotContains('BY', $offered);
+
         // The rest of the world still is.
         $this->assertContains('NG', $offered);
-        $this->assertContains('RU', $offered, 'sectoral sanctions are a business decision, not this list');
+        $this->assertContains('UA', $offered);
     }
 
     public function test_the_app_refuses_an_account_in_a_sanctioned_country(): void
