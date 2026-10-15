@@ -20,6 +20,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureAppTokenIsValid
 {
+    /** What an unfinished Google sign-up may still reach. */
+    private const OPEN_WHILE_UNFINISHED = [
+        'api.mobile.me',
+        'api.mobile.profile.complete',
+        'api.mobile.auth.logout',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         /** @var User|null $user */
@@ -40,6 +47,18 @@ class EnsureAppTokenIsValid
 
         if (! $this->stillSignedIn($token, $user, $request)) {
             return $this->refuse($token, 'You were signed out of this device for security reasons. Please sign in again.', 401);
+        }
+
+        // The website's EnsureProfileCompleted, for the app: an account Google
+        // created is not finished until it gives the country, phone and gender
+        // sign-up asks for, so until then only finishing it, reading who is
+        // signed in and signing out are open. Refused, not ended: the token stays.
+        if ($user->needsProfileCompletion()
+            && ! $request->routeIs(self::OPEN_WHILE_UNFINISHED)) {
+            return response()->json([
+                'message' => 'Please finish setting up your account first.',
+                'profile_required' => true,
+            ], 403);
         }
 
         return $next($request);

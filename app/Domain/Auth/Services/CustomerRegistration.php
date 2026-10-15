@@ -97,8 +97,10 @@ final class CustomerRegistration
      * The account, from input the full rules() have already passed.
      *
      * @param  array<string, mixed>  $validated
+     * @param  bool  $confirmsEmailByCode  The mobile app's sign-up, which confirms
+     *                                     the email with a code instead of the link
      */
-    public function create(array $validated, ?string $referralCode): User
+    public function create(array $validated, ?string $referralCode, bool $confirmsEmailByCode = false): User
     {
         $this->ensurePhoneIsFree((string) $validated['phone'], (string) $validated['country']);
 
@@ -132,7 +134,9 @@ final class CustomerRegistration
         // silently no-ops on blank / no-match / self-referral.
         Referral::attribute($user, $referralCode);
 
-        // The verification link goes out from here (MustVerifyEmail).
+        // The verification link goes out from here (MustVerifyEmail), unless the
+        // app is about to send its code instead.
+        $user->confirmsEmailByCode = $confirmsEmailByCode;
         event(new Registered($user));
 
         return $user;

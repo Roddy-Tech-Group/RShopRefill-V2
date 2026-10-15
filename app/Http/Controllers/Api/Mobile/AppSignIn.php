@@ -24,6 +24,11 @@ use Illuminate\Validation\ValidationException;
  * assesses a browser, and the customer is either signed in with a token or
  * asked for the emailed device code first.
  *
+ * The app also asks for the code while the account's email is unconfirmed, so
+ * a new account proves its address before it is signed in. The code goes to
+ * that address, so typing it back confirms it, as the website's link does
+ * (MobileAuthController::verifyDevice).
+ *
  * Each token belongs to one phone and is recorded as a session in the security
  * centre, so removing the device, "sign out everywhere", a ban or a password
  * change ends it (EnsureAppTokenIsValid). A sign-in waiting on its code is held
@@ -59,7 +64,8 @@ final class AppSignIn
     }
 
     /**
-     * Signed in now, or the device code first.
+     * Signed in now, or the emailed code first: for a phone the account has not
+     * seen, or for an email nobody has confirmed yet.
      *
      * @param  array<string, string|null>  $deviceData  What the app says about the phone (device_name, os)
      */
@@ -67,27 +73,43 @@ final class AppSignIn
     {
         $installationId = self::installationId($request);
         $assessment = $this->assess($user, $installationId, $request, ['device_type' => 'mobile'] + $deviceData);
+        $confirmsEmail = ! $user->hasVerifiedEmail();
 
-        if (! $assessment->needsOtp) {
+        if (! $assessment->needsOtp && ! $confirmsEmail) {
             return $this->complete($user, $assessment);
         }
 
         $challenge = Str::random(64);
-        $this->hold($challenge, [
+        $pending = [
             'user_id' => $user->id,
             'device_id' => $assessment->device->id,
             'risk_level' => $assessment->riskLevel,
             'installation_id' => $installationId,
-        ]);
-        $this->otp->issue($user);
+            // The address the code goes to, so only that address is confirmed by it.
+            'confirms_email' => $confirmsEmail ? (string) $user->email : null,
+        ];
+        $this->hold($challenge, $pending);
+        $this->otp->issue($user, self::codeContext($pending));
 
         return response()->json([
             'status' => 'verification_required',
+            // What the app titles the code screen: "Confirm your email" or "Verify your device".
+            'purpose' => $confirmsEmail ? 'email' : 'device',
             'challenge' => $challenge,
             'masked_email' => DeviceOtpService::maskEmail((string) $user->email),
             'expires_in' => $this->otp->secondsUntilExpiry($user),
             'resend_in' => $this->otp->secondsUntilResend($user),
         ], 202);
+    }
+
+    /**
+     * What a held sign-in's code is for, as its email names it.
+     *
+     * @param  array<string, mixed>  $pending
+     */
+    public static function codeContext(array $pending): string
+    {
+        return ($pending['confirms_email'] ?? null) !== null ? 'email_verification' : 'login';
     }
 
     /** The token, recorded as a security centre session on the phone it belongs to. */
@@ -170,6 +192,9 @@ final class AppSignIn
             'name' => $user->name,
             'email' => $user->email,
             'email_verified' => $user->email_verified_at !== null,
+            // False only for an account Google created that has not yet given
+            // the country, phone and gender sign-up asks for (MobileProfileController).
+            'profile_completed' => ! $user->needsProfileCompletion(),
             'phone' => $user->phone,
             'country' => $user->country,
             'avatar_url' => $user->avatar_url,

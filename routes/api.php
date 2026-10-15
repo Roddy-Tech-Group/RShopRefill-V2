@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\EmailUnsubscribeController;
 use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\KycStatusController;
 use App\Http\Controllers\Api\Mobile\MobileAuthController;
+use App\Http\Controllers\Api\Mobile\MobilePasswordController;
+use App\Http\Controllers\Api\Mobile\MobileProfileController;
 use App\Http\Controllers\Api\Mobile\MobileRegistrationController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
@@ -147,6 +149,16 @@ Route::prefix('mobile/auth')->name('api.mobile.auth.')->group(function () {
     Route::post('login', [MobileAuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
     Route::post('verify-device', [MobileAuthController::class, 'verifyDevice'])->middleware('throttle:10,1')->name('verify-device');
     Route::post('resend-code', [MobileAuthController::class, 'resendCode'])->middleware('throttle:6,1')->name('resend-code');
+    // The code the website's Google sign-in hands back to the app (AppGoogleHandoff).
+    Route::post('google', [MobileAuthController::class, 'google'])->middleware('throttle:10,1')->name('google');
+});
+
+// A forgotten password, reset in the mobile app: an emailed code where the web
+// sends a link, then the new password by the web's rule. See the controller.
+Route::prefix('mobile/password')->name('api.mobile.password.')->group(function () {
+    Route::post('forgot', [MobilePasswordController::class, 'forgot'])->middleware('throttle:6,1')->name('forgot');
+    Route::post('verify', [MobilePasswordController::class, 'verify'])->middleware('throttle:10,1')->name('verify');
+    Route::post('reset', [MobilePasswordController::class, 'reset'])->middleware('throttle:10,1')->name('reset');
 });
 
 // The mobile app's sign-up: the web's register wizard (CustomerRegistration),
@@ -169,6 +181,8 @@ Route::middleware(['auth:web,sanctum', 'app.token'])->group(function () {
     // The mobile app's own: who is signed in, and signing this phone out.
     Route::get('mobile/me', [MobileAuthController::class, 'me'])->name('api.mobile.me');
     Route::post('mobile/auth/logout', [MobileAuthController::class, 'logout'])->name('api.mobile.auth.logout');
+    // Finishing a Google sign-up: the country, phone and gender Google does not give.
+    Route::post('mobile/profile/complete', [MobileProfileController::class, 'complete'])->middleware('throttle:10,1')->name('api.mobile.profile.complete');
 
     // Poll KYC state after completing the Smile flow, so the UI can wait for the
     // callback and then retry the action that required verification.

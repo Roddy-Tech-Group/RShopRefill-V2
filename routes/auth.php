@@ -28,6 +28,17 @@ Route::middleware(['guest', 'throttle:10,1'])->group(function () {
     // Google OAuth
     Route::get('auth/google/redirect', [GoogleAuthController::class, 'redirect'])
         ->name('auth.google.redirect');
+});
+
+// The mobile app's Google sign-in, and the callback every Google sign-in
+// returns to. Not guest-only: the app opens these in the phone's browser,
+// which on Android shares Chrome's cookies and may already be signed in to the
+// website, and that must not turn the app's sign-in into a trip to the
+// dashboard. A website sign-in can still only begin signed out (the redirect
+// above), and the OAuth state check guards the callback either way.
+Route::middleware('throttle:10,1')->group(function () {
+    Route::get('auth/google/app', [GoogleAuthController::class, 'app'])
+        ->name('auth.google.app');
 
     Route::get('auth/google/callback', [GoogleAuthController::class, 'callback'])
         ->name('auth.google.callback');

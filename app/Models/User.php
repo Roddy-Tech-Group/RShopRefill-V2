@@ -66,6 +66,13 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * Set on an account the mobile app has just created: its email is confirmed
+     * by the code the app asks for next (Api\Mobile\AppSignIn), so the link is
+     * not sent as well. Not a column; it lasts as long as this instance.
+     */
+    public bool $confirmsEmailByCode = false;
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -628,6 +635,10 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
      */
     public function sendEmailVerificationNotification(): void
     {
+        if ($this->confirmsEmailByCode) {
+            return;
+        }
+
         app(CommunicationManager::class)->send(
             recipient: $this,
             category: CommunicationCategory::EmailVerification,

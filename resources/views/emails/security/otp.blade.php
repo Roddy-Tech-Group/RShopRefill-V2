@@ -4,6 +4,10 @@
     <p style="margin:0 0 16px; font-size:16px; line-height:1.65; color:#3f3f46;">
         @if($context === 'recovery')
             You are attempting to recover your Protected Mode account.
+        @elseif($context === 'password_reset')
+            You asked to reset your RShopRefill password. Enter this code in the app to choose a new one.
+        @elseif($context === 'email_verification')
+            Enter this code in the RShopRefill app to confirm your email address and finish signing in.
         @elseif($context === 'data_export')
             You asked to download a copy of the personal data we hold about you. Enter this code to confirm it is you.
         @else

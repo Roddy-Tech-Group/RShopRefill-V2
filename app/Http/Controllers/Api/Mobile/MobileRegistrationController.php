@@ -19,8 +19,10 @@ use Illuminate\Validation\ValidationException;
 /**
  * Sign-up for the mobile app. It is the website's register wizard by another
  * road: CustomerRegistration holds the rules, the one-phone-one-account check
- * and the account itself, and a new account is then signed in on the phone it
- * was made on (AppSignIn), as the web signs a new account in on its browser.
+ * and the account itself. Where the web signs a new account straight in and
+ * emails a link, the app emails a code, and the account is signed in on the
+ * phone it was made on once the code is entered (AppSignIn), with its email
+ * confirmed by it.
  */
 class MobileRegistrationController extends Controller
 {
@@ -95,6 +97,7 @@ class MobileRegistrationController extends Controller
         $user = $this->registration->create(
             Arr::only($validated, array_keys($this->registration->rules())),
             $validated['referral'] ?? null,
+            confirmsEmailByCode: true,
         );
 
         RateLimiter::clear($throttleKey);

@@ -106,6 +106,7 @@ class MobileAuthTest extends TestCase
             ->postJson(route('api.mobile.auth.login'), ['email' => $user->email, 'password' => 'password'])
             ->assertStatus(202)
             ->assertJsonPath('status', 'verification_required')
+            ->assertJsonPath('purpose', 'device')
             ->assertJsonPath('masked_email', 'am***@example.com')
             ->assertJsonMissingPath('token');
 
@@ -126,6 +127,48 @@ class MobileAuthTest extends TestCase
         $this->assertTrue($device->isTrusted());
         $this->assertSame(1, PersonalAccessToken::count());
         Event::assertDispatched(NewDeviceDetected::class);
+    }
+
+    public function test_an_unconfirmed_email_is_confirmed_with_the_code_before_sign_in(): void
+    {
+        Event::fake([OtpRequested::class]);
+        // Registered on the website and never clicked the link; this phone is its first device.
+        $user = User::factory()->unverified()->create(['email' => 'amina@example.com']);
+
+        $response = $this->app()
+            ->postJson(route('api.mobile.auth.login'), ['email' => $user->email, 'password' => 'password'])
+            ->assertStatus(202)
+            ->assertJsonPath('status', 'verification_required')
+            ->assertJsonPath('purpose', 'email')
+            ->assertJsonMissingPath('token');
+
+        $this->assertSame(0, PersonalAccessToken::count());
+        Event::assertDispatched(OtpRequested::class, fn (OtpRequested $event) => $event->context === 'email_verification');
+
+        // A new code says what it is for too, not "a new device".
+        Cache::forget('otp_throttle_'.$user->id);
+        $this->app()
+            ->postJson(route('api.mobile.auth.resend-code'), ['challenge' => $response->json('challenge')])
+            ->assertOk();
+        Event::assertDispatchedTimes(OtpRequested::class, 2);
+        Event::assertNotDispatched(OtpRequested::class, fn (OtpRequested $event) => $event->context !== 'email_verification');
+
+        $this->app()
+            ->postJson(route('api.mobile.auth.verify-device'), [
+                'challenge' => $response->json('challenge'),
+                'code' => Cache::get('device_otp_'.$user->id),
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'signed_in')
+            ->assertJsonPath('user.email_verified', true);
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertSame(1, PersonalAccessToken::count());
+
+        // Confirmed once, the same phone signs straight in after.
+        Event::fake([OtpRequested::class]);
+        $this->signIn($user->fresh());
+        Event::assertNotDispatched(OtpRequested::class);
     }
 
     public function test_the_code_is_burned_after_five_wrong_guesses(): void

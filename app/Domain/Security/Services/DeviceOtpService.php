@@ -38,13 +38,19 @@ final class DeviceOtpService
 
     private const MAX_GUESSES = 5;
 
-    /** The first code of a challenged sign-in, sent as the challenge begins. */
-    public function issue(User $user): void
+    /**
+     * The first code of a challenged sign-in, sent as the challenge begins.
+     *
+     * @param  string  $context  What the email says the code is for: 'login' (a
+     *                           new device) or 'email_verification' (an address
+     *                           the mobile app is confirming, AppSignIn).
+     */
+    public function issue(User $user, string $context = 'login'): void
     {
-        $this->send($user, attempt: 1);
+        $this->send($user, attempt: 1, context: $context);
     }
 
-    public function resend(User $user): OtpResend
+    public function resend(User $user, string $context = 'login'): OtpResend
     {
         $throttleKey = $this->throttleKey($user);
 
@@ -67,7 +73,7 @@ final class DeviceOtpService
             return OtpResend::Exhausted;
         }
 
-        $this->send($user, $attempt);
+        $this->send($user, $attempt, $context);
 
         return OtpResend::Sent;
     }
@@ -141,7 +147,7 @@ final class DeviceOtpService
         return substr($local, 0, $keep).str_repeat('*', max(1, strlen($local) - $keep)).'@'.$domain;
     }
 
-    private function send(User $user, int $attempt): void
+    private function send(User $user, int $attempt, string $context): void
     {
         // random_int is a CSPRNG (mt_rand is not) and the (0, 999999) range
         // covers the full six-digit space including 000000.
@@ -158,7 +164,7 @@ final class DeviceOtpService
         // A fresh code gets a fresh guess budget.
         Cache::forget($this->failsKey($user));
 
-        OtpRequested::dispatch($user, $code, 'login');
+        OtpRequested::dispatch($user, $code, $context);
     }
 
     private function codeKey(User $user): string

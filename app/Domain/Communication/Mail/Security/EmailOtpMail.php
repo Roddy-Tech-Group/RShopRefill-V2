@@ -17,10 +17,21 @@ class EmailOtpMail extends Mailable
         public readonly string $context = 'login'
     ) {}
 
+    /**
+     * The code leads the subject for the everyday codes, so it shows in the
+     * phone's notification without opening the email, and mail apps that offer
+     * a code to the keyboard or a "Copy code" button can find it. Account
+     * recovery and data export keep a subject without it.
+     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your RshopRefill Authentication Code',
+            subject: match ($this->context) {
+                'login' => "{$this->otp} is your RShopRefill sign-in code",
+                'email_verification' => "{$this->otp} is your RShopRefill confirmation code",
+                'password_reset' => "{$this->otp} is your RShopRefill password reset code",
+                default => 'Your RshopRefill Authentication Code',
+            },
         );
     }
 

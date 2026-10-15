@@ -14,6 +14,7 @@ use App\Models\TrustedDevice;
 use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -30,7 +31,8 @@ use Illuminate\Validation\ValidationException;
  * five-try limit (shared with the web form, so the two cannot be played off
  * each other), the same device assessment and risk score, and the same emailed
  * device code (DeviceOtpService). How a sign-in finishes is AppSignIn, shared
- * with the app's sign-up.
+ * with the app's sign-up. The same code also confirms an email nobody has
+ * confirmed yet, which the app asks for before it signs anyone in.
  */
 class MobileAuthController extends Controller
 {
@@ -39,7 +41,40 @@ class MobileAuthController extends Controller
         private readonly DeviceOtpService $otp,
         private readonly DeviceTrustManager $devices,
         private readonly LoginCountryGuard $countries,
+        private readonly AppGoogleHandoff $google,
     ) {}
+
+    /**
+     * A Google sign-in the app began on the website, finished here: the code the
+     * website handed back and the secret only the app that began it holds. The
+     * account is then signed in on the phone's own terms, the device code
+     * included, as a password sign-in is.
+     */
+    public function google(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'size:64'],
+            'verifier' => ['required', 'string', 'min:43', 'max:128', 'regex:/^[A-Za-z0-9._~-]+$/'],
+            'device_name' => ['nullable', 'string', 'max:100'],
+            'os' => ['nullable', 'string', 'max:50'],
+        ]);
+        AppSignIn::installationId($request);
+
+        $user = $this->google->redeem($data['code'], $data['verifier']);
+
+        if ($user === null || $user->anonymised_at !== null) {
+            throw ValidationException::withMessages(['code' => 'This Google sign-in has expired. Please try again.']);
+        }
+
+        if ($user->banned_at !== null) {
+            return response()->json(['message' => 'Your account has been banned. Please contact support.'], 403);
+        }
+
+        return $this->signIn->begin($user, $request, [
+            'device_name' => $data['device_name'] ?? null,
+            'os' => $data['os'] ?? null,
+        ]);
+    }
 
     public function login(Request $request): JsonResponse
     {
@@ -122,6 +157,16 @@ class MobileAuthController extends Controller
 
         $this->devices->trustAfterVerification($device);
 
+        // The code went to the account's address, so typing it back proves the
+        // address as the website's link does, and the welcome email follows
+        // (Verified). Only while the address is still the one it was sent to.
+        $sentTo = $pending['confirms_email'] ?? null;
+
+        if ($sentTo !== null && hash_equals((string) $sentTo, (string) $user->email)
+            && ! $user->hasVerifiedEmail() && $user->markEmailAsVerified()) {
+            event(new Verified($user));
+        }
+
         return $this->signIn->complete($user, new LoginAssessment($device->refresh(), (string) $pending['risk_level'], false));
     }
 
@@ -130,7 +175,7 @@ class MobileAuthController extends Controller
         $data = $request->validate(['challenge' => ['required', 'string', 'size:64']]);
         [$user, $pending] = $this->signIn->pending($request, $data['challenge']);
 
-        $outcome = $this->otp->resend($user);
+        $outcome = $this->otp->resend($user, AppSignIn::codeContext($pending));
 
         if ($outcome === OtpResend::TooSoon) {
             return response()->json([

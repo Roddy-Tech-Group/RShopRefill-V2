@@ -3,23 +3,22 @@
 namespace Tests\Feature\Api;
 
 use App\Domain\Risk\Services\RiskEngine;
+use App\Models\CommunicationLog;
 use App\Models\PersonalAccessToken;
 use App\Models\SiteSetting;
 use App\Models\TrustedDevice;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Stevebauman\Location\Facades\Location;
 use Tests\TestCase;
 
 /**
  * The mobile app's sign-up. Pinned here: it is the website's register wizard
- * by another road (the same rules, the same one-phone-one-account check, the
- * same verification email), each page is checked as it is left, and a new
- * account comes out signed in on the phone it was made on.
+ * by another road (the same rules, the same one-phone-one-account check), each
+ * page is checked as it is left, and a new account confirms its email with an
+ * emailed code before it is signed in on the phone it was made on.
  */
 class MobileRegistrationTest extends TestCase
 {
@@ -61,25 +60,68 @@ class MobileRegistrationTest extends TestCase
         ], $overrides);
     }
 
-    public function test_a_new_account_is_made_and_signed_in_on_the_phone(): void
+    /** Emails sent under one correlation ID (one log row per channel, so the email channel alone). */
+    private function emailsSent(string $correlationId): int
     {
-        Event::fake([Registered::class]);
+        return CommunicationLog::query()
+            ->where('correlation_id', $correlationId)
+            ->where('channel', 'email')
+            ->count();
+    }
 
-        $this->app()->postJson(route('api.mobile.register.store'), $this->answers())
-            ->assertOk()
-            ->assertJsonPath('status', 'signed_in')
-            ->assertJsonPath('user.name', 'Amina Bello')
-            ->assertJsonPath('user.email_verified', false);
+    public function test_a_new_account_confirms_its_email_with_a_code_before_it_is_signed_in(): void
+    {
+        $response = $this->app()->postJson(route('api.mobile.register.store'), $this->answers())
+            ->assertStatus(202)
+            ->assertJsonPath('status', 'verification_required')
+            ->assertJsonPath('purpose', 'email')
+            ->assertJsonPath('masked_email', 'am***@example.com')
+            ->assertJsonMissingPath('token');
 
         $user = User::where('email', 'amina@example.com')->sole();
         $this->assertSame('+2348031234567', $user->phone);
         $this->assertSame('NG', $user->country);
         $this->assertNotNull($user->profile_completed_at);
-        Event::assertDispatchedTimes(Registered::class, 1);
+        $this->assertNull($user->email_verified_at);
+        $this->assertSame(0, PersonalAccessToken::count());
+
+        // The code goes out in place of the website's link, not beside it.
+        $this->assertSame(1, $this->emailsSent('otp_email_verification_'.$user->id));
+        $this->assertSame(0, $this->emailsSent('email_verification_'.$user->id));
+        $this->assertSame(0, $this->emailsSent('welcome_'.$user->id));
+
+        $this->app()->postJson(route('api.mobile.auth.verify-device'), [
+            'challenge' => $response->json('challenge'),
+            'code' => Cache::get('device_otp_'.$user->id),
+        ])
+            ->assertOk()
+            ->assertJsonPath('status', 'signed_in')
+            ->assertJsonPath('user.name', 'Amina Bello')
+            ->assertJsonPath('user.email_verified', true);
+
+        // Confirmed by the code, and welcomed for it, as the website's link does.
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertSame(1, $this->emailsSent('welcome_'.$user->id));
 
         // The phone it was made on is the account's first device, trusted at birth.
         $this->assertTrue(TrustedDevice::where('device_uuid', $this->phone)->sole()->isTrusted());
         $this->assertSame(1, PersonalAccessToken::count());
+    }
+
+    public function test_a_wrong_code_signs_nobody_in_and_confirms_nothing(): void
+    {
+        $challenge = $this->app()->postJson(route('api.mobile.register.store'), $this->answers())
+            ->assertStatus(202)
+            ->json('challenge');
+        $user = User::where('email', 'amina@example.com')->sole();
+        $wrong = Cache::get('device_otp_'.$user->id) === '000000' ? '111111' : '000000';
+
+        $this->app()->postJson(route('api.mobile.auth.verify-device'), ['challenge' => $challenge, 'code' => $wrong])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('code');
+
+        $this->assertNull($user->fresh()->email_verified_at);
+        $this->assertSame(0, PersonalAccessToken::count());
     }
 
     public function test_a_registered_email_is_sent_to_sign_in_from_the_first_page(): void

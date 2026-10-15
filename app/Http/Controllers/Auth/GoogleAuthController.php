@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Domain\Auth\Services\GoogleAuthService;
+use App\Http\Controllers\Api\Mobile\AppGoogleHandoff;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\CaptureReferralCookie;
 use App\Models\Referral;
@@ -18,7 +19,7 @@ use Laravel\Socialite\Two\AbstractProvider;
 /**
  * Handles Google OAuth redirect and callback.
  *
- * The actual business logic lives in GoogleAuthService — this controller
+ * The actual business logic lives in GoogleAuthService; this controller
  * is a thin HTTP adapter that translates web requests into service calls.
  *
  * The driver() helper (from Roddy's branch) handles local-dev quirks:
@@ -29,6 +30,7 @@ class GoogleAuthController extends Controller
 {
     public function __construct(
         private readonly GoogleAuthService $googleAuthService,
+        private readonly AppGoogleHandoff $appHandoff,
     ) {}
 
     /**
@@ -40,6 +42,32 @@ class GoogleAuthController extends Controller
     public function redirect(Request $request): RedirectResponse
     {
         session(['google_oauth_popup' => $request->boolean('popup')]);
+
+        // A website sign-in, even in a browser where the app once began one and
+        // never came back: this one signs the browser in.
+        session()->forget('google_oauth_app');
+
+        return $this->driver()->redirect();
+    }
+
+    /**
+     * The mobile app's way in (rshoprefill-mobileapp): the same Google sign-in,
+     * opened in the phone's browser, ending with the account handed back to
+     * the app rather than this browser signed in (AppGoogleHandoff). Open to a
+     * browser already signed in to the website, which this sign-in leaves as
+     * it was.
+     */
+    public function app(Request $request): RedirectResponse
+    {
+        $challenge = (string) $request->query('challenge', '');
+        $return = AppGoogleHandoff::returnUrl((string) $request->query('return', ''));
+
+        abort_if($return === null || ! AppGoogleHandoff::isChallenge($challenge), 400);
+
+        session([
+            'google_oauth_popup' => false,
+            'google_oauth_app' => ['challenge' => $challenge, 'return' => $return],
+        ]);
 
         return $this->driver()->redirect();
     }
@@ -53,6 +81,8 @@ class GoogleAuthController extends Controller
     public function callback(): RedirectResponse
     {
         $isPopup = (bool) session()->pull('google_oauth_popup', false);
+        $app = session()->pull('google_oauth_app');
+        $app = is_array($app) ? $app : null;
 
         try {
             $googleUser = $this->driver()->user();
@@ -60,6 +90,10 @@ class GoogleAuthController extends Controller
             Log::warning('Google OAuth callback failed', [
                 'error' => $e->getMessage(),
             ]);
+
+            if ($app !== null) {
+                return AppGoogleHandoff::back($app['return'], ['error' => __('Google authentication failed. Please try again.')]);
+            }
 
             if ($isPopup) {
                 return redirect()->route('auth.popup-complete');
@@ -82,6 +116,13 @@ class GoogleAuthController extends Controller
                 Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
             }
 
+            // Begun in the app: the account goes back to it, to be signed in
+            // there on the phone's own terms (AppSignIn), and this browser
+            // stays as it was.
+            if ($app !== null) {
+                return AppGoogleHandoff::back($app['return'], ['code' => $this->appHandoff->issue($user, $app['challenge'])]);
+            }
+
             // A claimed account just had every session revoked, including
             // one this browser may hold, so it always logs in afresh.
             if (! Auth::check() || Auth::id() !== $user->id || $result['claimed']) {
@@ -100,6 +141,10 @@ class GoogleAuthController extends Controller
             Log::error('Google OAuth user creation failed', [
                 'error' => $e->getMessage(),
             ]);
+
+            if ($app !== null) {
+                return AppGoogleHandoff::back($app['return'], ['error' => $e->getMessage()]);
+            }
 
             if ($isPopup) {
                 return redirect()->route('auth.popup-complete');

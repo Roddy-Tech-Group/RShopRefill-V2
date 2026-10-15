@@ -1,22 +1,12 @@
 <?php
 
-use App\Domain\Communication\Listeners\System\WelcomeListener;
+use App\Domain\Auth\Services\GoogleSignupCompletion;
 use App\Http\Middleware\CaptureReferralCookie;
-use App\Models\NewsletterSubscriber;
-use App\Models\Referral;
-use App\Models\User;
-use App\Support\FeatureFlag;
 use App\Support\PhoneCountries;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
-use Propaganistas\LaravelPhone\PhoneNumber;
-use Propaganistas\LaravelPhone\Rules\Phone;
 
 /**
  * Finishes a Google sign-up.
@@ -86,80 +76,21 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
             return;
         }
 
-        $validated = $this->validate([
-            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
-            // The trunk 0 a customer may type is tolerated here and stripped
-            // when we store E.164, exactly as the register wizard does.
-            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
-            'gender' => ['required', 'in:male,female,other'],
+        // The wizard's rules and the write live in GoogleSignupCompletion, which
+        // the mobile app's completion step shares.
+        $completion = app(GoogleSignupCompletion::class);
+
+        $validated = $this->validate($completion->rules() + [
             'acceptedTerms' => ['accepted'],
-            'referral' => ['nullable', 'string', 'max:32'],
         ]);
 
-        // Canonicalise to E.164 (+2348031234567) before the uniqueness check:
-        // a national-number comparison could not see that 0803... and +234803...
-        // are the same line. One verified line, one account.
-        $phoneE164 = (new PhoneNumber($validated['phone'], [$validated['country']]))->formatE164();
-
-        if (User::where('phone', $phoneE164)->whereKeyNot($user->getKey())->exists()) {
-            throw ValidationException::withMessages([
-                'phone' => 'This phone number is already registered to another account.',
-            ]);
-        }
-
-        $user->forceFill([
-            'country' => $validated['country'],
-            'phone' => $phoneE164,
-            'gender' => $validated['gender'],
-            // Set only on a submission that passed the terms checkbox, so this
-            // timestamp doubles as the record of when they accepted.
-            'profile_completed_at' => now(),
-        ])->save();
-
-        // Newsletter opt-in feeds the same list the admin Newsletter page
-        // broadcasts to. firstOrCreate keeps it idempotent, and an address that
-        // had previously unsubscribed is re-activated because this tick is an
-        // explicit, current choice.
-        if ($this->newsletterOptIn && FeatureFlag::on('newsletter_signup')) {
-            $subscriber = NewsletterSubscriber::firstOrCreate(
-                ['email' => $user->email],
-                ['status' => 'active', 'subscribed_at' => now(), 'source' => 'google_signup'],
-            );
-
-            if ($subscriber->status !== 'active') {
-                $subscriber->update([
-                    'status' => 'active',
-                    'subscribed_at' => now(),
-                    'unsubscribed_at' => null,
-                ]);
-            }
-        }
-
-        // Referral attribution. GoogleAuthController already ran the cookie
-        // against this account at sign-up, and Referral::attribute is idempotent
-        // per referred user, so a code typed here can only fill a gap - it can
-        // never overwrite an attribution that already stuck.
-        Referral::attribute($user, $validated['referral'] !== ''
+        // A code typed here, or else the invite cookie that survived sign-in.
+        $validated['referral'] = (string) ($validated['referral'] ?? '') !== ''
             ? $validated['referral']
-            : (string) request()->cookie(CaptureReferralCookie::COOKIE_NAME, ''));
-        Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
+            : (string) request()->cookie(CaptureReferralCookie::COOKIE_NAME, '');
 
-        // The welcome email waited for this moment. WelcomeListener suppressed
-        // it at the Google callback because the account was still owing this
-        // form, so an abandoned signup is never welcomed; now that the hold is
-        // lifted the account is real and the greeting knows their name. The
-        // listener's correlation id keeps it once-per-account for life, so
-        // calling it here can never produce a second welcome. A mail failure
-        // must not cost the customer their finished registration, which is
-        // already saved above.
-        try {
-            app(WelcomeListener::class)->handle(new Registered($user));
-        } catch (\Throwable $e) {
-            Log::warning('Welcome email failed after signup completion', [
-                'user_id' => $user->getKey(),
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $completion->complete($user, $validated, $this->newsletterOptIn);
+        Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
 
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
     }
