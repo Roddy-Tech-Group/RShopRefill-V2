@@ -11,6 +11,7 @@ use App\Listeners\BackupFailureListener;
 use App\Listeners\ScheduledTaskFailureListener;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use App\Rules\HardToGuessPassword;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -36,14 +37,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // The one password policy every form uses (register, reset, change,
-        // admin accounts). NIST-style: length plus a breached-password check
-        // (Have I Been Pwned's k-anonymity range API, which never sees the
-        // password and fails open if unreachable), no composition rules.
-        // The network check runs in production only so tests and local
-        // development stay offline.
+        // admin accounts, and the mobile app's). NIST-style: length, nothing
+        // guessed first (a pattern, a common password, the account's own name
+        // or email: HardToGuessPassword), plus a breached-password check (Have
+        // I Been Pwned's k-anonymity range API, which never sees the password
+        // and fails open if unreachable), no composition rules. The network
+        // check runs in production only so tests and local development stay
+        // offline.
         Password::defaults(fn () => $this->app->isProduction()
-            ? Password::min(8)->uncompromised()
-            : Password::min(8));
+            ? Password::min(8)->rules([new HardToGuessPassword])->uncompromised()
+            : Password::min(8)->rules([new HardToGuessPassword]));
 
         // The mobile app's tokens, each bound to the phone and the security
         // centre session it was issued for (EnsureAppTokenIsValid reads both).

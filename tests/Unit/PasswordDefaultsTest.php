@@ -9,29 +9,38 @@ use Illuminate\Validation\Rules\Password;
 use Tests\TestCase;
 
 /**
- * One password policy for every form (register, reset, change, admin). In
- * production a breached-password check runs against Have I Been Pwned's
- * k-anonymity API; outside production the policy is length alone so tests
- * and local development never touch the network.
+ * One password policy for every form (register, reset, change, admin). Length
+ * and nothing guessed first (HardToGuessPassword) everywhere; in production a
+ * breached-password check also runs against Have I Been Pwned's k-anonymity
+ * API, and outside production it does not, so tests and local development
+ * never touch the network.
  */
 class PasswordDefaultsTest extends TestCase
 {
+    /** Ordinary, but faked below as found in a breach. */
+    private const BREACHED = 'Lagos-rain-at-7';
+
     private function passes(string $password): bool
     {
         return Validator::make(['password' => $password], ['password' => Password::defaults()])->passes();
     }
 
-    public function test_outside_production_the_policy_is_length_only(): void
+    public function test_outside_production_the_policy_is_length_and_guessability(): void
     {
+        Http::fake();
+
         $this->assertFalse($this->passes('short'));
-        $this->assertTrue($this->passes('password'));
+        $this->assertFalse($this->passes('password'));
+        $this->assertTrue($this->passes(self::BREACHED));
+
+        Http::assertNothingSent();
     }
 
     public function test_in_production_a_breached_password_is_refused_without_the_password_leaving_the_server(): void
     {
         $this->app['env'] = 'production';
 
-        $hash = strtoupper(sha1('password'));
+        $hash = strtoupper(sha1(self::BREACHED));
         $prefix = substr($hash, 0, 5);
         $suffix = substr($hash, 5);
 
@@ -39,7 +48,7 @@ class PasswordDefaultsTest extends TestCase
             'api.pwnedpasswords.com/range/*' => Http::response("ABCDEF1234567890ABCDEF1234567890ABCDE:2\r\n{$suffix}:1234\r\n"),
         ]);
 
-        $this->assertFalse($this->passes('password'));
+        $this->assertFalse($this->passes(self::BREACHED));
         $this->assertTrue($this->passes('correct horse battery staple'));
 
         Http::assertSent(fn ($request) => str_ends_with($request->url(), "/range/{$prefix}"));
@@ -51,6 +60,6 @@ class PasswordDefaultsTest extends TestCase
 
         Http::fake(fn () => throw new ConnectionException('offline'));
 
-        $this->assertTrue($this->passes('password'));
+        $this->assertTrue($this->passes(self::BREACHED));
     }
 }

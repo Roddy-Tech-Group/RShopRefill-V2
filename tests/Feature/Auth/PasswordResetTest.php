@@ -59,8 +59,8 @@ class PasswordResetTest extends TestCase
 
         $response = Volt::test('auth.reset-password', ['token' => $token])
             ->set('email', $user->email)
-            ->set('password', 'password')
-            ->set('password_confirmation', 'password')
+            ->set('password', 'Lagos-rain-at-7')
+            ->set('password_confirmation', 'Lagos-rain-at-7')
             ->call('resetPassword');
 
         $response

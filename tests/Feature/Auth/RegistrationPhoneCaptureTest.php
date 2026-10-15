@@ -39,8 +39,8 @@ class RegistrationPhoneCaptureTest extends TestCase
             'regEmail' => 'ada@example.com',
             'regCountry' => 'NG',
             'regPhone' => '8031234567',
-            'regPassword' => 'Password123!',
-            'regPasswordConfirmation' => 'Password123!',
+            'regPassword' => 'Lagos-rain-at-7!',
+            'regPasswordConfirmation' => 'Lagos-rain-at-7!',
             'regGender' => 'female',
             'regAcceptedTerms' => true,
         ];
