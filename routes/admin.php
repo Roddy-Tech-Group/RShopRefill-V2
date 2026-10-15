@@ -220,6 +220,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('risk', [AdminRiskReviewController::class, 'dashboard'])->name('risk.dashboard');
         Route::post('risk/label', [AdminRiskReviewController::class, 'label'])->name('risk.label');
         Route::get('risk/reviews', [AdminRiskReviewController::class, 'index'])->name('risk.reviews');
+        Route::get('risk/disputes', [AdminRiskReviewController::class, 'disputes'])->name('risk.disputes');
         Route::get('risk/reviews/{review}', [AdminRiskReviewController::class, 'show'])->name('risk.review');
         Route::post('risk/reviews/{review}/approve', [AdminRiskReviewController::class, 'approve'])->name('risk.review.approve');
         Route::post('risk/reviews/{review}/reject', [AdminRiskReviewController::class, 'reject'])->name('risk.review.reject');

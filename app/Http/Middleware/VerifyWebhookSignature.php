@@ -145,6 +145,13 @@ class VerifyWebhookSignature
 
         switch ($provider) {
             case 'flutterwave':
+                // A chargeback keeps its id from initiated to lost, and each
+                // step is its own event; keyed on the id alone, every step
+                // after the first would be dropped as a replay.
+                if (str_starts_with((string) ($data['event'] ?? ''), 'chargeback.') && isset($data['data']['id'])) {
+                    return 'chargeback:'.$data['data']['id'].':'.($data['data']['status'] ?? $data['event']);
+                }
+
                 return $data['data']['id'] ?? null;
             case 'paystack':
                 // Paystack retries undelivered events for 72 hours; only

@@ -450,6 +450,15 @@ Schedule::command('korapay:reconcile --hours=48')
     ->withoutOverlapping()
     ->sentryMonitor('korapay-reconcile');
 
+// Disputes and chargebacks, read from each live gateway's chargeback list so a
+// webhook that never came never hides one. New disputes page with their
+// deadline and label the customer for the risk engine; open ones page again
+// when under 6 hours remain. Reads only; nothing is answered or refunded.
+Schedule::command('disputes:sync')
+    ->hourlyAt(20)
+    ->withoutOverlapping()
+    ->sentryMonitor('disputes-sync');
+
 // Surfaces crypto payments that settled short or over. Exits non-zero when the
 // queue is non-empty so the monitor trips and a human actually looks at it —
 // these have no automatic resolution and used to accumulate silently.

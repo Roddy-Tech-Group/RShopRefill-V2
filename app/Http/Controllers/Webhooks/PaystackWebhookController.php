@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Webhooks;
 
+use App\Domain\Risk\Services\DisputeNoticeParser;
+use App\Domain\Risk\Services\DisputeRecorder;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Webhooks\Concerns\RecordsDisputes;
 use App\Jobs\VerifyPaymentJob;
 use App\Models\Order;
 use App\Models\PaymentAttempt;
@@ -27,6 +30,13 @@ use Illuminate\Support\Facades\Log;
  */
 class PaystackWebhookController extends Controller
 {
+    use RecordsDisputes;
+
+    public function __construct(
+        private readonly DisputeNoticeParser $disputeParser,
+        private readonly DisputeRecorder $disputes,
+    ) {}
+
     public function handle(Request $request)
     {
         $payload = $request->all();
@@ -45,6 +55,10 @@ class PaystackWebhookController extends Controller
             'processing_status' => 'pending',
             'processing_attempts' => 0,
         ]);
+
+        if (is_string($eventType) && str_starts_with($eventType, 'charge.dispute.')) {
+            return $this->recordDispute($webhook, $this->disputeParser->paystack(is_array($data) ? $data : []));
+        }
 
         if ($eventType !== 'charge.success') {
             $webhook->update([

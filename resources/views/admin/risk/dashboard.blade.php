@@ -32,6 +32,13 @@
             @else
                 <x-admin.badge tone="amber">Shadow mode</x-admin.badge>
             @endif
+            @php $openDisputes = \App\Models\PaymentDispute::query()->open()->count(); @endphp
+            <a href="{{ route('admin.risk.disputes') }}" class="ml-2 inline-flex items-center gap-1 rounded-[12px] bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-700">
+                Disputes
+                @if ($openDisputes > 0)
+                    <span class="rounded-full bg-red-500 px-1.5 text-xs">{{ $openDisputes }}</span>
+                @endif
+            </a>
             <a href="{{ route('admin.risk.reviews') }}" class="ml-2 inline-flex items-center gap-1 rounded-[12px] bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700">
                 Review queue
                 @if ($m['reviews']['pending'] > 0)

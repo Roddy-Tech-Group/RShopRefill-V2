@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Risk\Enums\DisputeStatus;
 use App\Domain\Risk\Enums\RiskReviewStatus;
 use App\Domain\Risk\Services\RiskMetricsService;
 use App\Domain\Risk\Services\RiskReviewService;
 use App\Http\Controllers\Controller;
+use App\Models\PaymentDispute;
 use App\Models\RiskLabel;
 use App\Models\RiskReview;
 use Illuminate\Contracts\View\View;
@@ -106,6 +108,39 @@ class AdminRiskReviewController extends Controller
         $this->reviews->escalate($review, (int) auth('admin')->id(), $validated['reason'] ?? null);
 
         return back()->with('status', 'Review escalated.');
+    }
+
+    /**
+     * Disputes and chargebacks the gateways raised against us, open ones first
+     * by nearest deadline. Read only: answering happens at the gateway, with
+     * the order and transaction reports linked from each row as the evidence.
+     */
+    public function disputes(Request $request): View
+    {
+        $status = $request->queryString('status') ?: 'open';
+        $status = in_array($status, ['open', 'won', 'lost', 'all'], true) ? $status : 'open';
+
+        $disputes = PaymentDispute::query()
+            ->with(['user', 'order', 'paymentAttempt'])
+            ->when($status !== 'all', fn ($query) => $query->where('status', $status))
+            ->orderByRaw('case when status = ? then 0 else 1 end', [DisputeStatus::Open->value])
+            ->orderByRaw('due_at is null')
+            ->orderBy('due_at')
+            ->latest('opened_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        $counts = PaymentDispute::query()
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->all();
+
+        return view('admin.risk.disputes', [
+            'disputes' => $disputes,
+            'status' => $status,
+            'counts' => $counts + ['all' => array_sum($counts)],
+        ]);
     }
 
     /**
