@@ -124,6 +124,7 @@ return [
         'symbols' => 'Sehemu ya :attribute lazima iwe na angalau alama moja.',
         'uncompromised' => ':attribute uliyotoa imeonekana katika uvujaji wa data. Tafadhali chagua :attribute nyingine.',
     ],
+    'phone' => 'Sehemu ya :attribute lazima iwe namba halali kwa nchi iliyochaguliwa.',
     'present' => 'Sehemu ya :attribute lazima iwepo.',
     'present_if' => 'Sehemu ya :attribute lazima iwepo wakati :other ni :value.',
     'present_unless' => 'Sehemu ya :attribute lazima iwepo isipokuwa :other ni :value.',

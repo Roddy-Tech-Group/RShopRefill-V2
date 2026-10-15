@@ -128,6 +128,7 @@ return [
         'symbols' => 'يجب أن يحتوي حقل :attribute على رمز واحد على الأقل.',
         'uncompromised' => 'ظهر :attribute المدخل في تسريب بيانات. يرجى اختيار :attribute مختلف.',
     ],
+    'phone' => 'يجب أن يكون حقل :attribute رقمًا صالحًا للدولة المحددة.',
     'present' => 'يجب أن يكون حقل :attribute موجودًا.',
     'present_if' => 'يجب أن يكون حقل :attribute موجودًا عندما تكون قيمة :other هي :value.',
     'present_unless' => 'يجب أن يكون حقل :attribute موجودًا إلا إذا كانت قيمة :other هي :value.',

@@ -128,6 +128,7 @@ return [
         'symbols' => 'Filin :attribute dole ne ya ƙunshi aƙalla alama ɗaya.',
         'uncompromised' => ':attribute da aka bayar ya bayyana a cikin ɓullar bayanai. Da fatan za a zaɓi wata :attribute daban.',
     ],
+    'phone' => 'Filin :attribute dole ne ya zama lamba mai inganci ga ƙasar da aka zaɓa.',
     'present' => 'Filin :attribute dole ne ya kasance.',
     'present_if' => 'Filin :attribute dole ne ya kasance idan :other ya zama :value.',
     'present_unless' => 'Filin :attribute dole ne ya kasance sai idan :other ya zama :value.',

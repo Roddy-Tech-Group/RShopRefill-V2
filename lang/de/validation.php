@@ -123,6 +123,7 @@ return [
         'symbols' => 'Das Feld :attribute muss mindestens ein Sonderzeichen enthalten.',
         'uncompromised' => 'Das angegebene :attribute ist in einem Datenleck aufgetaucht. Bitte wählen Sie ein anderes :attribute.',
     ],
+    'phone' => 'Das Feld :attribute muss eine gültige Nummer für das ausgewählte Land sein.',
     'present' => 'Das Feld :attribute muss vorhanden sein.',
     'present_if' => 'Das Feld :attribute muss vorhanden sein, wenn :other den Wert :value hat.',
     'present_unless' => 'Das Feld :attribute muss vorhanden sein, es sei denn, :other hat den Wert :value.',

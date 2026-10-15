@@ -128,6 +128,7 @@ return [
         'symbols' => ':attribute 必须至少包含一个符号。',
         'uncompromised' => '该 :attribute 曾出现在数据泄露中，请换一个 :attribute。',
     ],
+    'phone' => ':attribute 必须是所选国家/地区的有效号码。',
     'present' => ':attribute 必须存在。',
     'present_if' => '当 :other 为 :value 时，:attribute 必须存在。',
     'present_unless' => '除非 :other 为 :value，否则 :attribute 必须存在。',

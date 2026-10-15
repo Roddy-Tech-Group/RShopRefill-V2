@@ -128,6 +128,7 @@ return [
         'symbols' => 'O campo :attribute deve conter pelo menos um símbolo.',
         'uncompromised' => 'O valor informado para :attribute apareceu em um vazamento de dados. Escolha outro :attribute.',
     ],
+    'phone' => 'O campo :attribute deve ser um número válido para o país selecionado.',
     'present' => 'O campo :attribute deve estar presente.',
     'present_if' => 'O campo :attribute deve estar presente quando :other for :value.',
     'present_unless' => 'O campo :attribute deve estar presente, a menos que :other seja :value.',

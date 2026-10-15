@@ -125,6 +125,7 @@ return [
         'symbols' => 'Le champ :attribute doit contenir au moins un caractère spécial.',
         'uncompromised' => 'Ce :attribute est apparu dans une fuite de données. Veuillez en choisir un autre.',
     ],
+    'phone' => 'Le champ :attribute doit être un numéro valide pour le pays sélectionné.',
     'present' => 'Le champ :attribute doit être présent.',
     'present_if' => 'Le champ :attribute doit être présent quand :other vaut :value.',
     'present_unless' => 'Le champ :attribute doit être présent sauf si :other vaut :value.',
