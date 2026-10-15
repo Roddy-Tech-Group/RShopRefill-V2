@@ -9,7 +9,6 @@ use App\Domain\Wallet\Events\TransactionPinLocked;
 use App\Domain\Wallet\Events\TransactionPinVerificationFailed;
 use App\Models\Admin;
 use Illuminate\Auth\Events\Failed;
-use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\PasswordReset;
@@ -47,9 +46,6 @@ class AuditLogListener implements ShouldQueue
             // A failed attempt has no proven identity, so route by guard.
             $action = $event->guard === 'admin' ? 'admin_login_failed' : 'user_login_failed';
             $this->auditLogService->log($action, $event->user, null, null, ['credentials' => collect($event->credentials)->except('password')->toArray()]);
-        } elseif ($event instanceof Lockout) {
-            // Repeated failures tripped the login rate limiter.
-            $this->auditLogService->log('auth_lockout', null, null, null, ['email' => $event->request->input('email'), 'ip' => $event->request->ip()]);
         } elseif ($event instanceof PasswordReset) {
             $this->auditLogService->log('password_reset', $event->user, null, null, $this->adminActorContext($event->user), $this->actorIdFor($event->user));
         }
@@ -104,8 +100,10 @@ class AuditLogListener implements ShouldQueue
             Login::class => 'handle',
             Logout::class => 'handle',
             Failed::class => 'handle',
-            Lockout::class => 'handle',
-            PasswordReset::class => 'handle',
+            // Lockout is not queued here: AuditLockoutListener writes it as it
+            // happens, because the event's live request cannot be serialized.
+            IlluminateAuthventsockout::class => 'handle',
+            passwordreset::class => 'handle',
         ];
     }
 }

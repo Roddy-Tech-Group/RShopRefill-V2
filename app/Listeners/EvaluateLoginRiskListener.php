@@ -2,16 +2,12 @@
 
 namespace App\Listeners;
 
-use App\Domain\Risk\Services\RiskEngine;
-use App\Domain\Security\Events\OtpRequested;
-use App\Domain\Security\Services\DeviceTrustManager;
-use App\Domain\Security\Services\LoginCountryGuard;
+use App\Domain\Security\Services\DeviceOtpService;
+use App\Domain\Security\Services\LoginRiskEvaluator;
 use App\Domain\Security\Services\SessionSecurityManager;
-use App\Http\Controllers\Security\DeviceVerificationController;
 use App\Support\FeatureFlag;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
@@ -19,16 +15,23 @@ use Illuminate\Support\Str;
 class EvaluateLoginRiskListener
 {
     public function __construct(
-        private DeviceTrustManager $deviceTrustManager,
+        private LoginRiskEvaluator $evaluator,
         private SessionSecurityManager $sessionManager,
-        private RiskEngine $riskEngine,
-        private LoginCountryGuard $loginCountryGuard,
+        private DeviceOtpService $otp,
     ) {}
 
     public function handle(Login $event): void
     {
         // Avoid running this for admin guard since this is the customer security platform
         if ($event->guard === 'admin') {
+            return;
+        }
+
+        // The mobile app's sign-in assesses its device itself, before it issues
+        // a token, and keeps a pending sign-in in a challenge rather than a
+        // session (Api\Mobile\MobileAuthController). Running here as well would
+        // assess it twice.
+        if ($event->guard === 'sanctum') {
             return;
         }
 
@@ -54,83 +57,18 @@ class EvaluateLoginRiskListener
             Cookie::queue('device_uuid', $installationId, 60 * 24 * 365 * 10);
         }
 
-        $device = $this->deviceTrustManager->registerOrUpdateDevice(
-            $user,
-            ['installation_id' => $installationId],
-            $ipAddress,
-            $userAgent
-        );
-
-        // The account's FIRST device is trusted at birth: it belongs to the
-        // person who just created the account (or to the account's owner on
-        // the first login after this feature shipped). Without this, a brand
-        // new registrant was greeted with "new device detected" and an OTP
-        // for the very browser they registered on, and the entire existing
-        // user base would have been OTP-challenged at rollout.
-        if (! $device->isTrusted()
-            && $user->trustedDevices()->whereKeyNot($device->id)->doesntExist()) {
-            $this->deviceTrustManager->markAsTrusted($device);
-            $device->refresh();
-        }
-
-        $riskLevel = $this->riskEngine->evaluateLoginRisk($user, $device, $ipAddress);
+        $assessment = $this->evaluator->assess($user, $installationId, $ipAddress, $userAgent);
 
         // Create the unified session overlay
-        $this->sessionManager->createSession($user, $device, session()->getId(), $riskLevel);
+        $this->sessionManager->createSession($user, $assessment->device, session()->getId(), $assessment->riskLevel);
 
-        // Based on user preference or risk level, determine if we need to enforce Email OTP
-        $needsOtp = false;
-
-        if ($user->email_otp_preference === 'always') {
-            $needsOtp = true;
-        } elseif ($user->email_otp_preference === 'new_device' && ! $device->isTrusted()) {
-            $needsOtp = true;
-        } elseif ($riskLevel === 'CRITICAL' || $riskLevel === 'HIGH') {
-            // Even if preference is "never", CRITICAL/HIGH risk forces OTP
-            $needsOtp = true;
-        }
-
-        // A device that signs in WITHOUT needing verification (preference
-        // "never", or low risk) still becomes a known device: trust starts
-        // now, and the 24-hour maturity clock with it. Leaving it untrusted
-        // forever meant a "never" user could NEVER pass the new-device hold
-        // on sensitive actions, on any device, for the life of the account.
-        if (! $needsOtp && ! $device->isTrusted()) {
-            $this->deviceTrustManager->markAsTrusted($device);
-        }
-
-        // Same reasoning one level up: a login that needed no code also proves
-        // the country it came from, so the customer's own home country is
-        // proved from their very first session. Without this their first trip
-        // abroad would challenge them on the way out and again on the way back.
-        if (! $needsOtp) {
-            $this->loginCountryGuard->markProven($user, $ipAddress);
-        }
-
-        if ($needsOtp) {
+        if ($assessment->needsOtp) {
             // Store intermediate state so middleware knows to restrict access
-            // until the OTP is verified.
+            // until the OTP is verified, then send the first code.
             session()->put('pending_email_otp', true);
-            session()->put('pending_device_id', $device->id);
+            session()->put('pending_device_id', $assessment->device->id);
 
-            // Automatically send the first OTP. random_int is a CSPRNG and the
-            // (0, 999999) range covers the full six-digit space including 000000.
-            $otp = sprintf('%06d', random_int(0, 999999));
-            $throttleKey = 'otp_throttle_'.$user->id;
-            $attemptsKey = 'otp_attempts_'.$user->id;
-
-            // One lifetime for the code, its stamp and the page's clock, declared
-            // once on the controller that verifies it.
-            $expiresAt = now()->addMinutes(DeviceVerificationController::OTP_TTL_MINUTES);
-            Cache::put('device_otp_'.$user->id, $otp, $expiresAt);
-            Cache::put('device_otp_expires_'.$user->id, $expiresAt->timestamp, $expiresAt);
-            Cache::put($throttleKey, now()->addSeconds(60)->timestamp, now()->addSeconds(60));
-            Cache::put($attemptsKey, 1, now()->addHours(24));
-
-            // A fresh code gets a fresh guess budget (see DeviceVerificationController::verifyOtp).
-            Cache::forget('otp_verify_fails_'.$user->id);
-
-            OtpRequested::dispatch($user, $otp, 'login');
+            $this->otp->issue($user);
         }
     }
 }

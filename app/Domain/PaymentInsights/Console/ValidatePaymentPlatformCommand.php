@@ -286,9 +286,14 @@ class ValidatePaymentPlatformCommand extends Command
 
     private function checkRoutes(): void
     {
+        // The signed-in API accepts the website's session or the mobile app's
+        // token (routes/api.php); app.token is what holds a token to the rules
+        // a session lives by, so it is required alongside.
+        $signedIn = ['auth:web,sanctum', 'app.token'];
+
         $expectations = [
-            ['api.payment-sessions.telemetry.record-failure', ['auth', 'throttle:10,1']],
-            ['api.payment-sessions.telemetry.record-signal', ['auth', 'throttle:30,1']],
+            ['api.payment-sessions.telemetry.record-failure', [...$signedIn, 'throttle:10,1']],
+            ['api.payment-sessions.telemetry.record-signal', [...$signedIn, 'throttle:30,1']],
             ['recovery.show', ['throttle:20,1']],
             ['recovery.feedback', ['throttle:20,1']],
             ['recovery.retry', ['throttle:20,1']],

@@ -1,15 +1,10 @@
 <?php
 
+use App\Domain\Auth\Services\CustomerRegistration;
 use App\Http\Middleware\CaptureReferralCookie;
-use App\Models\Referral;
-use App\Models\User;
 use App\Support\PhoneCountries;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use App\Domain\Security\Services\TurnstileService;
 use App\Support\TaggedCache;
@@ -18,8 +13,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
-use Propaganistas\LaravelPhone\PhoneNumber;
-use Propaganistas\LaravelPhone\Rules\Phone;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     public string $first_name = '';
@@ -64,7 +57,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public const TOTAL_STEPS = 3;
 
     /**
-     * What each page asks for.
+     * What each page asks for. The rules, the steps and the account itself live
+     * in CustomerRegistration, which the mobile app's sign-up shares.
      *
      * Presentation only. register() still validates the whole form before it
      * writes anything, so a customer who skips ahead by poking at the Livewire
@@ -75,15 +69,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
      */
     private function rulesForStep(int $step): array
     {
-        $all = $this->registrationRules();
-
-        $fields = match ($step) {
-            1 => ['first_name', 'last_name', 'email'],
-            2 => ['country', 'phone', 'gender'],
-            default => [],
-        };
-
-        return array_intersect_key($all, array_flip($fields));
+        return app(CustomerRegistration::class)->rulesForStep($step);
     }
 
     /**
@@ -108,59 +94,26 @@ new #[Layout('components.layouts.auth')] class extends Component {
     }
 
     /**
-     * The whole form's rules, in one place, so a step can borrow its slice and
-     * the final submit can take the lot.
-     *
-     * max:100 a part, not 255: users.name holds both plus a space, and two
-     * 255s would overflow the column at the insert rather than at the form.
+     * The whole form's rules, so a step can borrow its slice and the final
+     * submit can take the lot.
      *
      * @return array<string, array<int, mixed>>
      */
     private function registrationRules(): array
     {
-        return [
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'country' => ['required', 'string', Rule::in(PhoneCountries::isoCodes())],
-            // The national number is validated against the chosen country's
-            // numbering plan (libphonenumber). A trunk 0 the customer may type
-            // is tolerated here and stripped when the number is stored.
-            'phone' => ['required', 'string', 'max:32', (new Phone)->countryField('country')],
-            'gender' => ['required', 'in:male,female,other'],
-            'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
-            'terms' => ['accepted'],
-        ];
+        return app(CustomerRegistration::class)->rules();
     }
 
     /** @return array<string, string> */
     private function validationMessages(): array
     {
-        return [
-            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
-        ];
+        return app(CustomerRegistration::class)->messages();
     }
 
-    /**
-     * The number in E.164 (+2348031234567), the one format every gateway and
-     * SMS provider reads the same way.
-     */
-    private function phoneE164(): string
-    {
-        return (new PhoneNumber($this->phone, [$this->country]))->formatE164();
-    }
-
-    /**
-     * One line, one account. A rule on the national number could not see that
-     * 0803... and +234803... are the same line, so the check is on E.164.
-     */
+    /** One line, one account, checked on E.164. */
     private function ensurePhoneIsFree(): void
     {
-        if (User::where('phone', $this->phoneE164())->exists()) {
-            throw ValidationException::withMessages([
-                'phone' => __('auth.phone_taken'),
-            ]);
-        }
+        app(CustomerRegistration::class)->ensurePhoneIsFree($this->phone, $this->country);
     }
 
     /**
@@ -186,48 +139,19 @@ new #[Layout('components.layouts.auth')] class extends Component {
         // presentation device; this is the gate.
         $validated = $this->validate($this->registrationRules(), $this->validationMessages());
 
-        $this->ensurePhoneIsFree();
-
-        $validated['phone'] = $this->phoneE164();
-
-        // Consent is recorded by the act of registering; it is not a column on
-        // users, so it must not reach User::create().
-        unset($validated['terms']);
-
-        // The split is a form concern only. users.name is still the single
-        // column every screen reads to greet a customer, so the two fields are
-        // joined back into it here rather than pushing the split onto the
-        // schema and every caller of $user->name.
-        $validated['name'] = trim($validated['first_name'].' '.$validated['last_name']);
-        unset($validated['first_name'], $validated['last_name']);
-
-        $validated['password'] = Hash::make($validated['password']);
-
-        // This form now collects everything an account needs, so the signup is
-        // complete on arrival and never meets the profile-completion step that
-        // a Google sign-in lands on.
-        $validated['profile_completed_at'] = now();
-
-        $user = User::create($validated);
-
         // ── Referral attribution ────────────────────────────────────────
         // Prefer the code the customer typed on the form; fall back to the
-        // `?ref=CODE` value CaptureReferralCookie stashed for 90 days. Either
-        // way Referral::attribute matches it against users.referral_code and,
-        // if it points at a DIFFERENT real user, creates the Referral row the
-        // RewardEngine reads when this user's first order completes. It
-        // silently no-ops on blank / no-match / self-referral.
+        // `?ref=CODE` value CaptureReferralCookie stashed for 90 days.
         $referralCode = $this->referral !== ''
             ? $this->referral
             : (string) request()->cookie(CaptureReferralCookie::COOKIE_NAME, '');
 
-        Referral::attribute($user, $referralCode);
+        // The phone check, the row, the referral and the verification email.
+        $user = app(CustomerRegistration::class)->create($validated, $referralCode);
 
         // Clear the cookie - it's done its job and a future signup on the same
         // browser shouldn't accidentally attribute to the same referrer.
         Cookie::queue(Cookie::forget(CaptureReferralCookie::COOKIE_NAME));
-
-        event(new Registered($user));
 
         Session::regenerate();
         Auth::login($user);

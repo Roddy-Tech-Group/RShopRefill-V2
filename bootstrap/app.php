@@ -7,6 +7,7 @@ use App\Http\Middleware\EnforceDeviceVerification;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureAccountNotSuspended;
+use App\Http\Middleware\EnsureAppTokenIsValid;
 use App\Http\Middleware\EnsureDeviceMature;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureFeatureEnabled;
@@ -105,6 +106,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // The 24-hour hold on new devices for account-security mutations
             // (PIN change/reset/remove, device revoke, OTP preference).
             'device.mature' => EnsureDeviceMature::class,
+            // Beside auth:sanctum on every route the mobile app calls: ends an
+            // app token on a ban, a closure, a removed device, "sign out
+            // everywhere" or a password change. Browser sessions pass through.
+            'app.token' => EnsureAppTokenIsValid::class,
         ]);
 
         // Refuses malformed-UTF-8 and oversized input with 422 before any

@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\CryptoQrController;
 use App\Http\Controllers\Api\EmailUnsubscribeController;
 use App\Http\Controllers\Api\InteractionTrackingController;
 use App\Http\Controllers\Api\KycStatusController;
+use App\Http\Controllers\Api\Mobile\MobileAuthController;
+use App\Http\Controllers\Api\Mobile\MobileRegistrationController;
 use App\Http\Controllers\Api\NewsletterApiController;
 use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PaymentSessionController;
@@ -138,9 +140,35 @@ Route::prefix('payment-sessions')->name('api.payment-sessions.')->group(function
     Route::post('{id}/top-up', [PaymentSessionController::class, 'topUp'])->middleware('throttle:payment-session-action')->name('top-up');
 });
 
+// The mobile app's sign-in (rshoprefill-mobileapp). The app cannot hold the
+// session cookie, so it signs in for a token, bound to the phone it was issued
+// to. The same password limit and device code as the web; see the controller.
+Route::prefix('mobile/auth')->name('api.mobile.auth.')->group(function () {
+    Route::post('login', [MobileAuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
+    Route::post('verify-device', [MobileAuthController::class, 'verifyDevice'])->middleware('throttle:10,1')->name('verify-device');
+    Route::post('resend-code', [MobileAuthController::class, 'resendCode'])->middleware('throttle:6,1')->name('resend-code');
+});
+
+// The mobile app's sign-up: the web's register wizard (CustomerRegistration),
+// with each page checked as it is left, then a sign-in on the same phone.
+Route::prefix('mobile/register')->name('api.mobile.register.')->group(function () {
+    Route::post('check', [MobileRegistrationController::class, 'check'])->middleware('throttle:30,1')->name('check');
+    Route::post('/', [MobileRegistrationController::class, 'register'])->middleware('throttle:10,1')->name('store');
+});
+
 // Protected Dashboard & Wallet APIs
-Route::middleware('auth')->group(function () {
+//
+// Signed in either way: the website's session cookie, or the mobile app's
+// token. The web guard is tried first and, for a browser, is the guard that
+// stays in use, exactly as before; the token guard answers only when there is
+// no session. app.token holds a token to the rules a browser session already
+// lives by.
+Route::middleware(['auth:web,sanctum', 'app.token'])->group(function () {
     Route::get('dashboard', [UserDashboardController::class, 'index'])->name('api.dashboard');
+
+    // The mobile app's own: who is signed in, and signing this phone out.
+    Route::get('mobile/me', [MobileAuthController::class, 'me'])->name('api.mobile.me');
+    Route::post('mobile/auth/logout', [MobileAuthController::class, 'logout'])->name('api.mobile.auth.logout');
 
     // Poll KYC state after completing the Smile flow, so the UI can wait for the
     // callback and then retry the action that required verification.

@@ -2,14 +2,17 @@
 
 namespace App\Providers;
 
+use App\Domain\Audit\Listeners\AuditLockoutListener;
 use App\Domain\Audit\Listeners\AuditLogListener;
 use App\Domain\Audit\Observers\UserAuditObserver;
 use App\Http\View\Composers\CartComposer;
 use App\Http\View\Composers\SiteIdentityComposer;
 use App\Listeners\BackupFailureListener;
 use App\Listeners\ScheduledTaskFailureListener;
+use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Support\FeatureFlag;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
@@ -18,6 +21,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -41,8 +45,14 @@ class AppServiceProvider extends ServiceProvider
             ? Password::min(8)->uncompromised()
             : Password::min(8));
 
-        // Append security-relevant events to the audit log.
+        // The mobile app's tokens, each bound to the phone and the security
+        // centre session it was issued for (EnsureAppTokenIsValid reads both).
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // Append security-relevant events to the audit log. Lockouts are
+        // written on the spot: see AuditLockoutListener.
         Event::subscribe(AuditLogListener::class);
+        Event::listen(Lockout::class, AuditLockoutListener::class);
 
         // Model-level audit of sensitive account fields (ban/suspend/KYC/identity):
         // captures EVERY surface that changes them, not just the admin panel.

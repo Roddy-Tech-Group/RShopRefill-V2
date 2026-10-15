@@ -62,6 +62,23 @@ class AuditCoverageTest extends TestCase
         $this->assertSame('target@example.test', $log->metadata['email']);
     }
 
+    /**
+     * A real request carries closures (its route and user resolvers), and a
+     * queued listener cannot serialize them: when lockouts were queued, the
+     * dispatch itself threw, so the sixth wrong password answered with a server
+     * error and the lockout never reached the log.
+     */
+    public function test_a_lockout_from_a_live_request_is_audited_not_lost_to_the_queue(): void
+    {
+        $request = Request::create('/login', 'POST', ['email' => 'target@example.test']);
+        $request->setRouteResolver(fn () => null);
+        $request->setUserResolver(fn () => null);
+
+        event(new Lockout($request));
+
+        $this->assertSame(1, AuditLog::where('action', 'auth_lockout')->count());
+    }
+
     public function test_an_admin_login_carries_admin_actor_attribution(): void
     {
         $admin = $this->admin();
