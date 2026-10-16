@@ -57,6 +57,14 @@ return [
     'method_wallet' => 'المحفظة',
     'method_crypto' => 'العملات المشفرة',
     'method_card' => 'البطاقة',
+    'method_mobile_money' => 'المحفظة الهاتفية',
+    'method_mobile_wallet' => 'محفظة الجوال',
+    'method_bank_transfer' => 'تحويل بنكي',
+    'method_pay_with_bank' => 'تطبيق البنك',
+    'method_bank_qr' => 'رمز QR البنكي',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'استخدم بطاقتك',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

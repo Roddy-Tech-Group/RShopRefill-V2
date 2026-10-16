@@ -55,6 +55,14 @@ return [
     'method_wallet' => 'Pochi',
     'method_crypto' => 'Sarafu za kidijitali',
     'method_card' => 'Kadi',
+    'method_mobile_money' => 'Pesa za Simu',
+    'method_mobile_wallet' => 'Pochi ya simu',
+    'method_bank_transfer' => 'Uhamisho wa benki',
+    'method_pay_with_bank' => 'Programu ya benki',
+    'method_bank_qr' => 'QR ya benki',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Komboa kadi yako',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

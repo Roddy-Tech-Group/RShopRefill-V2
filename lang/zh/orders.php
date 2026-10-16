@@ -55,6 +55,14 @@ return [
     'method_wallet' => '钱包',
     'method_crypto' => '加密货币',
     'method_card' => '银行卡',
+    'method_mobile_money' => '移动货币',
+    'method_mobile_wallet' => '移动钱包',
+    'method_bank_transfer' => '银行转账',
+    'method_pay_with_bank' => '银行应用',
+    'method_bank_qr' => '银行二维码',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => '兑换您的卡',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

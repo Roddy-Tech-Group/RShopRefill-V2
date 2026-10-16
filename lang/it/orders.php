@@ -57,6 +57,14 @@ return [
     'method_wallet' => 'Portafoglio',
     'method_crypto' => 'Cripto',
     'method_card' => 'Carta',
+    'method_mobile_money' => 'Mobile Money',
+    'method_mobile_wallet' => 'Portafoglio mobile',
+    'method_bank_transfer' => 'Bonifico bancario',
+    'method_pay_with_bank' => 'App bancaria',
+    'method_bank_qr' => 'QR bancario',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Riscatta la tua carta',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

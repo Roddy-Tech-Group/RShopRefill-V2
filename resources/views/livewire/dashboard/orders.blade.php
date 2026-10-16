@@ -89,9 +89,6 @@ class extends Component {
         'requires_attention'  => ['Needs review',       'text-amber-600 dark:text-amber-400',     'clock'],
     ];
 
-    // Generic payment label — the gateway/provider name is never shown.
-    $methodLabels = ['wallet' => 'Wallet', 'crypto' => 'Crypto', 'flutterwave' => 'Card'];
-
     // Pull a copyable redemption code out of an order item's fulfillment payload.
     $extractCode = function ($item): ?string {
         $payload = (array) ($item->fulfillment_payload ?? []);
@@ -253,16 +250,13 @@ class extends Component {
                                     </button>
                                 </dd>
                             </div>
+                            {{-- The channel the money actually travelled, in customer
+                                 words, never the provider's name. The paid attempt says
+                                 it; the order's own column only names a gateway family,
+                                 which used to show a mobile money payment as "Card"
+                                 beside a second row that said "Mobile Money". --}}
                             <div class="flex items-center justify-between gap-4">
                                 <dt class="text-zinc-500">Payment method</dt>
-                                <dd class="font-semibold text-zinc-900">{{ $methodLabels[$order->payment_method] ?? 'Card' }}</dd>
-                            </div>
-                            {{-- The channel the money actually travelled. The order's own
-                                 method folds card and mobile money together; the paid
-                                 attempt tells them apart. Customer words only, never the
-                                 provider's name. --}}
-                            <div class="flex items-center justify-between gap-4">
-                                <dt class="text-zinc-500">Payment gateway</dt>
                                 <dd class="font-semibold text-zinc-900">{{ $order->customerGatewayLabel() }}</dd>
                             </div>
                             <div class="flex items-center justify-between gap-4">

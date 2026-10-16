@@ -246,12 +246,23 @@ class PaymentAttempt extends Model
      * name. The recorded method is trusted first, then whatever the gateway
      * reported in its payload, then the gateway family.
      */
-    public function customerGatewayLabel(): string
+    /**
+     * The channel the money travelled, as a method key (mobile_money, card,
+     * bank_transfer, wallet, crypto, ...): what was recorded, else what the
+     * gateway's own payload says, else the gateway's family.
+     */
+    public function customerMethodKey(): string
     {
-        $method = PaymentMethodNormaliser::normalise($this->payment_method)
+        return PaymentMethodNormaliser::normalise($this->payment_method)
             ?? PaymentMethodNormaliser::fromGatewayPayload($this->verification_payload)
             ?? PaymentMethodNormaliser::fromGatewayPayload($this->webhook_payload)
-            ?? PaymentMethodNormaliser::normalise($this->gateway);
+            ?? PaymentMethodNormaliser::normalise($this->gateway)
+            ?? 'card';
+    }
+
+    public function customerGatewayLabel(): string
+    {
+        $method = $this->customerMethodKey();
 
         return match ($method) {
             'mobile_money' => 'Mobile Money',
