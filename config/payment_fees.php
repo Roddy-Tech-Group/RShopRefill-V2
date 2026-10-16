@@ -46,4 +46,27 @@ return [
 
     // Default rate when a method is not listed above.
     'default' => ['transaction' => 0.0, 'international' => 0.0],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Per-gateway overrides
+    |--------------------------------------------------------------------------
+    |
+    | The tables above are the Flutterwave account's, where the customer bears
+    | the fee. A method the switchboard routes to another gateway discloses
+    | THAT gateway's customer fee instead, read from here by gateway key; a
+    | gateway with no entry falls back to the tables above.
+    |
+    | Kora: the merchant bears the fee by default (merchant_bears_cost), so the
+    | customer pays the order amount and nothing is disclosed. When Kora goes
+    | live with the fee passed to the customer, the confirmed percentages go
+    | here and the line reappears on its own.
+    |
+    */
+    'gateways' => [
+        'korapay' => [
+            'methods' => [],
+            'default' => ['transaction' => 0.0, 'international' => 0.0],
+        ],
+    ],
 ];
