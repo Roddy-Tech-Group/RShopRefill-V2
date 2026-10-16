@@ -149,7 +149,8 @@ class RegistrationTest extends TestCase
         // driven there rather than read off a fresh GET.
         $html = Volt::test('auth.register')->set('step', 3)->html();
 
-        $this->assertStringContainsString('I agree to the', $html);
+        // The one affirmation covers age and the two documents.
+        $this->assertStringContainsString("I confirm I'm 18 or older and agree to the", $html);
         $this->assertStringContainsString('href="'.route('shop.terms').'"', $html);
         $this->assertStringContainsString('href="'.route('shop.privacy').'"', $html);
     }

@@ -51,8 +51,10 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $referral = '';
 
     /**
-     * Consent to the Terms of Service and Privacy Policy. Not a users column -
-     * it gates the submit and is stripped before the model is created.
+     * One affirmation: the customer is 18 or older and accepts the Terms of
+     * Service and Privacy Policy. Not a users column - it gates the submit
+     * and is stripped before the model is created; profile_completed_at is
+     * the record of when it was given.
      */
     public bool $terms = false;
 
@@ -137,7 +139,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     private function validationMessages(): array
     {
         return [
-            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
+            'terms.accepted' => __('auth.agree_required'),
         ];
     }
 
@@ -190,7 +192,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         $validated['phone'] = $this->phoneE164();
 
-        // Consent is recorded by the act of registering; it is not a column on
+        // Consent (18 or older, Terms, Privacy) is recorded by the act of
+        // registering; it is not a column on
         // users, so it must not reach User::create().
         unset($validated['terms']);
 
@@ -640,12 +643,10 @@ new #[Layout('components.layouts.auth')] class extends Component {
                         type="checkbox"
                         class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-[4px] border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/40 dark:border-white/20 dark:bg-white/5"
                     />
-                    <span>
-                        I agree to the
-                        <a href="{{ route('shop.terms') }}" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">Terms of Service</a>
-                        and
-                        <a href="{{ route('shop.privacy') }}" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">Privacy Policy</a>.
-                    </span>
+                    <span>{!! __('auth.agree_to_terms', [
+                        'terms' => '<a href="'.e(route('shop.terms')).'" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">'.e(__('auth.modal_terms_link')).'</a>',
+                        'privacy' => '<a href="'.e(route('shop.privacy')).'" target="_blank" rel="noopener" class="font-semibold text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-white">'.e(__('auth.modal_privacy_link')).'</a>',
+                    ]) !!}</span>
                 </label>
                 @error('terms') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>

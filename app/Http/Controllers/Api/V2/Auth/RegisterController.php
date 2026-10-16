@@ -40,7 +40,8 @@ class RegisterController extends Controller
 
         $referralCode = trim((string) ($validated['referral'] ?? ''));
 
-        // Consent is recorded by the act of registering, and the referral code is
+        // Consent (18 or older, Terms, Privacy) is recorded by the act of
+        // registering, and the referral code is
         // not a users column. Neither may reach User::create().
         unset($validated['terms'], $validated['referral']);
 

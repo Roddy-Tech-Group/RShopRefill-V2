@@ -121,7 +121,7 @@ paths:
                 gender: { type: string, enum: [male, female, other] }
                 password: { type: string, format: password, description: 'Default Laravel password rules.' }
                 password_confirmation: { type: string, format: password }
-                terms: { type: boolean, description: 'Must be `true`.' }
+                terms: { type: boolean, description: 'Must be `true`: the customer confirms they are 18 or older and accepts the Terms of Service and Privacy Policy. Recorded by the act of registering.' }
                 referral: { type: string, maxLength: 64, description: 'A referral code, if the customer has one.' }
       responses:
         '201':

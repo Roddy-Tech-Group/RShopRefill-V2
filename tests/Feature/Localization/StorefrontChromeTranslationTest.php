@@ -238,7 +238,7 @@ class StorefrontChromeTranslationTest extends TestCase
             'aria-label="Product categories"',
             'Send feedback',
             'Refer friends, earn',
-            '* I declare that I have read and agree to the <a',
+            '* I confirm I\'m 18 or older and have read and agree to the <a',
             'British Pound',
         ] as $english) {
             $this->assertSees($english, $html, 'English changed: '.$english);

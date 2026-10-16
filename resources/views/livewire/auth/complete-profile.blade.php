@@ -111,8 +111,9 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
             'country' => $validated['country'],
             'phone' => $phoneE164,
             'gender' => $validated['gender'],
-            // Set only on a submission that passed the terms checkbox, so this
-            // timestamp doubles as the record of when they accepted.
+            // Set only on a submission that passed the consent checkbox (18 or
+            // older, Terms, Privacy), so this timestamp doubles as the record
+            // of when they affirmed it.
             'profile_completed_at' => now(),
         ])->save();
 
@@ -310,7 +311,10 @@ new #[Layout('components.layouts.auth.centered')] class extends Component {
 
             <label class="flex cursor-pointer items-start gap-3 text-sm text-zinc-600">
                 <input wire:model="acceptedTerms" type="checkbox" required class="mt-0.5 h-5 w-5 shrink-0 rounded-full border-zinc-300 text-blue-600 focus:ring-blue-500/30">
-                <span>* I declare that I have read and agree to the <a href="{{ route('shop.terms') }}" target="_blank" class="text-blue-600 underline underline-offset-2 hover:text-blue-700">terms of use</a> and <a href="{{ route('shop.privacy') }}" target="_blank" class="text-blue-600 underline underline-offset-2 hover:text-blue-700">privacy notice</a></span>
+                <span>{!! __('auth.modal_terms_consent', [
+                    'terms' => '<a href="'.e(route('shop.terms')).'" target="_blank" class="text-blue-600 underline underline-offset-2 hover:text-blue-700">'.e(__('auth.modal_terms_link')).'</a>',
+                    'privacy' => '<a href="'.e(route('shop.privacy')).'" target="_blank" class="text-blue-600 underline underline-offset-2 hover:text-blue-700">'.e(__('auth.modal_privacy_link')).'</a>',
+                ]) !!}</span>
             </label>
             @error('acceptedTerms') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
 
