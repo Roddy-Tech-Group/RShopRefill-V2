@@ -188,6 +188,7 @@ class PaystackFailoverTest extends TestCase
         $response->assertOk();
         $this->assertSame('paystack', $attempt->fresh()->gateway, 'pre-charge session must re-stamp to the live backup');
         $this->assertSame('paystack', $session->fresh()->provider);
+        $this->assertSame('paystack', $order->fresh()->payment_method, 'the order follows the gateway taking it');
     }
 
     public function test_paystack_never_sees_traffic_while_flutterwave_is_on(): void

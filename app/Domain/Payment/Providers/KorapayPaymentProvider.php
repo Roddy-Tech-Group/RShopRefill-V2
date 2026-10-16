@@ -118,6 +118,9 @@ class KorapayPaymentProvider implements PaymentProviderInterface
                         'name' => $attempt->user->name,
                     ],
                     'redirect_url' => $returnUrl,
+                    // Per charge, like the popup and the direct charge: Kora
+                    // calls this one rather than whatever the dashboard holds.
+                    'notification_url' => $this->webhookUrl(),
                     'channels' => [$channel],
                     'default_channel' => $channel,
                     'narration' => $attempt->order
@@ -391,7 +394,12 @@ class KorapayPaymentProvider implements PaymentProviderInterface
                 'email' => $attempt->user->email,
             ],
             'channels' => [$channel],
-            'default_channel' => $channel,
+            // Kora's popup endpoint takes mobile_money as a channel but refuses
+            // it as a default_channel ("mobile_money is not a valid option",
+            // 2026-10-16), and refused the whole charge with it. With one
+            // channel the popup opens on that method anyway, so mobile money
+            // sends no default.
+            ...($channel === 'mobile_money' ? [] : ['default_channel' => $channel]),
             'notification_url' => $this->webhookUrl(),
             'narration' => $attempt->order
                 ? "Order #{$attempt->order->order_number}"

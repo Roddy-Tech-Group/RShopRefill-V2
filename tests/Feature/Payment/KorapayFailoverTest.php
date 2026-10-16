@@ -236,6 +236,42 @@ class KorapayFailoverTest extends TestCase
         $this->assertSame('KPY-CA-abc123', data_get($attempt->fresh()->metadata, 'korapay.transaction_reference'));
     }
 
+    /**
+     * With the popup switch on, Kora's mobile money opens Kora's popup on our
+     * page limited to mobile money, and no direct charge is sent. The switch
+     * exists for Kora's sandbox, where a phone prompt is never answered but
+     * the popup's test number and PIN are. The popup's endpoint refuses
+     * mobile_money as a default_channel while taking it as the channel, so
+     * the config carries no default for it.
+     */
+    public function test_the_popup_switch_opens_koras_popup_for_mobile_money_without_a_default_channel(): void
+    {
+        config(['services.korapay.mobile_money_via_checkout' => true, 'services.korapay.public_key' => 'pk_test_popup']);
+        [, $attempt, $session] = $this->koraLiveOrder('XAF');
+        Http::fake();
+
+        $response = $this->actingAs($this->user)->postJson("/api/payment-sessions/{$session->id}/pay", [
+            'method' => 'mobile_money',
+            'details' => ['phone_number' => '670000000', 'network' => 'MTN'],
+        ]);
+
+        $response->assertOk();
+        $session->refresh();
+        $this->assertSame('awaiting_payment', $session->status);
+        $inline = $session->payment_payload['inline'];
+        $this->assertSame('korapay', $inline['provider']);
+        $this->assertSame('pk_test_popup', $inline['key']);
+        $this->assertSame($attempt->idempotency_key, $inline['reference']);
+        $this->assertSame(['mobile_money'], $inline['channels']);
+        $this->assertArrayNotHasKey('default_channel', $inline);
+        $this->assertSame('https://tunnel.example/api/webhooks/korapay', $inline['notification_url']);
+
+        // Card and bank keep their default: only mobile money is refused one.
+        $this->assertSame('card', app(KorapayPaymentProvider::class)->inlineConfig($attempt, 'card')['default_channel']);
+
+        Http::assertNothingSent();
+    }
+
     /** Ghana: a one-time code first, typed in our checkout; a valid code is followed by the prompt. */
     public function test_a_kora_mobile_money_charge_that_needs_a_code_takes_it_in_our_checkout(): void
     {

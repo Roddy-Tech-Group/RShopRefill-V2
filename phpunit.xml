@@ -30,6 +30,8 @@
         <env name="PAYSTACK_PUBLIC_KEY" value=""/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
+        <!-- A developer .env may turn the Kora popup demo switch on; tests pin the live design (direct charge) and flip it per test. -->
+        <env name="KORAPAY_MOBILE_MONEY_VIA_CHECKOUT" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
         <!--
             The undeliverable-domain suppression list is blanked because the
