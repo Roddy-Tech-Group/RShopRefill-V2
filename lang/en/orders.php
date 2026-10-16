@@ -42,6 +42,7 @@ return [
     'hero_processing_line' => 'We are fulfilling your order. Codes land in your email the moment each item is ready.',
     'hero_failed_title' => 'This order could not be completed',
     'hero_failed_line' => 'Your payment did not go through and no charge was taken. You can try checking out again.',
+    'hero_failed_refunded_line' => 'We could not deliver this order, so your payment of :amount was refunded to your RShopRefill wallet. You can try again.',
     'hero_cancelled_title' => 'This order was cancelled',
     'hero_cancelled_line' => 'No payment was taken for this order.',
     'hero_review_title' => 'We are reviewing your order',

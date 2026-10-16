@@ -38,6 +38,7 @@ return [
     'hero_processing_line' => 'Nous préparons votre commande. Les codes arrivent dans votre boîte e-mail dès que chaque article est prêt.',
     'hero_failed_title' => 'Cette commande n’a pas pu être finalisée',
     'hero_failed_line' => 'Votre paiement n’a pas abouti et aucun montant n’a été débité. Vous pouvez réessayer de passer commande.',
+    'hero_failed_refunded_line' => 'Nous n’avons pas pu livrer cette commande, votre paiement de :amount a donc été remboursé sur votre portefeuille RShopRefill. Vous pouvez réessayer.',
     'hero_cancelled_title' => 'Cette commande a été annulée',
     'hero_cancelled_line' => 'Aucun paiement n’a été prélevé pour cette commande.',
     'hero_review_title' => 'Nous examinons votre commande',

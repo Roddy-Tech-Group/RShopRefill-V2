@@ -40,6 +40,7 @@ return [
     'hero_processing_line' => 'Estamos preparando tu pedido. Los códigos llegan a tu correo en cuanto cada artículo está listo.',
     'hero_failed_title' => 'Este pedido no se pudo completar',
     'hero_failed_line' => 'Tu pago no se procesó y no se realizó ningún cargo. Puedes intentar pagar de nuevo.',
+    'hero_failed_refunded_line' => 'No pudimos entregar este pedido, así que tu pago de :amount se devolvió a tu billetera RShopRefill. Puedes intentarlo de nuevo.',
     'hero_cancelled_title' => 'Este pedido fue cancelado',
     'hero_cancelled_line' => 'No se cobró ningún pago por este pedido.',
     'hero_review_title' => 'Estamos revisando tu pedido',

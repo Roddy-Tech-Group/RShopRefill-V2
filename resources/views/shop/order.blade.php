@@ -50,7 +50,12 @@
         'failed' => [
             'tone' => 'red', 'icon' => 'cross',
             'title' => __('orders.hero_failed_title'),
-            'line'  => __('orders.hero_failed_line'),
+            // A failed order is usually a payment that never went through. When
+            // the payment did go through and delivery failed, the money went
+            // back to the wallet, and saying "no charge was taken" is false.
+            'line'  => ($refundedTotal = (float) ($order->metadata['refunded_total'] ?? 0)) > 0
+                ? __('orders.hero_failed_refunded_line', ['amount' => \App\Models\Product::currencySymbol($order->display_currency).number_format((float) $order->total_amount, 2)])
+                : __('orders.hero_failed_line'),
         ],
         'cancelled' => [
             'tone' => 'zinc', 'icon' => 'cross',

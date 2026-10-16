@@ -38,6 +38,7 @@ return [
     'hero_processing_line' => 'Wir bearbeiten Ihre Bestellung. Die Codes landen in Ihrem Postfach, sobald jeder Artikel bereit ist.',
     'hero_failed_title' => 'Diese Bestellung konnte nicht abgeschlossen werden',
     'hero_failed_line' => 'Ihre Zahlung wurde nicht ausgeführt und es wurde nichts abgebucht. Sie können den Bezahlvorgang erneut versuchen.',
+    'hero_failed_refunded_line' => 'Wir konnten diese Bestellung nicht liefern, daher wurde Ihre Zahlung von :amount auf Ihr RShopRefill-Guthaben zurückerstattet. Sie können es erneut versuchen.',
     'hero_cancelled_title' => 'Diese Bestellung wurde storniert',
     'hero_cancelled_line' => 'Für diese Bestellung wurde keine Zahlung eingezogen.',
     'hero_review_title' => 'Wir prüfen Ihre Bestellung',

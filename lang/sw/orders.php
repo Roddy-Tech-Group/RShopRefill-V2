@@ -38,6 +38,7 @@ return [
     'hero_processing_line' => 'Tunashughulikia oda yako. Misimbo inafika kwenye barua pepe yako mara tu kila bidhaa inapokuwa tayari.',
     'hero_failed_title' => 'Oda hii haikuweza kukamilika',
     'hero_failed_line' => 'Malipo yako hayakufanikiwa na hakuna pesa iliyokatwa. Unaweza kujaribu kulipa tena.',
+    'hero_failed_refunded_line' => 'Hatukuweza kukamilisha agizo hili, kwa hivyo malipo yako ya :amount yamerudishwa kwenye pochi yako ya RShopRefill. Unaweza kujaribu tena.',
     'hero_cancelled_title' => 'Oda hii imeghairiwa',
     'hero_cancelled_line' => 'Hakuna malipo yaliyochukuliwa kwa oda hii.',
     'hero_review_title' => 'Tunakagua oda yako',

@@ -40,6 +40,7 @@ return [
     'hero_processing_line' => 'Muna aiwatar da odarka. Lambobin za su iso imel ɗinka da zarar kowane kaya ya shirya.',
     'hero_failed_title' => 'Ba a iya kammala wannan oda ba',
     'hero_failed_line' => 'Biyan kuɗinka bai yi nasara ba kuma ba a cire ko sisi ba. Kana iya sake gwada biya.',
+    'hero_failed_refunded_line' => 'Ba mu iya isar da wannan odar ba, don haka an mayar da kuɗin da ka biya na :amount zuwa walat ɗinka na RShopRefill. Kana iya sake gwadawa.',
     'hero_cancelled_title' => 'An soke wannan oda',
     'hero_cancelled_line' => 'Ba a karɓi wani kuɗi don wannan oda ba.',
     'hero_review_title' => 'Muna duba odarka',

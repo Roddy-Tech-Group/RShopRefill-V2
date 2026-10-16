@@ -40,6 +40,7 @@ return [
     'hero_processing_line' => 'Stiamo evadendo il Suo ordine. I codici arrivano nella Sua casella email non appena ogni articolo è pronto.',
     'hero_failed_title' => 'Non è stato possibile completare questo ordine',
     'hero_failed_line' => 'Il pagamento non è andato a buon fine e non è stato addebitato nulla. Può riprovare a completare l’acquisto.',
+    'hero_failed_refunded_line' => 'Non siamo riusciti a consegnare questo ordine, quindi il tuo pagamento di :amount è stato rimborsato sul tuo portafoglio RShopRefill. Puoi riprovare.',
     'hero_cancelled_title' => 'Questo ordine è stato annullato',
     'hero_cancelled_line' => 'Per questo ordine non è stato addebitato alcun pagamento.',
     'hero_review_title' => 'Stiamo verificando il Suo ordine',

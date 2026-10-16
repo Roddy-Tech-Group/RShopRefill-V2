@@ -38,6 +38,7 @@ return [
     'hero_processing_line' => '我们正在处理您的订单。每件商品准备就绪后，兑换码会立即发送到您的邮箱。',
     'hero_failed_title' => '此订单无法完成',
     'hero_failed_line' => '您的付款未成功，未产生任何扣款。您可以再次尝试结账。',
+    'hero_failed_refunded_line' => '我们无法交付此订单，您支付的 :amount 已退回到您的 RShopRefill 钱包。您可以重试。',
     'hero_cancelled_title' => '此订单已取消',
     'hero_cancelled_line' => '此订单未收取任何款项。',
     'hero_review_title' => '我们正在审核您的订单',
