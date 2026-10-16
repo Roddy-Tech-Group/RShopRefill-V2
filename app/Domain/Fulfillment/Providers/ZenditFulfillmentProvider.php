@@ -10,6 +10,7 @@ use App\Domain\Shared\Services\CircuitBreaker;
 use App\Models\FulfillmentLog;
 use App\Models\OrderItem;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -307,6 +308,28 @@ class ZenditFulfillmentProvider implements FulfillmentProviderInterface
                 'reference' => $responseBody['transactionId'],
                 'payload' => $responseBody,
             ];
+        } catch (ConnectionException $e) {
+            // The request did not complete at the transport level: a connect
+            // timeout, DNS failure, reset or read timeout. Whether Zendit ever
+            // saw it is unknown, which is exactly what the job's retries and the
+            // transaction_duplicate_id recovery above are for: the retry resends
+            // the same transactionId, and Zendit either fulfils it or tells us
+            // it already has. Returned as a terminal failure, as this used to
+            // be, one network blip refunded a paid order within the second.
+            $breaker->recordFailure();
+
+            Log::warning('Zendit fulfillment transport failure, leaving it to the retry: '.$e->getMessage(), ['order_item_id' => $item->id]);
+
+            FulfillmentLog::create([
+                'order_item_id' => $item->id,
+                'provider_name' => 'zendit',
+                'request_payload' => $requestPayload,
+                'response_payload' => null,
+                'status' => 'EXCEPTION',
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         } catch (\Exception $e) {
             $breaker->recordFailure();
 
