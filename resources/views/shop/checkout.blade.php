@@ -1,4 +1,5 @@
 @php
+    use App\Domain\Payment\Support\PaymentFeeDisclosure;
     use App\Models\CurrencyRate;
 
     /**
@@ -109,12 +110,11 @@
 
     // Processing-fee disclosure rates (config/payment_fees.php). The gateway
     // charges the customer these on top of the order amount; the totals block
-    // surfaces them up front so the statement never surprises anyone.
-    $paymentFees = [
-        'fee_free' => array_values((array) config('payment_fees.fee_free_methods', [])),
-        'methods'  => (array) config('payment_fees.methods', []),
-        'default'  => (array) config('payment_fees.default', ['transaction' => 0.0, 'international' => 0.0]),
-    ];
+    // surfaces them up front so the statement never surprises anyone. The
+    // rate follows the gateway the switchboard will route the method to in
+    // the checkout currency (a Kora-routed method discloses Kora's customer
+    // fee, none today), so this page and the payment window name one figure.
+    $paymentFees = PaymentFeeDisclosure::forCheckout();
 
     // The crypto network-fee / service-fee config that used to live here has been
     // removed along with the client-side fee engine it fed. Those figures were only
@@ -1612,7 +1612,7 @@
                 walletCurrency: '',
                 isLoggedIn: isLoggedIn || false,
                 hasTransactionPin: hasTransactionPin || false,
-                paymentFees: paymentFees || { fee_free: [], methods: {}, default: { transaction: 0, international: 0 } },
+                paymentFees: paymentFees || { fee_free: [], methods: {}, default: { transaction: 0, international: 0 }, gateways: {}, gateway_by_currency: {} },
                 deliveryMode: 'self',
 
                 // Coupon live-preview state. couponApplied holds the validated
@@ -2145,6 +2145,24 @@
                 // this on top of the order amount, so we disclose it before
                 // payment. The international surcharge applies when the
                 // checkout currency is not NGN (the account's home market).
+                // The gateway the switchboard routes the chosen method to in
+                // the checkout currency, or null when none is live for it.
+                feeGateway() {
+                    const byMethod = (this.paymentFees.gateway_by_currency || {})[this.$store.cart.currency || 'NGN'] || {};
+                    return byMethod[this.method] || null;
+                },
+
+                // That gateway's customer fee rates for the method: its own
+                // table when it has one (Kora: none), the account's otherwise.
+                feeRates() {
+                    const gateway = this.feeGateway();
+                    const own = gateway ? (this.paymentFees.gateways || {})[gateway] : null;
+                    if (own) {
+                        return (own.methods || {})[this.method] || own.default || { transaction: 0, international: 0 };
+                    }
+                    return (this.paymentFees.methods || {})[this.method] || this.paymentFees.default || { transaction: 0, international: 0 };
+                },
+
                 processingFee() {
                     const method = this.method;
                     if (method === 'crypto' || (this.paymentFees.fee_free || []).includes(method)) {
@@ -2154,7 +2172,7 @@
                     if (! (amount > 0)) {
                         return 0;
                     }
-                    const rates = (this.paymentFees.methods || {})[method] || this.paymentFees.default || { transaction: 0, international: 0 };
+                    const rates = this.feeRates();
                     const international = (this.$store.cart.currency || 'NGN') !== 'NGN';
                     const pct = Number(rates.transaction || 0) + (international ? Number(rates.international || 0) : 0);
 
@@ -2169,7 +2187,7 @@
                     if (this.method === 'crypto' || (this.paymentFees.fee_free || []).includes(this.method)) {
                         return 0;
                     }
-                    const rates = (this.paymentFees.methods || {})[this.method] || this.paymentFees.default || { transaction: 0, international: 0 };
+                    const rates = this.feeRates();
                     const international = (this.$store.cart.currency || 'NGN') !== 'NGN';
                     const rate = Number(rates.transaction || 0) + (international ? Number(rates.international || 0) : 0);
                     return Number(rate.toFixed(1));
@@ -2763,8 +2781,13 @@
                         });
                         let verifyData = await verifyRes.json();
                         if (verifyData.status === 'confirmed') {
+                            // The payment sheet was closed while the gateway's
+                            // popup had the screen; without reopening it the
+                            // success state played to nobody and the page
+                            // appeared to jump straight to the order.
                             self.paymentState = 'success';
-                            setTimeout(() => { window.location.href = self.redirectUrl; }, 2000);
+                            self.open = true;
+                            setTimeout(() => { window.location.href = self.redirectUrl; }, 2500);
                         } else {
                             self.paymentState = 'error';
                             self.errorMessage = verifyData.message || @js(__('checkout.payment_not_verified'));

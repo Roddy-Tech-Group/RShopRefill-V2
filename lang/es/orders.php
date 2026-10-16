@@ -57,6 +57,14 @@ return [
     'method_wallet' => 'Monedero',
     'method_crypto' => 'Cripto',
     'method_card' => 'Tarjeta',
+    'method_mobile_money' => 'Dinero móvil',
+    'method_mobile_wallet' => 'Billetera móvil',
+    'method_bank_transfer' => 'Transferencia bancaria',
+    'method_pay_with_bank' => 'App bancaria',
+    'method_bank_qr' => 'QR bancario',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Canjear tu tarjeta',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

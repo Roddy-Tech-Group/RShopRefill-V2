@@ -107,11 +107,12 @@
     $statusKey = 'orders.status_'.$status->value;
     $statusLabel = \Illuminate\Support\Facades\Lang::has($statusKey) ? __($statusKey) : $status->label();
 
-    // Customer-facing payment label only — the gateway/provider name is never shown.
-    // The order stores wallet / flutterwave / crypto; card + mobile money both
-    // settle through Flutterwave, so they surface as the generic "Card".
-    $methodLabels  = ['wallet' => __('orders.method_wallet'), 'crypto' => __('orders.method_crypto'), 'flutterwave' => __('orders.method_card')];
-    $paymentMethod = $methodLabels[$order->payment_method] ?? __('orders.method_card');
+    // Customer-facing payment label only, never the gateway's name: the channel
+    // the money travelled (mobile money, card, bank transfer, wallet, crypto),
+    // read from the paid attempt. The order's own column names a gateway
+    // family, which showed every mobile money payment as "Card".
+    $methodKey = $order->customerMethodKey();
+    $paymentMethod = \Illuminate\Support\Facades\Lang::has('orders.method_'.$methodKey) ? __('orders.method_'.$methodKey) : $order->customerGatewayLabel();
     $deliveryEmail = $order->metadata['delivery_email'] ?? auth()->user()?->email;
 
     // Per-order category mix — drives which "what happens next" copy + which
@@ -242,6 +243,9 @@
                                 if (! empty($payload[$credKey]) && is_scalar($payload[$credKey])) { $cardCode = (string) $payload[$credKey]; break; }
                             }
                             $qrUrl = is_scalar($payload['qrcode_url'] ?? null) ? (string) $payload['qrcode_url'] : null;
+                            // Cards delivered as a registration link rather than a code: the
+                            // link is the customer's only way in, so it is shown as delivery.
+                            $redemptionUrl = (! empty($payload['redemption_url']) && is_scalar($payload['redemption_url'])) ? (string) $payload['redemption_url'] : null;
 
                             // Top-up recipient number, resolved like the dashboard
                             // orders card: provider payload first, then the number
@@ -319,7 +323,7 @@
                                         <p class="truncate text-base font-bold tabular-nums text-zinc-900">{{ $phone }}</p>
                                     </div>
                                 </div>
-                            @elseif ($cardCode || $cardPin)
+                            @elseif ($cardCode || $cardPin || $redemptionUrl)
                                 <div class="space-y-2">
                                     @foreach (array_filter(['Code' => $cardCode, 'Pin' => $cardPin]) as $credLabel => $credValue)
                                         <div class="flex items-center gap-2 rounded-full border border-zinc-100 bg-white px-3.5 py-2" wire:key="success-cred-{{ $item->id }}-{{ $credLabel }}">
@@ -339,6 +343,11 @@
                                             </button>
                                         </div>
                                     @endforeach
+                                    @if ($redemptionUrl)
+                                        <a href="{{ $redemptionUrl }}" target="_blank" rel="noopener noreferrer" data-redemption-link class="flex items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
+                                            {{ __('orders.redeem_your_card') }}
+                                        </a>
+                                    @endif
                                 </div>
                             @else
                                 <div class="flex items-center gap-2 rounded-[12px] border-2 border-zinc-100 bg-white px-4 py-3 text-xs font-medium text-zinc-500">

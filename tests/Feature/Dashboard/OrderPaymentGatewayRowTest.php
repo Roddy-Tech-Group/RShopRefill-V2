@@ -26,8 +26,12 @@ class OrderPaymentGatewayRowTest extends TestCase
         $this->actingAs($user);
 
         Volt::test('dashboard.orders')
-            ->assertSeeHtml('<dt class="text-zinc-500">Payment gateway</dt>')
+            ->assertSeeHtml('<dt class="text-zinc-500">Payment method</dt>')
             ->assertSee('Mobile Money')
+            // One row, named for what it is: the old second row called the
+            // channel a "gateway" while the first called this payment "Card".
+            ->assertDontSeeHtml('<dt class="text-zinc-500">Payment gateway</dt>')
+            ->assertDontSeeHtml('<dd class="font-semibold text-zinc-900">Card</dd>')
             ->assertDontSee('flutterwave');
     }
 

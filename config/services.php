@@ -117,6 +117,13 @@ return [
         // API. Defaults to this app's own webhook route; set it to a public
         // tunnel when testing from a local machine.
         'webhook_url' => env('KORAPAY_WEBHOOK_URL'),
+        // Mobile money through Kora's popup on our page instead of the direct
+        // charge that puts the prompt on the phone. The direct charge is the
+        // live design; the popup is the only Kora mobile money flow that
+        // completes in Kora's sandbox (its test number and PIN are answered in
+        // the popup, while a sandbox phone prompt is never answered), so this
+        // is on for sandbox demos and off everywhere else.
+        'mobile_money_via_checkout' => (bool) env('KORAPAY_MOBILE_MONEY_VIA_CHECKOUT', false),
     ],
 
     'paystack' => [

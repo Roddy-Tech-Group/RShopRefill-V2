@@ -97,12 +97,7 @@ class Order extends Model
      */
     public function customerGatewayLabel(): string
     {
-        // Ids are time-ordered UUIDs: a tie within one second still has a
-        // definite newest.
-        $attempts = $this->paymentAttempts->sortBy([['created_at', 'desc'], ['id', 'desc']]);
-
-        $attempt = $attempts->first(fn (PaymentAttempt $attempt) => $attempt->payment_status === PaymentStatus::Paid)
-            ?? $attempts->first();
+        $attempt = $this->attemptThatSpeaksForPayment();
 
         if ($attempt !== null) {
             return $attempt->customerGatewayLabel();
@@ -113,6 +108,37 @@ class Order extends Model
             'crypto' => 'Crypto',
             default => 'Card',
         };
+    }
+
+    /**
+     * The same channel as a method key (mobile_money, card, wallet, ...), for
+     * screens that translate the label themselves.
+     */
+    public function customerMethodKey(): string
+    {
+        $attempt = $this->attemptThatSpeaksForPayment();
+
+        if ($attempt !== null) {
+            return $attempt->customerMethodKey();
+        }
+
+        return match ($this->payment_method) {
+            'wallet' => 'wallet',
+            'crypto' => 'crypto',
+            default => 'card',
+        };
+    }
+
+    /**
+     * The paid attempt, failing one the latest attempt of any state. Ids are
+     * time-ordered UUIDs: a tie within one second still has a definite newest.
+     */
+    private function attemptThatSpeaksForPayment(): ?PaymentAttempt
+    {
+        $attempts = $this->paymentAttempts->sortBy([['created_at', 'desc'], ['id', 'desc']]);
+
+        return $attempts->first(fn (PaymentAttempt $attempt) => $attempt->payment_status === PaymentStatus::Paid)
+            ?? $attempts->first();
     }
 
     // ────────────────────────────────────────────────────────────

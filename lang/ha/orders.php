@@ -57,6 +57,14 @@ return [
     'method_wallet' => 'Walat',
     'method_crypto' => 'Kuɗin kirifto',
     'method_card' => 'Kati',
+    'method_mobile_money' => 'Kuɗin Waya',
+    'method_mobile_wallet' => 'Walat ɗin waya',
+    'method_bank_transfer' => 'Canja wurin banki',
+    'method_pay_with_bank' => 'Manhajar banki',
+    'method_bank_qr' => 'QR na banki',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Fanshi katin ka',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

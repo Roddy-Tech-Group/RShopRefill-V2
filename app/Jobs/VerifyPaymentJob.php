@@ -89,6 +89,13 @@ class VerifyPaymentJob implements ShouldQueue
             $alreadyPaid = $attempt->payment_status === PaymentStatus::Paid;
 
             if ($alreadyPaid && $this->settlementLanded($attempt)) {
+                // The webhook that woke this run arrived after the page had
+                // already verified and settled the payment (every popup and
+                // inline flow does that first). It changed nothing, but it
+                // was received and understood: left "pending" it read as a
+                // delivery we never handled, on every such payment.
+                $this->markPendingWebhooksProcessed($attempt);
+
                 return;
             }
 
@@ -193,15 +200,7 @@ class VerifyPaymentJob implements ShouldQueue
                 }
 
                 // 5. Update any pending webhooks related to this attempt
-                if ($attempt->idempotency_key) {
-                    PaymentWebhook::where('reference', $attempt->idempotency_key)
-                        ->where('processing_status', 'pending')
-                        ->update([
-                            'processed' => true,
-                            'processing_status' => 'processed',
-                            'processed_at' => now(),
-                        ]);
-                }
+                $this->markPendingWebhooksProcessed($attempt);
             } else {
                 Log::warning("VerifyPaymentJob: payment verification returned unpaid/pending for attempt {$attempt->id}");
 
@@ -339,6 +338,26 @@ class VerifyPaymentJob implements ShouldQueue
      * means the order itself records the payment. A Paid attempt failing this
      * check is a stranded settlement the chain above must finish.
      */
+    /**
+     * Every webhook still pending for this attempt's reference is now
+     * accounted for: either this run settled the payment, or it found the
+     * payment already settled by the page's own verification.
+     */
+    private function markPendingWebhooksProcessed(PaymentAttempt $attempt): void
+    {
+        if (! $attempt->idempotency_key) {
+            return;
+        }
+
+        PaymentWebhook::where('reference', $attempt->idempotency_key)
+            ->where('processing_status', 'pending')
+            ->update([
+                'processed' => true,
+                'processing_status' => 'processed',
+                'processed_at' => now(),
+            ]);
+    }
+
     private function settlementLanded(PaymentAttempt $attempt): bool
     {
         if ($attempt->payable_type === WalletFunding::class) {

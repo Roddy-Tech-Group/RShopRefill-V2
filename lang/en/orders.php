@@ -61,6 +61,13 @@ return [
     'method_wallet' => 'Wallet',
     'method_crypto' => 'Crypto',
     'method_card' => 'Card',
+    'method_mobile_money' => 'Mobile Money',
+    'method_mobile_wallet' => 'Mobile wallet',
+    'method_bank_transfer' => 'Bank transfer',
+    'method_pay_with_bank' => 'Bank app',
+    'method_bank_qr' => 'Bank QR',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
 
     // Completed order view and the delivered gift card. Resellers screenshot
     // that card for their own customers, so the credential labels sit in a
@@ -79,6 +86,7 @@ return [
     'credential_pin' => 'Pin',
     'copy_credential' => 'Copy :label',
     'code_pending' => 'Your code appears here once payment clears.',
+    'redeem_your_card' => 'Redeem your card',
     'view_all_orders' => 'View all my orders',
 
     // Redeem instructions and terms panels under the completed order. Brand

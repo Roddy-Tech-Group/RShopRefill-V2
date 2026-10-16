@@ -55,6 +55,14 @@ return [
     'method_wallet' => 'Portefeuille',
     'method_crypto' => 'Crypto',
     'method_card' => 'Carte',
+    'method_mobile_money' => 'Mobile Money',
+    'method_mobile_wallet' => 'Portefeuille mobile',
+    'method_bank_transfer' => 'Virement bancaire',
+    'method_pay_with_bank' => 'Application bancaire',
+    'method_bank_qr' => 'QR bancaire',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Utiliser votre carte',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

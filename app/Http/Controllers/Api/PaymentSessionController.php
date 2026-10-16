@@ -452,6 +452,13 @@ class PaymentSessionController extends Controller
                 $attempt->pay_amount = null;
                 $attempt->save();
 
+                // The order was stamped with the gateway provisional at
+                // placement; reports and the customer's order history read
+                // that stamp, so it follows the gateway actually taking it.
+                if ($attempt->order && in_array($attempt->order->payment_method, FiatGatewayRouter::FIAT_GATEWAYS, true)) {
+                    $attempt->order->update(['payment_method' => $fiatGateway]);
+                }
+
                 // The payload still carried the first gateway's scaffold (a
                 // Flutterwave popup config on a Kora attempt): replaced by
                 // the gateway that is actually taking it.
@@ -562,6 +569,20 @@ class PaymentSessionController extends Controller
                     $details,
                     route('shop.checkout.return', ['session' => $session->id]),
                 );
+            } elseif ($method === 'mobile_money' && $fiatGateway === 'korapay' && config('services.korapay.mobile_money_via_checkout', false)) {
+                // The sandbox demo switch: Kora's popup on our page, limited to
+                // mobile money, verified by our reference when it reports
+                // success. Live, the direct charge below puts the prompt on the
+                // phone; in Kora's sandbox that prompt is never answered, while
+                // the popup answers the test number and PIN.
+                $session->transitionTo('awaiting_payment');
+                $session->payment_payload = array_merge(
+                    $session->payment_payload ?? [],
+                    ['inline' => $gatewayFactory->getProvider('korapay')->inlineConfig($attempt, 'mobile_money')],
+                );
+                $session->save();
+
+                return new PaymentSessionResource($session->fresh());
             } elseif ($method === 'mobile_money' && $fiatGateway === 'korapay' && ($otp = $request->input('otp'))) {
                 // The one-time code Kora asked for (Ghana, Côte d'Ivoire): a
                 // valid one is followed by the prompt on the phone.

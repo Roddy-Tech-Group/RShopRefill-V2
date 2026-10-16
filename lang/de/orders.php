@@ -55,6 +55,14 @@ return [
     'method_wallet' => 'Guthaben',
     'method_crypto' => 'Krypto',
     'method_card' => 'Karte',
+    'method_mobile_money' => 'Mobile Money',
+    'method_mobile_wallet' => 'Mobile Wallet',
+    'method_bank_transfer' => 'Banküberweisung',
+    'method_pay_with_bank' => 'Banking-App',
+    'method_bank_qr' => 'Bank-QR',
+    'method_ussd' => 'USSD',
+    'method_apple_pay' => 'Apple Pay',
+    'redeem_your_card' => 'Karte einlösen',
 
     // Completed order view and the delivered gift card. Credential labels
     // sit in a narrow column: keep them short.

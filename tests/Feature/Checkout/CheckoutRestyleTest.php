@@ -111,6 +111,22 @@ class CheckoutRestyleTest extends TestCase
         $this->assertStringContainsString('this.coverageByCurrency[this.$store.cart.currency]?.[this.momoCountry] ?? []', $source);
     }
 
+    /**
+     * A gateway popup closes our payment sheet while it has the screen. When
+     * the popup reports success and our verification confirms it, the sheet
+     * must reopen for the success state, or the customer sees nothing and the
+     * page appears to jump straight to the order.
+     */
+    public function test_the_success_state_reopens_the_sheet_after_a_popup_payment(): void
+    {
+        $source = $this->source();
+        $successBranch = str($source)->after("if (verifyData.status === 'confirmed') {")->before('} else {')->toString();
+
+        $this->assertStringContainsString("self.paymentState = 'success';", $successBranch);
+        $this->assertStringContainsString('self.open = true;', $successBranch);
+        $this->assertStringContainsString('window.location.href = self.redirectUrl;', $successBranch);
+    }
+
     /** Remove is an X now, which means it has to say what it is some other way. */
     public function test_remove_is_an_icon_that_still_names_itself(): void
     {

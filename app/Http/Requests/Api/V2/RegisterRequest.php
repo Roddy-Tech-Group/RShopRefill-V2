@@ -55,7 +55,7 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'terms.accepted' => 'Please accept the Terms of Service and Privacy Policy to continue.',
+            'terms.accepted' => __('auth.agree_required'),
         ];
     }
 }
